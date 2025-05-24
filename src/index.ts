@@ -86,6 +86,7 @@ export const pluginReactRouter = (
       basename = '/',
       buildDirectory = 'build',
       ssr = true,
+      routeDiscovery = { mode: 'lazy', manifestPath: '/__manifest' },
     } = await jiti
       .import<Config>('./react-router.config.ts', {
         default: true,
@@ -175,6 +176,7 @@ export const pluginReactRouter = (
         appDirectory,
         ssr,
         federation: options.federation,
+        routeDiscovery,
       }),
       'virtual/react-router/with-props': generateWithProps(),
     });

@@ -12,6 +12,15 @@ function generateAsyncTemplate(
     basename: string;
     appDirectory: string;
     ssr: boolean;
+    routeDiscovery:
+      | {
+          mode: 'lazy';
+          manifestPath?: string;
+        }
+      | {
+          mode: 'initial';
+        }
+      | undefined;
   }
 ): string {
   return `
@@ -82,6 +91,7 @@ function generateAsyncTemplate(
     export const future = ${JSON.stringify({})};
     export const isSpaMode = ${!options.ssr};
     export const ssr = ${options.ssr};
+    export const routeDiscovery = ${JSON.stringify(options.routeDiscovery)};
     export const publicPath = "/";
     export const prerender = [];
     export const entry = { module: entryServer };
@@ -115,6 +125,15 @@ function generateStaticTemplate(
     basename: string;
     appDirectory: string;
     ssr: boolean;
+    routeDiscovery:
+      | {
+          mode: 'lazy';
+          manifestPath?: string;
+        }
+      | {
+          mode: 'initial';
+        }
+      | undefined;
   }
 ): string {
   return `
@@ -136,6 +155,7 @@ function generateStaticTemplate(
     export const future = ${JSON.stringify({})};
     export const isSpaMode = ${!options.ssr};
     export const ssr = ${options.ssr};
+    export const routeDiscovery = ${JSON.stringify(options.routeDiscovery)};
     export const prerender = [];
     export const publicPath = "/";
     export const entry = { module: entryServer };
@@ -173,6 +193,15 @@ function generateServerBuild(
     appDirectory: string;
     ssr: boolean;
     federation?: boolean;
+    routeDiscovery:
+      | {
+          mode: 'lazy';
+          manifestPath?: string;
+        }
+      | {
+          mode: 'initial';
+        }
+      | undefined;
   }
 ): string {
   return options.federation
