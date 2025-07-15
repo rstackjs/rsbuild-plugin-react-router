@@ -86,7 +86,6 @@ export const pluginReactRouter = (
       basename = '/',
       buildDirectory = 'build',
       ssr = true,
-      routeDiscovery = { mode: 'lazy', manifestPath: '/__manifest' },
     } = await jiti
       .import<Config>('./react-router.config.ts', {
         default: true,
@@ -97,6 +96,9 @@ export const pluginReactRouter = (
         );
         return {} as Config;
       });
+
+    // Set default routeDiscovery configuration
+    const routeDiscovery = { mode: 'lazy', manifestPath: '/__manifest' } as const;
 
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
 
