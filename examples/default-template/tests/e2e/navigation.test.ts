@@ -19,7 +19,7 @@ test.describe('Navigation Flow', () => {
     await expect(page).toHaveURL('/projects');
     
     // Navigate to a specific project
-    const projectId = 'react-router';
+    const projectId = '1';
     await page.goto(`/projects/${projectId}`);
     await expect(page).toHaveURL(`/projects/${projectId}`);
   });

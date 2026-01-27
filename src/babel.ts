@@ -1,15 +1,18 @@
 import type { types as Babel } from '@babel/core';
+import generatorPkg from '@babel/generator';
 import { type ParseResult, parse } from '@babel/parser';
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 import type { NodePath } from '@babel/traverse';
+import traversePkg from '@babel/traverse';
 import * as t from '@babel/types';
 
-// These `require`s were needed to support building within vite-ecosystem-ci,
-// otherwise we get errors that `traverse` and `generate` are not functions.
-const traverse = require('@babel/traverse')
-  .default as typeof import('@babel/traverse').default;
-const generate = require('@babel/generator')
-  .default as typeof import('@babel/generator').default;
+// Babel packages are CommonJS. Depending on the bundler/runtime interop mode,
+// their "default" may either be the exported function or a module namespace.
+// We normalize to always get the callable function.
+const traverse: typeof import('@babel/traverse').default =
+  (traversePkg as any).default ?? (traversePkg as any);
+const generate: typeof import('@babel/generator').default =
+  (generatorPkg as any).default ?? (generatorPkg as any);
 
 export { traverse, generate, parse, t };
 export type { Babel, NodePath, ParseResult };

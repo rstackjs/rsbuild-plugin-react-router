@@ -1,5 +1,7 @@
 import { existsSync } from 'node:fs';
-import { copySync } from 'fs-extra';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import fsExtra from 'fs-extra';
 import type { Config } from '@react-router/dev/config';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import type { RsbuildPlugin, Rspack } from '@rsbuild/core';
@@ -25,6 +27,7 @@ import {
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
 import { transformRouteFederation } from './transform-route-federation.js';
+import { createRequestHandler } from 'react-router';
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -80,20 +83,24 @@ export const pluginReactRouter = (
 
     const jiti = createJiti(process.cwd());
 
-    // Read the react-router.config.ts file first
+    // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
+    const configPath = findEntryFile(resolve('react-router.config'));
+    const configExists = existsSync(configPath);
     const {
       appDirectory = 'app',
       basename = '/',
       buildDirectory = 'build',
       ssr = true,
     } = await jiti
-      .import<Config>('./react-router.config.ts', {
+      .import<Config>(configPath, {
         default: true,
       })
       .catch(() => {
-        console.error(
-          'No react-router.config.ts found, using default configuration.'
-        );
+        if (!configExists) {
+          console.warn(
+            'No react-router.config found, using default configuration.'
+          );
+        }
         return {} as Config;
       });
 
@@ -162,9 +169,77 @@ export const pluginReactRouter = (
         const clientBuildDir = resolve(buildDirectory, 'client');
         if (existsSync(serverBuildDir)) {
           const ssrDir = resolve(clientBuildDir, 'static');
-          copySync(serverBuildDir, ssrDir);
+          fsExtra.copySync(serverBuildDir, ssrDir);
         }
       }
+    });
+
+    // SPA Mode (`ssr:false`) still needs a one-time server render of the root route
+    // at build time to generate a hydratable `index.html`, matching React Router's
+    // own Vite implementation.
+    api.onAfterBuild(async ({ environments }) => {
+      if (ssr) {
+        return;
+      }
+
+      const webEnv = environments.web;
+      if (!webEnv) {
+        return;
+      }
+
+      // We intentionally mirror react-router's `handleSpaMode` logic:
+      // 1) Load the server build (even though we don't ship it)
+      // 2) Request the basename with the SPA-mode header
+      // 3) Write the resulting HTML to `client/index.html`
+      const serverBuildDir = resolve(buildDirectory, 'server');
+      const serverBuildFile = 'static/js/app.js';
+      const serverBuildPath = resolve(serverBuildDir, serverBuildFile);
+      const clientBuildDir = resolve(buildDirectory, 'client');
+
+      // In some setups, users might remove the server build output.
+      // If it's not present, we can't generate a proper SPA HTML fallback.
+      if (!existsSync(serverBuildPath)) {
+        console.warn(
+          `[${PLUGIN_NAME}] SPA mode is enabled (ssr:false) but the server build was not found at ${serverBuildPath}. ` +
+            'Skipping index.html generation.'
+        );
+        return;
+      }
+
+      const buildModule = await import(pathToFileURL(serverBuildPath).toString());
+      const requestHandler = createRequestHandler(buildModule, 'production');
+      const request = new Request(`http://localhost${basename}`, {
+        headers: {
+          // Enable SPA mode in the server runtime and only render down to the root
+          'X-React-Router-SPA-Mode': 'yes',
+        },
+      });
+      const response = await requestHandler(request);
+      const html = await response.text();
+
+      if (response.status !== 200) {
+        throw new Error(
+          `[${PLUGIN_NAME}] SPA mode: Received a ${response.status} status code from the server build while generating index.html.\n` +
+            html
+        );
+      }
+
+      if (
+        !html.includes('window.__reactRouterContext =') ||
+        !html.includes('window.__reactRouterRouteModules =')
+      ) {
+        throw new Error(
+          `[${PLUGIN_NAME}] SPA mode: Did you forget to include <Scripts/> in your root route? ` +
+            'The pre-rendered HTML cannot hydrate without it.'
+        );
+      }
+
+      await mkdir(clientBuildDir, { recursive: true });
+      await writeFile(resolve(clientBuildDir, 'index.html'), html);
+
+      // Remove server output for SPA mode so the build is deployable as static assets.
+      // This matches the behavior of React Router's official Vite plugin.
+      await fsExtra.remove(serverBuildDir);
     });
 
     // Create virtual modules for React Router
@@ -256,69 +331,78 @@ export const pluginReactRouter = (
               },
             },
           },
-          node: {
-            source: {
-              entry: {
-                ...(hasServerApp
-                  ? {
-                      app:
-                        serverAppPath +
+          // Always include node environment, even for SPA mode (`ssr:false`),
+          // because React Router still needs a server build to prerender the
+          // root route into a hydratable `index.html` at build time.
+          ...(true
+            ? {
+                node: {
+                  source: {
+                    entry: {
+                      ...(hasServerApp
+                        ? {
+                            app:
+                              serverAppPath +
+                              (options.federation
+                                ? '?react-router-route-federation'
+                                : ''),
+                          }
+                        : {
+                            app:
+                              'virtual/react-router/server-build' +
+                              (options.federation
+                                ? '?react-router-route-federation'
+                                : ''),
+                          }),
+                      'entry.server':
+                        finalEntryServerPath +
                         (options.federation
                           ? '?react-router-route-federation'
                           : ''),
-                    }
-                  : {
-                      app:
-                        'virtual/react-router/server-build' +
-                        (options.federation
-                          ? '?react-router-route-federation'
-                          : ''),
-                    }),
-                'entry.server':
-                  finalEntryServerPath +
-                  (options.federation ? '?react-router-route-federation' : ''),
-              },
-            },
-            output: {
-              distPath: {
-                root: resolve(buildDirectory, 'server'),
-              },
-              target: config.environments?.node?.output?.target || 'node',
-              filename: {
-                js: 'static/js/[name].js',
-              },
-            },
-            tools: {
-              rspack: {
-                target: options.federation ? 'async-node' : 'node',
-                externals: ['express'],
-                dependencies: ['web'],
-                experiments: {
-                  outputModule: pluginOptions.serverOutput === 'module',
+                    },
+                  },
+                  output: {
+                    distPath: {
+                      root: resolve(buildDirectory, 'server'),
+                    },
+                    target: config.environments?.node?.output?.target || 'node',
+                    filename: {
+                      js: 'static/js/[name].js',
+                    },
+                  },
+                  tools: {
+                    rspack: {
+                      target: options.federation ? 'async-node' : 'node',
+                      externals: ['express'],
+                      dependencies: ['web'],
+                      experiments: {
+                        outputModule: pluginOptions.serverOutput === 'module',
+                      },
+                      externalsType: pluginOptions.serverOutput,
+                      output: {
+                        chunkFormat: pluginOptions.serverOutput,
+                        chunkLoading:
+                          pluginOptions.serverOutput === 'module'
+                            ? 'import'
+                            : options.federation
+                              ? 'async-node'
+                              : 'require',
+                        workerChunkLoading:
+                          pluginOptions.serverOutput === 'module'
+                            ? 'import'
+                            : 'require',
+                        wasmLoading: 'fetch',
+                        library: { type: pluginOptions.serverOutput },
+                        module: pluginOptions.serverOutput === 'module',
+                      },
+                      // optimization: {
+                      //     runtimeChunk: 'single',
+                      // },
+                    },
+                  },
                 },
-                externalsType: pluginOptions.serverOutput,
-                output: {
-                  chunkFormat: pluginOptions.serverOutput,
-                  chunkLoading:
-                    pluginOptions.serverOutput === 'module'
-                      ? 'import'
-                      : options.federation
-                        ? 'async-node'
-                        : 'require',
-                  workerChunkLoading:
-                    pluginOptions.serverOutput === 'module'
-                      ? 'import'
-                      : 'require',
-                  wasmLoading: 'fetch',
-                  library: { type: pluginOptions.serverOutput },
-                  module: pluginOptions.serverOutput === 'module',
-                },
-                // optimization: {
-                //     runtimeChunk: 'single',
-                // },
-              },
-            },
-          },
+              }
+            : {}),
         },
       });
     });

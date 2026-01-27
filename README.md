@@ -80,7 +80,7 @@ pluginReactRouter({
 })
 ```
 
-2. **React Router Configuration** (in `react-router.config.ts`):
+2. **React Router Configuration** (in `react-router.config.*`):
 ```ts
 import type { Config } from '@react-router/dev/config';
 
@@ -112,6 +112,28 @@ export default {
 ```
 
 All configuration options are optional and will use sensible defaults if not specified.
+
+### Config File Resolution
+
+The plugin will look for `react-router.config` with any supported JS/TS extension, in this order:
+
+- `react-router.config.tsx`
+- `react-router.config.ts`
+- `react-router.config.jsx`
+- `react-router.config.js`
+- `react-router.config.mjs`
+
+If none are found, it falls back to defaults.
+
+### SPA Mode (`ssr: false`)
+
+React Router's SPA Mode still requires a build-time server render of the root route to generate a hydratable `index.html` (this is how the official React Router Vite plugin works).
+
+When `ssr: false`:
+
+- The plugin builds both `web` and `node` internally.
+- It generates `build/client/index.html` by running the server build once (requesting `basename` with the `X-React-Router-SPA-Mode: yes` header).
+- It removes `build/server` after generating `index.html`, so the output is deployable as static assets.
 
 ### Default Configuration Values
 
@@ -478,6 +500,10 @@ The plugin automatically:
 - Sets up development server with live reload
 - Handles route-based code splitting
 - Manages client and server builds
+
+## React Router Framework Mode
+
+React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild plugin currently targets React Router's Data Mode build/runtime model and does not implement the Vite plugin layer (type-safe href, route module splitting, etc.).
 
 ## License
 

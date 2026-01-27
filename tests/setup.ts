@@ -87,6 +87,7 @@ vi.mock('@scripts/test-helper', () => ({
     processAssets: vi.fn(),
     onBeforeStartDevServer: vi.fn(),
     onBeforeBuild: vi.fn(),
+    onAfterBuild: vi.fn(),
     modifyRsbuildConfig: vi.fn(),
     onAfterEnvironmentCompile: vi.fn(),
     modifyEnvironmentConfig: vi.fn(),
