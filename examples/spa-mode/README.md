@@ -55,7 +55,7 @@ Start the development server:
 pnpm run dev
 ```
 
-Your application will be available at `http://localhost:3000`.
+Your application will be available at `http://localhost:3001`.
 
 ### Building for Production
 

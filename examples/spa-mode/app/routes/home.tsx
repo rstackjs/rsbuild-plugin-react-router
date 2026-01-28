@@ -10,7 +10,7 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export function loader({ context }: Route.LoaderArgs) {
+export function clientLoader({ context }: Route.ClientLoaderArgs) {
   return { message: 'Welcome to React Router' };
 }
 

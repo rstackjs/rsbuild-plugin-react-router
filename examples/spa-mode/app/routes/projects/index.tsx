@@ -7,7 +7,7 @@ export function handle() {
   };
 }
 
-export function loader() {
+export function clientLoader() {
   // Simulated data - in a real app, this would come from a database
   return {
     stats: {

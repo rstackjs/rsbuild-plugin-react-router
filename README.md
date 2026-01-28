@@ -11,10 +11,13 @@ A Rsbuild plugin that provides seamless integration with React Router, supportin
 - 🚀 Zero-config setup with sensible defaults
 - 🔄 Automatic route generation from file system
 - 🖥️ Server-Side Rendering (SSR) support
-- 📱 Client-side navigation
+- 📱 Client-side navigation with SPA mode (`ssr: false`)
+- 📄 Static prerendering for hybrid static/dynamic sites
 - 🛠️ TypeScript support out of the box
 - 🔧 Customizable configuration
 - 🎯 Support for route-level code splitting
+- ☁️ Cloudflare Workers deployment support
+- 🔗 Module Federation support (experimental)
 
 ## Installation
 
@@ -134,6 +137,38 @@ When `ssr: false`:
 - The plugin builds both `web` and `node` internally.
 - It generates `build/client/index.html` by running the server build once (requesting `basename` with the `X-React-Router-SPA-Mode: yes` header).
 - It removes `build/server` after generating `index.html`, so the output is deployable as static assets.
+
+**Important:** In SPA mode, use `clientLoader` instead of `loader` for data loading since there's no server at runtime.
+
+### Static Prerendering
+
+For static sites with multiple pages, you can prerender specific routes at build time:
+
+```ts
+// react-router.config.ts
+import type { Config } from '@react-router/dev/config';
+
+export default {
+  ssr: false,
+  prerender: [
+    '/',
+    '/about',
+    '/docs',
+    '/docs/getting-started',
+    '/docs/advanced',
+    '/projects',
+  ],
+} satisfies Config;
+```
+
+When `prerender` is specified:
+
+- Each path in the array is rendered at build time
+- Static HTML files are generated for each route (e.g., `/about` → `build/client/about/index.html`)
+- The server build is removed after prerendering for static deployment
+- Non-prerendered routes fall back to client-side routing
+
+You can also use `prerender: true` to prerender all static routes automatically.
 
 ### Default Configuration Values
 
@@ -504,6 +539,46 @@ The plugin automatically:
 ## React Router Framework Mode
 
 React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild plugin currently targets React Router's Data Mode build/runtime model and does not implement the Vite plugin layer (type-safe href, route module splitting, etc.).
+
+## Examples
+
+The repository includes several examples demonstrating different use cases:
+
+| Example | Description | Port | Command |
+|---------|-------------|------|---------|
+| [default-template](./examples/default-template) | Standard SSR setup with React Router | 3000 | `pnpm dev` |
+| [spa-mode](./examples/spa-mode) | Single Page Application (`ssr: false`) | 3001 | `pnpm dev` |
+| [prerender](./examples/prerender) | Static prerendering for multiple routes | 3002 | `pnpm dev` |
+| [custom-node-server](./examples/custom-node-server) | Custom Express server with SSR | 3003 | `pnpm dev` |
+| [cloudflare](./examples/cloudflare) | Cloudflare Workers deployment | 3004 | `pnpm dev` |
+| [epic-stack](./examples/epic-stack) | Full-featured Epic Stack example | 3005 | `pnpm dev` |
+| [federation/epic-stack](./examples/federation/epic-stack) | Module Federation host | 3006 | `pnpm dev` |
+| [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote | 3007 | `pnpm dev` |
+
+Each example has unique ports configured to allow running multiple examples simultaneously.
+
+### Running Examples
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build the plugin
+pnpm build
+
+# Run any example
+cd examples/default-template
+pnpm dev
+```
+
+### Running E2E Tests
+
+Each example includes Playwright e2e tests:
+
+```bash
+cd examples/default-template
+pnpm test:e2e
+```
 
 ## License
 

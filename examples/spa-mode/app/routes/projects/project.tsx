@@ -7,7 +7,7 @@ export function handle() {
   };
 }
 
-export function loader({ params }: Route.LoaderArgs) {
+export function clientLoader({ params }: Route.ClientLoaderArgs) {
   // Simulated data - in a real app, this would come from a database
   return {
     project: {
