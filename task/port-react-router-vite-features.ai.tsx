@@ -18,7 +18,7 @@ export const portReport = assetRef('port_report');
 export default (
   <Program
     id="port-react-router-vite-features"
-    model={{ provider: 'openai', name: 'gpt-5.2-codex', reasoningEffort: 'high' }}
+    model={{ name: 'gpt-5.2-codex', reasoningEffort: 'high' }}
     workingDir=".."
     target={{ language: 'ts' }}
     description="Port missing behaviors from React Router's Vite plugin to rsbuild-plugin-react-router."

@@ -17,7 +17,7 @@ export const validationReport = assetRef('validation_report');
 export default (
   <Program
     id="validate"
-    model={{ provider: 'openai', name: 'gpt-5.2-codex' }}
+    model={{ name: 'gpt-5.2-codex' }}
     workingDir=".."
     target={{ language: 'markdown' }}
     description="Run local checks for rsbuild-plugin-react-router after porting features."
