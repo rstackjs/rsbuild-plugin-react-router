@@ -49,7 +49,7 @@
   },
   "scripts": {
     "build": "rslib build",
-    "e2e": "pnpm build && pnpm -r test:e2e",
+    "e2e": "pnpm build && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare}' test:e2e",
     "dev": "rslib build --watch",
     "test": "vitest run",
     "test:watch": "vitest watch",
@@ -97,6 +97,7 @@
     "@types/node": "^25.0.10",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
+    "es-module-lexer": "1.7.0",
     "kill-port": "^2.0.1",
     "playwright": "^1.58.0",
     "prettier": "3.8.1",

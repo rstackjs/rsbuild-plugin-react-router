@@ -13,6 +13,7 @@ import { validationReport } from './validate.ai.tsx';
 export default (
   <Program
     id="rsbuild-react-router-port"
+    model={{ provider: 'openai', name: 'gpt-5.2-codex' }}
     workingDir=".."
     target={{ language: 'markdown' }}
     description="Orchestrate fetching upstream React Router Vite plugin sources and porting missing features into rsbuild-plugin-react-router."

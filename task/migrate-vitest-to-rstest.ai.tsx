@@ -16,6 +16,7 @@ export const migrateReport = assetRef('migrate_report');
 export default (
   <Program
     id="migrate-vitest-to-rstest"
+    model={{ provider: 'openai', name: 'gpt-5.2-codex', reasoningEffort: 'high' }}
     workingDir=".."
     target={{ language: 'markdown' }}
     description="Plan (and if applicable, implement) migrating the test runner from Vitest to Rstest in rsbuild-plugin-react-router."
@@ -63,4 +64,3 @@ export default (
     </Agent>
   </Program>
 );
-

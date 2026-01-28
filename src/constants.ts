@@ -12,6 +12,7 @@ export const JS_LOADERS = {
 export const SERVER_ONLY_ROUTE_EXPORTS = [
   'loader',
   'action',
+  'middleware',
   'headers',
 ] as const;
 
@@ -36,6 +37,7 @@ export const NAMED_COMPONENT_EXPORTS = [
 export const SERVER_EXPORTS = {
   loader: 'loader',
   action: 'action',
+  middleware: 'middleware',
   headers: 'headers',
 } as const;
 

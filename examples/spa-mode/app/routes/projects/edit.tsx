@@ -20,7 +20,7 @@ export function clientLoader({ params }: Route.ClientLoaderArgs) {
   };
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
+export async function clientAction({ request, params }: Route.ClientActionArgs) {
   const formData = await request.formData();
   const updates = Object.fromEntries(formData);
 

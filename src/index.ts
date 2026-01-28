@@ -28,6 +28,7 @@ import {
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
 import { transformRouteFederation } from './transform-route-federation.js';
 import { createRequestHandler } from 'react-router';
+import { init, parse as parseExports } from 'es-module-lexer';
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -618,6 +619,45 @@ export const pluginReactRouter = (
         } catch (error) {
           console.error(args.resourcePath);
           throw error;
+        }
+
+        // Match React Router Vite behavior:
+        // In SPA mode, server-only route exports are invalid (except root `loader`),
+        // and `HydrateFallback` is only allowed on the root route.
+        //
+        // Important: `es-module-lexer` can't parse TS/TSX directly, so we scan
+        // the ESBuild-transformed JS output.
+        if (args.environment.name === 'web' && !ssr && isSpaMode) {
+          await init;
+          const [_, exportSpecifiers] = await parseExports(code);
+          const exportNames = exportSpecifiers.map(s => s.n);
+
+          const isRootRoute = args.resourcePath === rootRoutePath;
+
+          const invalidServerOnly = exportNames.filter(exp => {
+            if (isRootRoute && exp === 'loader') return false;
+            return (SERVER_ONLY_ROUTE_EXPORTS as readonly string[]).includes(
+              exp
+            );
+          });
+
+          if (invalidServerOnly.length > 0) {
+            const list = invalidServerOnly.map(e => `\`${e}\``).join(', ');
+            throw new Error(
+              `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
+                `\`${relative(process.cwd(), args.resourcePath)}\`: ${list}. ` +
+                `See https://reactrouter.com/how-to/spa for more information.`
+            );
+          }
+
+          if (!isRootRoute && exportNames.includes('HydrateFallback')) {
+            throw new Error(
+              `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
+                `\`${relative(process.cwd(), args.resourcePath)}\`. ` +
+                `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
+                `See https://reactrouter.com/how-to/spa for more information.`
+            );
+          }
         }
 
         const defaultExportMatch = code.match(

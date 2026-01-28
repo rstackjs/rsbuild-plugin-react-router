@@ -16,6 +16,7 @@ export const upstreamViteIndex = assetRef('upstream_vite_index');
 export default (
   <Program
     id="fetch-upstream-react-router-vite"
+    model={{ provider: 'openai', name: 'gpt-5.2-codex' }}
     workingDir=".."
     target={{ language: 'markdown' }}
     description="Fetch upstream react-router-dev/vite sources into task/upstream/ so later tasks can port behavior into Rsbuild."
