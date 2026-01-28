@@ -1,9 +1,13 @@
 import { vi } from 'vitest';
 
 // Mock the file system
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn().mockReturnValue(true),
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+  };
+});
 
 // Mock jiti
 vi.mock('jiti', () => ({
@@ -35,11 +39,30 @@ const mockRawSource = vi.fn().mockImplementation((content) => ({
   size: () => content.length,
 }));
 
+const deepMerge = (base: any, overrides: any): any => {
+  if (!overrides || typeof overrides !== 'object') {
+    return base;
+  }
+  if (!base || typeof base !== 'object') {
+    return overrides;
+  }
+  const result: Record<string, any> = Array.isArray(base) ? [...base] : { ...base };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (Array.isArray(value)) {
+      result[key] = value.slice();
+    } else if (value && typeof value === 'object') {
+      result[key] = deepMerge(result[key], value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+};
+
 // Mock the @scripts/test-helper module
 vi.mock('@scripts/test-helper', () => ({
-  createStubRsbuild: vi.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => ({
-    addPlugins: vi.fn(),
-    unwrapConfig: vi.fn().mockResolvedValue({
+  createStubRsbuild: vi.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => {
+    const baseConfig = {
       dev: {
         hmr: false,
         liveReload: true,
@@ -83,24 +106,31 @@ vi.mock('@scripts/test-helper', () => ({
       transforms: [
         { resourceQuery: /react-router-route/ },
       ],
-    }),
-    processAssets: vi.fn(),
-    onBeforeStartDevServer: vi.fn(),
-    onBeforeBuild: vi.fn(),
-    onAfterBuild: vi.fn(),
-    modifyRsbuildConfig: vi.fn(),
-    onAfterEnvironmentCompile: vi.fn(),
-    modifyEnvironmentConfig: vi.fn(),
-    transform: vi.fn(),
-    context: {
-      rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
-    },
-    compiler: {
-      webpack: {
-        sources: {
-          RawSource: mockRawSource,
+    };
+
+    const mergedConfig = deepMerge(baseConfig, rsbuildConfig);
+
+    return {
+      addPlugins: vi.fn(),
+      unwrapConfig: vi.fn().mockResolvedValue(mergedConfig),
+      processAssets: vi.fn(),
+      onBeforeStartDevServer: vi.fn(),
+      onBeforeBuild: vi.fn(),
+      onAfterBuild: vi.fn(),
+      modifyRsbuildConfig: vi.fn(),
+      onAfterEnvironmentCompile: vi.fn(),
+      modifyEnvironmentConfig: vi.fn(),
+      transform: vi.fn(),
+      context: {
+        rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
+      },
+      compiler: {
+        webpack: {
+          sources: {
+            RawSource: mockRawSource,
+          },
         },
       },
-    },
-  })),
+    };
+  }),
 })); 

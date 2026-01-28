@@ -81,7 +81,7 @@ describe('SPA Mode (ssr: false)', () => {
       root: { id: 'root', path: '', file: 'root.tsx' },
     };
 
-    it('should generate async template for federation mode', () => {
+    it('should generate static template for federation mode', () => {
       const result = generateServerBuild(mockRoutes, {
         entryServerPath: './app/entry.server.tsx',
         assetsBuildDirectory: 'build/client',
@@ -92,9 +92,9 @@ describe('SPA Mode (ssr: false)', () => {
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
-      // Federation mode uses async dynamic imports
-      expect(result).toContain('ensureEntryServerLoaded');
-      expect(result).toContain('createAsyncHandler');
+      // Federation mode no longer requires async entry wrappers
+      expect(result).toContain('import * as entryServer from');
+      expect(result).not.toContain('ensureEntryServerLoaded');
     });
 
     it('should generate static template for non-federation mode', () => {

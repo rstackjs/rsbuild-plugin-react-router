@@ -4,6 +4,7 @@ import {
   stripFileExtension,
   createRouteId,
   generateWithProps,
+  normalizeAssetPrefix,
 } from '../src/plugin-utils';
 
 describe('plugin-utils', () => {
@@ -100,6 +101,24 @@ describe('plugin-utils', () => {
     it('should import from react-router', () => {
       const result = generateWithProps();
       expect(result).toContain('from "react-router"');
+    });
+  });
+
+  describe('normalizeAssetPrefix', () => {
+    it('should default to "/" when undefined', () => {
+      expect(normalizeAssetPrefix()).toBe('/');
+    });
+
+    it('should normalize "auto" to "/"', () => {
+      expect(normalizeAssetPrefix('auto')).toBe('/');
+    });
+
+    it('should ensure trailing slash', () => {
+      expect(normalizeAssetPrefix('/assets')).toBe('/assets/');
+    });
+
+    it('should keep trailing slash intact', () => {
+      expect(normalizeAssetPrefix('/assets/')).toBe('/assets/');
     });
   });
 });

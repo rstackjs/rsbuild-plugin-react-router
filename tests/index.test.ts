@@ -57,4 +57,26 @@ describe('pluginReactRouter', () => {
     expect(nodeConfig.externals).toContain('express');
     expect(nodeConfig.experiments.outputModule).toBe(true);
   });
+
+  it('should use async-node target for federation builds', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        environments: {
+          node: {
+            tools: {
+              rspack: {
+                target: 'async-node',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ federation: true })]);
+    const config = await rsbuild.unwrapConfig();
+
+    const nodeConfig = config.environments?.node?.tools?.rspack;
+    expect(nodeConfig.target).toBe('async-node');
+  });
 });

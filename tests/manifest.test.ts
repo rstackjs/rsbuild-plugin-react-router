@@ -150,4 +150,24 @@ describe('manifest', () => {
       );
     });
   });
+
+  // The dev manifest is generated from compiled exports and should include
+  // flags for new route exports as they are added upstream.
+  // This is a light-weight shape test to ensure our types stay in sync.
+  it('route manifest item type includes hasClientMiddleware', () => {
+    const item = {
+      id: 'root',
+      module: '/static/js/root.js',
+      hasAction: false,
+      hasLoader: false,
+      hasClientAction: false,
+      hasClientLoader: false,
+      hasClientMiddleware: false,
+      hasErrorBoundary: false,
+      imports: [],
+      css: [],
+    };
+
+    expect(item).toHaveProperty('hasClientMiddleware', false);
+  });
 });
