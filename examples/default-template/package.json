@@ -8,7 +8,7 @@
     "start:esm": "react-router-serve ./build/server/static/js/app.js",
     "start:cjs": "react-router-serve ./cjs-serve-patch.cjs",
     "typecheck": "react-router typegen && tsc",
-    "test:e2e": "pnpm run dev & sleep 5 && playwright test",
+    "test:e2e": "playwright test",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -28,7 +28,7 @@
     "@rsbuild/plugin-react": "^1.4.3",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.0.10",
-    "@types/react": "^19.2.9",
+    "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "cross-env": "10.1.0",
     "react-router-devtools": "^6.2.0",

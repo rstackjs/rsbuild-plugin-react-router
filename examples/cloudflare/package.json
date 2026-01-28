@@ -5,9 +5,10 @@
   "scripts": {
     "build": "rsbuild build",
     "deploy": "npm run build && wrangler deploy",
-    "dev": "rsbuild dev",
-    "start": "wrangler dev",
-    "typecheck": "tsc -b"
+    "dev": "rsbuild dev --port 3004",
+    "start": "wrangler dev --port 3004",
+    "typecheck": "tsc -b",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@react-router/node": "^7.13.0",
@@ -19,17 +20,18 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260127.0",
+    "@playwright/test": "^1.58.0",
     "@react-router/cloudflare": "^7.13.0",
     "@react-router/dev": "^7.13.0",
     "@rsbuild/core": "1.7.2",
     "@rsbuild/plugin-react": "^1.4.3",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.0.10",
-    "@types/react": "^19.2.9",
+    "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "rsbuild-plugin-react-router": "workspace:*",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
-    "wrangler": "^4.60.0"
+    "wrangler": "^4.61.0"
   }
 }

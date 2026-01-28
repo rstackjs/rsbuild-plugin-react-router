@@ -5,19 +5,19 @@ import { type FileUpload, parseFormData } from '@mjackson/form-data-parser'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { useState } from 'react'
 import { data, redirect, Form, useNavigation } from 'react-router'
-import { z } from 'zod'
 import { ErrorList } from 'remote/components/forms'
 import { Button } from 'remote/components/ui/button'
-import { Icon } from '#app/components/ui/icon.tsx'
 import { StatusButton } from 'remote/components/ui/status-button'
-import { requireUserId } from '#app/utils/auth.server.ts'
-import { prisma } from '#app/utils/db.server.ts'
-import { uploadHandler } from '#app/utils/file-uploads.server.ts'
 import {
 	getUserImgSrc,
 	useDoubleCheck,
 	useIsPending,
 } from 'remote/utils/misc'
+import { z } from 'zod'
+import { Icon } from '#app/components/ui/icon.tsx'
+import { requireUserId } from '#app/utils/auth.server.ts'
+import { prisma } from '#app/utils/db.server.ts'
+import { uploadHandler } from '#app/utils/file-uploads.server.ts'
 import { type Route } from './+types/profile.photo.ts'
 import { type BreadcrumbHandle } from './profile.tsx'
 

@@ -4,24 +4,29 @@ import type { Route } from './types.js';
 /**
  * Generates the server build template string with async dynamic imports for federation mode
  */
+interface ServerBuildOptions {
+  entryServerPath: string;
+  assetsBuildDirectory: string;
+  basename: string;
+  appDirectory: string;
+  ssr: boolean;
+  future?: unknown;
+  allowedActionOrigins?: string[];
+  prerender?: string[];
+  routeDiscovery:
+    | {
+        mode: 'lazy';
+        manifestPath?: string;
+      }
+    | {
+        mode: 'initial';
+      }
+    | undefined;
+}
+
 function generateAsyncTemplate(
   routes: Record<string, Route>,
-  options: {
-    entryServerPath: string;
-    assetsBuildDirectory: string;
-    basename: string;
-    appDirectory: string;
-    ssr: boolean;
-    routeDiscovery:
-      | {
-          mode: 'lazy';
-          manifestPath?: string;
-        }
-      | {
-          mode: 'initial';
-        }
-      | undefined;
-  }
+  options: ServerBuildOptions
 ): string {
   return `
     // Create a module cache to store the dynamically imported module
@@ -88,13 +93,14 @@ function generateAsyncTemplate(
       options.assetsBuildDirectory
     )};
     export const basename = ${JSON.stringify(options.basename)};
-    export const future = ${JSON.stringify({})};
+    export const future = ${JSON.stringify(options.future ?? {})};
     export const isSpaMode = ${!options.ssr};
     export const ssr = ${options.ssr};
     export const routeDiscovery = ${JSON.stringify(options.routeDiscovery)};
     export const publicPath = "/";
-    export const prerender = [];
+    export const prerender = ${JSON.stringify(options.prerender ?? [])};
     export const entry = { module: entryServer };
+    export const allowedActionOrigins = ${JSON.stringify(options.allowedActionOrigins)};
     export const routes = {
       ${Object.keys(routes)
         .map((key, index) => {
@@ -119,22 +125,7 @@ function generateAsyncTemplate(
  */
 function generateStaticTemplate(
   routes: Record<string, Route>,
-  options: {
-    entryServerPath: string;
-    assetsBuildDirectory: string;
-    basename: string;
-    appDirectory: string;
-    ssr: boolean;
-    routeDiscovery:
-      | {
-          mode: 'lazy';
-          manifestPath?: string;
-        }
-      | {
-          mode: 'initial';
-        }
-      | undefined;
-  }
+  options: ServerBuildOptions
 ): string {
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
@@ -152,13 +143,14 @@ function generateStaticTemplate(
       options.assetsBuildDirectory
     )};
     export const basename = ${JSON.stringify(options.basename)};
-    export const future = ${JSON.stringify({})};
+    export const future = ${JSON.stringify(options.future ?? {})};
     export const isSpaMode = ${!options.ssr};
     export const ssr = ${options.ssr};
     export const routeDiscovery = ${JSON.stringify(options.routeDiscovery)};
-    export const prerender = [];
+    export const prerender = ${JSON.stringify(options.prerender ?? [])};
     export const publicPath = "/";
     export const entry = { module: entryServer };
+    export const allowedActionOrigins = ${JSON.stringify(options.allowedActionOrigins)};
     export const routes = {
       ${Object.keys(routes)
         .map((key, index) => {
@@ -186,23 +178,7 @@ function generateStaticTemplate(
  */
 function generateServerBuild(
   routes: Record<string, Route>,
-  options: {
-    entryServerPath: string;
-    assetsBuildDirectory: string;
-    basename: string;
-    appDirectory: string;
-    ssr: boolean;
-    federation?: boolean;
-    routeDiscovery:
-      | {
-          mode: 'lazy';
-          manifestPath?: string;
-        }
-      | {
-          mode: 'initial';
-        }
-      | undefined;
-  }
+  options: ServerBuildOptions & { federation?: boolean }
 ): string {
   return options.federation
     ? generateAsyncTemplate(routes, options)

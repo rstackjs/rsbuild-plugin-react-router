@@ -4,10 +4,11 @@ import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import * as E from '@react-email/components'
 import { data, redirect, Form, useSearchParams } from 'react-router'
 import { HoneypotInputs } from 'remix-utils/honeypot/react'
-import { z } from 'zod'
 import { GeneralErrorBoundary } from 'remote/components/error-boundary'
 import { ErrorList, Field } from 'remote/components/forms'
 import { StatusButton } from 'remote/components/ui/status-button'
+import { useIsPending } from 'remote/utils/misc'
+import { z } from 'zod'
 import {
 	ProviderConnectionForm,
 	providerNames,
@@ -15,7 +16,6 @@ import {
 import { prisma } from '#app/utils/db.server.ts'
 import { sendEmail } from '#app/utils/email.server.ts'
 import { checkHoneypot } from '#app/utils/honeypot.server.ts'
-import { useIsPending } from 'remote/utils/misc'
 import { EmailSchema } from '#app/utils/user-validation.ts'
 import { type Route } from './+types/signup.ts'
 import { prepareVerification } from './verify.server.ts'

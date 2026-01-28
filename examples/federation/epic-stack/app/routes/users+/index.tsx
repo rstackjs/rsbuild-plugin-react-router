@@ -1,10 +1,10 @@
 import { data, redirect, Link } from 'react-router'
-import { z } from 'zod'
 import { GeneralErrorBoundary } from 'remote/components/error-boundary'
 import { ErrorList } from 'remote/components/forms'
 import { SearchBar } from 'remote/components/search-bar'
-import { prisma } from '#app/utils/db.server.ts'
 import { cn, getUserImgSrc, useDelayedIsPending } from 'remote/utils/misc'
+import { z } from 'zod'
+import { prisma } from '#app/utils/db.server.ts'
 import { type Route } from './+types/index.ts'
 
 const UserSearchResultSchema = z.object({

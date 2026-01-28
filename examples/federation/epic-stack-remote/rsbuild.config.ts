@@ -1,8 +1,8 @@
 import { ModuleFederationPlugin } from '@module-federation/enhanced/rspack'
 import { defineConfig } from '@rsbuild/core'
 import { pluginReact } from '@rsbuild/plugin-react'
+import  { type Compiler } from '@rspack/core'
 import { pluginReactRouter } from 'rsbuild-plugin-react-router'
-import type { Compiler } from '@rspack/core'
 
 import 'react-router'
 

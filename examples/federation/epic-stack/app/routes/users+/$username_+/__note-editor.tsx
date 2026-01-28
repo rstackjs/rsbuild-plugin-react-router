@@ -10,7 +10,6 @@ import {
 import { getZodConstraint, parseWithZod } from '@conform-to/zod'
 import { useState } from 'react'
 import { Form } from 'react-router'
-import { z } from 'zod'
 import { GeneralErrorBoundary } from 'remote/components/error-boundary'
 import { floatingToolbarClassName } from 'remote/components/floating-toolbar'
 import { ErrorList, Field, TextareaField } from 'remote/components/forms'
@@ -20,6 +19,7 @@ import { Label } from 'remote/components/ui/label'
 import { StatusButton } from 'remote/components/ui/status-button'
 import { Textarea } from 'remote/components/ui/textarea'
 import { cn, getNoteImgSrc, useIsPending } from 'remote/utils/misc'
+import { z } from 'zod'
 import { type Info } from './+types/notes.$noteId_.edit.ts'
 
 const titleMinLength = 1

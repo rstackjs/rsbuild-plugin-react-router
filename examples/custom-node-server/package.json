@@ -6,11 +6,11 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "RSDOCTOR=false node server.js",
-    "start": "NODE_ENV=production node server.js",
+    "dev": "RSDOCTOR=false PORT=3003 node server.js",
+    "start": "NODE_ENV=production PORT=3003 node server.js",
     "build": "rsbuild build",
     "typecheck": "react-router typegen && tsc",
-    "test:e2e": "pnpm run dev & sleep 5 && playwright test",
+    "test:e2e": "playwright test",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -35,7 +35,7 @@
     "@tailwindcss/postcss": "^4.1.18",
     "@types/express": "^5.0.6",
     "@types/express-serve-static-core": "^5.1.1",
-    "@types/react": "^19.2.9",
+    "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "rsbuild-plugin-react-router": "workspace:*",
     "tailwindcss": "^4.1.18",

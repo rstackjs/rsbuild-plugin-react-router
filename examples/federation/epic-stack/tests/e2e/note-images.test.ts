@@ -123,8 +123,8 @@ test('Users can delete note image', async ({ page, login }) => {
 	await page.getByRole('button', { name: 'submit' }).click()
 	await page.waitForTimeout(500)
 	await expect(page).toHaveURL(`/users/${user.username}/notes/${note.id}`)
-	const countAfter = await images.count()
-	expect(countAfter).toEqual(countBefore - 1)
+	const countAfter = images
+	await expect(countAfter).toHaveCount(countBefore - 1)
 })
 
 function createNote() {

@@ -72,13 +72,29 @@ export const pluginReactRouter = (
 
     // Run typegen on build/dev
     api.onBeforeStartDevServer(async () => {
-      const { $ } = await import('execa');
-      $`npx --yes react-router typegen --watch`;
+      const { execa } = await import('execa');
+      // Run typegen in background (non-blocking) for watch mode
+      const child = execa(
+        'npx',
+        ['--yes', 'react-router', 'typegen', '--watch'],
+        {
+          stdio: 'inherit',
+          detached: false,
+          cleanup: true,
+        }
+      );
+      // Don't await - let it run in the background
+      child.catch(() => {
+        // Silently ignore errors when the process is killed on server shutdown
+      });
     });
 
     api.onBeforeBuild(async () => {
-      const { $ } = await import('execa');
-      $`npx --yes react-router typegen`;
+      const { execa } = await import('execa');
+      // Run typegen synchronously before build
+      await execa('npx', ['--yes', 'react-router', 'typegen'], {
+        stdio: 'inherit',
+      });
     });
 
     const jiti = createJiti(process.cwd());
@@ -90,7 +106,11 @@ export const pluginReactRouter = (
       appDirectory = 'app',
       basename = '/',
       buildDirectory = 'build',
+      future = {},
+      allowedActionOrigins,
+      routeDiscovery: userRouteDiscovery,
       ssr = true,
+      prerender: prerenderConfig,
     } = await jiti
       .import<Config>(configPath, {
         default: true,
@@ -104,8 +124,13 @@ export const pluginReactRouter = (
         return {} as Config;
       });
 
-    // Set default routeDiscovery configuration
-    const routeDiscovery = { mode: 'lazy', manifestPath: '/__manifest' } as const;
+    // React Router defaults to "lazy" route discovery, but "ssr:false" builds
+    // have no runtime server to serve manifest patch requests, so we force
+    // `mode:"initial"` in SPA mode to avoid any `/__manifest` fetches.
+    const routeDiscovery = !ssr
+      ? ({ mode: 'initial' } as const)
+      : (userRouteDiscovery ??
+        ({ mode: 'lazy', manifestPath: '/__manifest' } as const));
 
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
 
@@ -146,10 +171,10 @@ export const pluginReactRouter = (
       ? entryServerPath
       : templateServerPath;
 
-    const rootRouteFile = relative(
-      appDirectory,
-      resolve(appDirectory, 'root.tsx')
-    );
+    const rootRoutePath = findEntryFile(resolve(appDirectory, 'root'));
+    // React Router's server build expects route files relative to `appDirectory`
+    // so it can resolve them correctly during compilation.
+    const rootRouteFile = relative(appDirectory, rootRoutePath);
 
     const routes = {
       root: { path: '', id: 'root', file: rootRouteFile },
@@ -174,11 +199,60 @@ export const pluginReactRouter = (
       }
     });
 
-    // SPA Mode (`ssr:false`) still needs a one-time server render of the root route
-    // at build time to generate a hydratable `index.html`, matching React Router's
-    // own Vite implementation.
+    // Determine prerender paths from config
+    const getPrerenderPaths = (): string[] => {
+      if (!prerenderConfig) return [];
+      if (prerenderConfig === true) {
+        // When true, prerender all static routes (routes without params)
+        const paths = ['/'];
+        const addStaticPaths = (
+          routeEntries: RouteConfigEntry[],
+          prefix = ''
+        ) => {
+          for (const route of routeEntries) {
+            if (route.path) {
+              const fullPath = `${prefix}/${route.path}`
+                .replace(/\/+/g, '/')
+                .replace(/\/$/, '');
+              // Skip routes with dynamic segments
+              if (!route.path.includes(':') && route.path !== '*') {
+                if (fullPath && fullPath !== '/') {
+                  paths.push(fullPath);
+                }
+              }
+            }
+            if (route.children) {
+              const newPrefix = route.path
+                ? `${prefix}/${route.path}`.replace(/\/+/g, '/')
+                : prefix;
+              addStaticPaths(route.children, newPrefix);
+            }
+          }
+        };
+        addStaticPaths(routeConfig);
+        return paths;
+      }
+      if (Array.isArray(prerenderConfig)) {
+        return prerenderConfig;
+      }
+      if (
+        typeof prerenderConfig === 'object' &&
+        'paths' in prerenderConfig &&
+        Array.isArray(prerenderConfig.paths)
+      ) {
+        return prerenderConfig.paths;
+      }
+      return [];
+    };
+
+    const prerenderPaths = getPrerenderPaths();
+    const isSpaMode = !ssr && prerenderPaths.length === 0;
+    const isPrerenderMode = prerenderPaths.length > 0;
+
+    // Handle SPA mode and prerendering after build
     api.onAfterBuild(async ({ environments }) => {
-      if (ssr) {
+      // Skip if SSR is enabled and no prerender paths
+      if (ssr && !isPrerenderMode) {
         return;
       }
 
@@ -187,59 +261,96 @@ export const pluginReactRouter = (
         return;
       }
 
-      // We intentionally mirror react-router's `handleSpaMode` logic:
-      // 1) Load the server build (even though we don't ship it)
-      // 2) Request the basename with the SPA-mode header
-      // 3) Write the resulting HTML to `client/index.html`
       const serverBuildDir = resolve(buildDirectory, 'server');
       const serverBuildFile = 'static/js/app.js';
       const serverBuildPath = resolve(serverBuildDir, serverBuildFile);
       const clientBuildDir = resolve(buildDirectory, 'client');
 
-      // In some setups, users might remove the server build output.
-      // If it's not present, we can't generate a proper SPA HTML fallback.
       if (!existsSync(serverBuildPath)) {
         console.warn(
-          `[${PLUGIN_NAME}] SPA mode is enabled (ssr:false) but the server build was not found at ${serverBuildPath}. ` +
-            'Skipping index.html generation.'
+          `[${PLUGIN_NAME}] Server build not found at ${serverBuildPath}. ` +
+            'Skipping prerendering.'
         );
         return;
       }
 
-      const buildModule = await import(pathToFileURL(serverBuildPath).toString());
+      const buildModule = await import(
+        pathToFileURL(serverBuildPath).toString()
+      );
       const requestHandler = createRequestHandler(buildModule, 'production');
-      const request = new Request(`http://localhost${basename}`, {
-        headers: {
-          // Enable SPA mode in the server runtime and only render down to the root
-          'X-React-Router-SPA-Mode': 'yes',
-        },
-      });
-      const response = await requestHandler(request);
-      const html = await response.text();
 
-      if (response.status !== 200) {
-        throw new Error(
-          `[${PLUGIN_NAME}] SPA mode: Received a ${response.status} status code from the server build while generating index.html.\n` +
-            html
-        );
-      }
+      // Helper function to prerender a single path
+      const prerenderPath = async (
+        path: string,
+        options: { isSpaFallback?: boolean } = {}
+      ): Promise<void> => {
+        const url = `http://localhost${basename}${path}`.replace(/\/+/g, '/');
+        const headers: Record<string, string> = {};
 
-      if (
-        !html.includes('window.__reactRouterContext =') ||
-        !html.includes('window.__reactRouterRouteModules =')
-      ) {
-        throw new Error(
-          `[${PLUGIN_NAME}] SPA mode: Did you forget to include <Scripts/> in your root route? ` +
-            'The pre-rendered HTML cannot hydrate without it.'
-        );
-      }
+        if (options.isSpaFallback) {
+          headers['X-React-Router-SPA-Mode'] = 'yes';
+        }
+
+        const request = new Request(url, { headers });
+        const response = await requestHandler(request);
+        const html = await response.text();
+
+        if (response.status !== 200) {
+          throw new Error(
+            `[${PLUGIN_NAME}] Prerender failed for ${path}: Received status ${response.status}\n${html}`
+          );
+        }
+
+        if (
+          !html.includes('window.__reactRouterContext =') ||
+          !html.includes('window.__reactRouterRouteModules =')
+        ) {
+          throw new Error(
+            `[${PLUGIN_NAME}] Prerender failed for ${path}: Missing hydration scripts. ` +
+              'Did you forget to include <Scripts/> in your root route?'
+          );
+        }
+
+        // Determine output file path
+        let outputPath: string;
+        if (path === '/' || path === '') {
+          outputPath = resolve(clientBuildDir, 'index.html');
+        } else {
+          // Create directory structure for the path
+          const cleanPath = path.replace(/^\//, '').replace(/\/$/, '');
+          const pathDir = resolve(clientBuildDir, cleanPath);
+          await mkdir(pathDir, { recursive: true });
+          outputPath = resolve(pathDir, 'index.html');
+        }
+
+        await writeFile(outputPath, html);
+        console.log(`[${PLUGIN_NAME}] Prerendered: ${path} -> ${outputPath}`);
+      };
 
       await mkdir(clientBuildDir, { recursive: true });
-      await writeFile(resolve(clientBuildDir, 'index.html'), html);
 
-      // Remove server output for SPA mode so the build is deployable as static assets.
-      // This matches the behavior of React Router's official Vite plugin.
-      await fsExtra.remove(serverBuildDir);
+      if (isSpaMode) {
+        // SPA mode: only prerender root as a fallback
+        console.log(`[${PLUGIN_NAME}] SPA mode: Generating index.html...`);
+        await prerenderPath('/', { isSpaFallback: true });
+      } else if (isPrerenderMode) {
+        // Prerender mode: prerender all specified paths
+        console.log(
+          `[${PLUGIN_NAME}] Prerendering ${prerenderPaths.length} path(s)...`
+        );
+        for (const path of prerenderPaths) {
+          await prerenderPath(path);
+        }
+      }
+
+      // Remove server output for SPA mode and when not using SSR
+      // This makes the build deployable as static assets
+      if (!ssr) {
+        await fsExtra.remove(serverBuildDir);
+        console.log(
+          `[${PLUGIN_NAME}] Removed server build (static deployment)`
+        );
+      }
     });
 
     // Create virtual modules for React Router
@@ -253,6 +364,9 @@ export const pluginReactRouter = (
         appDirectory,
         ssr,
         federation: options.federation,
+        future,
+        allowedActionOrigins,
+        prerender: prerenderPaths,
         routeDiscovery,
       }),
       'virtual/react-router/with-props': generateWithProps(),
@@ -267,13 +381,16 @@ export const pluginReactRouter = (
           writeToDisk: true,
           hmr: false,
           liveReload: true,
-          setupMiddlewares: pluginOptions.customServer
-            ? []
-            : [
-                (middlewares, server) => {
-                  middlewares.push(createDevServerMiddleware(server));
-                },
-              ],
+          // Only add SSR middleware if SSR is enabled and not using a custom server
+          // In SPA mode (ssr: false), we just serve static files from the client build
+          setupMiddlewares:
+            pluginOptions.customServer || !ssr
+              ? []
+              : [
+                  (middlewares, server) => {
+                    middlewares.push(createDevServerMiddleware(server));
+                  },
+                ],
         },
         tools: {
           rspack: {
