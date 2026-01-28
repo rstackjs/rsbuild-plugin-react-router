@@ -29,6 +29,18 @@ yarn add rsbuild-plugin-react-router
 pnpm add rsbuild-plugin-react-router
 ```
 
+## Local development
+
+For the federation examples and Playwright e2e tests, use Node 22 and the
+repo-pinned pnpm version:
+
+```bash
+nvm install
+nvm use
+corepack enable
+corepack prepare pnpm@9.15.3 --activate
+```
+
 ## Usage
 
 Add the plugin to your `rsbuild.config.ts`:
@@ -46,7 +58,7 @@ export default defineConfig(() => {
         customServer: false,
         // Optional: Specify server output format
         serverOutput: "commonjs",
-        //Optional: enable experimental support for module federation
+        // Optional: enable experimental support for module federation
         federation: false
       }), 
       pluginReact()
@@ -81,6 +93,10 @@ pluginReactRouter({
    */
   federation?: boolean
 })
+
+When Module Federation is enabled, configure your Federation plugin with
+`experiments.asyncStartup: true` to avoid requiring entrypoint `import()` hacks.
+See the Module Federation examples under `examples/federation`.
 ```
 
 2. **React Router Configuration** (in `react-router.config.*`):
@@ -244,6 +260,7 @@ Route components support the following exports:
 - `Layout` - Layout component
 - `clientLoader` - Client-side data loading
 - `clientAction` - Client-side form actions
+- `clientMiddleware` - Client-side middleware
 - `handle` - Route handle
 - `links` - Prefetch links
 - `meta` - Route meta data
@@ -252,7 +269,23 @@ Route components support the following exports:
 #### Server-side Exports
 - `loader` - Server-side data loading
 - `action` - Server-side form actions
+- `middleware` - Server-side middleware
 - `headers` - HTTP headers
+
+### Client/Server-only Modules
+
+- Files ending in `.client.*` are treated as client-only. Their exports are
+  stubbed to `undefined` in the server build, so they are safe to import from
+  route components for browser-only behavior.
+- Files ending in `.server.*` are server-only. If they are imported by code
+  compiled for the web environment, the build will fail with a clear error.
+  Keep `.server` imports in server entrypoints or other server-only code.
+
+### Asset Prefix
+
+If you configure `output.assetPrefix` in Rsbuild, the plugin uses that value
+for the React Router browser manifest and server build `publicPath` so asset
+URLs resolve correctly when serving from a CDN or sub-path.
 
 ## Custom Server Setup
 
@@ -551,6 +584,7 @@ The repository includes several examples demonstrating different use cases:
 | [prerender](./examples/prerender) | Static prerendering for multiple routes | 3002 | `pnpm dev` |
 | [custom-node-server](./examples/custom-node-server) | Custom Express server with SSR | 3003 | `pnpm dev` |
 | [cloudflare](./examples/cloudflare) | Cloudflare Workers deployment | 3004 | `pnpm dev` |
+| [client-only](./examples/client-only) | `.client` modules with SSR hydration | 3010 | `pnpm dev` |
 | [epic-stack](./examples/epic-stack) | Full-featured Epic Stack example | 3005 | `pnpm dev` |
 | [federation/epic-stack](./examples/federation/epic-stack) | Module Federation host | 3006 | `pnpm dev` |
 | [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote | 3007 | `pnpm dev` |
