@@ -14,6 +14,7 @@ function isSourceMapEnabled(value: unknown): boolean {
   //  - { js?: devtool; css: boolean }
   if (value === true) return true;
   if (value === false || value == null) return false;
+  if (typeof value === 'string') return true;
   if (typeof value === 'object') {
     const js = (value as any).js;
     // Any truthy devtool string/object means source maps are on for JS.

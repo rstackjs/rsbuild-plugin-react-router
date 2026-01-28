@@ -44,6 +44,19 @@ describe('warnOnClientSourceMaps', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it('warns when output.sourceMap is a string in production', () => {
+    const warn = vi.fn();
+    warnOnClientSourceMaps(
+      {
+        mode: 'production',
+        output: { sourceMap: 'source-map' },
+        environments: {},
+      } as any,
+      warn
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
   it('does not warn when source maps are disabled in production', () => {
     const warn = vi.fn();
     warnOnClientSourceMaps(
