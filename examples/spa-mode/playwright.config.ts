@@ -5,7 +5,7 @@ export default defineConfig({
   // Maximum time one test can run for
   timeout: 30 * 1000,
   expect: {
-    timeout: 5000
+    timeout: 5000,
   },
   // Run tests in files in parallel
   fullyParallel: false,
@@ -14,10 +14,16 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env.CI ? 2 : 0,
 
+  // Reporter configuration
+  reporter: 'list',
+
   // Shared settings for all the projects below
   use: {
     // Base URL to use in actions like `await page.goto('/')`
     baseURL: 'http://localhost:3001',
+
+    // Run in headless mode
+    headless: true,
 
     // Collect trace when retrying the failed test
     trace: 'on-first-retry',

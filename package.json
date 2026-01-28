@@ -49,7 +49,7 @@
   },
   "scripts": {
     "build": "rslib build",
-    "e2e": "npx kill-port 3000 && pnpm build && cd examples/default-template && pnpm test:e2e && npx kill-port 3000 && cd ../custom-node-server && pnpm test:e2e",
+    "e2e": "pnpm build && pnpm -r test:e2e",
     "dev": "rslib build --watch",
     "test": "vitest run",
     "test:watch": "vitest watch",
