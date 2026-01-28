@@ -1,7 +1,7 @@
 import * as cookie from 'cookie'
+import type { Theme } from './theme.ts'
 
 const cookieName = 'en_theme'
-export type Theme = 'light' | 'dark'
 
 export function getTheme(request: Request): Theme | null {
 	const cookieHeader = request.headers.get('cookie')

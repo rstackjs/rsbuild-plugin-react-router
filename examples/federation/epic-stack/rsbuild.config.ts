@@ -5,6 +5,10 @@ import { pluginReactRouter } from 'rsbuild-plugin-react-router'
 
 import 'react-router'
 
+const REMOTE_PORT = Number(process.env.REMOTE_PORT || 3007)
+const REMOTE_ORIGIN =
+	process.env.REMOTE_ORIGIN ?? `http://localhost:${REMOTE_PORT}`
+
 // Common shared dependencies for Module Federation
 const sharedDependencies = {
 	'react-router': {
@@ -37,18 +41,25 @@ const commonFederationConfig = {
 // Web-specific federation config
 const webFederationConfig = {
 	...commonFederationConfig,
+	experiments: {
+		asyncStartup: true,
+	},
+	dts: false,
 	remoteType: 'import' as const,
 	remotes: {
-		remote: 'http://localhost:3001/static/js/remote.js',
+		remote: `${REMOTE_ORIGIN}/static/js/remote.js`,
 	},
 }
 
 // Node-specific federation config
 const nodeFederationConfig = {
 	...commonFederationConfig,
+	experiments: {
+		asyncStartup: true,
+	},
 	dts: false,
 	remotes: {
-		remote: 'remote@http://localhost:3001/static/static/js/remote.js',
+		remote: `remote@${REMOTE_ORIGIN}/static/static/js/remote.js`,
 	},
 	runtimePlugins: ['@module-federation/node/runtimePlugin'],
 }

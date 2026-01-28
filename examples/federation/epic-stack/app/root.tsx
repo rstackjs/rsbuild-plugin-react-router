@@ -26,7 +26,7 @@ import {
 	ThemeSwitch,
 	useOptionalTheme,
 	useTheme,
-} from './routes/resources+/theme-switch.tsx'
+} from './components/theme-switch.tsx'
 import { getUserId, logout } from './utils/auth.server.ts'
 import { ClientHintCheck, getHints } from './utils/client-hints.tsx'
 import { prisma } from './utils/db.server.ts'
@@ -34,7 +34,8 @@ import { getEnv } from './utils/env.server.ts'
 import { pipeHeaders } from './utils/headers.server.ts'
 import { honeypot } from './utils/honeypot.server.ts'
 import { useNonce } from './utils/nonce-provider.ts'
-import { type Theme, getTheme } from './utils/theme.server.ts'
+import { getTheme } from './utils/theme.server.ts'
+import type { Theme } from './utils/theme.ts'
 import { makeTimings, time } from './utils/timing.server.ts'
 import { getToast } from './utils/toast.server.ts'
 import { useOptionalUser } from './utils/user.ts'

@@ -76,6 +76,7 @@ async function getGitHubUsers() {
 		return []
 	} catch (error) {
 		console.error(error)
+		await fsExtra.remove(githubUserFixturePath)
 		return []
 	}
 }
@@ -93,7 +94,9 @@ export async function deleteGitHubUsers() {
 }
 
 async function setGitHubUsers(users: Array<GitHubUser>) {
-	await fsExtra.writeJson(githubUserFixturePath, users, { spaces: 2 })
+	const tmpPath = `${githubUserFixturePath}.${process.pid}.${Date.now()}`
+	await fsExtra.writeJson(tmpPath, users, { spaces: 2 })
+	await fsExtra.move(tmpPath, githubUserFixturePath, { overwrite: true })
 }
 
 export async function insertGitHubUser(code?: string | null) {
@@ -146,13 +149,10 @@ export const handlers: Array<HttpHandler> = [
 				user = await insertGitHubUser(code)
 			}
 
-			return new Response(
-				new URLSearchParams({
-					access_token: user.accessToken,
-					token_type: '__MOCK_TOKEN_TYPE__',
-				}).toString(),
-				{ headers: { 'content-type': 'application/x-www-form-urlencoded' } },
-			)
+			return json({
+				access_token: user.accessToken,
+				token_type: '__MOCK_TOKEN_TYPE__',
+			})
 		},
 	),
 	http.get('https://api.github.com/user/emails', async ({ request }) => {

@@ -23,9 +23,9 @@ if (process.env.MOCKS === 'true') {
 
 if (process.env.NODE_ENV === 'production') {
 	let build = (await import('./build/server/static/js/app.js'))
-	build = build?.default || build;
-	build = build?.createApp || build
-	build();
+	build = await (build?.default ?? build)
+	const createApp = build?.createApp ?? build
+	await createApp()
 } else {
 	await import('./server/dev-build.js')
 }

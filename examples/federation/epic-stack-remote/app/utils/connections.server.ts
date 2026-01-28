@@ -11,17 +11,24 @@ export const connectionSessionStorage = createCookieSessionStorage({
 		path: '/',
 		httpOnly: true,
 		maxAge: 60 * 10, // 10 minutes
-		secrets: process.env.SESSION_SECRET.split(','),
+		secrets: (process.env.SESSION_SECRET ?? 'development-session-secret').split(
+			',',
+		),
 		secure: process.env.NODE_ENV === 'production',
 	},
 })
 
-export const providers: Record<ProviderName, AuthProvider> = {
-	github: new GitHubProvider(),
+export const providers: Partial<Record<ProviderName, AuthProvider>> = {}
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+	providers.github = new GitHubProvider()
 }
 
 export function handleMockAction(providerName: ProviderName, request: Request) {
-	return providers[providerName].handleMockAction(request)
+	const provider = providers[providerName]
+	if (!provider) {
+		throw new Error(`Auth provider "${providerName}" is not configured`)
+	}
+	return provider.handleMockAction(request)
 }
 
 export function resolveConnectionData(
@@ -29,5 +36,9 @@ export function resolveConnectionData(
 	providerId: string,
 	options?: { timings?: Timings },
 ) {
-	return providers[providerName].resolveConnectionData(providerId, options)
+	const provider = providers[providerName]
+	if (!provider) {
+		throw new Error(`Auth provider "${providerName}" is not configured`)
+	}
+	return provider.resolveConnectionData(providerId, options)
 }

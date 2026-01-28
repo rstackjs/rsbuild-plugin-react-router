@@ -14,6 +14,11 @@ import { insertGitHubUser } from '#tests/mocks/github.ts'
 async function seed() {
 	console.log('🌱 Seeding...')
 	console.time(`🌱 Database has been seeded`)
+	const existingUser = await prisma.user.findFirst({ select: { id: true } })
+	if (existingUser) {
+		console.log('🌱 Seed skipped (database already seeded)')
+		return
+	}
 
 	const totalUsers = 5
 	console.time(`👤 Created ${totalUsers} users...`)
@@ -95,10 +100,10 @@ async function seed() {
 	})
 
 	const githubUser = await insertGitHubUser(MOCK_CODE_GITHUB)
-
-	await prisma.user.create({
-		select: { id: true },
-		data: {
+	await prisma.user.upsert({
+		where: { username: 'kody' },
+		update: {},
+		create: {
 			email: 'kody@kcd.dev',
 			username: 'kody',
 			name: 'Kody',

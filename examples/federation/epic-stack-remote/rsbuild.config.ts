@@ -6,6 +6,12 @@ import { pluginReactRouter } from 'rsbuild-plugin-react-router'
 
 import 'react-router'
 
+const DEV_PORT = Number(process.env.PORT || 3007)
+const REMOTE_ORIGIN =
+	process.env.REMOTE_ORIGIN ?? `http://localhost:${DEV_PORT}`
+const REMOTE_ASSET_PREFIX = REMOTE_ORIGIN.endsWith('/')
+	? REMOTE_ORIGIN
+	: `${REMOTE_ORIGIN}/`
 
 // Common shared dependencies for Module Federation
 const sharedDependencies = {
@@ -66,6 +72,10 @@ const commonFederationConfig = {
 // Web-specific federation config
 const webFederationConfig = {
 	...commonFederationConfig,
+	experiments: {
+		asyncStartup: true,
+	},
+	dts: false,
 	library: {
 		type: 'module'
 	},
@@ -74,6 +84,10 @@ const webFederationConfig = {
 // Node-specific federation config
 const nodeFederationConfig = {
 	...commonFederationConfig,
+	experiments: {
+		asyncStartup: true,
+	},
+	dts: false,
 	library: {
 		type: 'commonjs-module'
 	},
@@ -116,26 +130,26 @@ export default defineConfig({
 				}
 			},
 			plugins: []
+	},
+	node: {
+		output: {
+			assetPrefix: REMOTE_ASSET_PREFIX,
 		},
-		node: {
-			output: {
-				assetPrefix: 'http://localhost:3001/',
-			},
-			tools: {
-				rspack: {
-					plugins: [
-						new ModuleFederationPlugin(nodeFederationConfig)
+		tools: {
+			rspack: {
+				plugins: [
+					new ModuleFederationPlugin(nodeFederationConfig)
 					]
 				}
 			},
 			plugins: []
-		}
-	},
+	}
+},
 	server: {
-		port: Number(process.env.PORT || 3000),
+		port: DEV_PORT,
 	},
 	output: {
-		assetPrefix: 'http://localhost:3001/',
+		assetPrefix: REMOTE_ASSET_PREFIX,
 		externals: ['better-sqlite3', 'express','ws'],
 	},
 	plugins: [
