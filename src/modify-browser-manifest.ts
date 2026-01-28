@@ -13,7 +13,8 @@ import jsesc from 'jsesc';
 export function createModifyBrowserManifestPlugin(
   routes: Record<string, Route>,
   pluginOptions: PluginOptions,
-  appDirectory: string
+  appDirectory: string,
+  assetPrefix = '/'
 ) {
   return {
     apply(compiler: Rspack.Compiler): void {
@@ -24,7 +25,8 @@ export function createModifyBrowserManifestPlugin(
             routes,
             pluginOptions,
             compilation.getStats().toJson(),
-            appDirectory
+            appDirectory,
+            assetPrefix
           );
 
           const manifestPath =

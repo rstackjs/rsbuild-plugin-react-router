@@ -53,7 +53,8 @@ export async function getReactRouterManifestForDev(
   //@ts-ignore
   options: PluginOptions,
   clientStats: Rspack.StatsCompilation | undefined,
-  context: string
+  context: string,
+  assetPrefix = '/'
 ): Promise<{
   version: string;
   url: string;
@@ -101,14 +102,15 @@ export async function getReactRouterManifestForDev(
       path: route.path,
       index: route.index,
       caseSensitive: route.caseSensitive,
-      module: combineURLs('/', jsAssets[0] || ''),
+      module: combineURLs(assetPrefix, jsAssets[0] || ''),
       hasAction: exports.has(SERVER_EXPORTS.action),
       hasLoader: exports.has(SERVER_EXPORTS.loader),
       hasClientAction: exports.has(CLIENT_EXPORTS.clientAction),
       hasClientLoader: exports.has(CLIENT_EXPORTS.clientLoader),
+      hasClientMiddleware: exports.has(CLIENT_EXPORTS.clientMiddleware),
       hasErrorBoundary: exports.has(CLIENT_EXPORTS.ErrorBoundary),
-      imports: jsAssets.map(asset => combineURLs('/', asset)),
-      css: cssAssets.map(asset => combineURLs('/', asset)),
+      imports: jsAssets.map(asset => combineURLs(assetPrefix, asset)),
+      css: cssAssets.map(asset => combineURLs(assetPrefix, asset)),
     };
   }
 
@@ -120,11 +122,14 @@ export async function getReactRouterManifestForDev(
 
   return {
     version: String(Math.random()),
-    url: '/static/js/virtual/react-router/browser-manifest.js',
+    url: combineURLs(
+      assetPrefix,
+      'static/js/virtual/react-router/browser-manifest.js'
+    ),
     entry: {
-      module: combineURLs('/', entryJsAssets[0] || ''),
-      imports: entryJsAssets.map(asset => combineURLs('/', asset)),
-      css: entryCssAssets.map(asset => combineURLs('/', asset)),
+      module: combineURLs(assetPrefix, entryJsAssets[0] || ''),
+      imports: entryJsAssets.map(asset => combineURLs(assetPrefix, asset)),
+      css: entryCssAssets.map(asset => combineURLs(assetPrefix, asset)),
     },
     routes: result,
   };

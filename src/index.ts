@@ -8,16 +8,24 @@ import type { RsbuildPlugin, Rspack } from '@rsbuild/core';
 import * as esbuild from 'esbuild';
 import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
-import { relative, resolve } from 'pathe';
+import { extname, relative, resolve } from 'pathe';
 import { RspackVirtualModulePlugin } from 'rspack-plugin-virtual-module';
 import { generate, parse } from './babel.js';
-import { PLUGIN_NAME, SERVER_ONLY_ROUTE_EXPORTS } from './constants.js';
+import {
+  BUILD_CLIENT_ROUTE_QUERY_STRING,
+  CLIENT_ROUTE_EXPORTS,
+  JS_LOADERS,
+  PLUGIN_NAME,
+  SERVER_ONLY_ROUTE_EXPORTS,
+} from './constants.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import {
   generateWithProps,
   removeExports,
   transformRoute,
   findEntryFile,
+  normalizeAssetPrefix,
+  removeUnusedImports,
 } from './plugin-utils.js';
 import type { PluginOptions } from './types.js';
 import { generateServerBuild } from './server-utils.js';
@@ -26,9 +34,74 @@ import {
   configRoutesToRouteManifest,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
-import { transformRouteFederation } from './transform-route-federation.js';
 import { createRequestHandler } from 'react-router';
 import { init, parse as parseExports } from 'es-module-lexer';
+import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
+import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
+import { getSsrExternals } from './ssr-externals.js';
+
+const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
+  const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
+  return JS_LOADERS[ext] ?? 'js';
+};
+
+const transformToEsm = async (
+  code: string,
+  resourcePath: string
+): Promise<string> => {
+  return (
+    await esbuild.transform(code, {
+      jsx: 'automatic',
+      format: 'esm',
+      platform: 'neutral',
+      loader: getEsbuildLoader(resourcePath),
+    })
+  ).code;
+};
+
+const getExportNames = async (code: string): Promise<string[]> => {
+  await init;
+  const [, exportSpecifiers] = await parseExports(code);
+  return Array.from(
+    new Set(exportSpecifiers.map(specifier => specifier.n).filter(Boolean))
+  );
+};
+
+type ModuleFederationPluginLike = {
+  name?: string;
+  _options?: { experiments?: { asyncStartup?: boolean } };
+  options?: { experiments?: { asyncStartup?: boolean } };
+};
+
+const ensureFederationAsyncStartup = (
+  rspackConfig: Rspack.Configuration | undefined
+): void => {
+  if (!rspackConfig?.plugins?.length) {
+    return;
+  }
+
+  for (const plugin of rspackConfig.plugins) {
+    if (!plugin || typeof plugin !== 'object') {
+      continue;
+    }
+    const pluginName = (plugin as ModuleFederationPluginLike).name;
+    if (pluginName !== 'ModuleFederationPlugin') {
+      continue;
+    }
+
+    const pluginOptions =
+      (plugin as ModuleFederationPluginLike)._options ??
+      (plugin as ModuleFederationPluginLike).options;
+    if (!pluginOptions) {
+      continue;
+    }
+
+    pluginOptions.experiments = {
+      ...pluginOptions.experiments,
+      asyncStartup: true,
+    };
+  }
+};
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -45,6 +118,30 @@ export const pluginReactRouter = (
       ...defaultOptions,
       ...options,
     };
+
+    const nodeExternals = Array.from(
+      new Set(['express', ...getSsrExternals(process.cwd())])
+    );
+
+    let assetPrefix = '/';
+
+    // Best-effort configuration validation (upstream: validate-plugin-order).
+    // Run during config modification phase so we don't rely on `getRsbuildConfig()`
+    // being available during `setup()`.
+    api.modifyRsbuildConfig({
+      order: 'pre',
+      handler(config) {
+        const issues = validatePluginOrderFromConfig(config);
+        for (const issue of issues) {
+          if (issue.kind === 'error') {
+            throw new Error(issue.message);
+          }
+          api.logger.warn(issue.message);
+        }
+        assetPrefix = normalizeAssetPrefix(config.output?.assetPrefix);
+        return config;
+      },
+    });
 
     // Add processAssets hook to emit package.json for node environment
     if (pluginOptions.serverOutput === 'commonjs') {
@@ -70,6 +167,13 @@ export const pluginReactRouter = (
         }
       );
     }
+
+    // Warn loudly if client source maps are enabled in production builds.
+    // (Upstream behavior: react-router:warn-on-client-source-maps)
+    api.onBeforeBuild(() => {
+      const normalized = api.getNormalizedConfig();
+      warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
+    });
 
     // Run typegen on build/dev
     api.onBeforeStartDevServer(async () => {
@@ -369,11 +473,25 @@ export const pluginReactRouter = (
         allowedActionOrigins,
         prerender: prerenderPaths,
         routeDiscovery,
+        publicPath: assetPrefix,
       }),
       'virtual/react-router/with-props': generateWithProps(),
     });
 
     api.modifyRsbuildConfig(async (config, { mergeRsbuildConfig }) => {
+      assetPrefix = normalizeAssetPrefix(config.output?.assetPrefix);
+      const useAsyncNodeChunkLoading =
+        options.federation && pluginOptions.serverOutput === 'commonjs';
+      const nodeLibraryType =
+        pluginOptions.serverOutput === 'commonjs' && options.federation
+          ? 'commonjs2'
+          : pluginOptions.serverOutput;
+      const nodeChunkLoading =
+        pluginOptions.serverOutput === 'module'
+          ? 'import'
+          : useAsyncNodeChunkLoading
+            ? 'async-node'
+            : 'require';
       return mergeRsbuildConfig(config, {
         output: {
           assetPrefix: config.output?.assetPrefix || '/',
@@ -403,9 +521,7 @@ export const pluginReactRouter = (
             source: {
               entry: {
                 // no query needed when federation is disabled
-                'entry.client':
-                  finalEntryClientPath +
-                  (options.federation ? '?react-router-route-federation' : ''),
+                'entry.client': finalEntryClientPath,
                 'virtual/react-router/browser-manifest':
                   'virtual/react-router/browser-manifest',
                 ...Object.values(routes).reduce((acc: any, route) => {
@@ -413,7 +529,7 @@ export const pluginReactRouter = (
                     import: `${resolve(
                       appDirectory,
                       route.file
-                    )}?${options.federation ? 'react-router-route-federation' : 'react-router-route'}`,
+                    )}${BUILD_CLIENT_ROUTE_QUERY_STRING}`,
                   };
                   return acc;
                 }, {} as any),
@@ -434,6 +550,13 @@ export const pluginReactRouter = (
                   topLevelAwait: true,
                   outputModule: true,
                 },
+                ...(options.federation
+                  ? {
+                      output: {
+                        chunkLoading: 'import',
+                      },
+                    }
+                  : {}),
                 externalsType: 'module',
                 output: {
                   chunkFormat: 'module',
@@ -459,24 +582,12 @@ export const pluginReactRouter = (
                     entry: {
                       ...(hasServerApp
                         ? {
-                            app:
-                              serverAppPath +
-                              (options.federation
-                                ? '?react-router-route-federation'
-                                : ''),
+                            app: serverAppPath,
                           }
                         : {
-                            app:
-                              'virtual/react-router/server-build' +
-                              (options.federation
-                                ? '?react-router-route-federation'
-                                : ''),
+                            app: 'virtual/react-router/server-build',
                           }),
-                      'entry.server':
-                        finalEntryServerPath +
-                        (options.federation
-                          ? '?react-router-route-federation'
-                          : ''),
+                      'entry.server': finalEntryServerPath,
                     },
                   },
                   output: {
@@ -491,26 +602,19 @@ export const pluginReactRouter = (
                   tools: {
                     rspack: {
                       target: options.federation ? 'async-node' : 'node',
-                      externals: ['express'],
+                      externals: nodeExternals,
                       dependencies: ['web'],
                       experiments: {
                         outputModule: pluginOptions.serverOutput === 'module',
+                        ...(options.federation ? { asyncStartup: true } : {}),
                       },
                       externalsType: pluginOptions.serverOutput,
                       output: {
                         chunkFormat: pluginOptions.serverOutput,
-                        chunkLoading:
-                          pluginOptions.serverOutput === 'module'
-                            ? 'import'
-                            : options.federation
-                              ? 'async-node'
-                              : 'require',
-                        workerChunkLoading:
-                          pluginOptions.serverOutput === 'module'
-                            ? 'import'
-                            : 'require',
+                        chunkLoading: nodeChunkLoading,
+                        workerChunkLoading: nodeChunkLoading,
                         wasmLoading: 'fetch',
-                        library: { type: pluginOptions.serverOutput },
+                        library: { type: nodeLibraryType },
                         module: pluginOptions.serverOutput === 'module',
                       },
                       // optimization: {
@@ -528,25 +632,31 @@ export const pluginReactRouter = (
     // Add environment-specific modifications
     api.modifyEnvironmentConfig(
       async (config, { name, mergeEnvironmentConfig }) => {
-        if (name === 'web') {
-          return mergeEnvironmentConfig(config, {
-            tools: {
-              rspack: rspackConfig => {
-                if (rspackConfig.plugins) {
-                  rspackConfig.plugins.push(
-                    createModifyBrowserManifestPlugin(
-                      routes,
-                      pluginOptions,
-                      appDirectory
-                    )
-                  );
-                }
-                return rspackConfig;
-              },
-            },
-          });
+        if (name !== 'web' && name !== 'node') {
+          return config;
         }
-        return config;
+
+        return mergeEnvironmentConfig(config, {
+          tools: {
+            rspack: rspackConfig => {
+              if (pluginOptions.federation) {
+                ensureFederationAsyncStartup(rspackConfig);
+              }
+
+              if (name === 'web' && rspackConfig.plugins) {
+                rspackConfig.plugins.push(
+                  createModifyBrowserManifestPlugin(
+                    routes,
+                    pluginOptions,
+                    appDirectory,
+                    assetPrefix
+                  )
+                );
+              }
+              return rspackConfig;
+            },
+          },
+        });
       }
     );
 
@@ -584,7 +694,8 @@ export const pluginReactRouter = (
           routes,
           pluginOptions,
           clientStats,
-          appDirectory
+          appDirectory,
+          assetPrefix
         );
         return {
           code: `export default ${jsesc(manifest, { es6: true })};`,
@@ -594,10 +705,65 @@ export const pluginReactRouter = (
 
     api.transform(
       {
-        resourceQuery: /\?react-router-route-federation/,
+        resourceQuery: /__react-router-build-client-route/,
       },
       async args => {
-        return await transformRouteFederation(args);
+        const code = await transformToEsm(args.code, args.resourcePath);
+        const exportNames = await getExportNames(code);
+        const isServer = args.environment?.name === 'node';
+        const reexports = exportNames.filter(exp => {
+          return (
+            (CLIENT_ROUTE_EXPORTS as readonly string[]).includes(exp) ||
+            (isServer &&
+              (SERVER_ONLY_ROUTE_EXPORTS as readonly string[]).includes(exp))
+          );
+        });
+        const target = `${args.resourcePath}?react-router-route`;
+        return {
+          code: `export { ${reexports.join(', ')} } from ${JSON.stringify(
+            target
+          )};`,
+        };
+      }
+    );
+
+    api.transform(
+      {
+        test: /[\\/]\.server[\\/]|\.server(\.[cm]?[jt]sx?)?$/,
+      },
+      async args => {
+        if (args.environment?.name !== 'web') {
+          return { code: args.code, map: null };
+        }
+
+        const relativePath = relative(process.cwd(), args.resourcePath);
+        throw new Error(
+          `[${PLUGIN_NAME}] Server-only module referenced by client: ${relativePath}`
+        );
+      }
+    );
+
+    api.transform(
+      {
+        test: /[\\/]\.client[\\/]|\.client(\.[cm]?[jt]sx?)?$/,
+      },
+      async args => {
+        if (args.environment?.name !== 'node') {
+          return { code: args.code, map: null };
+        }
+
+        const code = await transformToEsm(args.code, args.resourcePath);
+        const exportNames = await getExportNames(code);
+        return {
+          code: exportNames
+            .map(name =>
+              name === 'default'
+                ? 'export default undefined;'
+                : `export const ${name} = undefined;`
+            )
+            .join('\n'),
+          map: null,
+        };
       }
     );
 
@@ -606,16 +772,9 @@ export const pluginReactRouter = (
         resourceQuery: /\?react-router-route/,
       },
       async args => {
-        let code;
+        let code: string;
         try {
-          code = (
-            await esbuild.transform(args.code, {
-              jsx: 'automatic',
-              format: 'esm',
-              platform: 'neutral',
-              loader: args.resourcePath.endsWith('x') ? 'tsx' : 'ts',
-            })
-          ).code;
+          code = await transformToEsm(args.code, args.resourcePath);
         } catch (error) {
           console.error(args.resourcePath);
           throw error;
@@ -628,9 +787,7 @@ export const pluginReactRouter = (
         // Important: `es-module-lexer` can't parse TS/TSX directly, so we scan
         // the ESBuild-transformed JS output.
         if (args.environment.name === 'web' && !ssr && isSpaMode) {
-          await init;
-          const [_, exportSpecifiers] = await parseExports(code);
-          const exportNames = exportSpecifiers.map(s => s.n);
+          const exportNames = await getExportNames(code);
 
           const isRootRoute = args.resourcePath === rootRoutePath;
 
@@ -679,6 +836,9 @@ export const pluginReactRouter = (
           removeExports(ast, mutableServerOnlyRouteExports);
         }
         transformRoute(ast);
+        if (args.environment.name === 'web') {
+          removeUnusedImports(ast);
+        }
 
         return generate(ast, {
           sourceMaps: true,
