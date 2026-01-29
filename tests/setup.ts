@@ -1,18 +1,14 @@
-import { vi } from 'vitest';
+import * as fs from 'node:fs';
+import { rstest } from '@rstest/core';
 
 // Mock the file system
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    existsSync: vi.fn().mockReturnValue(true),
-  };
-});
+rstest.mock('node:fs', { spy: true });
+rstest.spyOn(fs, 'existsSync').mockReturnValue(true);
 
 // Mock jiti
-vi.mock('jiti', () => ({
+rstest.mock('jiti', () => ({
   createJiti: () => ({
-    import: vi.fn().mockImplementation((path) => {
+    import: rstest.fn().mockImplementation((path) => {
       if (path.includes('routes.ts')) {
         return Promise.resolve([
           {
@@ -34,7 +30,7 @@ vi.mock('jiti', () => ({
 }));
 
 // Mock webpack sources
-const mockRawSource = vi.fn().mockImplementation((content) => ({
+const mockRawSource = rstest.fn().mockImplementation((content) => ({
   source: () => content,
   size: () => content.length,
 }));
@@ -60,8 +56,8 @@ const deepMerge = (base: any, overrides: any): any => {
 };
 
 // Mock the @scripts/test-helper module
-vi.mock('@scripts/test-helper', () => ({
-  createStubRsbuild: vi.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => {
+rstest.mock('@scripts/test-helper', () => ({
+  createStubRsbuild: rstest.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => {
     const baseConfig = {
       dev: {
         hmr: false,
@@ -111,16 +107,16 @@ vi.mock('@scripts/test-helper', () => ({
     const mergedConfig = deepMerge(baseConfig, rsbuildConfig);
 
     return {
-      addPlugins: vi.fn(),
-      unwrapConfig: vi.fn().mockResolvedValue(mergedConfig),
-      processAssets: vi.fn(),
-      onBeforeStartDevServer: vi.fn(),
-      onBeforeBuild: vi.fn(),
-      onAfterBuild: vi.fn(),
-      modifyRsbuildConfig: vi.fn(),
-      onAfterEnvironmentCompile: vi.fn(),
-      modifyEnvironmentConfig: vi.fn(),
-      transform: vi.fn(),
+      addPlugins: rstest.fn(),
+      unwrapConfig: rstest.fn().mockResolvedValue(mergedConfig),
+      processAssets: rstest.fn(),
+      onBeforeStartDevServer: rstest.fn(),
+      onBeforeBuild: rstest.fn(),
+      onAfterBuild: rstest.fn(),
+      modifyRsbuildConfig: rstest.fn(),
+      onAfterEnvironmentCompile: rstest.fn(),
+      modifyEnvironmentConfig: rstest.fn(),
+      transform: rstest.fn(),
       context: {
         rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
       },

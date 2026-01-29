@@ -1,5 +1,5 @@
 import { format, parse } from '@tusbar/cache-control'
-import { expect, test } from 'vitest'
+import { expect, test } from '@rstest/core'
 import { getConservativeCacheControl } from './headers.server.ts'
 
 test('works for basic usecase', () => {

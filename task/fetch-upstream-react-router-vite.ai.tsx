@@ -11,7 +11,7 @@ import {
 } from '@unpack/ai';
 
 // Downstream tasks can include the fetched snapshot index in prompt context.
-export const upstreamViteIndex = assetRef('upstream_vite_index');
+export const upstreamPlugin = assetRef('upstream_plugin');
 
 export default (
   <Program
@@ -22,12 +22,12 @@ export default (
     description="Fetch upstream react-router-dev/vite sources into task/upstream/ so later tasks can port behavior into Rsbuild."
   >
     <Asset
-      id="upstream_vite_index"
-      kind="doc"
-      path="task/upstream/react-router-dev/vite/INDEX.md"
+      id="upstream_plugin"
+      kind="code"
+      path="task/upstream/react-router-dev/vite/plugin.ts"
     />
 
-    <Agent id="fetch-upstream" produces={['upstream_vite_index']}>
+    <Agent id="fetch-upstream" produces={['upstream_plugin']}>
       <Prompt>
         <System>
           You fetch upstream source files into the repo using shell commands and
@@ -51,13 +51,6 @@ export default (
           download the upstream files (use `curl -fsSL ... -o ...`).
           Prefer one shell script that fetches everything deterministically.
           Overwrite existing files.
-          After fetching, write `task/upstream/react-router-dev/vite/INDEX.md`
-          listing:
-          - the raw URL for each file
-          - the local path
-          - a short note for "key" files: `plugin.ts`, `with-props.ts`,
-            `remove-exports.ts`, `styles.ts`, `route-chunks.ts`
-
           Fetch these files:
 
           - babel.ts

@@ -1,14 +1,16 @@
-import { Agent, Asset, Context, Instructions, Program, Prompt, System } from '@unpack/ai';
+import { Agent, Asset, Instructions, Program, Prompt, System, assetRef } from '@unpack/ai';
 
 import './fetch-upstream-react-router-vite.ai.tsx';
 import './migrate-vitest-to-rstest.ai.tsx';
 import './port-react-router-vite-features.ai.tsx';
 import './validate.ai.tsx';
 
-import { upstreamViteIndex } from './fetch-upstream-react-router-vite.ai.tsx';
-import { migrateReport } from './migrate-vitest-to-rstest.ai.tsx';
-import { portReport } from './port-react-router-vite-features.ai.tsx';
-import { validationReport } from './validate.ai.tsx';
+import { upstreamPlugin } from './fetch-upstream-react-router-vite.ai.tsx';
+import { migrateConfig } from './migrate-vitest-to-rstest.ai.tsx';
+import { portMain } from './port-react-router-vite-features.ai.tsx';
+import { validationTarget } from './validate.ai.tsx';
+
+export const orchestratorMarker = assetRef('orchestrator_marker');
 
 export default (
   <Program
@@ -18,26 +20,23 @@ export default (
     target={{ language: 'markdown' }}
     description="Orchestrate fetching upstream React Router Vite plugin sources and porting missing features into rsbuild-plugin-react-router."
   >
-    <Asset id="final_report" kind="doc" path="task/output/final-report.md" />
+    <Asset id="orchestrator_marker" kind="code" path="src/index.ts" />
 
-    <Agent id="write-final-report" produces={['final_report']}>
+    <Agent
+      id="orchestrate"
+      produces={['orchestrator_marker']}
+      external_needs={[
+        { alias: 'upstreamPlugin', agent: 'fetch-upstream' },
+        { alias: 'migrateConfig', agent: 'migrate-tests' },
+        { alias: 'portMain', agent: 'port-features' },
+        { alias: 'validationTarget', agent: 'run-checks' },
+      ]}
+    >
       <Prompt>
-        <System>
-          You summarize the work done by the upstream-fetch + port + validation
-          tasks.
-        </System>
-        <Context>
-          {upstreamViteIndex}
-          {migrateReport}
-          {portReport}
-          {validationReport}
-        </Context>
+        <System>Do not write any markdown report files.</System>
         <Instructions>
-          Write `task/output/final-report.md` with:
-          - What upstream snapshot was fetched
-          - What features were ported
-          - How to run tests/build
-          - Any remaining gaps vs upstream
+          Ensure upstream fetch, migration, porting, and validation run in
+          dependency order. Do not write any markdown files.
         </Instructions>
       </Prompt>
     </Agent>

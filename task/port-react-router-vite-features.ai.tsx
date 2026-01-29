@@ -11,9 +11,9 @@ import {
   ctx,
 } from '@unpack/ai';
 
-import { upstreamViteIndex } from './fetch-upstream-react-router-vite.ai.tsx';
+import { upstreamPlugin } from './fetch-upstream-react-router-vite.ai.tsx';
 
-export const portReport = assetRef('port_report');
+export const portMain = assetRef('port_main');
 
 export default (
   <Program
@@ -23,21 +23,22 @@ export default (
     target={{ language: 'ts' }}
     description="Port missing behaviors from React Router's Vite plugin to rsbuild-plugin-react-router."
   >
-    <Asset id="port_report" kind="doc" path="task/output/port-report.md" />
+    <Asset id="port_main" kind="code" path="src/index.ts" />
 
     <Agent
       id="port-features"
-      produces={['port_report']}
-      external_needs={[{ alias: 'upstreamViteIndex', agent: 'fetch-upstream' }]}
+      produces={['port_main']}
+      external_needs={[{ alias: 'upstreamPlugin', agent: 'fetch-upstream' }]}
     >
-      <Prompt skills={['rsbuild-docs']}>
+      <Prompt>
         <System>
           You are implementing features in a TypeScript Rsbuild plugin. Prefer
           upstream behavior from React Router's Vite plugin when reasonable, but
           adapt to Rsbuild/Rspack APIs correctly.
         </System>
-        <Skill name="rsbuild-docs" />
+        <Skill name="rsbuild-docs">{`Use https://rsbuild.rs/llms.txt as the entry point. It lists relative links like /guide/.../index.md and /config/.../source-map.md. Resolve those against https://rsbuild.rs to navigate to the relevant sections.`}</Skill>
         <Context>
+          {upstreamPlugin}
           {ctx.file('./README.md', { as: 'Plugin README', mode: 'quote' })}
           {ctx.file('./package.json', { as: 'package.json', mode: 'code' })}
           {ctx.file('./src/index.ts', { as: 'Current Plugin (src/index.ts)', mode: 'code' })}
@@ -108,14 +109,18 @@ export default (
           Keep changes scoped and testable:
           - Prefer adding small helper modules under `src/` (e.g. `src/plugins/*`
             or `src/warnings/*`) rather than growing `src/index.ts` further.
-          - Add/extend tests under `tests/` (Vitest) for any pure logic
-            (export lists, sourcemap detection, config validation).
+          - Add/extend tests under `tests/` using the repo’s current test runner
+            (check `package.json` + config). Cover pure logic (export lists,
+            sourcemap detection, config validation).
           - Update README only if user-facing configuration changes.
 
-          Write a short implementation log to `task/output/port-report.md` with:
-          - Features added (with file references)
-          - Known limitations vs upstream
-          - Tests added/updated and how to run them
+          You must implement real code changes when gaps exist. Do not respond
+          with a "no changes needed" outcome unless you have verified parity for
+          each requested item and explicitly cite the current files. If gaps
+          remain, change the codebase to close them and update tests accordingly.
+
+          This is a code-editing task. Make edits directly in the repo, update
+          any dependent files/tests/config, and keep the codebase compiling.
         </Instructions>
       </Prompt>
     </Agent>

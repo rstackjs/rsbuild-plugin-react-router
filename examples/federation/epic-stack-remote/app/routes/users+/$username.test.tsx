@@ -1,11 +1,8 @@
-/**
- * @vitest-environment jsdom
- */
 import { faker } from '@faker-js/faker'
 import { render, screen } from '@testing-library/react'
 import { createRoutesStub } from 'react-router'
 import setCookieParser from 'set-cookie-parser'
-import { test } from 'vitest'
+import { test } from '@rstest/core'
 import { loader as rootLoader } from '#app/root.tsx'
 import { getSessionExpirationDate, sessionKey } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'

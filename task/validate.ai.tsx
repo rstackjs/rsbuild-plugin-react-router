@@ -10,9 +10,7 @@ import {
   ctx,
 } from '@unpack/ai';
 
-import { migrateReport } from './migrate-vitest-to-rstest.ai.tsx';
-
-export const validationReport = assetRef('validation_report');
+export const validationTarget = assetRef('validation_target');
 
 export default (
   <Program
@@ -22,13 +20,9 @@ export default (
     target={{ language: 'markdown' }}
     description="Run local checks for rsbuild-plugin-react-router after porting features."
   >
-    <Asset id="validation_report" kind="doc" path="task/output/validation-report.md" />
+    <Asset id="validation_target" kind="code" path="package.json" />
 
-    <Agent
-      id="run-checks"
-      produces={['validation_report']}
-      external_needs={[{ alias: 'migrateReport', agent: 'migrate-tests' }]}
-    >
+    <Agent id="run-checks" produces={['validation_target']}>
       <Prompt>
         <System>
           You run the repo tests/build and write a concise report with any
@@ -39,15 +33,15 @@ export default (
         </Context>
         <Instructions>
           Run these commands from the repo root and fix any issues:
-          - `pnpm test`
+          - `pnpm test` (or the repo’s current test script if it changes)
           - `pnpm build`
 
           If a command fails, fix the code/tests and rerun until green.
 
-          Write `task/output/validation-report.md` containing:
-          - Commands run
-          - Result (pass/fail)
-          - Any fixes made
+          Do not write any markdown report files. Only run commands and fix
+          issues in code if needed.
+
+          This is a code-editing task. Apply fixes in the repo, not in reports.
         </Instructions>
       </Prompt>
     </Agent>

@@ -26,24 +26,48 @@ const shouldMock =
 
 export class GitHubProvider implements AuthProvider {
 	getAuthStrategy() {
+		const redirectURI = process.env.GITHUB_REDIRECT_URI
+			? new URL(process.env.GITHUB_REDIRECT_URI)
+			: new URL('/auth/github/callback', process.env.APP_BASE_URL ?? 'http://localhost')
+
 		return new GitHubStrategy(
 			{
-				clientID: process.env.GITHUB_CLIENT_ID,
-				clientSecret: process.env.GITHUB_CLIENT_SECRET,
-				callbackURL: '/auth/github/callback',
+				clientId: process.env.GITHUB_CLIENT_ID ?? 'MOCK_GITHUB_CLIENT_ID',
+				clientSecret: process.env.GITHUB_CLIENT_SECRET ?? 'MOCK_GITHUB_CLIENT_SECRET',
+				redirectURI,
+				scopes: ['user:email'],
 			},
-			async ({ profile }) => {
-				const email = profile.emails[0]?.value.trim().toLowerCase()
+			async ({ tokens }) => {
+				const headers = {
+					Accept: 'application/vnd.github+json',
+					Authorization: `token ${tokens.accessToken()}`,
+					'X-GitHub-Api-Version': '2022-11-28',
+				}
+				const [userResponse, emailsResponse] = await Promise.all([
+					fetch('https://api.github.com/user', { headers }),
+					fetch('https://api.github.com/user/emails', { headers }),
+				])
+				const userProfile = await userResponse.json()
+				const emails: Array<{
+					email: string
+					primary?: boolean
+					verified?: boolean
+				}> = await emailsResponse.json()
+				const primaryEmail =
+					emails.find((email) => email.primary && email.verified) ??
+					emails.find((email) => email.verified) ??
+					emails[0]
+				const email = primaryEmail?.email?.trim().toLowerCase()
 				if (!email) {
 					throw new Error('Email not found')
 				}
-				const username = profile.displayName
-				const imageUrl = profile.photos[0]?.value
+				const username = userProfile.login ?? userProfile.name ?? email
+				const imageUrl = userProfile.avatar_url
 				return {
 					email,
-					id: profile.id,
+					id: String(userProfile.id),
 					username,
-					name: profile.name.givenName,
+					name: userProfile.name ?? username,
 					imageUrl,
 				}
 			},

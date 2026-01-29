@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it } from '@rstest/core';
 import { generateServerBuild } from '../src/server-utils';
 
 describe('SPA Mode (ssr: false)', () => {

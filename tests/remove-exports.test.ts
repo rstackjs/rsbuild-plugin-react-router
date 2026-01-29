@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@rstest/core';
 import { parse, traverse } from '../src/babel';
 import { removeExports, removeUnusedImports } from '../src/plugin-utils';
 

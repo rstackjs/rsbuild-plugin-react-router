@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, rstest } from '@rstest/core';
 import { warnOnClientSourceMaps } from '../src/warnings/warn-on-client-source-maps';
 
 describe('warnOnClientSourceMaps', () => {
   it('does not warn in non-production mode', () => {
-    const warn = vi.fn();
+    const warn = rstest.fn();
     warnOnClientSourceMaps(
       {
         mode: 'development',
@@ -16,7 +16,7 @@ describe('warnOnClientSourceMaps', () => {
   });
 
   it('warns when web environment source maps are enabled in production', () => {
-    const warn = vi.fn();
+    const warn = rstest.fn();
     warnOnClientSourceMaps(
       {
         mode: 'production',
@@ -32,7 +32,7 @@ describe('warnOnClientSourceMaps', () => {
   });
 
   it('warns when output.sourceMap is true in production', () => {
-    const warn = vi.fn();
+    const warn = rstest.fn();
     warnOnClientSourceMaps(
       {
         mode: 'production',
@@ -45,7 +45,7 @@ describe('warnOnClientSourceMaps', () => {
   });
 
   it('warns when output.sourceMap is a string in production', () => {
-    const warn = vi.fn();
+    const warn = rstest.fn();
     warnOnClientSourceMaps(
       {
         mode: 'production',
@@ -58,7 +58,7 @@ describe('warnOnClientSourceMaps', () => {
   });
 
   it('does not warn when source maps are disabled in production', () => {
-    const warn = vi.fn();
+    const warn = rstest.fn();
     warnOnClientSourceMaps(
       {
         mode: 'production',
@@ -70,7 +70,7 @@ describe('warnOnClientSourceMaps', () => {
     expect(warn).not.toHaveBeenCalled();
   });
   it('warns when rspack devtool enables source maps in production', () => {
-    const warn = vi.fn();
+    const warn = rstest.fn();
     warnOnClientSourceMaps(
       {
         mode: 'production',
@@ -84,7 +84,7 @@ describe('warnOnClientSourceMaps', () => {
   });
 
   it('warns when web environment devtool enables source maps in production', () => {
-    const warn = vi.fn();
+    const warn = rstest.fn();
     warnOnClientSourceMaps(
       {
         mode: 'production',

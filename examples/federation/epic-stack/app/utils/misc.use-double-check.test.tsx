@@ -1,10 +1,7 @@
-/**
- * @vitest-environment jsdom
- */
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { useState } from 'react'
-import { expect, test } from 'vitest'
+import { expect, test } from '@rstest/core'
 import { useDoubleCheck } from './misc.tsx'
 
 function TestComponent() {

@@ -1,5 +1,5 @@
 import { createStubRsbuild } from '@scripts/test-helper';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, rstest } from '@rstest/core';
 import { pluginReactRouter } from '../src';
 
 describe('pluginReactRouter', () => {
@@ -143,7 +143,7 @@ describe('pluginReactRouter', () => {
         rsbuildConfig: {},
       });
 
-      const processAssets = vi.fn();
+      const processAssets = rstest.fn();
       rsbuild.processAssets = processAssets;
 
       const plugin = pluginReactRouter({ serverOutput: 'commonjs' });

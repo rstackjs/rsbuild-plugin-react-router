@@ -51,11 +51,11 @@
     "build": "rslib build",
     "e2e": "pnpm build && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e",
     "dev": "rslib build --watch",
-    "test": "vitest run",
-    "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage",
-    "test:core": "vitest run -c ./vitest.config.ts",
-    "test:core:watch": "vitest watch -c ./vitest.config.ts",
+    "test": "rstest run",
+    "test:watch": "rstest watch",
+    "test:coverage": "rstest run --coverage",
+    "test:core": "rstest run -c ./rstest.config.ts",
+    "test:core:watch": "rstest watch -c ./rstest.config.ts",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\"",
     "changeset": "changeset",
@@ -96,6 +96,8 @@
     "@types/jsesc": "^3.0.3",
     "@types/node": "^25.0.10",
     "@types/react": "^19.2.10",
+    "@rstest/core": "^0.8.1",
+    "@rstest/coverage-istanbul": "^0.2.0",
     "@types/react-dom": "^19.2.3",
     "es-module-lexer": "1.7.0",
     "kill-port": "^2.0.1",
@@ -105,8 +107,7 @@
     "react-dom": "^19.2.4",
     "react-router": "^7.13.0",
     "react-router-dom": "^7.13.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "@rsbuild/core": "^1.7.2"
