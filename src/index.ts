@@ -641,7 +641,9 @@ export const pluginReactRouter = (
         return mergeEnvironmentConfig(config, {
           tools: {
             rspack: rspackConfig => {
-              ensureFederationAsyncStartup(rspackConfig);
+              if (pluginOptions.federation) {
+                ensureFederationAsyncStartup(rspackConfig);
+              }
 
               if (name === 'web' && rspackConfig.plugins) {
                 rspackConfig.plugins.push(
