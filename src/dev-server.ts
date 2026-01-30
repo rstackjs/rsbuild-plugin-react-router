@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { normalizeBuildModule, resolveBuildExports } from './server-utils.js';
 
 export type DevServerMiddleware = (
   req: IncomingMessage,
@@ -20,7 +21,9 @@ export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
       }
 
       const { createRequestListener } = await import('@react-router/node');
-      const listener = createRequestListener({ build: bundle });
+      const normalizedBuild = normalizeBuildModule(bundle);
+      const build = await resolveBuildExports(normalizedBuild);
+      const listener = createRequestListener({ build });
       await listener(req, res);
     } catch (error) {
       console.error('SSR Error:', error);

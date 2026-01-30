@@ -87,4 +87,58 @@ function generateServerBuild(
   return generateStaticTemplate(routes, options);
 }
 
+const RESOLVABLE_BUILD_EXPORTS = new Set([
+  'allowedActionOrigins',
+  'assets',
+  'assetsBuildDirectory',
+  'basename',
+  'entry',
+  'future',
+  'isSpaMode',
+  'prerender',
+  'publicPath',
+  'routeDiscovery',
+  'routes',
+  'ssr',
+]);
+
+const isPromiseLike = (value: unknown): value is Promise<unknown> =>
+  typeof (value as Promise<unknown>)?.then === 'function';
+
+export const normalizeBuildModule = <T extends Record<string, any>>(build: T): T => {
+  if (!build || typeof build !== 'object') {
+    return build;
+  }
+  if (
+    'default' in build &&
+    Object.keys(build).length === 1 &&
+    typeof build.default === 'object' &&
+    build.default
+  ) {
+    return build.default as T;
+  }
+  return build;
+};
+
+export const resolveBuildExports = async <T extends Record<string, any>>(
+  build: T
+): Promise<T> => {
+  const resolved: Record<string, any> = { ...build };
+  for (const key of Object.keys(build)) {
+    if (!RESOLVABLE_BUILD_EXPORTS.has(key)) {
+      continue;
+    }
+    const value = build[key];
+    if (typeof value === 'function' && value.length === 0) {
+      const result = value();
+      resolved[key] = isPromiseLike(result) ? await result : result;
+      continue;
+    }
+    if (isPromiseLike(value)) {
+      resolved[key] = await value;
+    }
+  }
+  return resolved as T;
+};
+
 export { generateServerBuild };

@@ -28,7 +28,7 @@ import {
   removeUnusedImports,
 } from './plugin-utils.js';
 import type { PluginOptions } from './types.js';
-import { generateServerBuild } from './server-utils.js';
+import { generateServerBuild, normalizeBuildModule, resolveBuildExports } from './server-utils.js';
 import {
   getReactRouterManifestForDev,
   configRoutesToRouteManifest,
@@ -382,7 +382,9 @@ export const pluginReactRouter = (
       const buildModule = await import(
         pathToFileURL(serverBuildPath).toString()
       );
-      const requestHandler = createRequestHandler(buildModule, 'production');
+      const normalizedBuild = normalizeBuildModule(buildModule as any);
+      const build = await resolveBuildExports(normalizedBuild);
+      const requestHandler = createRequestHandler(build, 'production');
 
       // Helper function to prerender a single path
       const prerenderPath = async (

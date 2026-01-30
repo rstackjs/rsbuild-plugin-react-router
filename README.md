@@ -97,6 +97,11 @@ pluginReactRouter({
 When Module Federation is enabled, configure your Federation plugin with
 `experiments.asyncStartup: true` to avoid requiring entrypoint `import()` hacks.
 See the Module Federation examples under `examples/federation`.
+
+When Module Federation is enabled, some runtimes may expose server build exports
+as async getters. The dev server resolves these exports automatically. For
+production, use a custom server or an adapter that resolves async exports before
+passing the build to React Router's request handler.
 ```
 
 2. **React Router Configuration** (in `react-router.config.*`):
@@ -143,6 +148,20 @@ The plugin will look for `react-router.config` with any supported JS/TS extensio
 - `react-router.config.mjs`
 
 If none are found, it falls back to defaults.
+
+### Framework Mode
+
+React Router Framework Mode is implemented as a Vite plugin. This Rsbuild
+plugin targets Data Mode only and does not support Framework Mode.
+
+### FAQ
+
+#### rsbuild-plugin-react-router vs ModernJS
+
+This plugin is a lightweight adapter to run React Router on Rsbuild. It does
+not aim to replace ModernJS or its higher-level framework features. If your
+goal is a full framework or advanced microfrontend support, ModernJS may be
+a better fit.
 
 ### SPA Mode (`ssr: false`)
 
