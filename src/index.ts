@@ -30,6 +30,10 @@ import {
 import type { PluginOptions } from './types.js';
 import { generateServerBuild, normalizeBuildModule, resolveBuildExports } from './server-utils.js';
 import {
+  getPrerenderConcurrency,
+  resolvePrerenderPaths,
+} from './prerender.js';
+import {
   getReactRouterManifestForDev,
   configRoutesToRouteManifest,
 } from './manifest.js';
@@ -305,52 +309,15 @@ export const pluginReactRouter = (
     });
 
     // Determine prerender paths from config
-    const getPrerenderPaths = (): string[] => {
-      if (!prerenderConfig) return [];
-      if (prerenderConfig === true) {
-        // When true, prerender all static routes (routes without params)
-        const paths = ['/'];
-        const addStaticPaths = (
-          routeEntries: RouteConfigEntry[],
-          prefix = ''
-        ) => {
-          for (const route of routeEntries) {
-            if (route.path) {
-              const fullPath = `${prefix}/${route.path}`
-                .replace(/\/+/g, '/')
-                .replace(/\/$/, '');
-              // Skip routes with dynamic segments
-              if (!route.path.includes(':') && route.path !== '*') {
-                if (fullPath && fullPath !== '/') {
-                  paths.push(fullPath);
-                }
-              }
-            }
-            if (route.children) {
-              const newPrefix = route.path
-                ? `${prefix}/${route.path}`.replace(/\/+/g, '/')
-                : prefix;
-              addStaticPaths(route.children, newPrefix);
-            }
-          }
-        };
-        addStaticPaths(routeConfig);
-        return paths;
+    const prerenderPaths = await resolvePrerenderPaths(
+      prerenderConfig,
+      ssr,
+      routeConfig,
+      {
+        logWarning: true,
+        warn: message => api.logger.warn(message),
       }
-      if (Array.isArray(prerenderConfig)) {
-        return prerenderConfig;
-      }
-      if (
-        typeof prerenderConfig === 'object' &&
-        'paths' in prerenderConfig &&
-        Array.isArray(prerenderConfig.paths)
-      ) {
-        return prerenderConfig.paths;
-      }
-      return [];
-    };
-
-    const prerenderPaths = getPrerenderPaths();
+    );
     const isSpaMode = !ssr && prerenderPaths.length === 0;
     const isPrerenderMode = prerenderPaths.length > 0;
 
@@ -445,9 +412,17 @@ export const pluginReactRouter = (
         console.log(
           `[${PLUGIN_NAME}] Prerendering ${prerenderPaths.length} path(s)...`
         );
+        const concurrency = getPrerenderConcurrency(prerenderConfig);
+        const pending = new Set<Promise<void>>();
         for (const path of prerenderPaths) {
-          await prerenderPath(path);
+          const task = prerenderPath(path);
+          pending.add(task);
+          task.finally(() => pending.delete(task));
+          if (pending.size >= concurrency) {
+            await Promise.race(pending);
+          }
         }
+        await Promise.all(pending);
       }
 
       // Remove server output for SPA mode and when not using SSR
@@ -756,6 +731,17 @@ export const pluginReactRouter = (
 
         const code = await transformToEsm(args.code, args.resourcePath);
         const exportNames = await getExportNames(code);
+        const hasExportStar =
+          /\bexport\s*\*\s*(?!as\s)from\s*['"]/.test(code);
+
+        if (hasExportStar) {
+          throw new Error(
+            `[${PLUGIN_NAME}] Client-only module uses \`export * from\`, ` +
+              `which cannot be safely stubbed for the server build. ` +
+              `Please explicitly re-export named bindings in ` +
+              `\`${relative(process.cwd(), args.resourcePath)}\`.`
+          );
+        }
         return {
           code: exportNames
             .map(name =>

@@ -205,6 +205,28 @@ When `prerender` is specified:
 
 You can also use `prerender: true` to prerender all static routes automatically.
 
+`prerender` can also be a function:
+
+```ts
+export default {
+  ssr: false,
+  prerender: ({ getStaticPaths }) =>
+    getStaticPaths().filter(path => path !== '/admin'),
+} satisfies Config;
+```
+
+For large sites, you can tune prerender concurrency:
+
+```ts
+export default {
+  ssr: false,
+  prerender: {
+    paths: ['/','/about'],
+    unstable_concurrency: 4,
+  },
+} satisfies Config;
+```
+
 ### Default Configuration Values
 
 If no configuration is provided, the following defaults will be used:
