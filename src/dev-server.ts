@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createRequestListener } from '@react-router/node';
 
 export type DevServerMiddleware = (
   req: IncomingMessage,
@@ -20,6 +19,7 @@ export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
         throw new Error('Server bundle not found or invalid');
       }
 
+      const { createRequestListener } = await import('@react-router/node');
       const listener = createRequestListener({ build: bundle });
       await listener(req, res);
     } catch (error) {
