@@ -3,11 +3,11 @@ import type { Route } from './+types/edit';
 
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => `Edit ${data.project.name}`,
+    breadcrumb: (data: Route.ClientLoaderData) => `Edit ${data.project.name}`,
   };
 }
 
-export function loader({ params }: Route.LoaderArgs) {
+export function clientLoader({ params }: Route.ClientLoaderArgs) {
   // Simulated data - in a real app, this would come from a database
   return {
     project: {
@@ -20,7 +20,7 @@ export function loader({ params }: Route.LoaderArgs) {
   };
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
+export async function clientAction({ request, params }: Route.ClientActionArgs) {
   const formData = await request.formData();
   const updates = Object.fromEntries(formData);
 
@@ -31,7 +31,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function EditProject() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<Route.ClientLoaderData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
 

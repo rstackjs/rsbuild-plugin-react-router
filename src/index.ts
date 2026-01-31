@@ -1184,6 +1184,24 @@ export const pluginReactRouter = (
                 ensureFederationAsyncStartup(rspackConfig);
               }
 
+              if (name === 'node' && resolvedServerOutput === 'module') {
+                const output = rspackConfig.output;
+                const library = output?.library;
+                const libraryType =
+                  library &&
+                  typeof library === 'object' &&
+                  !Array.isArray(library) &&
+                  'type' in library
+                    ? library.type
+                    : undefined;
+                if (output && libraryType === 'commonjs2') {
+                  rspackConfig.output = {
+                    ...output,
+                    library: { type: 'module' },
+                  };
+                }
+              }
+
               if (name === 'web' && rspackConfig.plugins) {
                 rspackConfig.plugins.push(
                   createModifyBrowserManifestPlugin(

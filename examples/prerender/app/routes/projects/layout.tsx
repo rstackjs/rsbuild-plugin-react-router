@@ -7,7 +7,7 @@ export function handle() {
   };
 }
 
-export function loader() {
+export function clientLoader() {
   // Simulated data - in a real app, this would come from a database
   return {
     projects: [
@@ -20,7 +20,7 @@ export function loader() {
 }
 
 export default function ProjectsLayout() {
-  const { projects } = useLoaderData<Route.LoaderData>();
+  const { projects } = useLoaderData<Route.ClientLoaderData>();
 
   return (
     <div className="page-container">

@@ -3,11 +3,11 @@ import type { Route } from './+types/project';
 
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => data.project.name,
+    breadcrumb: (data: Route.ClientLoaderData) => data.project.name,
   };
 }
 
-export function loader({ params }: Route.LoaderArgs) {
+export function clientLoader({ params }: Route.ClientLoaderArgs) {
   // Simulated data - in a real app, this would come from a database
   return {
     project: {
@@ -74,7 +74,7 @@ function Avatar({ name, initials }: { name: string; initials: string }) {
 }
 
 export default function Project() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<Route.ClientLoaderData>();
 
   return (
     <div className="space-y-6">

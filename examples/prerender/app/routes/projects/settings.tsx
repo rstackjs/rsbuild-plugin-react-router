@@ -3,11 +3,11 @@ import type { Route } from './+types/settings';
 
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => `${data.project.name} Settings`,
+    breadcrumb: (data: Route.ClientLoaderData) => `${data.project.name} Settings`,
   };
 }
 
-export function loader({ params }: Route.LoaderArgs) {
+export function clientLoader({ params }: Route.ClientLoaderArgs) {
   // Simulated data - in a real app, this would come from a database
   return {
     project: {
@@ -27,7 +27,7 @@ export function loader({ params }: Route.LoaderArgs) {
   };
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
+export async function clientAction({ request, params }: Route.ClientActionArgs) {
   const formData = await request.formData();
   const updates = Object.fromEntries(formData);
 
@@ -64,7 +64,7 @@ function SettingsSection({
 }
 
 export default function ProjectSettings() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<Route.ClientLoaderData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
 
