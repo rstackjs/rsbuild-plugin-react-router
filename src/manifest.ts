@@ -1,10 +1,18 @@
+import { readFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'pathe';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import type { Rspack } from '@rsbuild/core';
 import { combineURLs, createRouteId } from './plugin-utils.js';
-import { SERVER_EXPORTS, CLIENT_EXPORTS, JS_LOADERS } from './constants.js';
-import * as esbuild from 'esbuild';
+import { SERVER_EXPORTS, CLIENT_EXPORTS } from './constants.js';
+import {
+  detectRouteChunksIfEnabled,
+  getRouteChunkEntryName,
+  validateRouteChunks,
+  type RouteChunkCache,
+  type RouteChunkConfig,
+} from './route-chunks.js';
+import { getExportNames, transformToEsm } from './export-utils.js';
 
 // Helper functions
 export function configRoutesToRouteManifest(
@@ -48,13 +56,21 @@ export function configRoutesToRouteManifest(
   return routeManifest;
 }
 
+type RouteChunkManifestOptions = {
+  splitRouteModules?: boolean | 'enforce';
+  rootRouteFile?: string;
+  isBuild?: boolean;
+  cache?: RouteChunkCache;
+};
+
 export async function getReactRouterManifestForDev(
   routes: Record<string, Route>,
   //@ts-ignore
   options: PluginOptions,
   clientStats: Rspack.StatsCompilation | undefined,
   context: string,
-  assetPrefix = '/'
+  assetPrefix = '/',
+  routeChunkOptions?: RouteChunkManifestOptions
 ): Promise<{
   version: string;
   url: string;
@@ -70,34 +86,88 @@ export async function getReactRouterManifestForDev(
   routes: Record<string, RouteManifestItem>;
 }> {
   const result: Record<string, RouteManifestItem> = {};
+  const splitRouteModules = routeChunkOptions?.splitRouteModules ?? false;
+  const enforceSplitRouteModules = splitRouteModules === 'enforce';
+  const isBuild = routeChunkOptions?.isBuild ?? false;
+  const routeChunkConfig: RouteChunkConfig | null =
+    splitRouteModules && routeChunkOptions?.rootRouteFile
+      ? {
+          splitRouteModules,
+          appDirectory: context,
+          rootRouteFile: routeChunkOptions.rootRouteFile,
+        }
+      : null;
+
+  const getAssetsForChunk = (chunkName: string): string[] => {
+    const assets = clientStats?.assetsByChunkName?.[chunkName];
+    if (!assets) {
+      return [];
+    }
+    return Array.isArray(assets) ? assets : [assets];
+  };
+
+  const getModulePathForChunk = (chunkName: string): string | undefined => {
+    const assets = getAssetsForChunk(chunkName);
+    const jsAssets = assets.filter(asset => asset.endsWith('.js'));
+    return jsAssets[0] ? combineURLs(assetPrefix, jsAssets[0]) : undefined;
+  };
 
   for (const [key, route] of Object.entries(routes)) {
-    const assets = clientStats?.assetsByChunkName?.[route.id];
-    const jsAssets = assets?.filter(asset => asset.endsWith('.js')) || [];
-    const cssAssets = assets?.filter(asset => asset.endsWith('.css')) || [];
+    const assets = getAssetsForChunk(route.id);
+    const jsAssets = assets.filter(asset => asset.endsWith('.js')) || [];
+    const cssAssets = assets.filter(asset => asset.endsWith('.css')) || [];
     // Read and analyze the route file to check for exports
     const routeFilePath = resolve(context, route.file);
     let exports = new Set<string>();
+    let hasRouteChunkByExportName: Record<
+      'clientAction' | 'clientLoader' | 'clientMiddleware' | 'HydrateFallback',
+      boolean
+    > = {
+      clientAction: false,
+      clientLoader: false,
+      clientMiddleware: false,
+      HydrateFallback: false,
+    };
 
     try {
-      const buildResult = await esbuild.build({
-        entryPoints: [routeFilePath],
-        bundle: false,
-        write: false,
-        metafile: true,
-        jsx: 'automatic',
-        format: 'esm',
-        platform: 'neutral',
-        loader: JS_LOADERS,
-      });
+      const source = await readFile(routeFilePath, 'utf8');
+      const code = await transformToEsm(source, routeFilePath);
+      exports = new Set(await getExportNames(code));
 
-      // Get exports from the metafile
-      const entryPoint = Object.values(buildResult.metafile.outputs)[0];
-      if (entryPoint?.exports) {
-        exports = new Set(entryPoint.exports);
+      if (isBuild && routeChunkConfig) {
+        const { hasRouteChunkByExportName: chunkInfo } =
+          await detectRouteChunksIfEnabled(
+            routeChunkOptions?.cache,
+            routeChunkConfig,
+            routeFilePath,
+            code
+          );
+        hasRouteChunkByExportName = chunkInfo;
       }
     } catch (error) {
       console.error(`Failed to analyze route file ${routeFilePath}:`, error);
+    }
+
+    const hasClientAction = exports.has(CLIENT_EXPORTS.clientAction);
+    const hasClientLoader = exports.has(CLIENT_EXPORTS.clientLoader);
+    const hasClientMiddleware = exports.has(CLIENT_EXPORTS.clientMiddleware);
+    const hasHydrateFallback = exports.has(CLIENT_EXPORTS.HydrateFallback);
+
+    if (isBuild && enforceSplitRouteModules && routeChunkConfig) {
+      validateRouteChunks({
+        config: routeChunkConfig,
+        id: routeFilePath,
+        valid: {
+          clientAction:
+            !hasClientAction || hasRouteChunkByExportName.clientAction,
+          clientLoader:
+            !hasClientLoader || hasRouteChunkByExportName.clientLoader,
+          clientMiddleware:
+            !hasClientMiddleware || hasRouteChunkByExportName.clientMiddleware,
+          HydrateFallback:
+            !hasHydrateFallback || hasRouteChunkByExportName.HydrateFallback,
+        },
+      });
     }
 
     result[key] = {
@@ -107,15 +177,35 @@ export async function getReactRouterManifestForDev(
       index: route.index,
       caseSensitive: route.caseSensitive,
       module: combineURLs(assetPrefix, jsAssets[0] || ''),
-      clientActionModule: undefined,
-      clientLoaderModule: undefined,
-      clientMiddlewareModule: undefined,
-      hydrateFallbackModule: undefined,
+      clientActionModule:
+        isBuild && hasRouteChunkByExportName.clientAction
+          ? getModulePathForChunk(
+              getRouteChunkEntryName(route.id, 'clientAction')
+            )
+          : undefined,
+      clientLoaderModule:
+        isBuild && hasRouteChunkByExportName.clientLoader
+          ? getModulePathForChunk(
+              getRouteChunkEntryName(route.id, 'clientLoader')
+            )
+          : undefined,
+      clientMiddlewareModule:
+        isBuild && hasRouteChunkByExportName.clientMiddleware
+          ? getModulePathForChunk(
+              getRouteChunkEntryName(route.id, 'clientMiddleware')
+            )
+          : undefined,
+      hydrateFallbackModule:
+        isBuild && hasRouteChunkByExportName.HydrateFallback
+          ? getModulePathForChunk(
+              getRouteChunkEntryName(route.id, 'HydrateFallback')
+            )
+          : undefined,
       hasAction: exports.has(SERVER_EXPORTS.action),
       hasLoader: exports.has(SERVER_EXPORTS.loader),
-      hasClientAction: exports.has(CLIENT_EXPORTS.clientAction),
-      hasClientLoader: exports.has(CLIENT_EXPORTS.clientLoader),
-      hasClientMiddleware: exports.has(CLIENT_EXPORTS.clientMiddleware),
+      hasClientAction,
+      hasClientLoader,
+      hasClientMiddleware,
       hasErrorBoundary: exports.has(CLIENT_EXPORTS.ErrorBoundary),
       imports: jsAssets.map(asset => combineURLs(assetPrefix, asset)),
       css: cssAssets.map(asset => combineURLs(assetPrefix, asset)),

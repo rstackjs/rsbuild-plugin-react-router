@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
-import type { Config } from '@react-router/dev/config';
+import type { Config } from '../src/react-router-config';
 import { getBuildManifest } from '../src/build-manifest';
 
 describe('build manifest', () => {

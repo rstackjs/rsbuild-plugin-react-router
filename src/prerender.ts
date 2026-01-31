@@ -1,4 +1,4 @@
-import type { Config } from '@react-router/dev/config';
+import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
 type PrerenderConfig = Config['prerender'];

@@ -157,6 +157,14 @@ export default {
    * @default '/'
    */
   basename: '/my-app',
+
+  /**
+   * React Router future flags (optional).
+   * Example: split client route modules into separate chunks.
+   */
+  future: {
+    v8_splitRouteModules: true,
+  },
 } satisfies Config;
 ```
 

@@ -49,6 +49,7 @@ function Navigation() {
     { to: '/', label: 'Home' },
     { to: '/about', label: 'About' },
     { to: '/docs', label: 'Documentation' },
+    { to: '/client-features', label: 'Client Features' },
     { to: '/projects', label: 'Projects' },
   ];
 

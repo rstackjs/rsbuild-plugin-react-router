@@ -1,5 +1,5 @@
 import { relative, resolve } from 'pathe';
-import type { Config } from '@react-router/dev/config';
+import type { Config } from './react-router-config.js';
 import type { Route } from './types.js';
 
 type BuildManifest =

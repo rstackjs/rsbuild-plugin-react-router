@@ -31,6 +31,30 @@ export const getExportNames = async (code: string): Promise<string[]> => {
   );
 };
 
+export const getExportNamesAndExportAll = async (
+  code: string
+): Promise<{ exportNames: string[]; exportAllModules: string[] }> => {
+  await init;
+  const [imports, exportSpecifiers] = await parseExports(code);
+  const exportNames = new Set<string>();
+  for (const specifier of exportSpecifiers) {
+    if (specifier.n) {
+      exportNames.add(specifier.n);
+    }
+  }
+  const exportAllModules: string[] = [];
+  for (const entry of imports) {
+    if (!entry.n) {
+      continue;
+    }
+    const statement = code.slice(entry.ss, entry.se);
+    if (/^\s*export\s*\*\s*from\s*['"]/.test(statement)) {
+      exportAllModules.push(entry.n);
+    }
+  }
+  return { exportNames: Array.from(exportNames), exportAllModules };
+};
+
 export const getRouteModuleExports = async (
   resourcePath: string
 ): Promise<string[]> => {

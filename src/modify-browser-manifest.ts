@@ -14,7 +14,8 @@ export function createModifyBrowserManifestPlugin(
   routes: Record<string, Route>,
   pluginOptions: PluginOptions,
   appDirectory: string,
-  assetPrefix = '/'
+  assetPrefix = '/',
+  routeChunkOptions?: Parameters<typeof getReactRouterManifestForDev>[5]
 ) {
   return {
     apply(compiler: Rspack.Compiler): void {
@@ -26,7 +27,8 @@ export function createModifyBrowserManifestPlugin(
             pluginOptions,
             compilation.getStats().toJson(),
             appDirectory,
-            assetPrefix
+            assetPrefix,
+            routeChunkOptions
           );
 
           const manifestPath =

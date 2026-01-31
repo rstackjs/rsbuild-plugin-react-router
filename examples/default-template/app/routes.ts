@@ -13,6 +13,9 @@ export default [
   // About page
   route('about', 'routes/about.tsx'),
 
+  // Client loader/action example
+  route('client-features', 'routes/client-features.tsx'),
+
   // Docs section with nested routes
   ...prefix('docs', [
     layout('routes/docs/layout.tsx', [

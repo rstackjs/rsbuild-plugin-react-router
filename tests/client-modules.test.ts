@@ -1,10 +1,11 @@
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'pathe';
 import { describe, expect, it } from '@rstest/core';
 import { createStubRsbuild } from '@scripts/test-helper';
 import { pluginReactRouter } from '../src';
 
 describe('client-only module transforms', () => {
-  it('throws when .client module uses export *', async () => {
+  it('stubs exports for .client modules using export *', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
     });
@@ -18,12 +19,19 @@ describe('client-only module transforms', () => {
     expect(transformCall).toBeDefined();
 
     const handler = transformCall?.[1];
-    await expect(
-      handler({
-        environment: { name: 'node' },
-        code: "export * from './client-exports';",
-        resourcePath: resolve('app/example.client.ts'),
-      })
-    ).rejects.toThrow('export *');
+    const resourcePath = resolve(
+      'tests/fixtures/client-modules/example.client.ts'
+    );
+    const code = await readFile(resourcePath, 'utf8');
+    const result = await handler({
+      environment: { name: 'node' },
+      code,
+      resourcePath,
+    });
+
+    expect(result.code).toContain('export const foo = undefined;');
+    expect(result.code).toContain('export const bar = undefined;');
+    expect(result.code).toContain('export const local = undefined;');
+    expect(result.code).not.toContain('export default undefined;');
   });
 });

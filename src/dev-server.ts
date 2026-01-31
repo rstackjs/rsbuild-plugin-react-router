@@ -14,7 +14,22 @@ export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
     next: (err?: any) => void
   ): Promise<void> => {
     try {
-      const bundle = await server.environments.node.loadBundle('app');
+      const tryLoadBundle = async (entryName: string) => {
+        try {
+          return await server.environments.node.loadBundle(entryName);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message.includes("Can't find entry")
+          ) {
+            return null;
+          }
+          throw error;
+        }
+      };
+
+      const bundle =
+        (await tryLoadBundle('static/js/app')) ?? (await tryLoadBundle('app'));
 
       if (!bundle || !bundle.routes) {
         throw new Error('Server bundle not found or invalid');
