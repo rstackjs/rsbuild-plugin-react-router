@@ -5,16 +5,14 @@ import fsExtra from 'fs-extra';
 import type { Config } from '@react-router/dev/config';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import type { RsbuildPlugin, Rspack } from '@rsbuild/core';
-import * as esbuild from 'esbuild';
 import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
-import { extname, relative, resolve } from 'pathe';
+import { dirname, relative, resolve } from 'pathe';
 import { RspackVirtualModulePlugin } from 'rspack-plugin-virtual-module';
 import { generate, parse } from './babel.js';
 import {
   BUILD_CLIENT_ROUTE_QUERY_STRING,
   CLIENT_ROUTE_EXPORTS,
-  JS_LOADERS,
   PLUGIN_NAME,
   SERVER_ONLY_ROUTE_EXPORTS,
 } from './constants.js';
@@ -32,44 +30,25 @@ import { generateServerBuild, normalizeBuildModule, resolveBuildExports } from '
 import {
   getPrerenderConcurrency,
   resolvePrerenderPaths,
+  validatePrerenderConfig,
 } from './prerender.js';
 import {
   getReactRouterManifestForDev,
   configRoutesToRouteManifest,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
-import { createRequestHandler } from 'react-router';
-import { init, parse as parseExports } from 'es-module-lexer';
+import { createRequestHandler, matchRoutes } from 'react-router';
+import {
+  getExportNames,
+  getRouteModuleExports,
+  transformToEsm,
+} from './export-utils.js';
+import { validateRouteConfig } from './route-config.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
 
-const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
-  const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
-  return JS_LOADERS[ext] ?? 'js';
-};
-
-const transformToEsm = async (
-  code: string,
-  resourcePath: string
-): Promise<string> => {
-  return (
-    await esbuild.transform(code, {
-      jsx: 'automatic',
-      format: 'esm',
-      platform: 'neutral',
-      loader: getEsbuildLoader(resourcePath),
-    })
-  ).code;
-};
-
-const getExportNames = async (code: string): Promise<string[]> => {
-  await init;
-  const [, exportSpecifiers] = await parseExports(code);
-  return Array.from(
-    new Set(exportSpecifiers.map(specifier => specifier.n).filter(Boolean))
-  );
-};
+const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 
 type ModuleFederationPluginLike = {
   name?: string;
@@ -211,6 +190,25 @@ export const pluginReactRouter = (
     // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
+    let reactRouterUserConfig: Config = {};
+    if (!configExists) {
+      console.warn('No react-router.config found, using default configuration.');
+    } else {
+      const displayPath = relative(process.cwd(), configPath);
+      try {
+        const imported = await jiti.import<Config>(configPath, { default: true });
+        if (imported === undefined) {
+          throw new Error(`${displayPath} must provide a default export`);
+        }
+        if (typeof imported !== 'object') {
+          throw new Error(`${displayPath} must export a config`);
+        }
+        reactRouterUserConfig = imported;
+      } catch (error) {
+        throw new Error(`Error loading ${displayPath}: ${error}`);
+      }
+    }
+
     const {
       appDirectory = 'app',
       basename = '/',
@@ -220,39 +218,59 @@ export const pluginReactRouter = (
       routeDiscovery: userRouteDiscovery,
       ssr = true,
       prerender: prerenderConfig,
-    } = await jiti
-      .import<Config>(configPath, {
-        default: true,
-      })
-      .catch(() => {
-        if (!configExists) {
-          console.warn(
-            'No react-router.config found, using default configuration.'
-          );
-        }
-        return {} as Config;
-      });
+    } = reactRouterUserConfig;
+
+    const prerenderConfigError = validatePrerenderConfig(prerenderConfig);
+    if (prerenderConfigError) {
+      throw new Error(prerenderConfigError);
+    }
 
     // React Router defaults to "lazy" route discovery, but "ssr:false" builds
     // have no runtime server to serve manifest patch requests, so we force
     // `mode:"initial"` in SPA mode to avoid any `/__manifest` fetches.
-    const routeDiscovery = !ssr
-      ? ({ mode: 'initial' } as const)
-      : (userRouteDiscovery ??
-        ({ mode: 'lazy', manifestPath: '/__manifest' } as const));
+    let routeDiscovery: Config['routeDiscovery'];
+    if (!userRouteDiscovery) {
+      routeDiscovery = ssr
+        ? ({ mode: 'lazy', manifestPath: '/__manifest' } as const)
+        : ({ mode: 'initial' } as const);
+    } else if (userRouteDiscovery.mode === 'initial') {
+      routeDiscovery = userRouteDiscovery;
+    } else if (userRouteDiscovery.mode === 'lazy') {
+      if (!ssr) {
+        throw new Error(
+          'The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`'
+        );
+      }
+      const manifestPath = userRouteDiscovery.manifestPath;
+      if (manifestPath && !manifestPath.startsWith('/')) {
+        throw new Error(
+          'The `routeDiscovery.manifestPath` config must be a root-relative pathname beginning with a slash (i.e., "/__manifest")'
+        );
+      }
+      routeDiscovery = userRouteDiscovery;
+    }
 
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
+    if (!existsSync(routesPath)) {
+      throw new Error(
+        `Route config file not found at "${relative(
+          process.cwd(),
+          routesPath
+        )}".`
+      );
+    }
 
-    // Then read the routes
-    const routeConfig = await jiti
-      .import<RouteConfigEntry[]>(routesPath, {
-        default: true,
-      })
-      .catch(error => {
-        console.error('Failed to load routes file:', error);
-        console.error('No routes file found in app directory.');
-        return [] as RouteConfigEntry[];
-      });
+    const routeConfigExport = await jiti.import<RouteConfigEntry[]>(routesPath, {
+      default: true,
+    });
+    const validation = validateRouteConfig({
+      routeConfigFile: relative(process.cwd(), routesPath),
+      routeConfig: routeConfigExport,
+    });
+    if (!validation.valid) {
+      throw new Error(validation.message);
+    }
+    const routeConfig = validation.routeConfig;
 
     const entryClientPath = findEntryFile(
       resolve(appDirectory, 'entry.client')
@@ -318,13 +336,314 @@ export const pluginReactRouter = (
         warn: message => api.logger.warn(message),
       }
     );
-    const isSpaMode = !ssr && prerenderPaths.length === 0;
-    const isPrerenderMode = prerenderPaths.length > 0;
+    const isPrerenderEnabled =
+      prerenderConfig !== undefined && prerenderConfig !== false;
+    const isSpaMode = !ssr && !isPrerenderEnabled;
+
+    const groupRoutesByParentId = (manifest: Record<string, any>) => {
+      const grouped: Record<string, any[]> = {};
+      Object.values(manifest).forEach(route => {
+        if (!route) return;
+        const parentId = route.parentId || '';
+        if (!grouped[parentId]) {
+          grouped[parentId] = [];
+        }
+        grouped[parentId].push(route);
+      });
+      return grouped;
+    };
+
+    const createPrerenderRoutes = (
+      manifest: Record<string, any>,
+      parentId = '',
+      grouped = groupRoutesByParentId(manifest)
+    ): RouteConfigEntry[] => {
+      return (grouped[parentId] || []).map(route => {
+        const common = { id: route.id, path: route.path };
+        if (route.index) {
+          return { index: true, ...common } as RouteConfigEntry;
+        }
+        return {
+          ...common,
+          children: createPrerenderRoutes(manifest, route.id, grouped),
+        } as RouteConfigEntry;
+      });
+    };
+
+    const normalizePrerenderMatchPath = (path: string) =>
+      `/${path}/`.replace(/^\/\/+/, '/');
+
+    const prerenderData = async (
+      handler: (request: Request) => Promise<Response>,
+      prerenderPath: string,
+      onlyRoutes: string[] | null,
+      clientBuildDir: string,
+      requestInit?: RequestInit
+    ): Promise<string> => {
+      let dataRequestPath: string;
+      if (future?.unstable_trailingSlashAwareDataRequests) {
+        if (prerenderPath.endsWith('/')) {
+          dataRequestPath = `${prerenderPath}_.data`;
+        } else {
+          dataRequestPath = `${prerenderPath}.data`;
+        }
+      } else {
+        dataRequestPath =
+          prerenderPath === '/'
+            ? '/_root.data'
+            : `${prerenderPath.replace(/\/$/, '')}.data`;
+      }
+
+      const normalizedPath = `${basename}${dataRequestPath}`.replace(
+        /\/\/+/g,
+        '/'
+      );
+      const url = new URL(`http://localhost${normalizedPath}`);
+      if (onlyRoutes?.length) {
+        url.searchParams.set('_routes', onlyRoutes.join(','));
+      }
+      const request = new Request(url, requestInit);
+      const response = await handler(request);
+      const data = await response.text();
+
+      if (response.status !== 200 && response.status !== 202) {
+        throw new Error(
+          `Prerender (data): Received a ${response.status} status code from ` +
+            `\`entry.server.tsx\` while prerendering the \`${prerenderPath}\` path.\n` +
+            `${normalizedPath}`
+        );
+      }
+
+      const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, data);
+      api.logger.info(
+        `Prerender (data): ${prerenderPath} -> ${relative(
+          process.cwd(),
+          outputPath
+        )}`
+      );
+      return data;
+    };
+
+    const prerenderRoute = async (
+      handler: (request: Request) => Promise<Response>,
+      prerenderPath: string,
+      clientBuildDir: string,
+      requestInit?: RequestInit
+    ): Promise<void> => {
+      const normalizedPath = `${basename}${prerenderPath}/`.replace(
+        /\/\/+/g,
+        '/'
+      );
+      const request = new Request(`http://localhost${normalizedPath}`, requestInit);
+      const response = await handler(request);
+      let html = await response.text();
+
+      if (redirectStatusCodes.has(response.status)) {
+        const location = response.headers.get('Location');
+        const delay = response.status === 302 ? 2 : 0;
+        html = `<!doctype html>
+<head>
+<title>Redirecting to: ${location}</title>
+<meta http-equiv="refresh" content="${delay};url=${location}">
+<meta name="robots" content="noindex">
+</head>
+<body>
+\t<a href="${location}">
+    Redirecting from <code>${normalizedPath}</code> to <code>${location}</code>
+  </a>
+</body>
+</html>`;
+      } else if (response.status !== 200) {
+        throw new Error(
+          `Prerender (html): Received a ${response.status} status code from ` +
+            `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
+            html
+        );
+      }
+
+      const outputPath = resolve(
+        clientBuildDir,
+        ...normalizedPath.split('/'),
+        'index.html'
+      );
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, html);
+      api.logger.info(
+        `Prerender (html): ${prerenderPath} -> ${relative(
+          process.cwd(),
+          outputPath
+        )}`
+      );
+    };
+
+    const prerenderResourceRoute = async (
+      handler: (request: Request) => Promise<Response>,
+      prerenderPath: string,
+      clientBuildDir: string,
+      requestInit?: RequestInit
+    ): Promise<void> => {
+      const normalizedPath = `${basename}${prerenderPath}/`
+        .replace(/\/\/+/g, '/')
+        .replace(/\/$/g, '');
+      const request = new Request(`http://localhost${normalizedPath}`, requestInit);
+      const response = await handler(request);
+      const content = Buffer.from(await response.arrayBuffer());
+
+      if (response.status !== 200) {
+        throw new Error(
+          `Prerender (resource): Received a ${response.status} status code from ` +
+            `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
+            content.toString('utf8')
+        );
+      }
+
+      const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, content);
+      api.logger.info(
+        `Prerender (resource): ${prerenderPath} -> ${relative(
+          process.cwd(),
+          outputPath
+        )}`
+      );
+    };
+
+    const handleSpaMode = async (
+      handler: (request: Request) => Promise<Response>,
+      build: any,
+      clientBuildDir: string
+    ): Promise<void> => {
+      const request = new Request(`http://localhost${basename}`, {
+        headers: {
+          'X-React-Router-SPA-Mode': 'yes',
+        },
+      });
+      const response = await handler(request);
+      const html = await response.text();
+      const isPrerenderSpaFallback = build.prerender?.includes('/');
+      const filename = isPrerenderSpaFallback ? '__spa-fallback.html' : 'index.html';
+
+      if (response.status !== 200) {
+        if (isPrerenderSpaFallback) {
+          throw new Error(
+            `Prerender: Received a ${response.status} status code from ` +
+              `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
+              html
+          );
+        }
+        throw new Error(
+          `SPA Mode: Received a ${response.status} status code from ` +
+            `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
+            html
+        );
+      }
+
+      if (
+        !html.includes('window.__reactRouterContext =') ||
+        !html.includes('window.__reactRouterRouteModules =')
+      ) {
+        throw new Error(
+          'SPA Mode: Did you forget to include `<Scripts/>` in your root route? ' +
+            'Your pre-rendered HTML cannot hydrate without `<Scripts />`.'
+        );
+      }
+
+      const outputPath = resolve(clientBuildDir, filename);
+      await writeFile(outputPath, html);
+      const prettyPath = relative(process.cwd(), outputPath);
+      if (build.prerender?.length) {
+        api.logger.info(`Prerender (html): SPA Fallback -> ${prettyPath}`);
+      } else {
+        api.logger.info(`SPA Mode: Generated ${prettyPath}`);
+      }
+    };
+
+    const validateSsrFalsePrerenderExports = async (
+      manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
+      prerenderList: string[]
+    ) => {
+      if (prerenderList.length === 0) {
+        return;
+      }
+
+      const prerenderRoutes = createPrerenderRoutes(routes);
+      const prerenderedRoutes = new Set<string>();
+      for (const path of prerenderList) {
+        const matches = matchRoutes(
+          prerenderRoutes,
+          normalizePrerenderMatchPath(path)
+        );
+        if (!matches) {
+          throw new Error(
+            `Unable to prerender path because it does not match any routes: ${path}`
+          );
+        }
+        matches.forEach(match => prerenderedRoutes.add(match.route.id as string));
+      }
+
+      const routeExports: Record<string, string[]> = {};
+      for (const route of Object.values(routes)) {
+        const filePath = resolve(appDirectory, route.file);
+        routeExports[route.id] = await getRouteModuleExports(filePath);
+      }
+
+      const errors: string[] = [];
+      for (const [routeId, route] of Object.entries(manifest.routes)) {
+        const exports = routeExports[routeId] ?? [];
+        const invalidApis: string[] = [];
+
+        if (exports.includes('headers')) invalidApis.push('headers');
+        if (exports.includes('action')) invalidApis.push('action');
+
+        if (invalidApis.length > 0) {
+          errors.push(
+            `Prerender: ${invalidApis.length} invalid route export(s) in ` +
+              `\`${routeId}\` when pre-rendering with \`ssr:false\`: ` +
+              `${invalidApis.map(api => `\`${api}\``).join(', ')}. ` +
+              `See https://reactrouter.com/how-to/pre-rendering#invalid-exports for more information.`
+          );
+        }
+
+        if (!prerenderedRoutes.has(routeId)) {
+          if (exports.includes('loader')) {
+            errors.push(
+              `Prerender: 1 invalid route export in \`${routeId}\` when pre-rendering with ` +
+                `\`ssr:false\`: \`loader\`. ` +
+                `See https://reactrouter.com/how-to/pre-rendering#invalid-exports for more information.`
+            );
+          }
+
+          let parentRoute =
+            route.parentId && manifest.routes[route.parentId]
+              ? manifest.routes[route.parentId]
+              : null;
+          while (parentRoute && parentRoute.id !== 'root') {
+            if (parentRoute.hasLoader && !parentRoute.hasClientLoader) {
+              errors.push(
+                `Prerender: 1 invalid route export in \`${parentRoute.id}\` when ` +
+                  `pre-rendering with \`ssr:false\`: \`loader\`. ` +
+                  `See https://reactrouter.com/how-to/pre-rendering#invalid-exports for more information.`
+              );
+            }
+            parentRoute =
+              parentRoute.parentId && parentRoute.parentId !== 'root'
+                ? manifest.routes[parentRoute.parentId]
+                : null;
+          }
+        }
+      }
+
+      if (errors.length > 0) {
+        api.logger.error(errors.join('\n'));
+        throw new Error('Invalid route exports found when prerendering with `ssr:false`');
+      }
+    };
 
     // Handle SPA mode and prerendering after build
     api.onAfterBuild(async ({ environments }) => {
-      // Skip if SSR is enabled and no prerender paths
-      if (ssr && !isPrerenderMode) {
+      if (ssr && !isPrerenderEnabled) {
         return;
       }
 
@@ -346,76 +665,107 @@ export const pluginReactRouter = (
         return;
       }
 
-      const buildModule = await import(
-        pathToFileURL(serverBuildPath).toString()
-      );
+      await mkdir(clientBuildDir, { recursive: true });
+
+      const buildModule = await import(pathToFileURL(serverBuildPath).toString());
       const normalizedBuild = normalizeBuildModule(buildModule as any);
       const build = await resolveBuildExports(normalizedBuild);
       const requestHandler = createRequestHandler(build, 'production');
 
-      // Helper function to prerender a single path
-      const prerenderPath = async (
-        path: string,
-        options: { isSpaFallback?: boolean } = {}
-      ): Promise<void> => {
-        const url = `http://localhost${basename}${path}`.replace(/\/+/g, '/');
-        const headers: Record<string, string> = {};
-
-        if (options.isSpaFallback) {
-          headers['X-React-Router-SPA-Mode'] = 'yes';
-        }
-
-        const request = new Request(url, { headers });
-        const response = await requestHandler(request);
-        const html = await response.text();
-
-        if (response.status !== 200) {
-          throw new Error(
-            `[${PLUGIN_NAME}] Prerender failed for ${path}: Received status ${response.status}\n${html}`
-          );
-        }
-
-        if (
-          !html.includes('window.__reactRouterContext =') ||
-          !html.includes('window.__reactRouterRouteModules =')
-        ) {
-          throw new Error(
-            `[${PLUGIN_NAME}] Prerender failed for ${path}: Missing hydration scripts. ` +
-              'Did you forget to include <Scripts/> in your root route?'
-          );
-        }
-
-        // Determine output file path
-        let outputPath: string;
-        if (path === '/' || path === '') {
-          outputPath = resolve(clientBuildDir, 'index.html');
-        } else {
-          // Create directory structure for the path
-          const cleanPath = path.replace(/^\//, '').replace(/\/$/, '');
-          const pathDir = resolve(clientBuildDir, cleanPath);
-          await mkdir(pathDir, { recursive: true });
-          outputPath = resolve(pathDir, 'index.html');
-        }
-
-        await writeFile(outputPath, html);
-        console.log(`[${PLUGIN_NAME}] Prerendered: ${path} -> ${outputPath}`);
-      };
-
-      await mkdir(clientBuildDir, { recursive: true });
-
-      if (isSpaMode) {
-        // SPA mode: only prerender root as a fallback
-        console.log(`[${PLUGIN_NAME}] SPA mode: Generating index.html...`);
-        await prerenderPath('/', { isSpaFallback: true });
-      } else if (isPrerenderMode) {
-        // Prerender mode: prerender all specified paths
-        console.log(
-          `[${PLUGIN_NAME}] Prerendering ${prerenderPaths.length} path(s)...`
+      if (isPrerenderEnabled) {
+        const manifest = await getReactRouterManifestForDev(
+          routes,
+          pluginOptions,
+          clientStats,
+          appDirectory,
+          assetPrefix
         );
+        if (!ssr) {
+          await validateSsrFalsePrerenderExports(manifest, prerenderPaths);
+        }
+
+        const routeTree = createPrerenderRoutes(routes);
+        for (const path of prerenderPaths) {
+          const matches = matchRoutes(
+            routeTree,
+            normalizePrerenderMatchPath(path)
+          );
+          if (!matches) {
+            throw new Error(
+              `Unable to prerender path because it does not match any routes: ${path}`
+            );
+          }
+        }
+
+        if (prerenderPaths.length > 0) {
+          api.logger.info(
+            `Prerender (html): ${prerenderPaths.length} path(s)...`
+          );
+        }
+
+        const buildRoutes = createPrerenderRoutes(build.routes);
         const concurrency = getPrerenderConcurrency(prerenderConfig);
         const pending = new Set<Promise<void>>();
+        const enqueue = async (path: string) => {
+          const matches = matchRoutes(
+            buildRoutes,
+            normalizePrerenderMatchPath(path)
+          );
+          if (!matches) return;
+
+          const leafRoute = matches[matches.length - 1]?.route as any;
+          const manifestRoute = leafRoute ? build.routes?.[leafRoute.id]?.module : null;
+          const isResourceRoute =
+            manifestRoute && !manifestRoute.default && !manifestRoute.ErrorBoundary;
+
+          if (isResourceRoute) {
+            if (manifestRoute.loader) {
+              await prerenderData(
+                requestHandler,
+                path,
+                [leafRoute.id],
+                clientBuildDir
+              );
+              await prerenderResourceRoute(
+                requestHandler,
+                path,
+                clientBuildDir
+              );
+            } else {
+              api.logger.warn(
+                `⚠️ Skipping prerendering for resource route without a loader: ${leafRoute?.id}`
+              );
+            }
+          } else {
+            const hasLoaders = matches.some(match =>
+              build.assets?.routes?.[match.route.id]?.hasLoader
+            );
+            let data: string | undefined;
+            if (hasLoaders) {
+              data = await prerenderData(
+                requestHandler,
+                path,
+                null,
+                clientBuildDir
+              );
+            }
+            await prerenderRoute(
+              requestHandler,
+              path,
+              clientBuildDir,
+              data
+                ? {
+                    headers: {
+                      'X-React-Router-Prerender-Data': encodeURI(data),
+                    },
+                  }
+                : undefined
+            );
+          }
+        };
+
         for (const path of prerenderPaths) {
-          const task = prerenderPath(path);
+          const task = enqueue(path);
           pending.add(task);
           task.finally(() => pending.delete(task));
           if (pending.size >= concurrency) {
@@ -425,11 +775,15 @@ export const pluginReactRouter = (
         await Promise.all(pending);
       }
 
+      if (!ssr) {
+        await handleSpaMode(requestHandler, build, clientBuildDir);
+      }
+
       // Remove server output for SPA mode and when not using SSR
       // This makes the build deployable as static assets
       if (!ssr) {
         await fsExtra.remove(serverBuildDir);
-        console.log(
+        api.logger.info(
           `[${PLUGIN_NAME}] Removed server build (static deployment)`
         );
       }

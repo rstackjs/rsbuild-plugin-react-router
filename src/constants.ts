@@ -1,12 +1,21 @@
 export const PLUGIN_NAME = 'rsbuild:react-router';
 
-export const JS_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.mjs'] as const;
+export const JS_EXTENSIONS = [
+  '.tsx',
+  '.ts',
+  '.jsx',
+  '.js',
+  '.mjs',
+  '.mts',
+] as const;
 
 export const JS_LOADERS = {
   '.ts': 'ts',
   '.tsx': 'tsx',
   '.js': 'js',
   '.jsx': 'jsx',
+  '.mjs': 'js',
+  '.mts': 'ts',
 } as const;
 
 export const BUILD_CLIENT_ROUTE_QUERY_STRING =

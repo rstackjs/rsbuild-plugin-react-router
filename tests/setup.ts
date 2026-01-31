@@ -12,15 +12,9 @@ rstest.mock('jiti', () => ({
       if (path.includes('routes.ts')) {
         return Promise.resolve([
           {
-            id: 'root',
-            file: 'root.tsx',
-            children: [
-              {
-                id: 'routes/index',
-                file: 'routes/index.tsx',
-                index: true,
-              },
-            ],
+            id: 'routes/index',
+            file: 'routes/index.tsx',
+            index: true,
           },
         ]);
       }

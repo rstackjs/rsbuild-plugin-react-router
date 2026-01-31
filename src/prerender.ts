@@ -147,3 +147,46 @@ export const getPrerenderConcurrency = (prerender: PrerenderConfig): number => {
   }
   return 1;
 };
+
+const isValidPrerenderPathsConfig = (value: unknown): value is PrerenderPathsConfig =>
+  typeof value === 'boolean' || typeof value === 'function' || Array.isArray(value);
+
+export const validatePrerenderConfig = (
+  prerender: PrerenderConfig
+): string | null => {
+  if (!prerender) {
+    return null;
+  }
+
+  const pathsConfig =
+    typeof prerender === 'object' && prerender !== null && 'paths' in prerender
+      ? (prerender as PrerenderConfigObject)?.paths
+      : prerender;
+
+  const isValidConfig =
+    isValidPrerenderPathsConfig(pathsConfig) ||
+    (typeof prerender === 'object' &&
+      prerender !== null &&
+      'paths' in prerender &&
+      isValidPrerenderPathsConfig((prerender as PrerenderConfigObject)?.paths));
+
+  if (!isValidConfig) {
+    return 'The `prerender`/`prerender.paths` config must be a boolean, an array of string paths, or a function returning a boolean or array of string paths.';
+  }
+
+  const concurrency =
+    typeof prerender === 'object' &&
+    prerender !== null &&
+    'unstable_concurrency' in prerender
+      ? (prerender as PrerenderConfigObject)?.unstable_concurrency
+      : undefined;
+
+  if (
+    concurrency !== undefined &&
+    (!Number.isInteger(concurrency) || concurrency <= 0)
+  ) {
+    return 'The `prerender.unstable_concurrency` config must be a positive integer if specified.';
+  }
+
+  return null;
+};

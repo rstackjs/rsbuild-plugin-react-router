@@ -143,6 +143,7 @@ The plugin will look for `react-router.config` with any supported JS/TS extensio
 
 - `react-router.config.tsx`
 - `react-router.config.ts`
+- `react-router.config.mts`
 - `react-router.config.jsx`
 - `react-router.config.js`
 - `react-router.config.mjs`
