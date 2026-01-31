@@ -129,3 +129,23 @@ export const getBuildManifest = async ({
 
   return buildManifest;
 };
+
+export const getRoutesByServerBundleId = (
+  buildManifest: BuildManifest | undefined
+): Record<string, Record<string, Route>> => {
+  if (!buildManifest || !('routeIdToServerBundleId' in buildManifest)) {
+    return {};
+  }
+
+  const routesByServerBundleId: Record<string, Record<string, Route>> = {};
+  for (const [routeId, serverBundleId] of Object.entries(
+    buildManifest.routeIdToServerBundleId
+  )) {
+    routesByServerBundleId[serverBundleId] ??= {};
+    const branch = getRouteBranch(buildManifest.routes, routeId);
+    for (const route of branch) {
+      routesByServerBundleId[serverBundleId][route.id] = route;
+    }
+  }
+  return routesByServerBundleId;
+};

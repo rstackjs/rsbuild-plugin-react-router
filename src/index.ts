@@ -45,7 +45,7 @@ import {
   transformToEsm,
 } from './export-utils.js';
 import { validateRouteConfig } from './route-config.js';
-import { getBuildManifest } from './build-manifest.js';
+import { getBuildManifest, getRoutesByServerBundleId } from './build-manifest.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
@@ -336,6 +336,13 @@ export const pluginReactRouter = (
       root: { path: '', id: 'root', file: rootRouteFile },
       ...configRoutesToRouteManifest(appDirectory, routeConfig),
     };
+
+    const buildManifest = await getBuildManifest({
+      reactRouterConfig: resolvedConfig,
+      routes,
+      rootDirectory: process.cwd(),
+    });
+    const routesByServerBundleId = getRoutesByServerBundleId(buildManifest);
 
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
@@ -855,6 +862,25 @@ export const pluginReactRouter = (
       }
     });
 
+    const bundleVirtualModules = Object.fromEntries(
+      Object.entries(routesByServerBundleId).map(([bundleId, bundleRoutes]) => [
+        `virtual/react-router/server-build-${bundleId}`,
+        generateServerBuild(bundleRoutes, {
+          entryServerPath: finalEntryServerPath,
+          assetsBuildDirectory,
+          basename,
+          appDirectory,
+          ssr,
+          federation: options.federation,
+          future,
+          allowedActionOrigins,
+          prerender: prerenderPaths,
+          routeDiscovery,
+          publicPath: assetPrefix,
+        }),
+      ])
+    );
+
     // Create virtual modules for React Router
     const vmodPlugin = new RspackVirtualModulePlugin({
       'virtual/react-router/browser-manifest': 'export default {};',
@@ -872,6 +898,7 @@ export const pluginReactRouter = (
         routeDiscovery,
         publicPath: assetPrefix,
       }),
+      ...bundleVirtualModules,
       'virtual/react-router/with-props': generateWithProps(),
     });
 
@@ -889,6 +916,32 @@ export const pluginReactRouter = (
           : useAsyncNodeChunkLoading
             ? 'async-node'
             : 'require';
+      const serverBuildFileBase = (serverBuildFile || 'index.js').replace(
+        /\.js$/,
+        ''
+      );
+
+      const nodeEntries: Record<string, string> = {
+        ...(hasServerApp
+          ? {
+              'static/js/app': serverAppPath,
+            }
+          : {
+              'static/js/app': 'virtual/react-router/server-build',
+            }),
+        'static/js/entry.server': finalEntryServerPath,
+      };
+
+      for (const [bundleId, bundleRoutes] of Object.entries(
+        routesByServerBundleId
+      )) {
+        if (!bundleRoutes || Object.keys(bundleRoutes).length === 0) {
+          continue;
+        }
+        nodeEntries[`${bundleId}/${serverBuildFileBase}`] =
+          `virtual/react-router/server-build-${bundleId}`;
+      }
+
       return mergeRsbuildConfig(config, {
         output: {
           assetPrefix: config.output?.assetPrefix || '/',
@@ -976,16 +1029,7 @@ export const pluginReactRouter = (
             ? {
                 node: {
                   source: {
-                    entry: {
-                      ...(hasServerApp
-                        ? {
-                            app: serverAppPath,
-                          }
-                        : {
-                            app: 'virtual/react-router/server-build',
-                          }),
-                      'entry.server': finalEntryServerPath,
-                    },
+                    entry: nodeEntries,
                   },
                   output: {
                     distPath: {
@@ -993,7 +1037,7 @@ export const pluginReactRouter = (
                     },
                     target: config.environments?.node?.output?.target || 'node',
                     filename: {
-                      js: 'static/js/[name].js',
+                      js: '[name].js',
                     },
                   },
                   tools: {
