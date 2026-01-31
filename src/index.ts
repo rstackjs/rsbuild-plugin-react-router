@@ -385,6 +385,15 @@ export const pluginReactRouter = (
       cache: routeChunkCache,
     };
 
+    type ReactRouterManifest = Awaited<
+      ReturnType<typeof getReactRouterManifestForDev>
+    >;
+    let latestServerManifest: ReactRouterManifest | null = null;
+    const latestServerManifestsByBundleId: Record<
+      string,
+      ReactRouterManifest
+    > = {};
+
     const routeByFilePath = new Map(
       Object.values(routes).map(route => [
         resolve(appDirectory, route.file),
@@ -984,8 +993,19 @@ export const pluginReactRouter = (
           prerender: prerenderPaths,
           routeDiscovery,
           publicPath: assetPrefix,
+          serverManifestId: `virtual/react-router/server-manifest-${bundleId}`,
         }),
       ])
+    );
+    const bundleManifestModules = Object.fromEntries(
+      Object.entries(routesByServerBundleId)
+        .filter(([, bundleRoutes]) =>
+          bundleRoutes && Object.keys(bundleRoutes).length > 0
+        )
+        .map(([bundleId]) => [
+          `virtual/react-router/server-manifest-${bundleId}`,
+          'export default {};',
+        ])
     );
 
     // Create virtual modules for React Router
@@ -1010,6 +1030,7 @@ export const pluginReactRouter = (
           publicPath: assetPrefix,
         }),
         ...bundleVirtualModules,
+        ...bundleManifestModules,
         'virtual/react-router/with-props': generateWithProps(),
       },
       vmodTempDir
@@ -1209,7 +1230,34 @@ export const pluginReactRouter = (
                     pluginOptions,
                     appDirectory,
                     assetPrefix,
-                    routeChunkOptions
+                    routeChunkOptions,
+                    {
+                      future,
+                      onManifest: (manifest, sri) => {
+                        const baseServerManifest = {
+                          ...manifest,
+                          sri,
+                        };
+                        latestServerManifest = baseServerManifest;
+                        for (const [bundleId, bundleRoutes] of Object.entries(
+                          routesByServerBundleId
+                        )) {
+                          if (!bundleRoutes) {
+                            continue;
+                          }
+                          const routeIds = new Set(Object.keys(bundleRoutes));
+                          const filteredRoutes = Object.fromEntries(
+                            Object.entries(manifest.routes).filter(([routeId]) =>
+                              routeIds.has(routeId)
+                            )
+                          );
+                          latestServerManifestsByBundleId[bundleId] = {
+                            ...baseServerManifest,
+                            routes: filteredRoutes,
+                          };
+                        }
+                      },
+                    }
                   )
                 );
               }
@@ -1249,15 +1297,25 @@ export const pluginReactRouter = (
           };
         }
 
-        // For server manifest, use the clientStats as before
-        const manifest = await getReactRouterManifestForDev(
-          routes,
-          pluginOptions,
-          clientStats,
-          appDirectory,
-          assetPrefix,
-          routeChunkOptions
+        const bundleMatch = args.resource.match(
+          /virtual\/react-router\/server-manifest(?:-([^?]+))?/
         );
+        const bundleId = bundleMatch?.[1]?.replace(/\\.js$/, '');
+
+        const manifest =
+          (isBuild && latestServerManifest
+            ? bundleId && latestServerManifestsByBundleId[bundleId]
+              ? latestServerManifestsByBundleId[bundleId]
+              : latestServerManifest
+            : null) ??
+          (await getReactRouterManifestForDev(
+            routes,
+            pluginOptions,
+            clientStats,
+            appDirectory,
+            assetPrefix,
+            routeChunkOptions
+          ));
         return {
           code: `export default ${jsesc(manifest, { es6: true })};`,
         };

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'pathe';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
@@ -63,6 +64,27 @@ type RouteChunkManifestOptions = {
   cache?: RouteChunkCache;
 };
 
+export const getReactRouterManifestPath = (
+  version: string,
+  isBuild: boolean
+): string =>
+  isBuild
+    ? `static/js/manifest-${version}.js`
+    : 'static/js/virtual/react-router/browser-manifest.js';
+
+const getManifestVersion = (
+  fingerprintedValues: { entry: unknown; routes: unknown },
+  isBuild: boolean
+): string => {
+  if (!isBuild) {
+    return String(Math.random());
+  }
+  return createHash('md5')
+    .update(JSON.stringify(fingerprintedValues))
+    .digest('hex')
+    .slice(0, 8);
+};
+
 export async function getReactRouterManifestForDev(
   routes: Record<string, Route>,
   //@ts-ignore
@@ -82,7 +104,7 @@ export async function getReactRouterManifestForDev(
     imports: string[];
     css: string[];
   };
-  sri?: unknown;
+  sri?: Record<string, string>;
   routes: Record<string, RouteManifestItem>;
 }> {
   const result: Record<string, RouteManifestItem> = {};
@@ -152,6 +174,7 @@ export async function getReactRouterManifestForDev(
     const hasClientLoader = exports.has(CLIENT_EXPORTS.clientLoader);
     const hasClientMiddleware = exports.has(CLIENT_EXPORTS.clientMiddleware);
     const hasHydrateFallback = exports.has(CLIENT_EXPORTS.HydrateFallback);
+    const hasDefaultExport = exports.has('default');
 
     if (isBuild && enforceSplitRouteModules && routeChunkConfig) {
       validateRouteChunks({
@@ -206,6 +229,7 @@ export async function getReactRouterManifestForDev(
       hasClientAction,
       hasClientLoader,
       hasClientMiddleware,
+      hasDefaultExport,
       hasErrorBoundary: exports.has(CLIENT_EXPORTS.ErrorBoundary),
       imports: jsAssets.map(asset => combineURLs(assetPrefix, asset)),
       css: cssAssets.map(asset => combineURLs(assetPrefix, asset)),
@@ -218,18 +242,22 @@ export async function getReactRouterManifestForDev(
   const entryCssAssets =
     entryAssets?.filter(asset => asset.endsWith('.css')) || [];
 
-  return {
-    version: String(Math.random()),
-    url: combineURLs(
-      assetPrefix,
-      'static/js/virtual/react-router/browser-manifest.js'
-    ),
-    hmr: undefined,
+  const fingerprintedValues = {
     entry: {
       module: combineURLs(assetPrefix, entryJsAssets[0] || ''),
       imports: entryJsAssets.map(asset => combineURLs(assetPrefix, asset)),
       css: entryCssAssets.map(asset => combineURLs(assetPrefix, asset)),
     },
+    routes: result,
+  };
+  const version = getManifestVersion(fingerprintedValues, isBuild);
+  const manifestPath = getReactRouterManifestPath(version, isBuild);
+
+  return {
+    version,
+    url: combineURLs(assetPrefix, manifestPath),
+    hmr: undefined,
+    entry: fingerprintedValues.entry,
     sri: undefined,
     routes: result,
   };

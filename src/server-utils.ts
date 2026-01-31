@@ -18,6 +18,7 @@ interface ServerBuildOptions {
   allowedActionOrigins?: string[];
   prerender?: string[];
   publicPath?: string;
+  serverManifestId?: string;
   routeDiscovery:
     | {
         mode: 'lazy';
@@ -33,6 +34,7 @@ function generateStaticTemplate(
   routes: Record<string, Route>,
   options: ServerBuildOptions
 ): string {
+  const manifestId = options.serverManifestId ?? 'virtual/react-router/server-manifest';
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
     ${Object.keys(routes)
@@ -44,7 +46,7 @@ function generateStaticTemplate(
       })
       .join('\n')}
         
-    export { default as assets } from "virtual/react-router/server-manifest";
+    export { default as assets } from ${JSON.stringify(manifestId)};
     export const assetsBuildDirectory = ${JSON.stringify(
       options.assetsBuildDirectory
     )};

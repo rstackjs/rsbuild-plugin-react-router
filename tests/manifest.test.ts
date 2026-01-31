@@ -163,11 +163,13 @@ describe('manifest', () => {
       hasClientAction: false,
       hasClientLoader: false,
       hasClientMiddleware: false,
+      hasDefaultExport: false,
       hasErrorBoundary: false,
       imports: [],
       css: [],
     };
 
     expect(item).toHaveProperty('hasClientMiddleware', false);
+    expect(item).toHaveProperty('hasDefaultExport', false);
   });
 });

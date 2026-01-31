@@ -53,6 +53,7 @@ export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {
   hasClientAction: boolean;
   hasClientLoader: boolean;
   hasClientMiddleware: boolean;
+  hasDefaultExport: boolean;
   hasErrorBoundary: boolean;
   imports: string[];
   css: string[];
