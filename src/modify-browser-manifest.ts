@@ -35,10 +35,11 @@ export function createModifyBrowserManifestPlugin(
       compiler.hooks.emit.tapAsync(
         'ModifyBrowserManifest',
         async (compilation: Rspack.Compilation, callback) => {
+          const stats = compilation.getStats().toJson();
           const manifest = await getReactRouterManifestForDev(
             routes,
             pluginOptions,
-            compilation.getStats().toJson(),
+            stats,
             appDirectory,
             assetPrefix,
             routeChunkOptions
@@ -82,10 +83,15 @@ export function createModifyBrowserManifestPlugin(
           }
 
           if (routeChunkOptions?.isBuild) {
-            const manifestPath = getReactRouterManifestPath(
-              manifest.version,
-              true
-            );
+            const entryAssets =
+              stats?.assetsByChunkName?.['entry.client'];
+            const entryJsAssets =
+              entryAssets?.filter(asset => asset.endsWith('.js')) || [];
+            const manifestPath = getReactRouterManifestPath({
+              version: manifest.version,
+              isBuild: true,
+              entryModulePath: entryJsAssets[0],
+            });
             const manifestSource = `window.__reactRouterManifest=${jsesc(
               manifest,
               { es6: true }

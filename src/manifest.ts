@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { isAbsolute, relative, resolve } from 'pathe';
+import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import type { Rspack } from '@rsbuild/core';
@@ -64,13 +64,31 @@ type RouteChunkManifestOptions = {
   cache?: RouteChunkCache;
 };
 
-export const getReactRouterManifestPath = (
-  version: string,
-  isBuild: boolean
-): string =>
-  isBuild
-    ? `static/js/manifest-${version}.js`
-    : 'static/js/virtual/react-router/browser-manifest.js';
+const DEFAULT_MANIFEST_DIR = 'static/js';
+
+const getManifestDirFromEntryAsset = (entryModulePath?: string): string => {
+  if (!entryModulePath) {
+    return DEFAULT_MANIFEST_DIR;
+  }
+  const dir = dirname(entryModulePath);
+  return dir === '.' ? DEFAULT_MANIFEST_DIR : dir;
+};
+
+export const getReactRouterManifestPath = ({
+  version,
+  isBuild,
+  entryModulePath,
+}: {
+  version: string;
+  isBuild: boolean;
+  entryModulePath?: string;
+}): string => {
+  if (!isBuild) {
+    return 'static/js/virtual/react-router/browser-manifest.js';
+  }
+  const dir = getManifestDirFromEntryAsset(entryModulePath);
+  return `${dir}/manifest-${version}.js`;
+};
 
 const getManifestVersion = (
   fingerprintedValues: { entry: unknown; routes: unknown },
@@ -251,7 +269,11 @@ export async function getReactRouterManifestForDev(
     routes: result,
   };
   const version = getManifestVersion(fingerprintedValues, isBuild);
-  const manifestPath = getReactRouterManifestPath(version, isBuild);
+  const manifestPath = getReactRouterManifestPath({
+    version,
+    isBuild,
+    entryModulePath: entryJsAssets[0],
+  });
 
   return {
     version,
