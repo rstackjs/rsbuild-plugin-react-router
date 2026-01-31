@@ -58,11 +58,15 @@ export async function getReactRouterManifestForDev(
 ): Promise<{
   version: string;
   url: string;
+  hmr?: {
+    runtime: string;
+  };
   entry: {
     module: string;
     imports: string[];
     css: string[];
   };
+  sri?: unknown;
   routes: Record<string, RouteManifestItem>;
 }> {
   const result: Record<string, RouteManifestItem> = {};
@@ -103,6 +107,10 @@ export async function getReactRouterManifestForDev(
       index: route.index,
       caseSensitive: route.caseSensitive,
       module: combineURLs(assetPrefix, jsAssets[0] || ''),
+      clientActionModule: undefined,
+      clientLoaderModule: undefined,
+      clientMiddlewareModule: undefined,
+      hydrateFallbackModule: undefined,
       hasAction: exports.has(SERVER_EXPORTS.action),
       hasLoader: exports.has(SERVER_EXPORTS.loader),
       hasClientAction: exports.has(CLIENT_EXPORTS.clientAction),
@@ -126,11 +134,13 @@ export async function getReactRouterManifestForDev(
       assetPrefix,
       'static/js/virtual/react-router/browser-manifest.js'
     ),
+    hmr: undefined,
     entry: {
       module: combineURLs(assetPrefix, entryJsAssets[0] || ''),
       imports: entryJsAssets.map(asset => combineURLs(assetPrefix, asset)),
       css: entryCssAssets.map(asset => combineURLs(assetPrefix, asset)),
     },
+    sri: undefined,
     routes: result,
   };
 }

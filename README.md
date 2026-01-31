@@ -116,6 +116,31 @@ export default {
   ssr: true,
 
   /**
+   * The file name for the server build output.
+   * @default "index.js"
+   */
+  serverBuildFile: "index.js",
+
+  /**
+   * The output format for the server build.
+   * Options: "esm" | "cjs"
+   * @default "esm"
+   */
+  serverModuleFormat: "esm",
+
+  /**
+   * Split server bundles by route branch (advanced).
+   */
+  serverBundles: async ({ branch }) => branch[0]?.id ?? "main",
+
+  /**
+   * Hook called after the build completes.
+   */
+  buildEnd: async ({ buildManifest, reactRouterConfig }) => {
+    console.log(buildManifest, reactRouterConfig);
+  },
+
+  /**
    * Build directory for output files
    * @default 'build'
    */

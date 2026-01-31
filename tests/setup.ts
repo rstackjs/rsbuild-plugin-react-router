@@ -111,6 +111,11 @@ rstest.mock('@scripts/test-helper', () => ({
       onAfterEnvironmentCompile: rstest.fn(),
       modifyEnvironmentConfig: rstest.fn(),
       transform: rstest.fn(),
+      logger: {
+        warn: rstest.fn(),
+        info: rstest.fn(),
+        error: rstest.fn(),
+      },
       context: {
         rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
       },

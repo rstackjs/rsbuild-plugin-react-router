@@ -44,6 +44,10 @@ export type TransformArgs = {
 
 export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {
   module: string;
+  clientActionModule?: string;
+  clientLoaderModule?: string;
+  clientMiddlewareModule?: string;
+  hydrateFallbackModule?: string;
   hasAction: boolean;
   hasLoader: boolean;
   hasClientAction: boolean;
