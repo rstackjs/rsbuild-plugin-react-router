@@ -3,7 +3,7 @@ import type { Route } from './+types/settings';
 
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => `${data.project.name} Settings`,
+    breadcrumb: (data: Route.ComponentProps["loaderData"]) => `${data.project.name} Settings`,
   };
 }
 
@@ -64,7 +64,7 @@ function SettingsSection({
 }
 
 export default function ProjectSettings() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<Route.ComponentProps["loaderData"]>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
 

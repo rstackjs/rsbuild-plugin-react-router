@@ -20,7 +20,7 @@ export function loader() {
 }
 
 export default function ProjectsLayout() {
-  const { projects } = useLoaderData<Route.LoaderData>();
+  const { projects } = useLoaderData<Route.ComponentProps["loaderData"]>();
 
   return (
     <div className="page-container">
@@ -41,7 +41,7 @@ export default function ProjectsLayout() {
             </div>
 
             <nav className="space-y-1">
-              {projects.map((project) => (
+              {projects.map((project: any) => (
                 <NavLink
                   key={project.id}
                   to={`/projects/${project.id}`}

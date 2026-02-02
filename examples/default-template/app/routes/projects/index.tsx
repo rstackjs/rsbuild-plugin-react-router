@@ -73,7 +73,7 @@ function StatCard({
 }
 
 export default function ProjectsIndex() {
-  const { stats, recentActivity } = useLoaderData<Route.LoaderData>();
+  const { stats, recentActivity } = useLoaderData<Route.ComponentProps["loaderData"]>();
 
   return (
     <div className="space-y-8">
@@ -99,7 +99,7 @@ export default function ProjectsIndex() {
           Recent Activity
         </h2>
         <div className="space-y-4">
-          {recentActivity.map((activity) => (
+          {recentActivity.map((activity: any) => (
             <div
               key={activity.id}
               className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-0"

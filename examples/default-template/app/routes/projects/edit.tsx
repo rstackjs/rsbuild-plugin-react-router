@@ -3,7 +3,7 @@ import type { Route } from './+types/edit';
 
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => `Edit ${data.project.name}`,
+    breadcrumb: (data: Route.ComponentProps["loaderData"]) => `Edit ${data.project.name}`,
   };
 }
 
@@ -31,7 +31,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function EditProject() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<Route.ComponentProps["loaderData"]>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
 

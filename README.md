@@ -186,8 +186,14 @@ If none are found, it falls back to defaults.
 
 ### Framework Mode
 
-React Router Framework Mode is implemented as a Vite plugin. This Rsbuild
-plugin targets Data Mode only and does not support Framework Mode.
+React Router "Framework Mode" is implemented as a Vite plugin, but this Rsbuild
+plugin aims to provide equivalent **framework-mode behaviors** (typegen, Route
+Module API types, route module splitting, SPA/SSR/prerender strategies) on top
+of Rsbuild/Rspack.
+
+In practice, you should be able to use the `@react-router/dev/*` config + routes
+APIs, import generated `./+types/*` in route modules, and use the standard
+`entry.client`/`entry.server` entrypoints like you would in the official setup.
 
 ### FAQ
 
@@ -647,7 +653,15 @@ The plugin automatically:
 
 ## React Router Framework Mode
 
-React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild plugin currently targets React Router's Data Mode build/runtime model and does not implement the Vite plugin layer (type-safe href, route module splitting, etc.).
+React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild
+plugin aims to match the important behaviors without depending on Vite:
+
+- Typegen + Route Module API types (`./+types/*`)
+- Route module splitting (`future.v8_splitRouteModules`)
+- SPA mode (`ssr: false`), SSR mode, and static prerendering (`prerender`)
+
+Some Vite-specific integrations (for example Vite's environment API + critical
+CSS endpoint) are not supported 1:1.
 
 ## Examples
 

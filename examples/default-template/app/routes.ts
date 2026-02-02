@@ -13,6 +13,9 @@ export default [
   // About page
   route('about', 'routes/about.tsx'),
 
+  // Styling demo (LESS/SASS CSS Modules)
+  route('styling', 'routes/styling.tsx'),
+
   // Client loader/action example
   route('client-features', 'routes/client-features.tsx'),
 
