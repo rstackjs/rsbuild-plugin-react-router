@@ -8,6 +8,7 @@ A Rsbuild plugin that provides seamless integration with React Router, supportin
 
 ## Features
 
+
 - 🚀 Zero-config setup with sensible defaults
 - 🔄 Automatic route generation from file system
 - 🖥️ Server-Side Rendering (SSR) support
