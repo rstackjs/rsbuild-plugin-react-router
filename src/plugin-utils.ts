@@ -103,6 +103,13 @@ export function combineURLs(baseURL: string, relativeURL: string): string {
     : baseURL;
 }
 
+export function normalizeAssetPrefix(assetPrefix?: string): string {
+  if (!assetPrefix || assetPrefix === 'auto') {
+    return '/';
+  }
+  return assetPrefix.endsWith('/') ? assetPrefix : `${assetPrefix}/`;
+}
+
 export function stripFileExtension(file: string): string {
   return file.replace(/\.[^/.]+$/, '');
 }
@@ -173,6 +180,9 @@ export const removeExports = (
   const previouslyReferencedIdentifiers = findReferencedIdentifiers(ast);
   let exportsFiltered = false;
   const markedForRemoval = new Set<NodePath<Babel.Node>>();
+  // Keep track of identifiers referenced by removed exports,
+  // e.g. export { localName as exportName }, export default function localName
+  const removedExportLocalNames = new Set<string>();
 
   traverse(ast, {
     ExportDeclaration(path: NodePath) {
@@ -195,6 +205,14 @@ export const removeExports = (
               ) {
                 if (exportsToRemove.includes(specifier.exported.name)) {
                   exportsFiltered = true;
+                  // Track the local identifier if it's different from the exported name
+                  if (
+                    specifier.local &&
+                    specifier.local.type === 'Identifier' &&
+                    specifier.local.name !== specifier.exported.name
+                  ) {
+                    removedExportLocalNames.add(specifier.local.name);
+                  }
                   return false;
                 }
               }
@@ -268,9 +286,48 @@ export const removeExports = (
         exportsToRemove.includes('default')
       ) {
         markedForRemoval.add(path);
+        // Track the identifier being exported as default
+        if (path.node.declaration) {
+          if (path.node.declaration.type === 'Identifier') {
+            removedExportLocalNames.add(path.node.declaration.name);
+          } else if (
+            (path.node.declaration.type === 'FunctionDeclaration' ||
+              path.node.declaration.type === 'ClassDeclaration') &&
+            path.node.declaration.id
+          ) {
+            removedExportLocalNames.add(path.node.declaration.id.name);
+          }
+        }
       }
     },
   });
+
+  // Remove top-level property assignments to removed exports. Handles
+  // `clientLoader.hydrate = true`, `Component.displayName = "..."`, etc.
+  traverse(ast, {
+    ExpressionStatement(path: NodePath<Babel.ExpressionStatement>) {
+      // Only handle top-level statements
+      if (!path.parentPath.isProgram()) {
+        return;
+      }
+
+      const expr = path.node.expression;
+      if (expr.type !== 'AssignmentExpression') {
+        return;
+      }
+
+      const left = expr.left;
+      if (
+        left.type === 'MemberExpression' &&
+        left.object.type === 'Identifier' &&
+        (exportsToRemove.includes(left.object.name) ||
+          removedExportLocalNames.has(left.object.name))
+      ) {
+        markedForRemoval.add(path as any);
+      }
+    },
+  });
+
   if (markedForRemoval.size > 0 || exportsFiltered) {
     for (const path of markedForRemoval) {
       path.remove();
@@ -279,6 +336,43 @@ export const removeExports = (
     // Run dead code elimination on any newly unreferenced identifiers
     deadCodeElimination(ast, previouslyReferencedIdentifiers);
   }
+};
+
+export const removeUnusedImports = (
+  ast: ParseResult<Babel.File>
+): void => {
+  let scopeCrawled = false;
+  traverse(ast, {
+    Program(path: NodePath<Babel.Program>) {
+      if (!scopeCrawled) {
+        path.scope.crawl();
+        scopeCrawled = true;
+      }
+    },
+    ImportDeclaration(path: NodePath<Babel.ImportDeclaration>) {
+      if (path.node.specifiers.length === 0) {
+        return;
+      }
+
+      const specifierPaths = path.get('specifiers') as NodePath<
+        | Babel.ImportSpecifier
+        | Babel.ImportDefaultSpecifier
+        | Babel.ImportNamespaceSpecifier
+      >[];
+
+      for (const specifierPath of specifierPaths) {
+        const local = specifierPath.node.local;
+        const binding = local ? path.scope.getBinding(local.name) : null;
+        if (!binding || !binding.referenced) {
+          specifierPath.remove();
+        }
+      }
+
+      if (path.node.specifiers.length === 0) {
+        path.remove();
+      }
+    },
+  });
 };
 
 export const transformRoute = (ast: ParseResult<Babel.File>): void => {

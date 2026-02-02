@@ -1,8 +1,8 @@
 import { redirect } from 'react-router'
+import { getReferrerRoute } from 'remote/utils/misc'
 import { authenticator } from '#app/utils/auth.server.ts'
 import { handleMockAction } from '#app/utils/connections.server.ts'
 import { ProviderNameSchema } from '#app/utils/connections.tsx'
-import { getReferrerRoute } from 'remote/utils/misc'
 import { getRedirectCookieHeader } from '#app/utils/redirect-cookie.server.ts'
 import { type Route } from './+types/auth_.$provider.ts'
 

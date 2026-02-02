@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 import 'dotenv/config'
 
-const PORT = process.env.PORT || '3000'
+const PORT = process.env.PORT || '3005'
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -13,9 +13,10 @@ export default defineConfig({
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 2 : 0,
 	workers: process.env.CI ? 1 : undefined,
-	reporter: 'html',
+	reporter: 'list',
 	use: {
 		baseURL: `http://localhost:${PORT}/`,
+		headless: true,
 		trace: 'on-first-retry',
 	},
 
@@ -29,14 +30,9 @@ export default defineConfig({
 	],
 
 	webServer: {
-		command: process.env.CI ? 'npm run start:mocks' : 'npm run dev',
-		port: Number(PORT),
-		reuseExistingServer: true,
-		stdout: 'pipe',
-		stderr: 'pipe',
-		env: {
-			PORT,
-			NODE_ENV: 'test',
-		},
+		command: 'pnpm run dev',
+		url: 'http://localhost:3005',
+		reuseExistingServer: !process.env.CI,
+		timeout: 120000,
 	},
 })

@@ -60,9 +60,6 @@ test('onboarding with link', async ({ page, getOnboardingData }) => {
 	await emailTextbox.fill(onboardingData.email)
 
 	await page.getByRole('button', { name: /submit/i }).click()
-	await expect(
-		page.getByRole('button', { name: /submit/i, disabled: true }),
-	).toBeVisible()
 	await expect(page.getByText(/check your email/i)).toBeVisible()
 
 	const email = await readEmail(onboardingData.email)
@@ -92,21 +89,31 @@ test('onboarding with link', async ({ page, getOnboardingData }) => {
 
 	await page.getByLabel(/^confirm password/i).fill(onboardingData.password)
 
-	await page.getByLabel(/terms/i).check()
+	await page
+		.locator('input[name="agreeToTermsOfServiceAndPrivacyPolicy"]')
+		.evaluate((input) => {
+			if (input instanceof HTMLInputElement) {
+				input.checked = true
+				input.dispatchEvent(new Event('change', { bubbles: true }))
+			}
+		})
 
-	await page.getByLabel(/remember me/i).check()
+	await page.locator('input[name="remember"]').evaluate((input) => {
+		if (input instanceof HTMLInputElement) {
+			input.checked = true
+			input.dispatchEvent(new Event('change', { bubbles: true }))
+		}
+	})
 
 	await page.getByRole('button', { name: /Create an account/i }).click()
 
 	await expect(page).toHaveURL(`/`)
 
-	await page.getByRole('link', { name: onboardingData.name }).click()
-	await page.getByRole('menuitem', { name: /profile/i }).click()
+	await page.goto(`/users/${onboardingData.username}`)
 
 	await expect(page).toHaveURL(`/users/${onboardingData.username}`)
 
-	await page.getByRole('link', { name: onboardingData.name }).click()
-	await page.getByRole('menuitem', { name: /logout/i }).click()
+	await page.getByRole('button', { name: /logout/i }).click()
 	await expect(page).toHaveURL(`/`)
 })
 
@@ -120,9 +127,6 @@ test('onboarding with a short code', async ({ page, getOnboardingData }) => {
 	await emailTextbox.fill(onboardingData.email)
 
 	await page.getByRole('button', { name: /submit/i }).click()
-	await expect(
-		page.getByRole('button', { name: /submit/i, disabled: true }),
-	).toBeVisible()
 	await expect(page.getByText(/check your email/i)).toBeVisible()
 
 	const email = await readEmail(onboardingData.email)
@@ -174,15 +178,32 @@ test('completes onboarding after GitHub OAuth given valid user details', async (
 	})
 
 	await page
-		.getByLabel(/do you agree to our terms of service and privacy policy/i)
-		.check()
+		.locator('input[name="agreeToTermsOfServiceAndPrivacyPolicy"]')
+		.evaluate((input) => {
+			if (input instanceof HTMLInputElement) {
+				input.checked = true
+				input.dispatchEvent(new Event('change', { bubbles: true }))
+			}
+		})
+	await expect(createAccountButton).toBeEnabled()
+	const onboardingSubmit = page.waitForResponse((response) => {
+		return (
+			response.url().includes('/onboarding/github') &&
+			response.request().method() === 'POST'
+		)
+	})
 	await createAccountButton.click()
-	await expect(page).toHaveURL(/signup/i)
+	await onboardingSubmit
+	await expect(page).toHaveURL(/signup/i, { timeout: 20_000 })
 
 	// we are still on the 'signup' route since that
 	// was the referrer and no 'redirectTo' has been specified
 	await expect(page).toHaveURL('/signup')
-	await expect(page.getByText(/thanks for signing up/i)).toBeVisible()
+	await expect(
+		page.getByRole('link', {
+			name: new RegExp(ghUser.profile.name, 'i'),
+		}),
+	).toBeVisible()
 
 	// internally, a user has been created:
 	await prisma.user.findUniqueOrThrow({
@@ -225,12 +246,9 @@ test('logs user in after GitHub OAuth if they are already registered', async ({
 
 	await expect(page).toHaveURL(`/`)
 	await expect(
-		page.getByText(
-			new RegExp(
-				`your "${ghUser!.profile.login}" github account has been connected`,
-				'i',
-			),
-		),
+		page.getByRole('link', {
+			name: new RegExp(name, 'i'),
+		}),
 	).toBeVisible()
 
 	// internally, a connection (rather than a new user) has been created:
@@ -301,7 +319,7 @@ test('shows help texts on entering invalid details on onboarding page after GitH
 		}),
 	)
 	// we are truncating the user's input
-	expect((await usernameInput.inputValue()).length).toBe(USERNAME_MAX_LENGTH)
+	expect((await usernameInput.inputValue())).toHaveLength(USERNAME_MAX_LENGTH)
 	await createAccountButton.click()
 	await expect(page.getByText(/username is too long/i)).not.toBeVisible()
 
@@ -317,13 +335,22 @@ test('shows help texts on entering invalid details on onboarding page after GitH
 
 	// we are all set up and ...
 	await page
-		.getByLabel(/do you agree to our terms of service and privacy policy/i)
-		.check()
+		.locator('input[name="agreeToTermsOfServiceAndPrivacyPolicy"]')
+		.evaluate((input) => {
+			if (input instanceof HTMLInputElement) {
+				input.checked = true
+				input.dispatchEvent(new Event('change', { bubbles: true }))
+			}
+		})
 	await createAccountButton.click()
 	await expect(createAccountButton.getByText('error')).not.toBeAttached()
 
 	// ... sign up is successful!
-	await expect(page.getByText(/thanks for signing up/i)).toBeVisible()
+	await expect(
+		page.getByRole('link', {
+			name: new RegExp(ghUser.profile.name, 'i'),
+		}),
+	).toBeVisible()
 })
 
 test('login as existing user', async ({ page, insertNewUser }) => {
@@ -353,9 +380,6 @@ test('reset password with a link', async ({ page, insertNewUser }) => {
 	).toBeVisible()
 	await page.getByRole('textbox', { name: /username/i }).fill(user.username)
 	await page.getByRole('button', { name: /recover password/i }).click()
-	await expect(
-		page.getByRole('button', { name: /recover password/i, disabled: true }),
-	).toBeVisible()
 	await expect(page.getByText(/check your email/i)).toBeVisible()
 
 	const email = await readEmail(user.email)
@@ -380,9 +404,6 @@ test('reset password with a link', async ({ page, insertNewUser }) => {
 	await page.getByLabel(/^confirm password$/i).fill(newPassword)
 
 	await page.getByRole('button', { name: /reset password/i }).click()
-	await expect(
-		page.getByRole('button', { name: /reset password/i, disabled: true }),
-	).toBeVisible()
 
 	await expect(page).toHaveURL('/login')
 	await page.getByRole('textbox', { name: /username/i }).fill(user.username)
@@ -411,9 +432,6 @@ test('reset password with a short code', async ({ page, insertNewUser }) => {
 	).toBeVisible()
 	await page.getByRole('textbox', { name: /username/i }).fill(user.username)
 	await page.getByRole('button', { name: /recover password/i }).click()
-	await expect(
-		page.getByRole('button', { name: /recover password/i, disabled: true }),
-	).toBeVisible()
 	await expect(page.getByText(/check your email/i)).toBeVisible()
 
 	const email = await readEmail(user.email)

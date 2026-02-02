@@ -7,4 +7,4 @@ export {
 	getInternalInstanceDomain,
 	getInstanceInfoSync,
 } from 'litefs-js'
-export { ensurePrimary, ensureInstance } from 'litefs-js/remix.js'
+export { ensurePrimary, ensureInstance } from 'litefs-js/remix'

@@ -34,7 +34,7 @@ autocomplete with TypeScript
 configure both, then you can get the best of both worlds!
 
 By using the `"imports"` field, you don't have to do any special configuration
-for `vitest` or `eslint` to be able to resolve imports. They just resolve them
+for `rstest` or `eslint` to be able to resolve imports. They just resolve them
 using the standard.
 
 And by using the `tsconfig.json` `paths` field configured in the same way as the

@@ -1,7 +1,9 @@
 import { remember } from '@epic-web/remember'
-import {PrismaClient}  from '@prisma/client/index'
+import * as PrismaClientPkg from '@prisma/client'
 
 import chalk from 'chalk'
+
+const { PrismaClient } = PrismaClientPkg
 
 export const prisma = remember('prisma', () => {
 	// NOTE: if you change anything in this function you'll need to restart

@@ -1,8 +1,8 @@
 import closeWithGrace from 'close-with-grace'
 import { setupServer } from 'msw/node'
+import { handlers as federationHandlers } from './federation.ts'
 import { handlers as githubHandlers } from './github.ts'
 import { handlers as resendHandlers } from './resend.ts'
-import { handlers as federationHandlers } from './federation.ts'
 
 export const server = setupServer(...resendHandlers, ...githubHandlers, ...federationHandlers)
 

@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker'
-import { expect, test } from 'vitest'
+import { expect, test } from '@rstest/core'
 import { consoleError } from '#tests/setup/setup-test-env.ts'
 import { getErrorMessage } from './misc.tsx'
 

@@ -39,13 +39,14 @@ test('Users can create note with multiple images', async ({ page, login }) => {
 	// fill in form and submit
 	await page.getByRole('textbox', { name: 'title' }).fill(newNote.title)
 	await page.getByRole('textbox', { name: 'content' }).fill(newNote.content)
+	await page.getByRole('button', { name: 'add image' }).click()
+	await page.getByLabel('image').nth(1).waitFor()
+
 	await page
 		.getByLabel('image')
 		.nth(0)
 		.setInputFiles('tests/fixtures/images/kody-notes/cute-koala.png')
 	await page.getByLabel('alt text').nth(0).fill(altText1)
-	await page.getByRole('button', { name: 'add image' }).click()
-
 	await page
 		.getByLabel('image')
 		.nth(1)
@@ -109,8 +110,8 @@ test('Users can delete note image', async ({ page, login }) => {
 	await page.getByRole('button', { name: 'remove image' }).click()
 	await page.getByRole('button', { name: 'submit' }).click()
 	await expect(page).toHaveURL(`/users/${user.username}/notes/${note.id}`)
-	const countAfter = await images.count()
-	expect(countAfter).toEqual(countBefore - 1)
+	const countAfter = images
+	await expect(countAfter).toHaveCount(countBefore - 1)
 })
 
 function createNote() {

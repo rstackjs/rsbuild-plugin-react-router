@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createRequestListener } from '@react-router/node';
+import { normalizeBuildModule, resolveBuildExports } from './server-utils.js';
 
 export type DevServerMiddleware = (
   req: IncomingMessage,
@@ -14,13 +14,31 @@ export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
     next: (err?: any) => void
   ): Promise<void> => {
     try {
-      const bundle = await server.environments.node.loadBundle('app');
+      const tryLoadBundle = async (entryName: string) => {
+        try {
+          return await server.environments.node.loadBundle(entryName);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message.includes("Can't find entry")
+          ) {
+            return null;
+          }
+          throw error;
+        }
+      };
+
+      const bundle =
+        (await tryLoadBundle('static/js/app')) ?? (await tryLoadBundle('app'));
 
       if (!bundle || !bundle.routes) {
         throw new Error('Server bundle not found or invalid');
       }
 
-      const listener = createRequestListener({ build: bundle });
+      const { createRequestListener } = await import('@react-router/node');
+      const normalizedBuild = normalizeBuildModule(bundle);
+      const build = await resolveBuildExports(normalizedBuild);
+      const listener = createRequestListener({ build });
       await listener(req, res);
     } catch (error) {
       console.error('SSR Error:', error);

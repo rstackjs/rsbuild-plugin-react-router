@@ -1,26 +1,20 @@
-import { vi } from 'vitest';
+import * as fs from 'node:fs';
+import { rstest } from '@rstest/core';
 
 // Mock the file system
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn().mockReturnValue(true),
-}));
+rstest.mock('node:fs', { spy: true });
+rstest.spyOn(fs, 'existsSync').mockReturnValue(true);
 
 // Mock jiti
-vi.mock('jiti', () => ({
+rstest.mock('jiti', () => ({
   createJiti: () => ({
-    import: vi.fn().mockImplementation((path) => {
+    import: rstest.fn().mockImplementation((path) => {
       if (path.includes('routes.ts')) {
         return Promise.resolve([
           {
-            id: 'root',
-            file: 'root.tsx',
-            children: [
-              {
-                id: 'routes/index',
-                file: 'routes/index.tsx',
-                index: true,
-              },
-            ],
+            id: 'routes/index',
+            file: 'routes/index.tsx',
+            index: true,
           },
         ]);
       }
@@ -30,16 +24,35 @@ vi.mock('jiti', () => ({
 }));
 
 // Mock webpack sources
-const mockRawSource = vi.fn().mockImplementation((content) => ({
+const mockRawSource = rstest.fn().mockImplementation((content) => ({
   source: () => content,
   size: () => content.length,
 }));
 
+const deepMerge = (base: any, overrides: any): any => {
+  if (!overrides || typeof overrides !== 'object') {
+    return base;
+  }
+  if (!base || typeof base !== 'object') {
+    return overrides;
+  }
+  const result: Record<string, any> = Array.isArray(base) ? [...base] : { ...base };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (Array.isArray(value)) {
+      result[key] = value.slice();
+    } else if (value && typeof value === 'object') {
+      result[key] = deepMerge(result[key], value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+};
+
 // Mock the @scripts/test-helper module
-vi.mock('@scripts/test-helper', () => ({
-  createStubRsbuild: vi.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => ({
-    addPlugins: vi.fn(),
-    unwrapConfig: vi.fn().mockResolvedValue({
+rstest.mock('@scripts/test-helper', () => ({
+  createStubRsbuild: rstest.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => {
+    const baseConfig = {
       dev: {
         hmr: false,
         liveReload: true,
@@ -83,23 +96,36 @@ vi.mock('@scripts/test-helper', () => ({
       transforms: [
         { resourceQuery: /react-router-route/ },
       ],
-    }),
-    processAssets: vi.fn(),
-    onBeforeStartDevServer: vi.fn(),
-    onBeforeBuild: vi.fn(),
-    modifyRsbuildConfig: vi.fn(),
-    onAfterEnvironmentCompile: vi.fn(),
-    modifyEnvironmentConfig: vi.fn(),
-    transform: vi.fn(),
-    context: {
-      rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
-    },
-    compiler: {
-      webpack: {
-        sources: {
-          RawSource: mockRawSource,
+    };
+
+    const mergedConfig = deepMerge(baseConfig, rsbuildConfig);
+
+    return {
+      addPlugins: rstest.fn(),
+      unwrapConfig: rstest.fn().mockResolvedValue(mergedConfig),
+      processAssets: rstest.fn(),
+      onBeforeStartDevServer: rstest.fn(),
+      onBeforeBuild: rstest.fn(),
+      onAfterBuild: rstest.fn(),
+      modifyRsbuildConfig: rstest.fn(),
+      onAfterEnvironmentCompile: rstest.fn(),
+      modifyEnvironmentConfig: rstest.fn(),
+      transform: rstest.fn(),
+      logger: {
+        warn: rstest.fn(),
+        info: rstest.fn(),
+        error: rstest.fn(),
+      },
+      context: {
+        rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
+      },
+      compiler: {
+        webpack: {
+          sources: {
+            RawSource: mockRawSource,
+          },
         },
       },
-    },
-  })),
+    };
+  }),
 })); 

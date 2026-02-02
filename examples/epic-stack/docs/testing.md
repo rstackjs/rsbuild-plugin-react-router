@@ -22,9 +22,9 @@ test('my test', async ({ page, login }) => {
 We also auto-delete the user at the end of your test. That way, we can keep your
 local db clean and keep your tests isolated from one another.
 
-## Vitest
+## Rstest
 
-For lower level tests of utilities and individual components, we use `vitest`.
+For lower level tests of utilities and individual components, we use `rstest`.
 We have DOM-specific assertion helpers via
 [`@testing-library/jest-dom`](https://testing-library.com/jest-dom).
 

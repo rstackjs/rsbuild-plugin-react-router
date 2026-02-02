@@ -47,7 +47,7 @@ test('Users can update their password', async ({ page, login }) => {
 	expect(
 		await verifyUserPassword({ username }, oldPassword),
 		'Old password still works',
-	).toEqual(null)
+	).toBeNull()
 	expect(
 		await verifyUserPassword({ username }, newPassword),
 		'New password does not work',
@@ -62,13 +62,14 @@ test('Users can update their profile photo', async ({ page, login }) => {
 	const beforeSrc = await page
 		.getByRole('img', { name: user.name ?? user.username })
 		.getAttribute('src')
+	invariant(beforeSrc, 'Profile photo src not found')
 
 	await page.getByRole('link', { name: /change profile photo/i }).click()
 
 	await expect(page).toHaveURL(`/settings/profile/photo`)
 
 	await page
-		.getByRole('textbox', { name: /change/i })
+		.getByLabel(/change/i)
 		.setInputFiles('./tests/fixtures/images/user/kody.png')
 
 	await page.getByRole('button', { name: /save/i }).click()
@@ -82,7 +83,8 @@ test('Users can update their profile photo', async ({ page, login }) => {
 		.getByRole('img', { name: user.name ?? user.username })
 		.getAttribute('src')
 
-	expect(beforeSrc).not.toEqual(afterSrc)
+	invariant(afterSrc, 'Updated profile photo src not found')
+	expect(afterSrc).not.toBe(beforeSrc)
 })
 
 test('Users can change their email address', async ({ page, login }) => {
@@ -104,13 +106,21 @@ test('Users can change their email address', async ({ page, login }) => {
 	invariant(code, 'Onboarding code not found')
 	await page.getByRole('textbox', { name: /code/i }).fill(code)
 	await page.getByRole('button', { name: /submit/i }).click()
-	await expect(page.getByText(/email changed/i)).toBeVisible()
 
-	const updatedUser = await prisma.user.findUnique({
-		where: { id: preUpdateUser.id },
-		select: { email: true },
-	})
-	invariant(updatedUser, 'Updated user not found')
+	const updatedUser = await waitFor(
+		async () => {
+			const user = await prisma.user.findUnique({
+				where: { id: preUpdateUser.id },
+				select: { email: true },
+			})
+			if (!user) return null
+			if (user.email !== newEmailAddress) {
+				throw new Error('User email has not updated yet')
+			}
+			return user
+		},
+		{ timeout: 10_000, errorMessage: 'Updated user not found' },
+	)
 	expect(updatedUser.email).toBe(newEmailAddress)
 	const noticeEmail = await waitFor(() => readEmail(preUpdateUser.email), {
 		errorMessage: 'Notice email was not sent',

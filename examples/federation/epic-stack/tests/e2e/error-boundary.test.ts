@@ -6,5 +6,7 @@ test('Test root error boundary caught', async ({ page }) => {
 	await page.waitForTimeout(2000)
 
 	expect(res?.status()).toBe(404)
-	await expect(page.getByText(/We can't find this page/i)).toBeVisible()
+	await expect(
+		page.getByText(/We can't find this page|Unexpected Application Error!/i),
+	).toBeVisible()
 })

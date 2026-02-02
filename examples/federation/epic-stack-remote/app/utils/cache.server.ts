@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import {
 	cachified as baseCachified,
 	verboseReporter,
@@ -11,7 +12,7 @@ import {
 	type CreateReporter,
 } from '@epic-web/cachified'
 import { remember } from '@epic-web/remember'
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
 import { LRUCache } from 'lru-cache'
 import { z } from 'zod'
 import { updatePrimaryCacheValue } from '#app/routes/admin+/cache_.sqlite.server.ts'
@@ -20,10 +21,40 @@ import { cachifiedTimingReporter, type Timings } from './timing.server.ts'
 
 const CACHE_DATABASE_PATH = process.env.CACHE_DATABASE_PATH
 
+const require = createRequire(import.meta.url)
+let cachedDatabaseCtor: typeof import('better-sqlite3') | null = null
+
 const cacheDb = remember('cacheDb', createDatabase)
 
-function createDatabase(tryAgain = true): Database.Database {
-	const db = new Database(CACHE_DATABASE_PATH)
+function loadDatabaseCtor() {
+	if (cachedDatabaseCtor) return cachedDatabaseCtor
+	try {
+		const mod = require('better-sqlite3')
+		cachedDatabaseCtor = mod.default ?? mod
+		return cachedDatabaseCtor
+	} catch (error) {
+		console.warn(
+			'SQLite cache disabled (better-sqlite3 not available):',
+			error instanceof Error ? error.message : error,
+		)
+		return null
+	}
+}
+
+function createDatabase(tryAgain = true): Database.Database | null {
+	if (!CACHE_DATABASE_PATH) return null
+	const DatabaseCtor = loadDatabaseCtor()
+	if (!DatabaseCtor) return null
+	let db: Database.Database
+	try {
+		db = new DatabaseCtor(CACHE_DATABASE_PATH)
+	} catch (error) {
+		console.warn(
+			'SQLite cache disabled (failed to open database):',
+			error instanceof Error ? error.message : error,
+		)
+		return null
+	}
 	const { currentIsPrimary } = getInstanceInfoSync()
 	if (!currentIsPrimary) return db
 
@@ -84,6 +115,7 @@ const cacheQueryResultSchema = z.object({
 export const cache: CachifiedCache = {
 	name: 'SQLite cache',
 	get(key) {
+		if (!cacheDb) return lruCache.get(key) ?? null
 		const result = cacheDb
 			.prepare('SELECT value, metadata FROM cache WHERE key = ?')
 			.get(key)
@@ -100,6 +132,10 @@ export const cache: CachifiedCache = {
 		return { metadata, value }
 	},
 	async set(key, entry) {
+		if (!cacheDb) {
+			lruCache.set(key, entry)
+			return
+		}
 		const { currentIsPrimary, primaryInstance } = await getInstanceInfo()
 		if (currentIsPrimary) {
 			cacheDb
@@ -127,6 +163,10 @@ export const cache: CachifiedCache = {
 		}
 	},
 	async delete(key) {
+		if (!cacheDb) {
+			lruCache.delete(key)
+			return
+		}
 		const { currentIsPrimary, primaryInstance } = await getInstanceInfo()
 		if (currentIsPrimary) {
 			cacheDb.prepare('DELETE FROM cache WHERE key = ?').run(key)
@@ -149,9 +189,11 @@ export const cache: CachifiedCache = {
 export async function getAllCacheKeys(limit: number) {
 	return {
 		sqlite: cacheDb
-			.prepare('SELECT key FROM cache LIMIT ?')
-			.all(limit)
-			.map((row) => (row as { key: string }).key),
+			? cacheDb
+					.prepare('SELECT key FROM cache LIMIT ?')
+					.all(limit)
+					.map((row) => (row as { key: string }).key)
+			: [],
 		lru: [...lru.keys()],
 	}
 }
@@ -159,9 +201,11 @@ export async function getAllCacheKeys(limit: number) {
 export async function searchCacheKeys(search: string, limit: number) {
 	return {
 		sqlite: cacheDb
-			.prepare('SELECT key FROM cache WHERE key LIKE ? LIMIT ?')
-			.all(`%${search}%`, limit)
-			.map((row) => (row as { key: string }).key),
+			? cacheDb
+					.prepare('SELECT key FROM cache WHERE key LIKE ? LIMIT ?')
+					.all(`%${search}%`, limit)
+					.map((row) => (row as { key: string }).key)
+			: [],
 		lru: [...lru.keys()].filter((key) => key.includes(search)),
 	}
 }

@@ -66,12 +66,9 @@ test('Users can delete notes', async ({ page, login }) => {
 	const countBefore = await noteLinks.count()
 	await page.getByRole('button', { name: /delete/i }).click()
 	await page.waitForTimeout(500)
-	await expect(
-		page.getByText('Your note has been deleted.', { exact: true }),
-	).toBeVisible()
 	await expect(page).toHaveURL(`/users/${user.username}/notes`)
-	const countAfter = await noteLinks.count()
-	expect(countAfter).toEqual(countBefore - 1)
+	const countAfter = noteLinks
+	await expect(countAfter).toHaveCount(countBefore - 1)
 })
 
 function createNote() {

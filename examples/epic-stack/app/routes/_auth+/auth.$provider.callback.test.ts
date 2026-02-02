@@ -1,10 +1,9 @@
 import { invariant } from '@epic-web/invariant'
 import { faker } from '@faker-js/faker'
-import { http } from 'msw'
-import { afterEach, expect, test } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { afterEach, expect, test } from '@rstest/core'
 import { twoFAVerificationType } from '#app/routes/settings+/profile.two-factor.tsx'
 import { getSessionExpirationDate, sessionKey } from '#app/utils/auth.server.ts'
-import { connectionSessionStorage } from '#app/utils/connections.server.ts'
 import { GITHUB_PROVIDER_NAME } from '#app/utils/connections.tsx'
 import { prisma } from '#app/utils/db.server.ts'
 import { authSessionStorage } from '#app/utils/session.server.ts'
@@ -35,7 +34,7 @@ test('when auth fails, send the user to login with a toast', async () => {
 	consoleError.mockImplementation(() => {})
 	server.use(
 		http.post('https://github.com/login/oauth/access_token', async () => {
-			return new Response('error', { status: 400 })
+			return HttpResponse.json({ error: 'bad_verification_code' })
 		}),
 	)
 	const request = await setupRequest()
@@ -219,19 +218,15 @@ async function setupRequest({
 	const state = faker.string.uuid()
 	url.searchParams.set('state', state)
 	url.searchParams.set('code', code)
-	const connectionSession = await connectionSessionStorage.getSession()
-	connectionSession.set('oauth2:state', state)
 	const authSession = await authSessionStorage.getSession()
 	if (sessionId) authSession.set(sessionKey, sessionId)
 	const setSessionCookieHeader =
 		await authSessionStorage.commitSession(authSession)
-	const setConnectionSessionCookieHeader =
-		await connectionSessionStorage.commitSession(connectionSession)
 	const request = new Request(url.toString(), {
 		method: 'GET',
 		headers: {
 			cookie: [
-				convertSetCookieToCookie(setConnectionSessionCookieHeader),
+				`github=${new URLSearchParams({ state }).toString()}`,
 				convertSetCookieToCookie(setSessionCookieHeader),
 			].join('; '),
 		},

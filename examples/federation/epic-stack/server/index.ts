@@ -6,7 +6,7 @@ import chalk from 'chalk'
 import closeWithGrace from 'close-with-grace'
 import compression from 'compression'
 import express, { type RequestHandler } from 'express'
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import getPort, { portNumbers } from 'get-port'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -65,7 +65,8 @@ export async function createApp(devServer?: any) {
 
 	// no ending slashes for SEO reasons
 	// https://github.com/epicweb-dev/epic-stack/discussions/108
-	app.get('*', (req, res, next) => {
+	app.use((req, res, next) => {
+		if (req.method !== 'GET') return next()
 		if (req.path.endsWith('/') && req.path.length > 1) {
 			const query = req.url.slice(req.path.length)
 			const safepath = req.path.slice(0, -1).replace(/\/+/g, '/')
@@ -98,7 +99,7 @@ export async function createApp(devServer?: any) {
 		app.use('/server', express.static('build/server', { maxAge: '1h' }))
 	}
 
-	app.get(['/img/*', '/favicons/*'], ((
+	app.get(/^\/(img|favicons)\//, ((
 		_req: express.Request,
 		res: express.Response,
 	) => {
@@ -178,7 +179,8 @@ export async function createApp(devServer?: any) {
 		// When sitting behind a CDN such as cloudflare, replace fly-client-ip with the CDN
 		// specific header such as cf-connecting-ip
 		keyGenerator: (req: express.Request) => {
-			return req.get('fly-client-ip') ?? `${req.ip}`
+			const flyClientIp = req.get('fly-client-ip')
+			return flyClientIp ?? ipKeyGenerator(req.ip)
 		},
 	}
 
@@ -226,7 +228,19 @@ export async function createApp(devServer?: any) {
 	async function getBuild() {
 		try {
 			//@ts-ignore
-			const build = import('virtual/react-router/server-build')
+			const rawBuild = await import('virtual/react-router/server-build')
+			const build =
+				rawBuild?.routes
+					? rawBuild
+					: rawBuild?.default?.routes
+						? rawBuild.default
+						: rawBuild?.build?.routes
+							? rawBuild.build
+							: rawBuild
+
+			if (!build?.routes) {
+				throw new Error('Invalid server build: missing routes')
+			}
 
 			return { build: build as unknown as ServerBuild, error: null }
 		} catch (error) {
@@ -243,25 +257,27 @@ export async function createApp(devServer?: any) {
 		})
 	}
 
-	app.all(
-		'*',
-		createRequestHandler({
-			getLoadContext: (_: any, res: any) => ({
-				cspNonce: res.locals.cspNonce,
-				serverBuild: getBuild(),
-				VALUE_FROM_EXPRESS: 'Hello from Epic Stack',
-			}),
-			mode: MODE,
-			build: async () => {
-				const { error, build } = await getBuild()
-				// gracefully "catch" the error
-				if (error) {
-					throw error
-				}
-				return build
-			},
-		}),
-	)
+	const getLoadContext = (_: any, res: any) => ({
+		cspNonce: res.locals.cspNonce,
+		serverBuild: getBuild(),
+		VALUE_FROM_EXPRESS: 'Hello from Epic Stack',
+	})
+
+	app.all(/.*/, async (req, res, next) => {
+		try {
+			const { error, build } = await getBuild()
+			if (error) {
+				throw error
+			}
+			return createRequestHandler({
+				getLoadContext,
+				mode: MODE,
+				build,
+			})(req, res, next)
+		} catch (error) {
+			next(error)
+		}
+	})
 
 	const desiredPort = Number(process.env.PORT || 3000)
 	const portToUse = await getPort({
@@ -301,19 +317,21 @@ ${chalk.bold('Press Ctrl+C to stop')}
 		)
 	})
 
-	closeWithGrace(async ({ err }) => {
-		await new Promise((resolve, reject) => {
-			server.close((e) => (e ? reject(e) : resolve('ok')))
-		})
-		if (err) {
-			console.error(chalk.red(err))
-			console.error(chalk.red(err.stack))
-			if (SENTRY_ENABLED) {
-				Sentry.captureException(err)
-				await Sentry.flush(500)
+	if (IS_PROD) {
+		closeWithGrace(async ({ err }) => {
+			await new Promise((resolve, reject) => {
+				server.close((e) => (e ? reject(e) : resolve('ok')))
+			})
+			if (err) {
+				console.error(chalk.red(err))
+				console.error(chalk.red(err.stack))
+				if (SENTRY_ENABLED) {
+					Sentry.captureException(err)
+					await Sentry.flush(500)
+				}
 			}
-		}
-	})
+		})
+	}
 
 	return app
 }

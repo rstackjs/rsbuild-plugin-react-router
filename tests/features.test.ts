@@ -1,5 +1,5 @@
 import { createStubRsbuild } from '@scripts/test-helper';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, rstest } from '@rstest/core';
 import { pluginReactRouter } from '../src';
 
 describe('pluginReactRouter', () => {
@@ -107,6 +107,34 @@ describe('pluginReactRouter', () => {
 
       expect(routeTransform).toBeDefined();
     });
+
+    it('should register build and dot file transforms', async () => {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      const plugin = pluginReactRouter();
+      await plugin.setup(rsbuild as any);
+
+      const calls = (rsbuild.transform as any).mock.calls.map(
+        (call: any[]) => call[0]
+      );
+
+      expect(
+        calls.some(
+          (call: any) =>
+            call.resourceQuery?.toString().includes('__react-router-build-client-route')
+        )
+      ).toBe(true);
+
+      expect(
+        calls.some((call: any) => call.test?.toString().includes('\\.server'))
+      ).toBe(true);
+
+      expect(
+        calls.some((call: any) => call.test?.toString().includes('\\.client'))
+      ).toBe(true);
+    });
   });
 
   describe('asset handling', () => {
@@ -115,7 +143,7 @@ describe('pluginReactRouter', () => {
         rsbuildConfig: {},
       });
 
-      const processAssets = vi.fn();
+      const processAssets = rstest.fn();
       rsbuild.processAssets = processAssets;
 
       const plugin = pluginReactRouter({ serverOutput: 'commonjs' });

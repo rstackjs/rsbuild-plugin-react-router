@@ -1,21 +1,38 @@
 import { defineConfig, devices } from '@playwright/test'
 import 'dotenv/config'
 
-const PORT = process.env.PORT || '3000'
+const PORT = process.env.PORT || '3006'
+const WORKERS = process.env.PW_WORKERS
+	? Number(process.env.PW_WORKERS)
+	: 1
+const RETRIES = process.env.PW_RETRIES
+	? Number(process.env.PW_RETRIES)
+	: process.env.CI
+		? 2
+		: 1
+const TEST_TIMEOUT = process.env.PW_TEST_TIMEOUT
+	? Number(process.env.PW_TEST_TIMEOUT)
+	: 30_000
+const EXPECT_TIMEOUT = process.env.PW_EXPECT_TIMEOUT
+	? Number(process.env.PW_EXPECT_TIMEOUT)
+	: 10_000
 
 export default defineConfig({
 	testDir: './tests/e2e',
-	timeout: 15 * 1000,
+	timeout: TEST_TIMEOUT,
 	expect: {
-		timeout: 10 * 1000,
+		timeout: EXPECT_TIMEOUT,
 	},
 	fullyParallel: true,
 	forbidOnly: !!process.env.CI,
-	retries: process.env.CI ? 2 : 2,
-	workers: process.env.CI ? 1 : undefined,
-	reporter: 'html',
+	retries: RETRIES,
+	workers: WORKERS,
+	reporter: 'list',
 	use: {
 		baseURL: `http://localhost:${PORT}/`,
+		headless: true,
+		actionTimeout: 10_000,
+		navigationTimeout: 20_000,
 		trace: 'on-first-retry',
 	},
 
@@ -29,14 +46,9 @@ export default defineConfig({
 	],
 
 	webServer: {
-		command: process.env.CI ? 'npm run start:mocks' : 'npm run dev',
-		port: Number(PORT),
-		reuseExistingServer: true,
-		stdout: 'pipe',
-		stderr: 'pipe',
-		env: {
-			PORT,
-			NODE_ENV: 'test',
-		},
+		command: 'E2E=true pnpm run dev',
+		url: 'http://localhost:3006',
+		reuseExistingServer: !process.env.CI,
+		timeout: 120000,
 	},
 })

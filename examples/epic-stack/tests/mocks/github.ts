@@ -14,7 +14,7 @@ const githubUserFixturePath = path.join(
 		'..',
 		'fixtures',
 		'github',
-		`users.${process.env.VITEST_POOL_ID || 0}.local.json`,
+		`users.${process.env.RSTEST_WORKER_ID || 0}.local.json`,
 	),
 )
 
@@ -128,6 +128,7 @@ async function getUser(request: Request) {
 }
 
 const passthroughGitHub =
+	process.env.GITHUB_CLIENT_ID &&
 	!process.env.GITHUB_CLIENT_ID.startsWith('MOCK_') &&
 	process.env.NODE_ENV !== 'test'
 
@@ -145,13 +146,10 @@ export const handlers: Array<HttpHandler> = [
 				user = await insertGitHubUser(code)
 			}
 
-			return new Response(
-				new URLSearchParams({
-					access_token: user.accessToken,
-					token_type: '__MOCK_TOKEN_TYPE__',
-				}).toString(),
-				{ headers: { 'content-type': 'application/x-www-form-urlencoded' } },
-			)
+			return json({
+				access_token: user.accessToken,
+				token_type: '__MOCK_TOKEN_TYPE__',
+			})
 		},
 	),
 	http.get('https://api.github.com/user/emails', async ({ request }) => {

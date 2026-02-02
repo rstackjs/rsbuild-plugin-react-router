@@ -15,8 +15,8 @@ test.describe('Projects Section', () => {
   });
   
   test('should navigate to project detail page', async ({ page }) => {
-    const projectId = 'react-router';
-    
+    const projectId = '1';
+
     // Go directly to the project page
     await page.goto(`/projects/${projectId}`);
     
@@ -42,8 +42,8 @@ test.describe('Projects Section', () => {
   });
   
   test('should navigate to project edit page', async ({ page }) => {
-    const projectId = 'react-router';
-    
+    const projectId = '1';
+
     // Go to the project detail page
     await page.goto(`/projects/${projectId}`);
     
@@ -56,8 +56,8 @@ test.describe('Projects Section', () => {
   });
   
   test('should navigate to project settings page', async ({ page }) => {
-    const projectId = 'react-router';
-    
+    const projectId = '1';
+
     // Go to the project detail page
     await page.goto(`/projects/${projectId}`);
     

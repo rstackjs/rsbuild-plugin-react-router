@@ -20,8 +20,18 @@ async function startServer() {
 
     app.use(async (req, res, next) => {
       try {
+        const tryLoadBundle = async (entryName) => {
+          try {
+            return await devServer.environments.node.loadBundle(entryName);
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("Can't find entry")) {
+              return null;
+            }
+            throw error;
+          }
+        };
         const bundle = /** @type {import("./server/index.js")} */ (
-          await devServer.environments.node.loadBundle('app')
+          (await tryLoadBundle('static/js/app')) ?? (await tryLoadBundle('app'))
         );
         await bundle.app(req, res, next);
       } catch (e) {

@@ -11,10 +11,13 @@ A Rsbuild plugin that provides seamless integration with React Router, supportin
 - 🚀 Zero-config setup with sensible defaults
 - 🔄 Automatic route generation from file system
 - 🖥️ Server-Side Rendering (SSR) support
-- 📱 Client-side navigation
+- 📱 Client-side navigation with SPA mode (`ssr: false`)
+- 📄 Static prerendering for hybrid static/dynamic sites
 - 🛠️ TypeScript support out of the box
 - 🔧 Customizable configuration
 - 🎯 Support for route-level code splitting
+- ☁️ Cloudflare Workers deployment support
+- 🔗 Module Federation support (experimental)
 
 ## Installation
 
@@ -24,6 +27,18 @@ npm install rsbuild-plugin-react-router
 yarn add rsbuild-plugin-react-router
 # or
 pnpm add rsbuild-plugin-react-router
+```
+
+## Local development
+
+For the federation examples and Playwright e2e tests, use Node 22 and the
+repo-pinned pnpm version:
+
+```bash
+nvm install
+nvm use
+corepack enable
+corepack prepare pnpm@9.15.3 --activate
 ```
 
 ## Usage
@@ -43,7 +58,7 @@ export default defineConfig(() => {
         customServer: false,
         // Optional: Specify server output format
         serverOutput: "commonjs",
-        //Optional: enable experimental support for module federation
+        // Optional: enable experimental support for module federation
         federation: false
       }), 
       pluginReact()
@@ -78,9 +93,18 @@ pluginReactRouter({
    */
   federation?: boolean
 })
+
+When Module Federation is enabled, configure your Federation plugin with
+`experiments.asyncStartup: true` to avoid requiring entrypoint `import()` hacks.
+See the Module Federation examples under `examples/federation`.
+
+When Module Federation is enabled, some runtimes may expose server build exports
+as async getters. The dev server resolves these exports automatically. For
+production, use a custom server or an adapter that resolves async exports before
+passing the build to React Router's request handler.
 ```
 
-2. **React Router Configuration** (in `react-router.config.ts`):
+2. **React Router Configuration** (in `react-router.config.*`):
 ```ts
 import type { Config } from '@react-router/dev/config';
 
@@ -90,6 +114,31 @@ export default {
    * @default true
    */
   ssr: true,
+
+  /**
+   * The file name for the server build output.
+   * @default "index.js"
+   */
+  serverBuildFile: "index.js",
+
+  /**
+   * The output format for the server build.
+   * Options: "esm" | "cjs"
+   * @default "esm"
+   */
+  serverModuleFormat: "esm",
+
+  /**
+   * Split server bundles by route branch (advanced).
+   */
+  serverBundles: async ({ branch }) => branch[0]?.id ?? "main",
+
+  /**
+   * Hook called after the build completes.
+   */
+  buildEnd: async ({ buildManifest, reactRouterConfig }) => {
+    console.log(buildManifest, reactRouterConfig);
+  },
 
   /**
    * Build directory for output files
@@ -108,10 +157,109 @@ export default {
    * @default '/'
    */
   basename: '/my-app',
+
+  /**
+   * React Router future flags (optional).
+   * Example: split client route modules into separate chunks.
+   */
+  future: {
+    v8_splitRouteModules: true,
+  },
 } satisfies Config;
 ```
 
 All configuration options are optional and will use sensible defaults if not specified.
+
+### Config File Resolution
+
+The plugin will look for `react-router.config` with any supported JS/TS extension, in this order:
+
+- `react-router.config.tsx`
+- `react-router.config.ts`
+- `react-router.config.mts`
+- `react-router.config.jsx`
+- `react-router.config.js`
+- `react-router.config.mjs`
+
+If none are found, it falls back to defaults.
+
+### Framework Mode
+
+React Router Framework Mode is implemented as a Vite plugin. This Rsbuild
+plugin targets Data Mode only and does not support Framework Mode.
+
+### FAQ
+
+#### rsbuild-plugin-react-router vs ModernJS
+
+This plugin is a lightweight adapter to run React Router on Rsbuild. It does
+not aim to replace ModernJS or its higher-level framework features. If your
+goal is a full framework or advanced microfrontend support, ModernJS may be
+a better fit.
+
+### SPA Mode (`ssr: false`)
+
+React Router's SPA Mode still requires a build-time server render of the root route to generate a hydratable `index.html` (this is how the official React Router Vite plugin works).
+
+When `ssr: false`:
+
+- The plugin builds both `web` and `node` internally.
+- It generates `build/client/index.html` by running the server build once (requesting `basename` with the `X-React-Router-SPA-Mode: yes` header).
+- It removes `build/server` after generating `index.html`, so the output is deployable as static assets.
+
+**Important:** In SPA mode, use `clientLoader` instead of `loader` for data loading since there's no server at runtime.
+
+### Static Prerendering
+
+For static sites with multiple pages, you can prerender specific routes at build time:
+
+```ts
+// react-router.config.ts
+import type { Config } from '@react-router/dev/config';
+
+export default {
+  ssr: false,
+  prerender: [
+    '/',
+    '/about',
+    '/docs',
+    '/docs/getting-started',
+    '/docs/advanced',
+    '/projects',
+  ],
+} satisfies Config;
+```
+
+When `prerender` is specified:
+
+- Each path in the array is rendered at build time
+- Static HTML files are generated for each route (e.g., `/about` → `build/client/about/index.html`)
+- The server build is removed after prerendering for static deployment
+- Non-prerendered routes fall back to client-side routing
+
+You can also use `prerender: true` to prerender all static routes automatically.
+
+`prerender` can also be a function:
+
+```ts
+export default {
+  ssr: false,
+  prerender: ({ getStaticPaths }) =>
+    getStaticPaths().filter(path => path !== '/admin'),
+} satisfies Config;
+```
+
+For large sites, you can tune prerender concurrency:
+
+```ts
+export default {
+  ssr: false,
+  prerender: {
+    paths: ['/','/about'],
+    unstable_concurrency: 4,
+  },
+} satisfies Config;
+```
 
 ### Default Configuration Values
 
@@ -187,6 +335,7 @@ Route components support the following exports:
 - `Layout` - Layout component
 - `clientLoader` - Client-side data loading
 - `clientAction` - Client-side form actions
+- `clientMiddleware` - Client-side middleware
 - `handle` - Route handle
 - `links` - Prefetch links
 - `meta` - Route meta data
@@ -195,7 +344,23 @@ Route components support the following exports:
 #### Server-side Exports
 - `loader` - Server-side data loading
 - `action` - Server-side form actions
+- `middleware` - Server-side middleware
 - `headers` - HTTP headers
+
+### Client/Server-only Modules
+
+- Files ending in `.client.*` are treated as client-only. Their exports are
+  stubbed to `undefined` in the server build, so they are safe to import from
+  route components for browser-only behavior.
+- Files ending in `.server.*` are server-only. If they are imported by code
+  compiled for the web environment, the build will fail with a clear error.
+  Keep `.server` imports in server entrypoints or other server-only code.
+
+### Asset Prefix
+
+If you configure `output.assetPrefix` in Rsbuild, the plugin uses that value
+for the React Router browser manifest and server build `publicPath` so asset
+URLs resolve correctly when serving from a CDN or sub-path.
 
 ## Custom Server Setup
 
@@ -478,6 +643,51 @@ The plugin automatically:
 - Sets up development server with live reload
 - Handles route-based code splitting
 - Manages client and server builds
+
+## React Router Framework Mode
+
+React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild plugin currently targets React Router's Data Mode build/runtime model and does not implement the Vite plugin layer (type-safe href, route module splitting, etc.).
+
+## Examples
+
+The repository includes several examples demonstrating different use cases:
+
+| Example | Description | Port | Command |
+|---------|-------------|------|---------|
+| [default-template](./examples/default-template) | Standard SSR setup with React Router | 3000 | `pnpm dev` |
+| [spa-mode](./examples/spa-mode) | Single Page Application (`ssr: false`) | 3001 | `pnpm dev` |
+| [prerender](./examples/prerender) | Static prerendering for multiple routes | 3002 | `pnpm dev` |
+| [custom-node-server](./examples/custom-node-server) | Custom Express server with SSR | 3003 | `pnpm dev` |
+| [cloudflare](./examples/cloudflare) | Cloudflare Workers deployment | 3004 | `pnpm dev` |
+| [client-only](./examples/client-only) | `.client` modules with SSR hydration | 3010 | `pnpm dev` |
+| [epic-stack](./examples/epic-stack) | Full-featured Epic Stack example | 3005 | `pnpm dev` |
+| [federation/epic-stack](./examples/federation/epic-stack) | Module Federation host | 3006 | `pnpm dev` |
+| [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote | 3007 | `pnpm dev` |
+
+Each example has unique ports configured to allow running multiple examples simultaneously.
+
+### Running Examples
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build the plugin
+pnpm build
+
+# Run any example
+cd examples/default-template
+pnpm dev
+```
+
+### Running E2E Tests
+
+Each example includes Playwright e2e tests:
+
+```bash
+cd examples/default-template
+pnpm test:e2e
+```
 
 ## License
 

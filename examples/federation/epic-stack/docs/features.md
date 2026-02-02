@@ -30,7 +30,7 @@ Here are a few things you get today:
   [Radix UI](https://www.radix-ui.com/)
 - End-to-end testing with [Playwright](https://playwright.dev/)
 - Local third party request mocking with [MSW](https://mswjs.io/)
-- Unit testing with [Vitest](https://vitest.dev/) and
+- Unit testing with [Rstest](https://rstest.rs/) and
   [Testing Library](https://testing-library.com/) with pre-configured Test
   Database
 - Code formatting with [Prettier](https://prettier.io/)

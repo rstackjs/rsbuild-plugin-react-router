@@ -17,7 +17,7 @@ import sqlite from './sqlite.svg'
 import tailwind from './tailwind.svg'
 import testingLibrary from './testing-library.png'
 import typescript from './typescript.svg'
-import vitest from './vitest.svg'
+import rstest from './rstest.svg'
 import zod from './zod.svg'
 
 export { default as stars } from './stars.jpg'
@@ -122,9 +122,9 @@ export const logos = [
 		row: 3,
 	},
 	{
-		src: vitest,
-		alt: 'Vitest',
-		href: 'https://vitest.dev',
+		src: rstest,
+		alt: 'Rstest',
+		href: 'https://rstest.rs',
 		column: 4,
 		row: 4,
 	},

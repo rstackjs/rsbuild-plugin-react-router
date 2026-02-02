@@ -2,10 +2,11 @@ import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { getZodConstraint, parseWithZod } from '@conform-to/zod'
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
 import { data, redirect, Form } from 'react-router'
-import { z } from 'zod'
 import { ErrorList, Field } from 'remote/components/forms'
-import { Icon } from '#app/components/ui/icon.tsx'
 import { StatusButton } from 'remote/components/ui/status-button'
+import { useIsPending } from 'remote/utils/misc'
+import { z } from 'zod'
+import { Icon } from '#app/components/ui/icon.tsx'
 import {
 	prepareVerification,
 	requireRecentVerification,
@@ -13,7 +14,6 @@ import {
 import { requireUserId } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { sendEmail } from '#app/utils/email.server.ts'
-import { useIsPending } from 'remote/utils/misc'
 import { EmailSchema } from '#app/utils/user-validation.ts'
 import { verifySessionStorage } from '#app/utils/verification.server.ts'
 import { type Route } from './+types/profile.change-email.ts'

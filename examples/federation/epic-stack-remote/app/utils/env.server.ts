@@ -36,6 +36,8 @@ export function init() {
 
 		throw new Error('Invalid environment variables')
 	}
+
+	Object.assign(process.env, parsed.data)
 }
 
 /**
