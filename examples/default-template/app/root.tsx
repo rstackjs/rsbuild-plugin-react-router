@@ -48,6 +48,7 @@ function Navigation() {
   const mainNavItems = [
     { to: '/', label: 'Home' },
     { to: '/about', label: 'About' },
+    { to: '/styling', label: 'Styling' },
     { to: '/docs', label: 'Documentation' },
     { to: '/client-features', label: 'Client Features' },
     { to: '/projects', label: 'Projects' },

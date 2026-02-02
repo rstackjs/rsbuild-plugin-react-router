@@ -3,7 +3,7 @@ import type { Route } from './+types/project';
 
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => data.project.name,
+    breadcrumb: (data: Route.ComponentProps["loaderData"]) => data.project.name,
   };
 }
 
@@ -74,7 +74,7 @@ function Avatar({ name, initials }: { name: string; initials: string }) {
 }
 
 export default function Project() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<Route.ComponentProps["loaderData"]>();
 
   return (
     <div className="space-y-6">
@@ -128,7 +128,7 @@ export default function Project() {
           Team
         </h2>
         <div className="space-y-4">
-          {project.team.map((member) => (
+          {project.team.map((member: any) => (
             <div
               key={member.id}
               className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-0"
@@ -155,7 +155,7 @@ export default function Project() {
           Recent Activity
         </h2>
         <div className="space-y-4">
-          {project.activity.map((item) => (
+          {project.activity.map((item: any) => (
             <div
               key={item.id}
               className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-0"

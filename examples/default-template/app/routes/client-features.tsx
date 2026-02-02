@@ -19,8 +19,8 @@ export async function clientAction() {
 }
 
 export default function ClientFeatures() {
-  const data = useLoaderData<Route.LoaderData>();
-  const fetcher = useFetcher<Route.ActionData>();
+  const data = useLoaderData<Route.ComponentProps["loaderData"]>();
+  const fetcher = useFetcher<Route.ComponentProps["actionData"]>();
 
   return (
     <div className="page-container">
