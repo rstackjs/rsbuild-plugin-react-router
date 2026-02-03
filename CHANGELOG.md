@@ -1,5 +1,12 @@
 # rsbuild-plugin-react-router
 
+## 0.1.1
+
+### Patch Changes
+
+- f6691e1: Enable Rspack HMR for ESM server outputs by not forcing `dev.hmr=false` in the React Router plugin.
+- 4b933d0: Use `@remix-run/node-fetch-server` for the built-in dev server middleware to reduce direct reliance on `@mjackson/node-fetch-server`.
+
 ## 0.1.0
 
 ### Minor Changes
