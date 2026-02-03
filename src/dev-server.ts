@@ -35,10 +35,20 @@ export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
         throw new Error('Server bundle not found or invalid');
       }
 
-      const { createRequestListener } = await import('@react-router/node');
+      // Use the modern request listener implementation directly to reduce
+      // our reliance on the deprecated `@mjackson/node-fetch-server` package.
+      const [{ createRequestHandler }, { createRequestListener }] = await Promise.all([
+        import('react-router'),
+        import('@remix-run/node-fetch-server'),
+      ]);
       const normalizedBuild = normalizeBuildModule(bundle);
       const build = await resolveBuildExports(normalizedBuild);
-      const listener = createRequestListener({ build });
+      const requestHandler = createRequestHandler(build);
+      // `createRequestListener` provides `client` info but React Router's
+      // request handler expects an app-defined `loadContext` object.
+      // For the built-in dev middleware we don't currently provide a load
+      // context, so pass `undefined`.
+      const listener = createRequestListener((request) => requestHandler(request));
       await listener(req, res);
     } catch (error) {
       console.error('SSR Error:', error);
