@@ -12,7 +12,8 @@ describe('pluginReactRouter', () => {
       rsbuild.addPlugins([pluginReactRouter()]);
       const config = await rsbuild.unwrapConfig();
 
-      expect(config.dev.hmr).toBe(false);
+      // The plugin should not override Rsbuild's HMR defaults.
+      expect(config.dev.hmr).toBe(true);
       expect(config.dev.liveReload).toBe(true);
       expect(config.dev.writeToDisk).toBe(true);
     });

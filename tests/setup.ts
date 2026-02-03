@@ -54,9 +54,11 @@ rstest.mock('@scripts/test-helper', () => ({
   createStubRsbuild: rstest.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => {
     const baseConfig = {
       dev: {
-        hmr: false,
+        // Match Rsbuild defaults so plugin changes are observable in tests.
+        // (Historically the plugin forced `hmr: false` / `liveReload: true`.)
+        hmr: true,
         liveReload: true,
-        writeToDisk: true,
+        writeToDisk: false,
         setupMiddlewares: [],
       },
       environments: {
@@ -98,17 +100,24 @@ rstest.mock('@scripts/test-helper', () => ({
       ],
     };
 
-    const mergedConfig = deepMerge(baseConfig, rsbuildConfig);
+    let mergedConfig = deepMerge(baseConfig, rsbuildConfig);
 
-    return {
+    const mergeRsbuildConfig = (a: any, b: any) => deepMerge(a, b);
+    const pending: Promise<unknown>[] = [];
+
+    const stub: any = {
       addPlugins: rstest.fn(),
-      unwrapConfig: rstest.fn().mockResolvedValue(mergedConfig),
+      unwrapConfig: rstest.fn(),
       processAssets: rstest.fn(),
       onBeforeStartDevServer: rstest.fn(),
       onBeforeBuild: rstest.fn(),
       onAfterBuild: rstest.fn(),
+      getNormalizedConfig: rstest.fn().mockImplementation(() => mergedConfig),
       modifyRsbuildConfig: rstest.fn(),
       onAfterEnvironmentCompile: rstest.fn(),
+      // Keep as a spy-only hook; tests in this repo assert against the merged
+      // Rsbuild config (modifyRsbuildConfig), not post-normalization environment
+      // mutations.
       modifyEnvironmentConfig: rstest.fn(),
       transform: rstest.fn(),
       logger: {
@@ -118,6 +127,7 @@ rstest.mock('@scripts/test-helper', () => ({
       },
       context: {
         rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
+        action: 'dev',
       },
       compiler: {
         webpack: {
@@ -127,5 +137,39 @@ rstest.mock('@scripts/test-helper', () => ({
         },
       },
     };
+
+    stub.modifyRsbuildConfig.mockImplementation((arg: any) => {
+      const handler = typeof arg === 'function' ? arg : arg?.handler;
+      if (typeof handler !== 'function') return;
+
+      const res = handler(mergedConfig, { mergeRsbuildConfig });
+      if (res && typeof res.then === 'function') {
+        const p = res.then((next: any) => {
+          if (next) mergedConfig = next;
+          return next;
+        });
+        pending.push(p);
+        return p;
+      }
+      if (res) mergedConfig = res;
+      return res;
+    });
+
+    // In Rsbuild, `addPlugins()` triggers plugin setup before config is read.
+    stub.addPlugins.mockImplementation((next: any[]) => {
+      for (const plugin of next) {
+        if (typeof plugin?.setup === 'function') {
+          // Tests do not await `addPlugins`, so ensure `unwrapConfig` waits for setup.
+          pending.push(Promise.resolve(plugin.setup(stub)));
+        }
+      }
+    });
+
+    stub.unwrapConfig.mockImplementation(async () => {
+      await Promise.all(pending);
+      return mergedConfig;
+    });
+
+    return stub;
   }),
 })); 

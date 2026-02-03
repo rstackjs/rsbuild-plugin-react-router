@@ -1078,8 +1078,6 @@ export const pluginReactRouter = (
         },
         dev: {
           writeToDisk: true,
-          hmr: false,
-          liveReload: true,
           // Only add SSR middleware if SSR is enabled and not using a custom server
           // In SPA mode (ssr: false), we just serve static files from the client build
           setupMiddlewares:
