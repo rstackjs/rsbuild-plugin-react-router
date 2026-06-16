@@ -27,6 +27,13 @@ export type PluginOptions = {
    * Federation mode configuration
    */
   federation?: boolean;
+
+  /**
+   * Emit structured React Router plugin timing logs after each compiler
+   * environment finishes.
+   * @default false
+   */
+  logPerformance?: boolean;
 };
 
 /**
