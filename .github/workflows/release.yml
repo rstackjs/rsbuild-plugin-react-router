@@ -36,6 +36,9 @@ jobs:
           node-version: 22
           registry-url: 'https://registry.npmjs.org/'
 
+      - name: Setup npm for Trusted Publishing
+        run: npm install -g npm@^11.5.1
+
       - name: Setup PNPM
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
 
@@ -60,4 +63,4 @@ jobs:
         if: steps.changesets.outputs.published == 'true'
         run: |
           echo "🎉 Published packages to npm!"
-          echo "Published packages: ${{ steps.changesets.outputs.publishedPackages }}" 
+          echo "Published packages: ${{ steps.changesets.outputs.publishedPackages }}"
