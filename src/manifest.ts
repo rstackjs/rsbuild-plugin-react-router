@@ -141,9 +141,13 @@ export async function getReactRouterManifestForDev(
   const getAssetsForChunk = (chunkName: string): string[] => {
     const assets = clientStats?.assetsByChunkName?.[chunkName];
     if (!assets) {
-      return [];
+      return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`];
     }
-    return Array.isArray(assets) ? assets : [assets];
+    const normalizedAssets = Array.isArray(assets) ? assets : [assets];
+    if (!normalizedAssets.some(asset => asset.endsWith('.js'))) {
+      return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`, ...normalizedAssets];
+    }
+    return normalizedAssets;
   };
 
   const getModulePathForChunk = (chunkName: string): string | undefined => {
@@ -155,7 +159,7 @@ export async function getReactRouterManifestForDev(
   for (const [key, route] of Object.entries(routes)) {
     const assets = getAssetsForChunk(route.id);
     const jsAssets = assets.filter(asset => asset.endsWith('.js')) || [];
-    const cssAssets = assets.filter(asset => asset.endsWith('.css')) || [];
+    let cssAssets = assets.filter(asset => asset.endsWith('.css')) || [];
     // Read and analyze the route file to check for exports
     const routeFilePath = resolve(context, route.file);
     let exports = new Set<string>();
@@ -171,6 +175,15 @@ export async function getReactRouterManifestForDev(
 
     try {
       const source = await readFile(routeFilePath, 'utf8');
+      if (
+        !isBuild &&
+        cssAssets.length === 0 &&
+        /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/.test(source)
+      ) {
+        cssAssets = [
+          `${DEFAULT_MANIFEST_DIR.replace('/js', '/css')}/${route.id}.css`,
+        ];
+      }
       const code = await transformToEsm(source, routeFilePath);
       exports = new Set(await getExportNames(code));
 
@@ -254,11 +267,9 @@ export async function getReactRouterManifestForDev(
     };
   }
 
-  const entryAssets = clientStats?.assetsByChunkName?.['entry.client'];
-  const entryJsAssets =
-    entryAssets?.filter(asset => asset.endsWith('.js')) || [];
-  const entryCssAssets =
-    entryAssets?.filter(asset => asset.endsWith('.css')) || [];
+  const entryAssets = getAssetsForChunk('entry.client');
+  const entryJsAssets = entryAssets.filter(asset => asset.endsWith('.js'));
+  const entryCssAssets = entryAssets.filter(asset => asset.endsWith('.css'));
 
   const fingerprintedValues = {
     entry: {

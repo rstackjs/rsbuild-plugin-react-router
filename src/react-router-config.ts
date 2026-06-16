@@ -87,7 +87,9 @@ const mergeReactRouterConfig = (...configs: Config[]): Config => {
       ...configB,
       ...(mergeRequired('buildEnd')
         ? {
-            buildEnd: async (...args: Parameters<NonNullable<Config['buildEnd']>>) => {
+            buildEnd: async (
+              ...args: Parameters<NonNullable<Config['buildEnd']>>
+            ) => {
               await Promise.all([
                 configA.buildEnd?.(...args),
                 configB.buildEnd?.(...args),
@@ -122,7 +124,9 @@ export const resolveReactRouterConfig = async (
   const presets = await Promise.all(
     (reactRouterUserConfig.presets ?? []).map(async preset => {
       if (!preset.name) {
-        throw new Error('React Router presets must have a `name` property defined.');
+        throw new Error(
+          'React Router presets must have a `name` property defined.'
+        );
       }
       if (!preset.reactRouterConfig) {
         return null;

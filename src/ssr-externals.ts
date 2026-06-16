@@ -15,7 +15,10 @@ const REACT_ROUTER_EXTERNALS = [
 
 const requireFromHere = createRequire(import.meta.url);
 
-function resolvePackageJson(name: string, rootDirectory: string): string | null {
+function resolvePackageJson(
+  name: string,
+  rootDirectory: string
+): string | null {
   try {
     return requireFromHere.resolve(`${name}/package.json`, {
       paths: [rootDirectory],

@@ -34,7 +34,8 @@ function generateStaticTemplate(
   routes: Record<string, Route>,
   options: ServerBuildOptions
 ): string {
-  const manifestId = options.serverManifestId ?? 'virtual/react-router/server-manifest';
+  const manifestId =
+    options.serverManifestId ?? 'virtual/react-router/server-manifest';
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
     ${Object.keys(routes)
@@ -107,7 +108,9 @@ const RESOLVABLE_BUILD_EXPORTS = new Set([
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   typeof (value as Promise<unknown>)?.then === 'function';
 
-export const normalizeBuildModule = <T extends Record<string, any>>(build: T): T => {
+export const normalizeBuildModule = <T extends Record<string, any>>(
+  build: T
+): T => {
   if (!build || typeof build !== 'object') {
     return build;
   }

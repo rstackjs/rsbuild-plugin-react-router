@@ -338,9 +338,7 @@ export const removeExports = (
   }
 };
 
-export const removeUnusedImports = (
-  ast: ParseResult<Babel.File>
-): void => {
+export const removeUnusedImports = (ast: ParseResult<Babel.File>): void => {
   let scopeCrawled = false;
   traverse(ast, {
     Program(path: NodePath<Babel.Program>) {

@@ -56,7 +56,7 @@ export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
       // request handler expects an app-defined `loadContext` object.
       // For the built-in dev middleware we don't currently provide a load
       // context, so pass `undefined`.
-      const listener = nfs.createRequestListener((request) =>
+      const listener = nfs.createRequestListener(request =>
         requestHandler(request)
       );
       await listener(req, res);

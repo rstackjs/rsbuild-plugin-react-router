@@ -52,7 +52,8 @@ export function getClientDevtoolSetting(
   const envTools = normalized.environments?.[clientEnvName]?.tools?.rspack;
   const rootTools = normalized.tools?.rspack;
   return (
-    getDevtoolFromRspackConfig(envTools) ?? getDevtoolFromRspackConfig(rootTools)
+    getDevtoolFromRspackConfig(envTools) ??
+    getDevtoolFromRspackConfig(rootTools)
   );
 }
 

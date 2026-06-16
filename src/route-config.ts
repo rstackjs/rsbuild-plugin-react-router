@@ -31,10 +31,18 @@ const validateEntry = (
   if ('id' in entry && entry.id === 'root') {
     issues.push(`${path}.id\nA route cannot use the reserved id 'root'.`);
   }
-  if ('path' in entry && entry.path !== undefined && typeof entry.path !== 'string') {
+  if (
+    'path' in entry &&
+    entry.path !== undefined &&
+    typeof entry.path !== 'string'
+  ) {
     issues.push(`${path}.path\nInvalid type: Expected string.`);
   }
-  if ('index' in entry && entry.index !== undefined && typeof entry.index !== 'boolean') {
+  if (
+    'index' in entry &&
+    entry.index !== undefined &&
+    typeof entry.index !== 'boolean'
+  ) {
     issues.push(`${path}.index\nInvalid type: Expected boolean.`);
   }
   if (

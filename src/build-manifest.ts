@@ -28,10 +28,15 @@ const getAddressableRoutes = (routes: Record<string, Route>): Route[] => {
       nonAddressableIds.add(id);
     }
   }
-  return Object.values(routes).filter(route => !nonAddressableIds.has(route.id));
+  return Object.values(routes).filter(
+    route => !nonAddressableIds.has(route.id)
+  );
 };
 
-const getRouteBranch = (routes: Record<string, Route>, routeId: string): Route[] => {
+const getRouteBranch = (
+  routes: Record<string, Route>,
+  routeId: string
+): Route[] => {
   const branch: Route[] = [];
   let current = routeId;
   while (current) {
@@ -58,14 +63,22 @@ export const getBuildManifest = async ({
   rootDirectory,
 }: {
   reactRouterConfig: Required<
-    Pick<Config, 'appDirectory' | 'buildDirectory' | 'serverBuildFile' | 'future'>
+    Pick<
+      Config,
+      'appDirectory' | 'buildDirectory' | 'serverBuildFile' | 'future'
+    >
   > &
     Pick<Config, 'serverBundles'>;
   routes: Record<string, Route>;
   rootDirectory: string;
 }): Promise<BuildManifest | undefined> => {
-  const { serverBundles, appDirectory, buildDirectory, serverBuildFile, future } =
-    reactRouterConfig;
+  const {
+    serverBundles,
+    appDirectory,
+    buildDirectory,
+    serverBuildFile,
+    future,
+  } = reactRouterConfig;
 
   if (!serverBundles) {
     return { routes };
@@ -74,7 +87,10 @@ export const getBuildManifest = async ({
   const rootRelativeRoutes = Object.fromEntries(
     Object.entries(routes).map(([id, route]) => {
       const filePath = resolve(appDirectory, route.file);
-      return [id, { ...route, file: normalizePath(relative(rootDirectory, filePath)) }];
+      return [
+        id,
+        { ...route, file: normalizePath(relative(rootDirectory, filePath)) },
+      ];
     })
   );
 

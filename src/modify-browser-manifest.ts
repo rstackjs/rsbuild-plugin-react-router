@@ -83,8 +83,7 @@ export function createModifyBrowserManifestPlugin(
           }
 
           if (routeChunkOptions?.isBuild) {
-            const entryAssets =
-              stats?.assetsByChunkName?.['entry.client'];
+            const entryAssets = stats?.assetsByChunkName?.['entry.client'];
             const entryJsAssets =
               entryAssets?.filter(asset => asset.endsWith('.js')) || [];
             const manifestPath = getReactRouterManifestPath({
@@ -119,9 +118,7 @@ export function createModifyBrowserManifestPlugin(
                 continue;
               }
               const source = asset.source.source().toString();
-              const hash = createHash('sha384')
-                .update(source)
-                .digest('base64');
+              const hash = createHash('sha384').update(source).digest('base64');
               sri[combineURLs(assetPrefix, asset.name)] = `sha384-${hash}`;
             }
           }

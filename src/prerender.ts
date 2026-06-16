@@ -6,18 +6,14 @@ type PrerenderConfig = Config['prerender'];
 type PrerenderPathsConfig =
   | boolean
   | string[]
-  | ((
-      args: {
-        getStaticPaths: () => string[];
-      }
-    ) => boolean | string[] | Promise<boolean | string[]>);
+  | ((args: {
+      getStaticPaths: () => string[];
+    }) => boolean | string[] | Promise<boolean | string[]>);
 
-type PrerenderConfigObject =
-  | {
-      paths?: PrerenderPathsConfig;
-      unstable_concurrency?: number;
-    }
-  | null;
+type PrerenderConfigObject = {
+  paths?: PrerenderPathsConfig;
+  unstable_concurrency?: number;
+} | null;
 
 type PrerenderResolveOptions = {
   logWarning?: boolean;
@@ -88,7 +84,11 @@ export const resolvePrerenderPaths = async (
   }
 
   let pathsConfig: PrerenderPathsConfig | undefined;
-  if (typeof prerender === 'object' && prerender !== null && 'paths' in prerender) {
+  if (
+    typeof prerender === 'object' &&
+    prerender !== null &&
+    'paths' in prerender
+  ) {
     pathsConfig = (prerender as PrerenderConfigObject)?.paths;
   } else {
     pathsConfig = prerender as PrerenderPathsConfig;
@@ -148,8 +148,12 @@ export const getPrerenderConcurrency = (prerender: PrerenderConfig): number => {
   return 1;
 };
 
-const isValidPrerenderPathsConfig = (value: unknown): value is PrerenderPathsConfig =>
-  typeof value === 'boolean' || typeof value === 'function' || Array.isArray(value);
+const isValidPrerenderPathsConfig = (
+  value: unknown
+): value is PrerenderPathsConfig =>
+  typeof value === 'boolean' ||
+  typeof value === 'function' ||
+  Array.isArray(value);
 
 export const validatePrerenderConfig = (
   prerender: PrerenderConfig
