@@ -54,10 +54,16 @@ async function startServer() {
 
     // Load the server bundle
     const serverBundle = await import('./build/server/static/js/app.js');
+    const serverApp = serverBundle.app ?? serverBundle.default?.app;
+    if (typeof serverApp !== 'function') {
+      throw new Error(
+        'Invalid server bundle: expected an exported `app(req, res, next)` handler.'
+      );
+    }
+
     // Mount the server app after static file handling
     app.use(async (req, res, next) => {
       try {
-        const serverApp = serverBundle.app ?? serverBundle.default?.app;
         await serverApp(req, res, next);
       } catch (e) {
         next(e);
