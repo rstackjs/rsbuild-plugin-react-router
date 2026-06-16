@@ -22,10 +22,27 @@ type RouteModuleAnalysisCacheEntry = {
 };
 
 const transformCache = new Map<string, TransformCacheEntry>();
+const exportNamesCache = new Map<string, Promise<string[]>>();
 const routeModuleAnalysisCache = new Map<
   string,
   RouteModuleAnalysisCacheEntry
 >();
+
+const MAX_MODULE_ANALYSIS_CACHE_ENTRIES = 2048;
+
+const setBoundedCacheEntry = <Key, Value>(
+  cache: Map<Key, Value>,
+  key: Key,
+  value: Value
+) => {
+  if (!cache.has(key) && cache.size >= MAX_MODULE_ANALYSIS_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey !== undefined) {
+      cache.delete(oldestKey);
+    }
+  }
+  cache.set(key, value);
+};
 
 const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
   const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
@@ -56,16 +73,34 @@ export const transformToEsm = async (
       throw error;
     });
 
-  transformCache.set(resourcePath, { source: code, transformed });
+  setBoundedCacheEntry(transformCache, resourcePath, {
+    source: code,
+    transformed,
+  });
   return transformed;
 };
 
 export const getExportNames = async (code: string): Promise<string[]> => {
-  await init;
-  const [, exportSpecifiers] = await parseExports(code);
-  return Array.from(
-    new Set(exportSpecifiers.map(specifier => specifier.n).filter(Boolean))
-  );
+  const cached = exportNamesCache.get(code);
+  if (cached) {
+    return cached;
+  }
+
+  const exports = (async () => {
+    await init;
+    const [, exportSpecifiers] = await parseExports(code);
+    return Array.from(
+      new Set(exportSpecifiers.map(specifier => specifier.n).filter(Boolean))
+    );
+  })().catch(error => {
+    if (exportNamesCache.get(code) === exports) {
+      exportNamesCache.delete(code);
+    }
+    throw error;
+  });
+
+  setBoundedCacheEntry(exportNamesCache, code, exports);
+  return exports;
 };
 
 export const getExportNamesAndExportAll = async (
@@ -113,7 +148,7 @@ export const getRouteModuleAnalysis = async (
     throw error;
   });
 
-  routeModuleAnalysisCache.set(resourcePath, {
+  setBoundedCacheEntry(routeModuleAnalysisCache, resourcePath, {
     mtimeMs: stats.mtimeMs,
     size: stats.size,
     analysis,

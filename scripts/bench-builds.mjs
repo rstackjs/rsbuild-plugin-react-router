@@ -129,7 +129,7 @@ const runCommand = async ({
   const childCommand = useTime ? '/usr/bin/time' : command;
   const childArgs = useTime ? ['-v', command, ...args] : args;
 
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const child = spawn(childCommand, childArgs, {
       cwd,
       env: { ...process.env, ...env },
@@ -154,6 +154,7 @@ const runCommand = async ({
         wallMs: performance.now() - startedAt,
       });
     });
+    child.on('error', reject);
   });
 };
 

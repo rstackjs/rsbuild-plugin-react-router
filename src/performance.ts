@@ -79,8 +79,20 @@ export const createReactRouterPerformanceProfiler = ({
     timing.totalMs = Math.round((timing.totalMs + roundedDuration) * 10) / 10;
     timing.maxMs = Math.max(timing.maxMs, roundedDuration);
     timing.slowest.push({ durationMs: roundedDuration, resource });
-    timing.slowest.sort((a, b) => b.durationMs - a.durationMs);
-    timing.slowest = timing.slowest.slice(0, 5);
+    for (let index = timing.slowest.length - 1; index > 0; index -= 1) {
+      if (
+        timing.slowest[index].durationMs <= timing.slowest[index - 1].durationMs
+      ) {
+        break;
+      }
+      [timing.slowest[index - 1], timing.slowest[index]] = [
+        timing.slowest[index],
+        timing.slowest[index - 1],
+      ];
+    }
+    if (timing.slowest.length > 5) {
+      timing.slowest.pop();
+    }
   };
 
   return {
