@@ -44,7 +44,10 @@ Each run writes:
 - `.benchmark/results/<profile>/baseline.md`
 
 The JSON includes wall time, optional GNU `/usr/bin/time -v` user/sys/RSS data,
-and parsed `[react-router:performance]` reports from the plugin.
+parsed `[react-router:performance]` reports from the plugin, and an aggregated
+`pluginOperations` table per fixture. The markdown report includes the same
+operation breakdown so route transforms and manifest work can be compared
+without opening the raw JSON.
 
 ## Hygiene
 

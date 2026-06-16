@@ -218,8 +218,45 @@ const summarizeRuns = runs => ({
   maxRssKb: summarizeMetric(runs.map(run => run.maxRssKb)),
 });
 
+const summarizePluginOperations = runs => {
+  const operations = new Map();
+
+  for (const run of runs) {
+    for (const report of run.pluginReports) {
+      for (const [operation, metrics] of Object.entries(
+        report.operations ?? {}
+      )) {
+        const key = `${report.environment}:${operation}`;
+        const current = operations.get(key) ?? {
+          environment: report.environment,
+          operation,
+          count: 0,
+          totalMs: 0,
+          maxMs: 0,
+          reports: 0,
+        };
+        current.count += metrics.count ?? 0;
+        current.totalMs += metrics.totalMs ?? 0;
+        current.maxMs = Math.max(current.maxMs, metrics.maxMs ?? 0);
+        current.reports += 1;
+        operations.set(key, current);
+      }
+    }
+  }
+
+  return [...operations.values()].sort((a, b) => {
+    if (b.totalMs !== a.totalMs) {
+      return b.totalMs - a.totalMs;
+    }
+    return `${a.environment}:${a.operation}`.localeCompare(
+      `${b.environment}:${b.operation}`
+    );
+  });
+};
+
 const formatMs = value =>
   value == null ? '-' : `${(value / 1000).toFixed(2)}s`;
+const formatReportMs = value => (value == null ? '-' : `${value.toFixed(1)}ms`);
 const formatRss = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
 
@@ -256,6 +293,34 @@ const renderMarkdown = result => {
         .replace(/^/, '| ')
         .replace(/$/, ' |')
     );
+  }
+
+  for (const benchmark of result.benchmarks) {
+    if (benchmark.pluginOperations.length === 0) {
+      continue;
+    }
+    lines.push(
+      '',
+      `## ${benchmark.id} Plugin Operations`,
+      '',
+      '| Environment | Operation | Count | Total | Max | Reports |',
+      '|---|---|---:|---:|---:|---:|'
+    );
+    for (const operation of benchmark.pluginOperations.slice(0, 12)) {
+      lines.push(
+        [
+          operation.environment,
+          operation.operation,
+          operation.count,
+          formatReportMs(operation.totalMs),
+          formatReportMs(operation.maxMs),
+          operation.reports,
+        ]
+          .join(' | ')
+          .replace(/^/, '| ')
+          .replace(/$/, ' |')
+      );
+    }
   }
 
   lines.push('');
@@ -406,6 +471,7 @@ const main = async () => {
         'node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs',
       runs,
       summary: summarizeRuns(runs),
+      pluginOperations: summarizePluginOperations(runs),
     });
   }
 
