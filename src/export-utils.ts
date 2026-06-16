@@ -1,8 +1,31 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { extname } from 'pathe';
 import * as esbuild from 'esbuild';
 import { init, parse as parseExports } from 'es-module-lexer';
 import { JS_LOADERS } from './constants.js';
+
+type TransformCacheEntry = {
+  source: string;
+  transformed: Promise<string>;
+};
+
+type RouteModuleAnalysis = {
+  source: string;
+  code: string;
+  exports: string[];
+};
+
+type RouteModuleAnalysisCacheEntry = {
+  mtimeMs: number;
+  size: number;
+  analysis: Promise<RouteModuleAnalysis>;
+};
+
+const transformCache = new Map<string, TransformCacheEntry>();
+const routeModuleAnalysisCache = new Map<
+  string,
+  RouteModuleAnalysisCacheEntry
+>();
 
 const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
   const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
@@ -13,14 +36,28 @@ export const transformToEsm = async (
   code: string,
   resourcePath: string
 ): Promise<string> => {
-  return (
-    await esbuild.transform(code, {
+  const cached = transformCache.get(resourcePath);
+  if (cached?.source === code) {
+    return cached.transformed;
+  }
+
+  const transformed = esbuild
+    .transform(code, {
       jsx: 'automatic',
       format: 'esm',
       platform: 'neutral',
       loader: getEsbuildLoader(resourcePath),
     })
-  ).code;
+    .then(result => result.code)
+    .catch(error => {
+      if (transformCache.get(resourcePath)?.transformed === transformed) {
+        transformCache.delete(resourcePath);
+      }
+      throw error;
+    });
+
+  transformCache.set(resourcePath, { source: code, transformed });
+  return transformed;
 };
 
 export const getExportNames = async (code: string): Promise<string[]> => {
@@ -55,10 +92,37 @@ export const getExportNamesAndExportAll = async (
   return { exportNames: Array.from(exportNames), exportAllModules };
 };
 
+export const getRouteModuleAnalysis = async (
+  resourcePath: string
+): Promise<RouteModuleAnalysis> => {
+  const stats = await stat(resourcePath);
+  const cached = routeModuleAnalysisCache.get(resourcePath);
+  if (cached?.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
+    return cached.analysis;
+  }
+
+  const analysis = (async () => {
+    const source = await readFile(resourcePath, 'utf8');
+    const code = await transformToEsm(source, resourcePath);
+    const exports = await getExportNames(code);
+    return { source, code, exports };
+  })().catch(error => {
+    if (routeModuleAnalysisCache.get(resourcePath)?.analysis === analysis) {
+      routeModuleAnalysisCache.delete(resourcePath);
+    }
+    throw error;
+  });
+
+  routeModuleAnalysisCache.set(resourcePath, {
+    mtimeMs: stats.mtimeMs,
+    size: stats.size,
+    analysis,
+  });
+  return analysis;
+};
+
 export const getRouteModuleExports = async (
   resourcePath: string
 ): Promise<string[]> => {
-  const source = await readFile(resourcePath, 'utf8');
-  const code = await transformToEsm(source, resourcePath);
-  return getExportNames(code);
+  return (await getRouteModuleAnalysis(resourcePath)).exports;
 };

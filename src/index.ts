@@ -73,6 +73,7 @@ import {
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
+import { createReactRouterPerformanceProfiler } from './performance.js';
 
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 
@@ -127,6 +128,12 @@ export const pluginReactRouter = (
       ...defaultOptions,
       ...options,
     };
+    const logPerformance = pluginOptions.logPerformance === true;
+    const setupStartMs = logPerformance ? performance.now() : 0;
+    const performanceProfiler = createReactRouterPerformanceProfiler({
+      enabled: logPerformance,
+      log: message => api.logger.info(message),
+    });
 
     const nodeExternals = Array.from(
       new Set(['express', ...getSsrExternals(process.cwd())])
@@ -478,6 +485,12 @@ export const pluginReactRouter = (
           const ssrDir = resolve(clientBuildDir, 'static');
           fsExtra.copySync(serverBuildDir, ssrDir);
         }
+      }
+      if (logPerformance) {
+        performanceProfiler.flush(environment.name, {
+          compilerLifecycleMs:
+            Math.round((performance.now() - setupStartMs) * 10) / 10,
+        });
       }
     });
 
@@ -1256,28 +1269,38 @@ export const pluginReactRouter = (
                     {
                       future,
                       onManifest: (manifest, sri) => {
-                        const baseServerManifest = {
-                          ...manifest,
-                          sri,
-                        };
-                        latestServerManifest = baseServerManifest;
-                        for (const [bundleId, bundleRoutes] of Object.entries(
-                          routesByServerBundleId
-                        )) {
-                          if (!bundleRoutes) {
-                            continue;
+                        performanceProfiler.recordSync(
+                          'web',
+                          'manifest:stage',
+                          'virtual/react-router/browser-manifest',
+                          () => {
+                            const baseServerManifest = {
+                              ...manifest,
+                              sri,
+                            };
+                            latestServerManifest = baseServerManifest;
+                            for (const [
+                              bundleId,
+                              bundleRoutes,
+                            ] of Object.entries(routesByServerBundleId)) {
+                              if (!bundleRoutes) {
+                                continue;
+                              }
+                              const routeIds = new Set(
+                                Object.keys(bundleRoutes)
+                              );
+                              const filteredRoutes = Object.fromEntries(
+                                Object.entries(manifest.routes).filter(
+                                  ([routeId]) => routeIds.has(routeId)
+                                )
+                              );
+                              latestServerManifestsByBundleId[bundleId] = {
+                                ...baseServerManifest,
+                                routes: filteredRoutes,
+                              };
+                            }
                           }
-                          const routeIds = new Set(Object.keys(bundleRoutes));
-                          const filteredRoutes = Object.fromEntries(
-                            Object.entries(manifest.routes).filter(
-                              ([routeId]) => routeIds.has(routeId)
-                            )
-                          );
-                          latestServerManifestsByBundleId[bundleId] = {
-                            ...baseServerManifest,
-                            routes: filteredRoutes,
-                          };
-                        }
+                        );
                       },
                     }
                   )
@@ -1311,445 +1334,506 @@ export const pluginReactRouter = (
       {
         test: /virtual\/react-router\/(browser|server)-manifest/,
       },
-      async args => {
-        // For browser manifest, return a placeholder that will be modified by the plugin
-        if (args.environment.name === 'web') {
-          return {
-            code: `window.__reactRouterManifest = "PLACEHOLDER";`,
-          };
-        }
+      async args =>
+        performanceProfiler.record(
+          args.environment?.name,
+          'manifest:transform',
+          args.resource,
+          async () => {
+            // For browser manifest, return a placeholder that will be modified by the plugin
+            if (args.environment.name === 'web') {
+              return {
+                code: `window.__reactRouterManifest = "PLACEHOLDER";`,
+              };
+            }
 
-        const bundleMatch = args.resource.match(
-          /virtual\/react-router\/server-manifest(?:-([^?]+))?/
-        );
-        const bundleId = bundleMatch?.[1]?.replace(/\\.js$/, '');
+            const bundleMatch = args.resource.match(
+              /virtual\/react-router\/server-manifest(?:-([^?]+))?/
+            );
+            const bundleId = bundleMatch?.[1]?.replace(/\\.js$/, '');
 
-        const manifest =
-          (isBuild && latestServerManifest
-            ? bundleId && latestServerManifestsByBundleId[bundleId]
-              ? latestServerManifestsByBundleId[bundleId]
-              : latestServerManifest
-            : null) ??
-          (await getReactRouterManifestForDev(
-            routes,
-            pluginOptions,
-            clientStats,
-            appDirectory,
-            assetPrefix,
-            routeChunkOptions
-          ));
-        return {
-          code: `export default ${jsesc(manifest, { es6: true })};`,
-        };
-      }
+            const manifest =
+              (isBuild && latestServerManifest
+                ? bundleId && latestServerManifestsByBundleId[bundleId]
+                  ? latestServerManifestsByBundleId[bundleId]
+                  : latestServerManifest
+                : null) ??
+              (await getReactRouterManifestForDev(
+                routes,
+                pluginOptions,
+                clientStats,
+                appDirectory,
+                assetPrefix,
+                routeChunkOptions
+              ));
+            return {
+              code: `export default ${jsesc(manifest, { es6: true })};`,
+            };
+          }
+        )
     );
 
     api.transform(
       {
         resourceQuery: /__react-router-build-client-route/,
       },
-      async args => {
-        const code = await transformToEsm(args.code, args.resourcePath);
-        const exportNames = await getExportNames(code);
-        const isServer = args.environment?.name === 'node';
-        const chunkedExports =
-          !isServer && isBuild && splitRouteModules
-            ? (
-                await detectRouteChunksIfEnabled(
-                  routeChunkCache,
-                  routeChunkConfig,
-                  args.resourcePath,
-                  code
-                )
-              ).chunkedExports
-            : [];
-        const chunkedExportSet = new Set<string>(chunkedExports);
-        const reexports = exportNames.filter(exp => {
-          if (chunkedExportSet.has(exp)) {
-            return false;
+      async args =>
+        performanceProfiler.record(
+          args.environment?.name,
+          'route:client-entry',
+          args.resource,
+          async () => {
+            const code = await transformToEsm(args.code, args.resourcePath);
+            const exportNames = await getExportNames(code);
+            const isServer = args.environment?.name === 'node';
+            const chunkedExports =
+              !isServer && isBuild && splitRouteModules
+                ? (
+                    await detectRouteChunksIfEnabled(
+                      routeChunkCache,
+                      routeChunkConfig,
+                      args.resourcePath,
+                      code
+                    )
+                  ).chunkedExports
+                : [];
+            const chunkedExportSet = new Set<string>(chunkedExports);
+            const reexports = exportNames.filter(exp => {
+              if (chunkedExportSet.has(exp)) {
+                return false;
+              }
+              return (
+                (CLIENT_ROUTE_EXPORTS as readonly string[]).includes(exp) ||
+                (isServer &&
+                  (SERVER_ONLY_ROUTE_EXPORTS as readonly string[]).includes(
+                    exp
+                  ))
+              );
+            });
+            const target = `${args.resourcePath}?react-router-route`;
+            return {
+              code: `export { ${reexports.join(', ')} } from ${JSON.stringify(
+                target
+              )};`,
+            };
           }
-          return (
-            (CLIENT_ROUTE_EXPORTS as readonly string[]).includes(exp) ||
-            (isServer &&
-              (SERVER_ONLY_ROUTE_EXPORTS as readonly string[]).includes(exp))
-          );
-        });
-        const target = `${args.resourcePath}?react-router-route`;
-        return {
-          code: `export { ${reexports.join(', ')} } from ${JSON.stringify(
-            target
-          )};`,
-        };
-      }
+        )
     );
 
     api.transform(
       {
         resourceQuery: /route-chunk=/,
       },
-      async args => {
-        if (args.environment?.name !== 'web') {
-          return { code: args.code, map: null };
-        }
-        const preventEmptyChunkSnippet = (reason: string) =>
-          `Math.random()<0&&console.log(${JSON.stringify(reason)});`;
+      async args =>
+        performanceProfiler.record(
+          args.environment?.name,
+          'route:chunk',
+          args.resource,
+          async () => {
+            if (args.environment?.name !== 'web') {
+              return { code: args.code, map: null };
+            }
+            const preventEmptyChunkSnippet = (reason: string) =>
+              `Math.random()<0&&console.log(${JSON.stringify(reason)});`;
 
-        if (!isBuild || !splitRouteModules) {
-          return {
-            code: preventEmptyChunkSnippet('Split route modules disabled'),
-            map: null,
-          };
-        }
+            if (!isBuild || !splitRouteModules) {
+              return {
+                code: preventEmptyChunkSnippet('Split route modules disabled'),
+                map: null,
+              };
+            }
 
-        const chunkName = getRouteChunkNameFromModuleId(args.resource);
-        if (!chunkName) {
-          throw new Error(`Invalid route chunk name in "${args.resource}"`);
-        }
+            const chunkName = getRouteChunkNameFromModuleId(args.resource);
+            if (!chunkName) {
+              throw new Error(`Invalid route chunk name in "${args.resource}"`);
+            }
 
-        const transformed = await transformToEsm(args.code, args.resourcePath);
-        const chunk = await getRouteChunkIfEnabled(
-          routeChunkCache,
-          routeChunkConfig,
-          args.resourcePath,
-          chunkName,
-          transformed
-        );
+            const transformed = await transformToEsm(
+              args.code,
+              args.resourcePath
+            );
+            const chunk = await getRouteChunkIfEnabled(
+              routeChunkCache,
+              routeChunkConfig,
+              args.resourcePath,
+              chunkName,
+              transformed
+            );
 
-        if (enforceSplitRouteModules && chunkName === 'main' && chunk) {
-          const exportNames = await getExportNames(chunk);
-          validateRouteChunks({
-            config: routeChunkConfig,
-            id: args.resourcePath,
-            valid: {
-              clientAction: !exportNames.includes('clientAction'),
-              clientLoader: !exportNames.includes('clientLoader'),
-              clientMiddleware: !exportNames.includes('clientMiddleware'),
-              HydrateFallback: !exportNames.includes('HydrateFallback'),
-            },
-          });
-        }
+            if (enforceSplitRouteModules && chunkName === 'main' && chunk) {
+              const exportNames = await getExportNames(chunk);
+              validateRouteChunks({
+                config: routeChunkConfig,
+                id: args.resourcePath,
+                valid: {
+                  clientAction: !exportNames.includes('clientAction'),
+                  clientLoader: !exportNames.includes('clientLoader'),
+                  clientMiddleware: !exportNames.includes('clientMiddleware'),
+                  HydrateFallback: !exportNames.includes('HydrateFallback'),
+                },
+              });
+            }
 
-        return {
-          code: chunk ?? preventEmptyChunkSnippet(`No ${chunkName} chunk`),
-          map: null,
-        };
-      }
+            return {
+              code: chunk ?? preventEmptyChunkSnippet(`No ${chunkName} chunk`),
+              map: null,
+            };
+          }
+        )
     );
 
     api.transform(
       {
         test: /\.[cm]?[jt]sx?$/,
       },
-      async args => {
-        if (args.environment?.name !== 'web') {
-          return { code: args.code, map: null };
-        }
-        if (!isBuild || !splitRouteModules) {
-          return { code: args.code, map: null };
-        }
-        if (
-          args.resource.includes(BUILD_CLIENT_ROUTE_QUERY_STRING) ||
-          args.resource.includes('?react-router-route') ||
-          args.resource.includes('route-chunk=')
-        ) {
-          return { code: args.code, map: null };
-        }
-        const route = routeByFilePath.get(args.resourcePath);
-        if (!route) {
-          return { code: args.code, map: null };
-        }
+      async args =>
+        performanceProfiler.record(
+          args.environment?.name,
+          'route:split-exports',
+          args.resource,
+          async () => {
+            if (args.environment?.name !== 'web') {
+              return { code: args.code, map: null };
+            }
+            if (!isBuild || !splitRouteModules) {
+              return { code: args.code, map: null };
+            }
+            if (
+              args.resource.includes(BUILD_CLIENT_ROUTE_QUERY_STRING) ||
+              args.resource.includes('?react-router-route') ||
+              args.resource.includes('route-chunk=')
+            ) {
+              return { code: args.code, map: null };
+            }
+            const route = routeByFilePath.get(args.resourcePath);
+            if (!route) {
+              return { code: args.code, map: null };
+            }
 
-        const transformed = await transformToEsm(args.code, args.resourcePath);
-        const { hasRouteChunks, chunkedExports } =
-          await detectRouteChunksIfEnabled(
-            routeChunkCache,
-            routeChunkConfig,
-            args.resourcePath,
-            transformed
-          );
-        if (!hasRouteChunks) {
-          return { code: args.code, map: null };
-        }
+            const transformed = await transformToEsm(
+              args.code,
+              args.resourcePath
+            );
+            const { hasRouteChunks, chunkedExports } =
+              await detectRouteChunksIfEnabled(
+                routeChunkCache,
+                routeChunkConfig,
+                args.resourcePath,
+                transformed
+              );
+            if (!hasRouteChunks) {
+              return { code: args.code, map: null };
+            }
 
-        const sourceExports = await getCachedRouteExports(args.resourcePath);
-        const chunkedExportSet = new Set<string>(chunkedExports);
-        const isMainChunkExport = (name: string) => !chunkedExportSet.has(name);
-        const mainChunkReexports = sourceExports
-          .filter(isMainChunkExport)
-          .join(', ');
-        const chunkBasePath = `./${pathBasename(args.resourcePath)}`;
+            const sourceExports = await getCachedRouteExports(
+              args.resourcePath
+            );
+            const chunkedExportSet = new Set<string>(chunkedExports);
+            const isMainChunkExport = (name: string) =>
+              !chunkedExportSet.has(name);
+            const mainChunkReexports = sourceExports
+              .filter(isMainChunkExport)
+              .join(', ');
+            const chunkBasePath = `./${pathBasename(args.resourcePath)}`;
 
-        return {
-          code: [
-            mainChunkReexports
-              ? `export { ${mainChunkReexports} } from "${getRouteChunkModuleId(
-                  chunkBasePath,
-                  'main'
-                )}";`
-              : null,
-            ...chunkedExports.map(
-              exportName =>
-                `export { ${exportName} } from "${getRouteChunkModuleId(
-                  chunkBasePath,
-                  exportName
-                )}";`
-            ),
-          ]
-            .filter(Boolean)
-            .join('\n'),
-          map: null,
-        };
-      }
+            return {
+              code: [
+                mainChunkReexports
+                  ? `export { ${mainChunkReexports} } from "${getRouteChunkModuleId(
+                      chunkBasePath,
+                      'main'
+                    )}";`
+                  : null,
+                ...chunkedExports.map(
+                  exportName =>
+                    `export { ${exportName} } from "${getRouteChunkModuleId(
+                      chunkBasePath,
+                      exportName
+                    )}";`
+                ),
+              ]
+                .filter(Boolean)
+                .join('\n'),
+              map: null,
+            };
+          }
+        )
     );
 
     api.transform(
       {
         test: /[\\/]\.server[\\/]|\.server(\.[cm]?[jt]sx?)?$/,
       },
-      async args => {
-        if (args.environment?.name !== 'web') {
-          return { code: args.code, map: null };
-        }
+      async args =>
+        performanceProfiler.record(
+          args.environment?.name,
+          'module:server-only-guard',
+          args.resource,
+          async () => {
+            if (args.environment?.name !== 'web') {
+              return { code: args.code, map: null };
+            }
 
-        const relativePath = relative(process.cwd(), args.resourcePath);
-        throw new Error(
-          `[${PLUGIN_NAME}] Server-only module referenced by client: ${relativePath}`
-        );
-      }
+            const relativePath = relative(process.cwd(), args.resourcePath);
+            throw new Error(
+              `[${PLUGIN_NAME}] Server-only module referenced by client: ${relativePath}`
+            );
+          }
+        )
     );
 
     api.transform(
       {
         test: /[\\/]\.client[\\/]|\.client(\.[cm]?[jt]sx?)?$/,
       },
-      async args => {
-        if (args.environment?.name !== 'node') {
-          return { code: args.code, map: null };
-        }
-
-        const code = await transformToEsm(args.code, args.resourcePath);
-        const { exportNames: directExportNames, exportAllModules } =
-          await getExportNamesAndExportAll(code);
-        const exportNames = new Set(directExportNames);
-        const unresolvedExportAll = new Set<string>();
-        const visitedModules = new Set<string>();
-
-        const resolveIndexFile = (dirPath: string): string | null => {
-          for (const ext of JS_EXTENSIONS) {
-            const candidate = resolve(dirPath, `index${ext}`);
-            if (!existsSync(candidate)) {
-              continue;
+      async args =>
+        performanceProfiler.record(
+          args.environment?.name,
+          'module:client-only-stub',
+          args.resource,
+          async () => {
+            if (args.environment?.name !== 'node') {
+              return { code: args.code, map: null };
             }
-            try {
-              if (statSync(candidate).isFile()) {
-                return candidate;
+
+            const code = await transformToEsm(args.code, args.resourcePath);
+            const { exportNames: directExportNames, exportAllModules } =
+              await getExportNamesAndExportAll(code);
+            const exportNames = new Set(directExportNames);
+            const unresolvedExportAll = new Set<string>();
+            const visitedModules = new Set<string>();
+
+            const resolveIndexFile = (dirPath: string): string | null => {
+              for (const ext of JS_EXTENSIONS) {
+                const candidate = resolve(dirPath, `index${ext}`);
+                if (!existsSync(candidate)) {
+                  continue;
+                }
+                try {
+                  if (statSync(candidate).isFile()) {
+                    return candidate;
+                  }
+                } catch {
+                  continue;
+                }
               }
-            } catch {
-              continue;
-            }
-          }
-          return null;
-        };
+              return null;
+            };
 
-        const resolvePathWithExtensions = (basePath: string): string | null => {
-          if (existsSync(basePath)) {
-            try {
-              const stats = statSync(basePath);
-              if (stats.isFile()) {
-                return basePath;
+            const resolvePathWithExtensions = (
+              basePath: string
+            ): string | null => {
+              if (existsSync(basePath)) {
+                try {
+                  const stats = statSync(basePath);
+                  if (stats.isFile()) {
+                    return basePath;
+                  }
+                  if (stats.isDirectory()) {
+                    return resolveIndexFile(basePath);
+                  }
+                } catch {
+                  // Ignore invalid paths and fall back to extension probing.
+                }
               }
-              if (stats.isDirectory()) {
-                return resolveIndexFile(basePath);
+
+              for (const ext of JS_EXTENSIONS) {
+                const candidate = `${basePath}${ext}`;
+                if (!existsSync(candidate)) {
+                  continue;
+                }
+                try {
+                  if (statSync(candidate).isFile()) {
+                    return candidate;
+                  }
+                } catch {
+                  continue;
+                }
               }
-            } catch {
-              // Ignore invalid paths and fall back to extension probing.
-            }
-          }
 
-          for (const ext of JS_EXTENSIONS) {
-            const candidate = `${basePath}${ext}`;
-            if (!existsSync(candidate)) {
-              continue;
-            }
-            try {
-              if (statSync(candidate).isFile()) {
-                return candidate;
+              return resolveIndexFile(basePath);
+            };
+
+            const resolveExportAllModule = (
+              specifier: string,
+              importerPath: string
+            ): string | null => {
+              if (specifier.startsWith('.') || specifier.startsWith('/')) {
+                const basePath = specifier.startsWith('/')
+                  ? specifier
+                  : resolve(dirname(importerPath), specifier);
+                const resolvedPath = resolvePathWithExtensions(basePath);
+                if (resolvedPath) {
+                  return resolvedPath;
+                }
               }
-            } catch {
-              continue;
+
+              try {
+                const resolver = createRequire(
+                  pathToFileURL(importerPath).href
+                );
+                return resolver.resolve(specifier);
+              } catch {
+                return null;
+              }
+            };
+
+            const collectExportNamesFromModule = async (
+              modulePath: string
+            ): Promise<void> => {
+              if (visitedModules.has(modulePath)) {
+                return;
+              }
+              visitedModules.add(modulePath);
+              const source = await readFile(modulePath, 'utf8');
+              const moduleCode = await transformToEsm(source, modulePath);
+              const {
+                exportNames: moduleExportNames,
+                exportAllModules: moduleExportAll,
+              } = await getExportNamesAndExportAll(moduleCode);
+              for (const name of moduleExportNames) {
+                if (name !== 'default') {
+                  exportNames.add(name);
+                }
+              }
+              for (const nestedSpecifier of moduleExportAll) {
+                const nestedPath = resolveExportAllModule(
+                  nestedSpecifier,
+                  modulePath
+                );
+                if (!nestedPath) {
+                  unresolvedExportAll.add(nestedSpecifier);
+                  continue;
+                }
+                await collectExportNamesFromModule(nestedPath);
+              }
+            };
+
+            for (const specifier of exportAllModules) {
+              const resolvedPath = resolveExportAllModule(
+                specifier,
+                args.resourcePath
+              );
+              if (!resolvedPath) {
+                unresolvedExportAll.add(specifier);
+                continue;
+              }
+              await collectExportNamesFromModule(resolvedPath);
             }
-          }
 
-          return resolveIndexFile(basePath);
-        };
-
-        const resolveExportAllModule = (
-          specifier: string,
-          importerPath: string
-        ): string | null => {
-          if (specifier.startsWith('.') || specifier.startsWith('/')) {
-            const basePath = specifier.startsWith('/')
-              ? specifier
-              : resolve(dirname(importerPath), specifier);
-            const resolvedPath = resolvePathWithExtensions(basePath);
-            if (resolvedPath) {
-              return resolvedPath;
+            if (unresolvedExportAll.size > 0) {
+              throw new Error(
+                `[${PLUGIN_NAME}] Client-only module uses \`export * from\` with ` +
+                  `unresolvable specifier(s): ${Array.from(unresolvedExportAll)
+                    .map(spec => `\`${spec}\``)
+                    .join(', ')}. ` +
+                  `Please explicitly re-export named bindings in ` +
+                  `\`${relative(process.cwd(), args.resourcePath)}\`.`
+              );
             }
+            return {
+              code: Array.from(exportNames)
+                .map(name =>
+                  name === 'default'
+                    ? 'export default undefined;'
+                    : `export const ${name} = undefined;`
+                )
+                .join('\n'),
+              map: null,
+            };
           }
-
-          try {
-            const resolver = createRequire(pathToFileURL(importerPath).href);
-            return resolver.resolve(specifier);
-          } catch {
-            return null;
-          }
-        };
-
-        const collectExportNamesFromModule = async (
-          modulePath: string
-        ): Promise<void> => {
-          if (visitedModules.has(modulePath)) {
-            return;
-          }
-          visitedModules.add(modulePath);
-          const source = await readFile(modulePath, 'utf8');
-          const moduleCode = await transformToEsm(source, modulePath);
-          const {
-            exportNames: moduleExportNames,
-            exportAllModules: moduleExportAll,
-          } = await getExportNamesAndExportAll(moduleCode);
-          for (const name of moduleExportNames) {
-            if (name !== 'default') {
-              exportNames.add(name);
-            }
-          }
-          for (const nestedSpecifier of moduleExportAll) {
-            const nestedPath = resolveExportAllModule(
-              nestedSpecifier,
-              modulePath
-            );
-            if (!nestedPath) {
-              unresolvedExportAll.add(nestedSpecifier);
-              continue;
-            }
-            await collectExportNamesFromModule(nestedPath);
-          }
-        };
-
-        for (const specifier of exportAllModules) {
-          const resolvedPath = resolveExportAllModule(
-            specifier,
-            args.resourcePath
-          );
-          if (!resolvedPath) {
-            unresolvedExportAll.add(specifier);
-            continue;
-          }
-          await collectExportNamesFromModule(resolvedPath);
-        }
-
-        if (unresolvedExportAll.size > 0) {
-          throw new Error(
-            `[${PLUGIN_NAME}] Client-only module uses \`export * from\` with ` +
-              `unresolvable specifier(s): ${Array.from(unresolvedExportAll)
-                .map(spec => `\`${spec}\``)
-                .join(', ')}. ` +
-              `Please explicitly re-export named bindings in ` +
-              `\`${relative(process.cwd(), args.resourcePath)}\`.`
-          );
-        }
-        return {
-          code: Array.from(exportNames)
-            .map(name =>
-              name === 'default'
-                ? 'export default undefined;'
-                : `export const ${name} = undefined;`
-            )
-            .join('\n'),
-          map: null,
-        };
-      }
+        )
     );
 
     api.transform(
       {
         resourceQuery: /\?react-router-route/,
       },
-      async args => {
-        let code: string;
-        try {
-          code = await transformToEsm(args.code, args.resourcePath);
-        } catch (error) {
-          console.error(args.resourcePath);
-          throw error;
-        }
+      async args =>
+        performanceProfiler.record(
+          args.environment?.name,
+          'route:module',
+          args.resource,
+          async () => {
+            let code: string;
+            try {
+              code = await transformToEsm(args.code, args.resourcePath);
+            } catch (error) {
+              console.error(args.resourcePath);
+              throw error;
+            }
 
-        // Match React Router Vite behavior:
-        // In SPA mode, server-only route exports are invalid (except root `loader`),
-        // and `HydrateFallback` is only allowed on the root route.
-        //
-        // Important: `es-module-lexer` can't parse TS/TSX directly, so we scan
-        // the ESBuild-transformed JS output.
-        if (args.environment.name === 'web' && !ssr && isSpaMode) {
-          const exportNames = await getExportNames(code);
+            // Match React Router Vite behavior:
+            // In SPA mode, server-only route exports are invalid (except root `loader`),
+            // and `HydrateFallback` is only allowed on the root route.
+            //
+            // Important: `es-module-lexer` can't parse TS/TSX directly, so we scan
+            // the ESBuild-transformed JS output.
+            if (args.environment.name === 'web' && !ssr && isSpaMode) {
+              const exportNames = await getExportNames(code);
 
-          const isRootRoute = args.resourcePath === rootRoutePath;
+              const isRootRoute = args.resourcePath === rootRoutePath;
 
-          const invalidServerOnly = exportNames.filter(exp => {
-            if (isRootRoute && exp === 'loader') return false;
-            return (SERVER_ONLY_ROUTE_EXPORTS as readonly string[]).includes(
-              exp
+              const invalidServerOnly = exportNames.filter(exp => {
+                if (isRootRoute && exp === 'loader') return false;
+                return (
+                  SERVER_ONLY_ROUTE_EXPORTS as readonly string[]
+                ).includes(exp);
+              });
+
+              if (invalidServerOnly.length > 0) {
+                const list = invalidServerOnly.map(e => `\`${e}\``).join(', ');
+                throw new Error(
+                  `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
+                    `\`${relative(process.cwd(), args.resourcePath)}\`: ${list}. ` +
+                    `See https://reactrouter.com/how-to/spa for more information.`
+                );
+              }
+
+              if (!isRootRoute && exportNames.includes('HydrateFallback')) {
+                throw new Error(
+                  `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
+                    `\`${relative(process.cwd(), args.resourcePath)}\`. ` +
+                    `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
+                    `See https://reactrouter.com/how-to/spa for more information.`
+                );
+              }
+            }
+
+            const defaultExportMatch = code.match(
+              /\n\s{0,}([\w\d_]+)\sas default,?/
             );
-          });
+            if (
+              defaultExportMatch &&
+              typeof defaultExportMatch.index === 'number'
+            ) {
+              code =
+                code.slice(0, defaultExportMatch.index) +
+                code.slice(
+                  defaultExportMatch.index + defaultExportMatch[0].length
+                );
+              code += `\nexport default ${defaultExportMatch[1]};`;
+            }
 
-          if (invalidServerOnly.length > 0) {
-            const list = invalidServerOnly.map(e => `\`${e}\``).join(', ');
-            throw new Error(
-              `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
-                `\`${relative(process.cwd(), args.resourcePath)}\`: ${list}. ` +
-                `See https://reactrouter.com/how-to/spa for more information.`
-            );
+            const ast = parse(code, { sourceType: 'module' });
+            if (args.environment.name === 'web') {
+              const mutableServerOnlyRouteExports = [
+                ...SERVER_ONLY_ROUTE_EXPORTS,
+              ];
+              removeExports(ast, mutableServerOnlyRouteExports);
+            }
+            transformRoute(ast);
+            if (args.environment.name === 'web') {
+              removeUnusedImports(ast);
+            }
+
+            return generate(ast, {
+              sourceMaps: true,
+              filename: args.resource,
+              sourceFileName: args.resourcePath,
+            });
           }
-
-          if (!isRootRoute && exportNames.includes('HydrateFallback')) {
-            throw new Error(
-              `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
-                `\`${relative(process.cwd(), args.resourcePath)}\`. ` +
-                `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
-                `See https://reactrouter.com/how-to/spa for more information.`
-            );
-          }
-        }
-
-        const defaultExportMatch = code.match(
-          /\n\s{0,}([\w\d_]+)\sas default,?/
-        );
-        if (
-          defaultExportMatch &&
-          typeof defaultExportMatch.index === 'number'
-        ) {
-          code =
-            code.slice(0, defaultExportMatch.index) +
-            code.slice(defaultExportMatch.index + defaultExportMatch[0].length);
-          code += `\nexport default ${defaultExportMatch[1]};`;
-        }
-
-        const ast = parse(code, { sourceType: 'module' });
-        if (args.environment.name === 'web') {
-          const mutableServerOnlyRouteExports = [...SERVER_ONLY_ROUTE_EXPORTS];
-          removeExports(ast, mutableServerOnlyRouteExports);
-        }
-        transformRoute(ast);
-        if (args.environment.name === 'web') {
-          removeUnusedImports(ast);
-        }
-
-        return generate(ast, {
-          sourceMaps: true,
-          filename: args.resource,
-          sourceFileName: args.resourcePath,
-        });
-      }
+        )
     );
   },
 });
