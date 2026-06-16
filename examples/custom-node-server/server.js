@@ -57,7 +57,8 @@ async function startServer() {
     // Mount the server app after static file handling
     app.use(async (req, res, next) => {
       try {
-        await /** @type {any} */(serverBundle.default).app(req, res, next);
+        const serverApp = serverBundle.app ?? serverBundle.default?.app;
+        await serverApp(req, res, next);
       } catch (e) {
         next(e);
       }

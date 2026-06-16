@@ -103,6 +103,11 @@ const getManifestVersion = (
     .slice(0, 8);
 };
 
+const getRouteEntryName = (route: Route): string => {
+  const extensionIndex = route.file.lastIndexOf('.');
+  return extensionIndex >= 0 ? route.file.slice(0, extensionIndex) : route.file;
+};
+
 export async function getReactRouterManifestForDev(
   routes: Record<string, Route>,
   //@ts-ignore
@@ -157,7 +162,8 @@ export async function getReactRouterManifestForDev(
   };
 
   for (const [key, route] of Object.entries(routes)) {
-    const assets = getAssetsForChunk(route.id);
+    const routeEntryName = getRouteEntryName(route);
+    const assets = getAssetsForChunk(routeEntryName);
     const jsAssets = assets.filter(asset => asset.endsWith('.js')) || [];
     let cssAssets = assets.filter(asset => asset.endsWith('.css')) || [];
     // Read and analyze the route file to check for exports
@@ -181,7 +187,7 @@ export async function getReactRouterManifestForDev(
         /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/.test(source)
       ) {
         cssAssets = [
-          `${DEFAULT_MANIFEST_DIR.replace('/js', '/css')}/${route.id}.css`,
+          `${DEFAULT_MANIFEST_DIR.replace('/js', '/css')}/${routeEntryName}.css`,
         ];
       }
       const code = await transformToEsm(source, routeFilePath);

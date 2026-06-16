@@ -12,9 +12,6 @@ export default defineConfig({
       tools: {
         rspack: {
           // must use esm module output
-          experiments: {
-            outputModule: true,
-          },
           externalsType: 'module',
           output: {
             chunkFormat: 'module',
