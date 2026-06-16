@@ -421,15 +421,6 @@ export const pluginReactRouter = (
         route,
       ])
     );
-    const routeExportsCache = new Map<string, string[]>();
-    const getCachedRouteExports = async (filePath: string) => {
-      if (routeExportsCache.has(filePath)) {
-        return routeExportsCache.get(filePath)!;
-      }
-      const exports = await getRouteModuleExports(filePath);
-      routeExportsCache.set(filePath, exports);
-      return exports;
-    };
 
     const webRouteEntries = Object.values(routes).reduce(
       (acc, route) => {
@@ -1525,7 +1516,7 @@ export const pluginReactRouter = (
               return { code: args.code, map: null };
             }
 
-            const sourceExports = await getCachedRouteExports(
+            const sourceExports = await getRouteModuleExports(
               args.resourcePath
             );
             const chunkedExportSet = new Set<string>(chunkedExports);
