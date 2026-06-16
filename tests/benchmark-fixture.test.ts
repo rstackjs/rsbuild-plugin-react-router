@@ -75,6 +75,38 @@ describe('benchmark fixture generator', () => {
     }
   });
 
+  it('omits server-only route exports from SPA benchmark fixtures', async () => {
+    const { generateSyntheticFixture } = await import(
+      '../scripts/benchmark/fixture.mjs'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
+
+    try {
+      await generateSyntheticFixture({
+        root,
+        routeCount: 8,
+        variant: 'spa',
+      });
+
+      const rootModule = readFileSync(join(root, 'app/root.tsx'), 'utf8');
+      expect(rootModule).toContain('Scripts');
+
+      for (let index = 1; index <= 8; index += 1) {
+        const routeModule = readFileSync(
+          join(root, `app/routes/route-${String(index).padStart(4, '0')}.tsx`),
+          'utf8'
+        );
+        expect(routeModule).not.toContain('function loader');
+        expect(routeModule).not.toContain('function action');
+        expect(routeModule).not.toContain('function headers');
+        expect(routeModule).not.toContain('HydrateFallback');
+        expect(routeModule).not.toContain('server-data.server');
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('accepts equals-form CLI options before benchmark selection', () => {
     const result = spawnSync(
       process.execPath,

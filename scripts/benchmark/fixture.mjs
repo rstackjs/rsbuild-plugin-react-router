@@ -18,7 +18,7 @@ const routeId = index => `route-${padRoute(index)}`;
 
 const routeComponentName = index => `Route${padRoute(index)}`;
 
-const createRouteModule = (index, profile) => {
+const createRouteModule = (index, profile, { isSpa }) => {
   const name = routeComponentName(index);
   const shared = [
     `export const handle = { label: '${routeId(index)}' };`,
@@ -27,6 +27,13 @@ const createRouteModule = (index, profile) => {
   ];
 
   if (profile === 'ssr-data') {
+    if (isSpa) {
+      return [
+        ...shared,
+        `export function shouldRevalidate() { return false; }`,
+      ].join('\n');
+    }
+
     return [
       `import { serverValue } from '../server-data.server';`,
       ...shared,
@@ -44,11 +51,19 @@ const createRouteModule = (index, profile) => {
       `export async function clientLoader() { return { id: '${routeId(index)}', clientValue }; }`,
       `export async function clientAction() { return { ok: true }; }`,
       `export async function clientMiddleware() { return undefined; }`,
-      `export function HydrateFallback() { return null; }`,
+      ...(isSpa ? [] : [`export function HydrateFallback() { return null; }`]),
     ].join('\n');
   }
 
   if (profile === 'client-server-imports') {
+    if (isSpa) {
+      return [
+        `import { clientValue } from '../client-data.client';`,
+        ...shared,
+        `export async function clientLoader() { return { id: '${routeId(index)}', clientValue }; }`,
+      ].join('\n');
+    }
+
     return [
       `import { clientValue } from '../client-data.client';`,
       `import { serverValue } from '../server-data.server';`,
@@ -133,6 +148,8 @@ export async function generateSyntheticFixture({
   sourceMap = false,
   pluginImportPath = 'rsbuild-plugin-react-router',
 }) {
+  const isSpa = variant === 'spa';
+
   await rm(root, { recursive: true, force: true });
   await mkdir(path.join(root, 'app/routes'), { recursive: true });
 
@@ -155,9 +172,12 @@ export async function generateSyntheticFixture({
   await writeFile(
     path.join(root, 'app/root.tsx'),
     [
-      `import { Outlet } from 'react-router';`,
-      `export default function Root() { return null; }`,
-      `export function Layout() { return null; }`,
+      `import { createElement } from 'react';`,
+      `import { Outlet, Scripts } from 'react-router';`,
+      `export function Layout({ children }) {`,
+      `  return createElement('html', null, createElement('head'), createElement('body', null, children, createElement(Scripts)));`,
+      `}`,
+      `export default function Root() { return createElement(Outlet); }`,
       `export function ErrorBoundary() { return null; }`,
       '',
     ].join('\n')
@@ -179,7 +199,7 @@ export async function generateSyntheticFixture({
     const profile = routeExportProfiles[index % routeExportProfiles.length];
     await writeFile(
       path.join(root, 'app', routeFile(index)),
-      `${createRouteModule(index, profile)}\n`
+      `${createRouteModule(index, profile, { isSpa })}\n`
     );
   }
 
