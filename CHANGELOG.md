@@ -1,5 +1,11 @@
 # rsbuild-plugin-react-router
 
+## 0.2.0
+
+### Minor Changes
+
+- fc02b96: Add support for Rsbuild 2 and update the Rsbuild/Rspack toolchain.
+
 ## 0.1.1
 
 ### Patch Changes
