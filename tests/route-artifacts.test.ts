@@ -5,6 +5,7 @@ import {
   createRouteClientEntryArtifact,
 } from '../src/route-artifacts';
 import {
+  emptyRouteChunkSnippet,
   getRouteChunkIfEnabled,
   getRouteChunkModuleId,
   type RouteChunkCache,
@@ -45,7 +46,7 @@ const createRouteChunk = async (
     resource: getRouteChunkModuleId(resourcePath, chunkName),
     resourcePath,
     routeChunkConfig: options.config ?? routeChunkConfig,
-    routeChunkCache: options.cache ?? new Map(),
+    routeChunkCache: options.cache,
     isBuild: options.isBuild ?? true,
   });
 
@@ -64,7 +65,6 @@ describe('route artifact helpers', () => {
         environmentName: 'web',
         isBuild: false,
         routeChunkConfig: disabledRouteChunkConfig,
-        routeChunkCache: new Map(),
       });
 
       expect(result).toEqual({
@@ -86,7 +86,6 @@ describe('route artifact helpers', () => {
         environmentName: 'node',
         isBuild: true,
         routeChunkConfig,
-        routeChunkCache: new Map(),
       });
 
       expect(result).toEqual({
@@ -107,7 +106,6 @@ describe('route artifact helpers', () => {
         environmentName: 'web',
         isBuild: true,
         routeChunkConfig,
-        routeChunkCache: new Map(),
       });
 
       expect(result).toEqual({
@@ -124,7 +122,7 @@ describe('route artifact helpers', () => {
           isBuild: true,
         })
       ).resolves.toEqual({
-        code: 'Math.random()<0&&console.log("Split route modules disabled");',
+        code: emptyRouteChunkSnippet('Split route modules disabled'),
         map: null,
       });
     });
@@ -136,7 +134,6 @@ describe('route artifact helpers', () => {
           resource: `${resourcePath}?route-chunk=invalid`,
           resourcePath,
           routeChunkConfig,
-          routeChunkCache: new Map(),
           isBuild: true,
         })
       ).rejects.toThrow(`Invalid route chunk name in "${resourcePath}?route-chunk=invalid"`);

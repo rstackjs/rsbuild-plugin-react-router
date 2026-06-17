@@ -1,6 +1,7 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { rspack } from '@rsbuild/core';
+import path from 'node:path';
 import { pluginReactRouter } from '../src';
 import { getVirtualModuleFilePath } from '../src/virtual-modules';
 
@@ -107,15 +108,17 @@ describe('pluginReactRouter', () => {
           compiler
         );
       const virtualFilePaths = virtualFiles?.map(file => file.path) || [];
+      const virtualModulePath = (id: string) =>
+        path.join(compiler.context, getVirtualModuleFilePath(id));
 
       expect(virtualFilePaths).toContain(
-        '/virtual/project/node_modules/virtual/react-router/browser-manifest.js'
+        virtualModulePath('virtual/react-router/browser-manifest')
       );
       expect(virtualFilePaths).toContain(
-        '/virtual/project/node_modules/virtual/react-router/server-build.js'
+        virtualModulePath('virtual/react-router/server-build')
       );
       expect(virtualFilePaths).toContain(
-        '/virtual/project/node_modules/virtual/react-router/with-props.js'
+        virtualModulePath('virtual/react-router/with-props')
       );
       expect(virtualFilePaths).not.toContain(
         '/virtual/project/virtual/react-router/browser-manifest'

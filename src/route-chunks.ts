@@ -62,6 +62,9 @@ const createRouteChunkExportMap = (
     routeChunkExportNames.map(exportName => [exportName, getValue(exportName)])
   ) as Record<RouteChunkExportName, boolean>;
 
+export const emptyRouteChunkSnippet = (reason: string): string =>
+  `Math.random()<0&&console.log(${JSON.stringify(reason)});`;
+
 const routeChunkQueryStringPrefix = '?route-chunk=';
 
 const routeChunkQueryStrings: Record<RouteChunkName, string> = {
@@ -907,10 +910,10 @@ const normalizeRelativeFilePath = (file: string, appDirectory: string) => {
 const isRootRouteModuleId = (config: RouteChunkConfig, id: string) =>
   normalizeRelativeFilePath(id, config.appDirectory) === config.rootRouteFile;
 
-export const EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME: Record<
+export const createEmptyRouteChunkByExportName = (): Record<
   RouteChunkExportName,
   boolean
-> = createRouteChunkExportMap(() => false);
+> => createRouteChunkExportMap(() => false);
 
 export const buildEnforceChunkValidity = (
   exportNames: readonly string[]
@@ -920,6 +923,15 @@ export const buildEnforceChunkValidity = (
     exportName => !exportNameSet.has(exportName)
   );
 };
+
+export const buildManifestChunkValidity = (
+  exportNames: ReadonlySet<string>,
+  hasRouteChunkByExportName: Readonly<Record<RouteChunkExportName, boolean>>
+): Record<RouteChunkExportName, boolean> =>
+  createRouteChunkExportMap(
+    exportName =>
+      !exportNames.has(exportName) || hasRouteChunkByExportName[exportName]
+  );
 
 export const detectRouteChunksIfEnabled: (
   cache: RouteChunkCache | undefined,
@@ -935,7 +947,7 @@ export const detectRouteChunksIfEnabled: (
   const noRouteChunks = (): RouteChunkInfo => ({
     chunkedExports: [] as RouteChunkExportName[],
     hasRouteChunks: false,
-    hasRouteChunkByExportName: { ...EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME },
+    hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
   });
 
   if (!config.splitRouteModules) {
