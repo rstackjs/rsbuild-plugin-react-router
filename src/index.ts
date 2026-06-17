@@ -1659,52 +1659,47 @@ export const pluginReactRouter = (
           'route:module',
           args.resource,
           async () => {
-            let code: string;
-            try {
-              const analysis = await getBundlerRouteAnalysis(
-                args.code,
-                args.resourcePath
-              );
-              code = analysis.code;
+            const analysis = await getBundlerRouteAnalysis(
+              args.code,
+              args.resourcePath
+            );
+            let code = analysis.code;
 
-              // Match React Router Vite behavior:
-              // In SPA mode, server-only route exports are invalid (except root `loader`),
-              // and `HydrateFallback` is only allowed on the root route.
-              if (args.environment.name === 'web' && !ssr && isSpaMode) {
-                const resolvedExportNames = await analysis.getExportNames();
-                const isRootRoute = args.resourcePath === rootRoutePath;
+            // Match React Router Vite behavior:
+            // In SPA mode, server-only route exports are invalid (except root `loader`),
+            // and `HydrateFallback` is only allowed on the root route.
+            if (args.environment.name === 'web' && !ssr && isSpaMode) {
+              const resolvedExportNames = await analysis.getExportNames();
+              const isRootRoute = args.resourcePath === rootRoutePath;
+              const relativePath = relative(process.cwd(), args.resourcePath);
 
-                const invalidServerOnly = resolvedExportNames.filter(exp => {
-                  if (isRootRoute && exp === 'loader') return false;
-                  return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
-                });
+              const invalidServerOnly = resolvedExportNames.filter(exp => {
+                if (isRootRoute && exp === 'loader') return false;
+                return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
+              });
 
-                if (invalidServerOnly.length > 0) {
-                  const list = invalidServerOnly
-                    .map(e => `\`${e}\``)
-                    .join(', ');
-                  throw new Error(
-                    `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
-                      `\`${relative(process.cwd(), args.resourcePath)}\`: ${list}. ` +
-                      `See https://reactrouter.com/how-to/spa for more information.`
-                  );
-                }
-
-                if (
-                  !isRootRoute &&
-                  resolvedExportNames.includes('HydrateFallback')
-                ) {
-                  throw new Error(
-                    `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
-                      `\`${relative(process.cwd(), args.resourcePath)}\`. ` +
-                      `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
-                      `See https://reactrouter.com/how-to/spa for more information.`
-                  );
-                }
+              if (invalidServerOnly.length > 0) {
+                const list = invalidServerOnly
+                  .map(e => `\`${e}\``)
+                  .join(', ');
+                throw new Error(
+                  `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
+                    `\`${relativePath}\`: ${list}. ` +
+                    `See https://reactrouter.com/how-to/spa for more information.`
+                );
               }
-            } catch (error) {
-              console.error(args.resourcePath);
-              throw error;
+
+              if (
+                !isRootRoute &&
+                resolvedExportNames.includes('HydrateFallback')
+              ) {
+                throw new Error(
+                  `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
+                    `\`${relativePath}\`. ` +
+                    `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
+                    `See https://reactrouter.com/how-to/spa for more information.`
+                );
+              }
             }
 
             const defaultExportMatch = code.match(

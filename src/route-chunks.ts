@@ -591,7 +591,6 @@ const cloneImportForNames = (
   node: t.ImportDeclaration,
   importedIdentifierNames: ReadonlySet<string>
 ) => {
-  // Shallow clone is safe here: only the top-level specifiers array is reassigned.
   const clonedNode = t.cloneNode(node, false);
   clonedNode.specifiers = node.specifiers.filter(specifier =>
     importedIdentifierNames.has(specifier.local.name)
@@ -612,7 +611,6 @@ const cloneVariableExportForKeys = (
     t.isVariableDeclaration(node.declaration),
     'Expected export declaration to contain variable declarations'
   );
-  // Shallow clones are safe here: only declaration/declarations array references are reassigned.
   const clonedNode = t.cloneNode(node, false);
   const clonedDeclaration = t.cloneNode(node.declaration, false);
   clonedDeclaration.declarations = node.declaration.declarations.filter(
@@ -699,7 +697,6 @@ const getChunkedExportFromAnalysis = (
         if (node.specifiers.length === 0) {
           return null;
         }
-        // Shallow clone is safe here: only the top-level specifiers array is reassigned.
         const clonedNode = t.cloneNode(node, false);
         clonedNode.specifiers = node.specifiers.filter(
           specifier => getExportedName(specifier.exported) === exportName
@@ -755,7 +752,6 @@ const omitChunkedExportsFromAnalysis = (
         if (node.specifiers.length === 0) {
           return t.cloneNode(node, false);
         }
-        // Shallow clone is safe here: only the top-level specifiers array is reassigned.
         const clonedNode = t.cloneNode(node, false);
         clonedNode.specifiers = node.specifiers.filter(specifier => {
           const importedName = specifier.local.name;
@@ -819,7 +815,6 @@ const omitChunkedExportsFromAnalysis = (
         if (node.specifiers.length === 0) {
           return t.cloneNode(node, false);
         }
-        // Shallow clone is safe here: only the top-level specifiers array is reassigned.
         const clonedNode = t.cloneNode(node, false);
         clonedNode.specifiers = node.specifiers.filter(specifier => {
           const exportedName = getExportedName(specifier.exported);

@@ -180,7 +180,6 @@ export async function getReactRouterManifestForDev(
       const assets = getAssetsForChunk(routeEntryName);
       const jsAssets = assets.filter(asset => asset.endsWith('.js')) || [];
       let cssAssets = assets.filter(asset => asset.endsWith('.css')) || [];
-      // Read and analyze the route file to check for exports
       const routeFilePath = resolve(context, route.file);
       let exports = new Set<string>();
       let routeModuleExports: string[] = [];
