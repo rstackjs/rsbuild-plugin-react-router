@@ -129,11 +129,35 @@ describe('pluginReactRouter', () => {
       ).toBe(true);
 
       expect(
-        calls.some((call: any) => call.test?.toString().includes('\\.server'))
+        calls.some(
+          (call: any) =>
+            call.resourceQuery?.toString().includes('route-chunk=') &&
+            call.environments?.includes('web')
+        )
       ).toBe(true);
 
       expect(
-        calls.some((call: any) => call.test?.toString().includes('\\.client'))
+        calls.some(
+          (call: any) =>
+            call.test?.toString().includes('\\.[cm]?') &&
+            call.environments?.includes('web')
+        )
+      ).toBe(true);
+
+      expect(
+        calls.some(
+          (call: any) =>
+            call.test?.toString().includes('\\.server') &&
+            call.environments?.includes('web')
+        )
+      ).toBe(true);
+
+      expect(
+        calls.some(
+          (call: any) =>
+            call.test?.toString().includes('\\.client') &&
+            call.environments?.includes('node')
+        )
       ).toBe(true);
     });
   });

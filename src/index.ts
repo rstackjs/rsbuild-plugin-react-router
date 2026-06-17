@@ -13,10 +13,11 @@ import { RspackVirtualModulePlugin } from 'rspack-plugin-virtual-module';
 import { generate, parse } from './babel.js';
 import {
   BUILD_CLIENT_ROUTE_QUERY_STRING,
-  CLIENT_ROUTE_EXPORTS,
+  CLIENT_ROUTE_EXPORTS_SET,
   JS_EXTENSIONS,
   PLUGIN_NAME,
   SERVER_ONLY_ROUTE_EXPORTS,
+  SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import {
@@ -1392,11 +1393,8 @@ export const pluginReactRouter = (
                 return false;
               }
               return (
-                (CLIENT_ROUTE_EXPORTS as readonly string[]).includes(exp) ||
-                (isServer &&
-                  (SERVER_ONLY_ROUTE_EXPORTS as readonly string[]).includes(
-                    exp
-                  ))
+                CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
+                (isServer && SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp))
               );
             });
             const target = `${args.resourcePath}?react-router-route`;
@@ -1412,6 +1410,7 @@ export const pluginReactRouter = (
     api.transform(
       {
         resourceQuery: /route-chunk=/,
+        environments: ['web'],
       },
       async args =>
         performanceProfiler.record(
@@ -1474,6 +1473,7 @@ export const pluginReactRouter = (
     api.transform(
       {
         test: /\.[cm]?[jt]sx?$/,
+        environments: ['web'],
       },
       async args =>
         performanceProfiler.record(
@@ -1548,6 +1548,7 @@ export const pluginReactRouter = (
     api.transform(
       {
         test: /[\\/]\.server[\\/]|\.server(\.[cm]?[jt]sx?)?$/,
+        environments: ['web'],
       },
       async args =>
         performanceProfiler.record(
@@ -1570,6 +1571,7 @@ export const pluginReactRouter = (
     api.transform(
       {
         test: /[\\/]\.client[\\/]|\.client(\.[cm]?[jt]sx?)?$/,
+        environments: ['node'],
       },
       async args =>
         performanceProfiler.record(
@@ -1768,9 +1770,7 @@ export const pluginReactRouter = (
 
               const invalidServerOnly = resolvedExportNames.filter(exp => {
                 if (isRootRoute && exp === 'loader') return false;
-                return (
-                  SERVER_ONLY_ROUTE_EXPORTS as readonly string[]
-                ).includes(exp);
+                return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
               });
 
               if (invalidServerOnly.length > 0) {
