@@ -295,12 +295,31 @@ const isNonReferenceIdentifier = (node: AnyNode, parent: AnyNode | null) => {
   return false;
 };
 
+const isUppercaseName = (name: string): boolean => /^[A-Z]/.test(name);
+
 const collectReferencedNames = (program: AnyNode): Set<string> => {
   const referenced = new Set<string>();
   walk(program as any, {
     Identifier(node: AnyNode, ctx: any) {
       const parent = ctx.parent as AnyNode | null;
       if (!isNonReferenceIdentifier(node, parent)) {
+        referenced.add(node.name);
+      }
+    },
+    JSXIdentifier(node: AnyNode, ctx: any) {
+      const parent = ctx.parent as AnyNode | null;
+      if (!parent || !isUppercaseName(node.name)) {
+        return;
+      }
+      if (
+        (parent.type === 'JSXOpeningElement' ||
+          parent.type === 'JSXClosingElement') &&
+        parent.name === node
+      ) {
+        referenced.add(node.name);
+        return;
+      }
+      if (parent.type === 'JSXMemberExpression' && parent.object === node) {
         referenced.add(node.name);
       }
     },
