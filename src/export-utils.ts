@@ -33,6 +33,7 @@ type RouteModuleAnalysis = {
   source: string;
   code: string;
   exports: string[];
+  exportAllModules: string[];
 };
 
 type RouteModuleAnalysisCacheEntry = {
@@ -42,7 +43,10 @@ type RouteModuleAnalysisCacheEntry = {
 };
 
 const transformCache = new Map<string, TransformCacheEntry>();
-const exportNamesCache = new Map<string, Promise<string[]>>();
+const exportInfoCache = new Map<
+  string,
+  Promise<{ exportNames: string[]; exportAllModules: string[] }>
+>();
 const bundlerRouteAnalysisCache = new Map<
   string,
   BundlerRouteAnalysisCacheEntry
@@ -108,26 +112,7 @@ export const transformToEsm = async (
 };
 
 export const getExportNames = async (code: string): Promise<string[]> => {
-  const cached = exportNamesCache.get(code);
-  if (cached) {
-    return cached;
-  }
-
-  const exports = (async () => {
-    await init;
-    const [, exportSpecifiers] = await parseExports(code);
-    return Array.from(
-      new Set(exportSpecifiers.map(specifier => specifier.n).filter(Boolean))
-    );
-  })().catch(error => {
-    if (exportNamesCache.get(code) === exports) {
-      exportNamesCache.delete(code);
-    }
-    throw error;
-  });
-
-  setBoundedCacheEntry(exportNamesCache, code, exports);
-  return exports;
+  return (await getExportNamesAndExportAll(code)).exportNames;
 };
 
 export const getBundlerRouteAnalysis = async (
@@ -193,25 +178,40 @@ export const getBundlerRouteAnalysis = async (
 export const getExportNamesAndExportAll = async (
   code: string
 ): Promise<{ exportNames: string[]; exportAllModules: string[] }> => {
-  await init;
-  const [imports, exportSpecifiers] = await parseExports(code);
-  const exportNames = new Set<string>();
-  for (const specifier of exportSpecifiers) {
-    if (specifier.n) {
-      exportNames.add(specifier.n);
-    }
+  const cached = exportInfoCache.get(code);
+  if (cached) {
+    return cached;
   }
-  const exportAllModules: string[] = [];
-  for (const entry of imports) {
-    if (!entry.n) {
-      continue;
+
+  const exportInfo = (async () => {
+    await init;
+    const [imports, exportSpecifiers] = await parseExports(code);
+    const exportNames = new Set<string>();
+    for (const specifier of exportSpecifiers) {
+      if (specifier.n) {
+        exportNames.add(specifier.n);
+      }
     }
-    const statement = code.slice(entry.ss, entry.se);
-    if (/^\s*export\s*\*\s*from\s*['"]/.test(statement)) {
-      exportAllModules.push(entry.n);
+    const exportAllModules: string[] = [];
+    for (const entry of imports) {
+      if (!entry.n) {
+        continue;
+      }
+      const statement = code.slice(entry.ss, entry.se);
+      if (/^\s*export\s*\*\s*from\s*['"]/.test(statement)) {
+        exportAllModules.push(entry.n);
+      }
     }
-  }
-  return { exportNames: Array.from(exportNames), exportAllModules };
+    return { exportNames: Array.from(exportNames), exportAllModules };
+  })().catch(error => {
+    if (exportInfoCache.get(code) === exportInfo) {
+      exportInfoCache.delete(code);
+    }
+    throw error;
+  });
+
+  setBoundedCacheEntry(exportInfoCache, code, exportInfo);
+  return exportInfo;
 };
 
 export const getRouteModuleAnalysis = async (
@@ -226,8 +226,9 @@ export const getRouteModuleAnalysis = async (
   const analysis = (async () => {
     const source = await readFile(resourcePath, 'utf8');
     const code = await transformToEsm(source, resourcePath);
-    const exports = await getExportNames(code);
-    return { source, code, exports };
+    const { exportNames, exportAllModules } =
+      await getExportNamesAndExportAll(code);
+    return { source, code, exports: exportNames, exportAllModules };
   })().catch(error => {
     if (routeModuleAnalysisCache.get(resourcePath)?.analysis === analysis) {
       routeModuleAnalysisCache.delete(resourcePath);
