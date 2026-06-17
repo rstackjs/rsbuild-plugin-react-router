@@ -3,9 +3,36 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import { getReactRouterManifestForDev } from '../src/manifest';
-import { getRouteChunkEntryName } from '../src/route-chunks';
+import {
+  getRouteChunkEntryName,
+  routeChunkExportNames,
+  type RouteChunkExportName,
+} from '../src/route-chunks';
 
-const createTempApp = () => {
+const clientExportFixtures: Record<RouteChunkExportName, string> = {
+  clientAction: `export async function clientAction() { return {}; }`,
+  clientLoader: `export async function clientLoader() { return {}; }`,
+  clientMiddleware: `export async function clientMiddleware() { return null; }`,
+  HydrateFallback: `export function HydrateFallback() { return null; }`,
+};
+
+type ManifestModuleField =
+  | 'clientActionModule'
+  | 'clientLoaderModule'
+  | 'clientMiddlewareModule'
+  | 'hydrateFallbackModule';
+
+const moduleFieldByExportName: Record<
+  RouteChunkExportName,
+  ManifestModuleField
+> = {
+  clientAction: 'clientActionModule',
+  clientLoader: 'clientLoaderModule',
+  clientMiddleware: 'clientMiddlewareModule',
+  HydrateFallback: 'hydrateFallbackModule',
+};
+
+const createTempApp = (routeCode?: string, rootCode?: string) => {
   const root = mkdtempSync(join(tmpdir(), 'rr-manifest-'));
   const appDir = join(root, 'app');
   const routesDir = join(appDir, 'routes');
@@ -13,100 +40,154 @@ const createTempApp = () => {
 
   writeFileSync(
     join(appDir, 'root.tsx'),
-    `export default function Root() { return null; }`
+    rootCode ?? `export default function Root() { return null; }`
   );
   writeFileSync(
     join(routesDir, 'clients.tsx'),
-    `export async function clientAction() { return {}; }
-     export async function clientLoader() { return {}; }
-     export default function Clients() { return null; }`
+    routeCode ??
+      `export async function clientAction() { return {}; }
+       export async function clientLoader() { return {}; }
+       export default function Clients() { return null; }`
   );
 
-  return { root, appDir, routesDir };
+  return { root, appDir };
 };
 
+const routes = {
+  root: { id: 'root', file: 'root.tsx', path: '' },
+  'routes/clients': {
+    id: 'routes/clients',
+    parentId: 'root',
+    file: 'routes/clients.tsx',
+    path: 'clients',
+  },
+};
+
+const createClientStats = (routeId = 'routes/clients') => {
+  const assetsByChunkName: Record<string, string[]> = {
+    'entry.client': ['static/js/entry.client.js'],
+    [routeId]: [`static/js/${routeId}.js`],
+  };
+  for (const exportName of routeChunkExportNames) {
+    assetsByChunkName[getRouteChunkEntryName(routeId, exportName)] = [
+      `static/js/${getRouteChunkEntryName(routeId, exportName)}.js`,
+    ];
+  }
+  return { assetsByChunkName };
+};
+
+const getManifest = async (
+  appDir: string,
+  splitRouteModules: boolean | 'enforce',
+  isBuild = true
+) =>
+  getReactRouterManifestForDev(routes, {}, createClientStats(), appDir, '/', {
+    splitRouteModules,
+    rootRouteFile: 'root.tsx',
+    isBuild,
+    cache: new Map(),
+  });
+
 describe('manifest split route modules', () => {
-  it('includes clientActionModule when split route modules are enabled for build', async () => {
+  it.each(routeChunkExportNames)(
+    'includes %sModule when the export is splittable in build mode',
+    async (exportName: RouteChunkExportName) => {
+      const { root, appDir } = createTempApp(`
+        ${clientExportFixtures[exportName]}
+        export default function Clients() { return null; }
+      `);
+      try {
+        const manifest = await getManifest(appDir, true);
+        const field = moduleFieldByExportName[exportName];
+
+        expect(manifest.routes['routes/clients'][field]).toBe(
+          `/static/js/${getRouteChunkEntryName('routes/clients', exportName)}.js`
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('omits split route module fields in dev mode', async () => {
     const { root, appDir } = createTempApp();
     try {
-      const routes = {
-        root: { id: 'root', file: 'root.tsx', path: '' },
-        'routes/clients': {
-          id: 'routes/clients',
-          parentId: 'root',
-          file: 'routes/clients.tsx',
-          path: 'clients',
-        },
-      };
+      const manifest = await getManifest(appDir, true, false);
 
-      const clientActionEntry = getRouteChunkEntryName(
-        'routes/clients',
-        'clientAction'
-      );
+      expect(manifest.routes['routes/clients'].clientActionModule).toBeUndefined();
+      expect(manifest.routes['routes/clients'].clientLoaderModule).toBeUndefined();
+      expect(
+        manifest.routes['routes/clients'].clientMiddlewareModule
+      ).toBeUndefined();
+      expect(
+        manifest.routes['routes/clients'].hydrateFallbackModule
+      ).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 
-      const clientStats: { assetsByChunkName: Record<string, string[]> } = {
-        assetsByChunkName: {
-          'routes/clients': ['static/js/routes/clients.js'],
-          [clientActionEntry]: ['static/js/routes/clients-client-action.js'],
-        },
-      };
-
-      const manifest = await getReactRouterManifestForDev(
-        routes,
-        {},
-        clientStats,
-        appDir,
-        '/',
-        {
-          splitRouteModules: true,
-          rootRouteFile: 'root.tsx',
-          isBuild: true,
-        }
-      );
+  it('omits a module field for a client export that is present but not splittable', async () => {
+    const { root, appDir } = createTempApp(`
+      const shared = () => null;
+      export default function Clients() { return shared(); }
+      export async function clientAction() { return shared(); }
+    `);
+    try {
+      const manifest = await getManifest(appDir, true);
 
       expect(manifest.routes['routes/clients'].hasClientAction).toBe(true);
-      expect(manifest.routes['routes/clients'].clientActionModule).toBe(
-        '/static/js/routes/clients-client-action.js'
+      expect(manifest.routes['routes/clients'].clientActionModule).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('throws in enforce mode when a present client export is not splittable', async () => {
+    const { root, appDir } = createTempApp(`
+      const shared = () => null;
+      export default function Clients() { return shared(); }
+      export async function clientAction() { return shared(); }
+    `);
+    try {
+      await expect(getManifest(appDir, 'enforce')).rejects.toThrowError(
+        /Error splitting route module[\s\S]*clientAction/
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('omits split route module fields in dev mode', async () => {
-    const { root, appDir } = createTempApp();
+  it('does not throw outside enforce mode when a present client export is not splittable', async () => {
+    const { root, appDir } = createTempApp(`
+      const shared = () => null;
+      export default function Clients() { return shared(); }
+      export async function clientAction() { return shared(); }
+    `);
     try {
-      const routes = {
-        root: { id: 'root', file: 'root.tsx', path: '' },
-        'routes/clients': {
-          id: 'routes/clients',
-          parentId: 'root',
-          file: 'routes/clients.tsx',
-          path: 'clients',
-        },
-      };
+      const manifest = await getManifest(appDir, true);
 
-      const clientStats: { assetsByChunkName: Record<string, string[]> } = {
-        assetsByChunkName: {
-          'routes/clients': ['static/js/routes/clients.js'],
-        },
-      };
-
-      const manifest = await getReactRouterManifestForDev(
-        routes,
-        {},
-        clientStats,
-        appDir,
-        '/',
-        {
-          splitRouteModules: true,
-          rootRouteFile: 'root.tsx',
-          isBuild: false,
-        }
-      );
-
+      expect(manifest.routes['routes/clients'].hasClientAction).toBe(true);
       expect(manifest.routes['routes/clients'].clientActionModule).toBeUndefined();
-      expect(manifest.routes['routes/clients'].clientLoaderModule).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not add route chunk module fields for the root route', async () => {
+    const { root, appDir } = createTempApp(
+      `export default function Clients() { return null; }`,
+      `export async function clientAction() { return {}; }
+       export default function Root() { return null; }`
+    );
+    try {
+      const manifest = await getManifest(appDir, true);
+
+      expect(manifest.routes.root.hasClientAction).toBe(true);
+      expect(manifest.routes.root.clientActionModule).toBeUndefined();
+      expect(manifest.routes.root.clientLoaderModule).toBeUndefined();
+      expect(manifest.routes.root.clientMiddlewareModule).toBeUndefined();
+      expect(manifest.routes.root.hydrateFallbackModule).toBeUndefined();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

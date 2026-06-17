@@ -50,6 +50,7 @@
   "scripts": {
     "build": "rslib build",
     "bench": "node scripts/bench-builds.mjs",
+    "bench:compare": "node scripts/compare-benchmarks.mjs",
     "bench:smoke": "node scripts/bench-builds.mjs --profile smoke --iterations 1 --warmup 0 --format both --out .benchmark/results/smoke",
     "bench:baseline": "node scripts/bench-builds.mjs --profile default --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/baseline",
     "bench:full": "node scripts/bench-builds.mjs --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",

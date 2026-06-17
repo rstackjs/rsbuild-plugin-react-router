@@ -226,11 +226,15 @@ const summarizePluginOperations = runs => {
           operation,
           count: 0,
           totalMs: 0,
+          wallMs: null,
           maxMs: 0,
           reports: 0,
         };
         current.count += metrics.count ?? 0;
         current.totalMs += metrics.totalMs ?? 0;
+        if (typeof metrics.wallMs === 'number') {
+          current.wallMs = (current.wallMs ?? 0) + metrics.wallMs;
+        }
         current.maxMs = Math.max(current.maxMs, metrics.maxMs ?? 0);
         current.reports += 1;
         operations.set(key, current);
@@ -297,8 +301,8 @@ const renderMarkdown = result => {
       '',
       `## ${benchmark.id} Plugin Operations`,
       '',
-      '| Environment | Operation | Count | Total | Max | Reports |',
-      '|---|---|---:|---:|---:|---:|'
+      '| Environment | Operation | Count | Total | Wall | Max | Reports |',
+      '|---|---|---:|---:|---:|---:|---:|'
     );
     for (const operation of benchmark.pluginOperations.slice(0, 12)) {
       lines.push(
@@ -307,6 +311,7 @@ const renderMarkdown = result => {
           operation.operation,
           operation.count,
           formatReportMs(operation.totalMs),
+          formatReportMs(operation.wallMs),
           formatReportMs(operation.maxMs),
           operation.reports,
         ]

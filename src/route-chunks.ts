@@ -29,6 +29,20 @@ export type RouteChunkInfo = {
   chunkedExports: RouteChunkExportName[];
 };
 
+type ExportDependencyIndex = {
+  topLevelStatementIndices: ReadonlySet<number>;
+  topLevelNonModuleStatementIndices: ReadonlySet<number>;
+  importedIdentifierNames: ReadonlySet<string>;
+  exportedVariableDeclaratorKeys: ReadonlySet<string>;
+};
+
+type RouteChunkAnalysis = {
+  readonly ast: t.File;
+  readonly exports: ReadonlyMap<string, ExportDependencyIndex>;
+  readonly topLevel: readonly t.Statement[];
+  readonly chunkableExports: ReadonlySet<RouteChunkExportName>;
+};
+
 export const routeChunkExportNames: RouteChunkExportName[] = [
   'clientAction',
   'clientLoader',
@@ -85,18 +99,6 @@ const getOrSetFromCache = <T>(
   return value;
 };
 
-const codeToAst = (
-  code: string,
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
-) => {
-  return structuredClone(
-    getOrSetFromCache(cache, `${cacheKey}::codeToAst`, code, () =>
-      parse(code, { sourceType: 'module' })
-    )
-  );
-};
-
 const assertNodePath: (
   path: NodePath | NodePath[] | null | undefined
 ) => asserts path is NodePath = path => {
@@ -146,172 +148,6 @@ const assertNodePathIsPattern: (
     `Expected a Pattern path, but got ${
       Array.isArray(path) ? 'an array' : path?.node?.type
     }`
-  );
-};
-
-type ExportDependencies = {
-  topLevelStatements: Set<t.Statement>;
-  topLevelNonModuleStatements: Set<t.Statement>;
-  importedIdentifierNames: Set<string>;
-  exportedVariableDeclarators: Set<t.VariableDeclarator>;
-};
-
-const getExportDependencies = (
-  code: string,
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
-): Map<string, ExportDependencies> => {
-  return getOrSetFromCache(
-    cache,
-    `${cacheKey}::getExportDependencies`,
-    code,
-    () => {
-      const exportDependencies = new Map<string, ExportDependencies>();
-      const ast = codeToAst(code, cache, cacheKey);
-
-      function handleExport(
-        exportName: string,
-        exportPath: NodePath,
-        identifiersPath: NodePath = exportPath
-      ) {
-        const identifiers = getDependentIdentifiersForPath(identifiersPath);
-        const topLevelStatements = new Set<t.Statement>([
-          exportPath.node as t.Statement,
-          ...getTopLevelStatementsForPaths(identifiers),
-        ]);
-        const topLevelNonModuleStatements = new Set(
-          Array.from(topLevelStatements).filter(
-            statement =>
-              !t.isImportDeclaration(statement) &&
-              !t.isExportDeclaration(statement)
-          )
-        );
-        const importedIdentifierNames = new Set<string>();
-        for (const identifier of identifiers) {
-          if (
-            t.isIdentifier(identifier.node) &&
-            identifier.parentPath?.parentPath?.isImportDeclaration()
-          ) {
-            importedIdentifierNames.add(identifier.node.name);
-          }
-        }
-        const exportedVariableDeclarators = new Set<t.VariableDeclarator>();
-        for (const identifier of identifiers) {
-          if (identifier.parentPath?.isVariableDeclarator()) {
-            const parentPath = identifier.parentPath;
-            if (parentPath.parentPath?.parentPath?.isExportNamedDeclaration()) {
-              exportedVariableDeclarators.add(
-                parentPath.node as t.VariableDeclarator
-              );
-              continue;
-            }
-          }
-          const isWithinExportDestructuring = Boolean(
-            identifier.findParent(path =>
-              Boolean(
-                path.isPattern() &&
-                path.parentPath?.isVariableDeclarator() &&
-                path.parentPath.parentPath?.parentPath?.isExportNamedDeclaration()
-              )
-            )
-          );
-          if (isWithinExportDestructuring) {
-            let currentPath: NodePath | null = identifier;
-            while (currentPath) {
-              if (
-                currentPath.parentPath?.isVariableDeclarator() &&
-                currentPath.parentKey === 'id'
-              ) {
-                exportedVariableDeclarators.add(
-                  currentPath.parentPath.node as t.VariableDeclarator
-                );
-                break;
-              }
-              currentPath = currentPath.parentPath;
-            }
-          }
-        }
-        exportDependencies.set(exportName, {
-          topLevelStatements,
-          topLevelNonModuleStatements,
-          importedIdentifierNames,
-          exportedVariableDeclarators,
-        });
-      }
-
-      traverse(ast, {
-        ExportDeclaration(exportPath) {
-          const { node } = exportPath;
-          if (t.isExportAllDeclaration(node)) {
-            return;
-          }
-          if (t.isExportDefaultDeclaration(node)) {
-            handleExport('default', exportPath);
-            return;
-          }
-          const { declaration } = node;
-          if (t.isVariableDeclaration(declaration)) {
-            const { declarations } = declaration;
-            for (let i = 0; i < declarations.length; i++) {
-              const declarator = declarations[i];
-              if (t.isIdentifier(declarator.id)) {
-                const declaratorPath = exportPath.get(
-                  `declaration.declarations.${i}`
-                );
-                assertNodePathIsVariableDeclarator(declaratorPath);
-                handleExport(declarator.id.name, exportPath, declaratorPath);
-                continue;
-              }
-              if (t.isPattern(declarator.id)) {
-                const exportedPatternPath = exportPath.get(
-                  `declaration.declarations.${i}.id`
-                );
-                assertNodePathIsPattern(exportedPatternPath);
-                const identifiers =
-                  getIdentifiersForPatternPath(exportedPatternPath);
-                for (const identifier of identifiers) {
-                  if (!t.isIdentifier(identifier.node)) {
-                    continue;
-                  }
-                  handleExport(identifier.node.name, exportPath, identifier);
-                }
-              }
-            }
-            return;
-          }
-          if (
-            t.isFunctionDeclaration(declaration) ||
-            t.isClassDeclaration(declaration)
-          ) {
-            invariant(
-              declaration.id,
-              'Expected exported function or class declaration to have a name when not the default export'
-            );
-            handleExport(declaration.id.name, exportPath);
-            return;
-          }
-          if (t.isExportNamedDeclaration(node)) {
-            for (const specifier of node.specifiers) {
-              if (t.isIdentifier(specifier.exported)) {
-                const name = specifier.exported.name;
-                const specifierPath = exportPath
-                  .get('specifiers')
-                  .find(path => path.node === specifier);
-                invariant(
-                  specifierPath,
-                  `Expected to find specifier path for ${name}`
-                );
-                handleExport(name, exportPath, specifierPath);
-              }
-            }
-            return;
-          }
-          throw new Error('Unknown export node type');
-        },
-      });
-
-      return exportDependencies;
-    }
   );
 };
 
@@ -383,14 +219,54 @@ const getTopLevelStatementPathForPath = (path: NodePath) => {
   return topLevelStatement;
 };
 
-const getTopLevelStatementsForPaths = (paths: Set<NodePath>) => {
-  const topLevelStatements = new Set<t.Statement>();
-  for (const path of paths) {
-    const topLevelStatement = getTopLevelStatementPathForPath(path);
-    topLevelStatements.add(topLevelStatement.node as t.Statement);
-  }
-  return topLevelStatements;
+const getTopLevelStatementIndexForPath = (
+  path: NodePath,
+  topLevel: readonly t.Statement[]
+) => {
+  const topLevelStatement = getTopLevelStatementPathForPath(path);
+  const index = topLevel.indexOf(topLevelStatement.node as t.Statement);
+  invariant(
+    index >= 0,
+    'Expected top-level statement to exist in program body'
+  );
+  return index;
 };
+
+const getTopLevelStatementIndicesForPaths = (
+  paths: Set<NodePath>,
+  topLevel: readonly t.Statement[]
+) => {
+  const indices = new Set<number>();
+  for (const path of paths) {
+    indices.add(getTopLevelStatementIndexForPath(path, topLevel));
+  }
+  return indices;
+};
+
+const getExportedVariableDeclaratorKey = (
+  path: NodePath,
+  topLevel: readonly t.Statement[]
+) => {
+  const statementIndex = getTopLevelStatementIndexForPath(path, topLevel);
+  const declarationPath = path.parentPath;
+  invariant(
+    declarationPath?.isVariableDeclaration(),
+    'Expected exported variable declarator to have a variable declaration parent'
+  );
+  const declarationIndex = declarationPath.node.declarations.indexOf(
+    path.node as t.VariableDeclarator
+  );
+  invariant(
+    declarationIndex >= 0,
+    'Expected exported variable declarator to exist in its declaration'
+  );
+  return `${statementIndex}:${declarationIndex}`;
+};
+
+const getExportedVariableDeclaratorKeyForIndex = (
+  statementIndex: number,
+  declarationIndex: number
+) => `${statementIndex}:${declarationIndex}`;
 
 const getIdentifiersForPatternPath = (
   patternPath: NodePath,
@@ -443,7 +319,7 @@ const getExportedName = (exported: t.Identifier | t.StringLiteral) => {
   return t.isIdentifier(exported) ? exported.name : exported.value;
 };
 
-const setsIntersect = <T>(set1: Set<T>, set2: Set<T>) => {
+const setsIntersect = <T>(set1: ReadonlySet<T>, set2: ReadonlySet<T>) => {
   let smallerSet = set1;
   let largerSet = set2;
   if (set1.size > set2.size) {
@@ -458,22 +334,39 @@ const setsIntersect = <T>(set1: Set<T>, set2: Set<T>) => {
   return false;
 };
 
-const hasChunkableExport = (
-  code: string,
-  exportName: string,
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
+const getChunkableExports = (
+  exportDependencies: ReadonlyMap<string, ExportDependencyIndex>
 ) => {
-  return getOrSetFromCache(
-    cache,
-    `${cacheKey}::hasChunkableExport::${exportName}`,
-    code,
-    () => {
-      const exportDependencies = getExportDependencies(code, cache, cacheKey);
-      const dependencies = exportDependencies.get(exportName);
-      if (!dependencies) {
-        return false;
+  const chunkableExports = new Set<RouteChunkExportName>();
+
+  for (const exportName of routeChunkExportNames) {
+    const dependencies = exportDependencies.get(exportName);
+    if (!dependencies) {
+      continue;
+    }
+
+    let isChunkable = true;
+    for (const [currentExportName, currentDependencies] of exportDependencies) {
+      if (currentExportName === exportName) {
+        continue;
       }
+      if (
+        setsIntersect(
+          currentDependencies.topLevelNonModuleStatementIndices,
+          dependencies.topLevelNonModuleStatementIndices
+        )
+      ) {
+        isChunkable = false;
+        break;
+      }
+    }
+    if (!isChunkable) {
+      continue;
+    }
+    if (dependencies.exportedVariableDeclaratorKeys.size > 1) {
+      continue;
+    }
+    if (dependencies.exportedVariableDeclaratorKeys.size > 0) {
       for (const [
         currentExportName,
         currentDependencies,
@@ -483,302 +376,480 @@ const hasChunkableExport = (
         }
         if (
           setsIntersect(
-            currentDependencies.topLevelNonModuleStatements,
-            dependencies.topLevelNonModuleStatements
+            currentDependencies.exportedVariableDeclaratorKeys,
+            dependencies.exportedVariableDeclaratorKeys
           )
         ) {
-          return false;
+          isChunkable = false;
+          break;
         }
       }
-      if (dependencies.exportedVariableDeclarators.size > 1) {
-        return false;
+    }
+    if (isChunkable) {
+      chunkableExports.add(exportName);
+    }
+  }
+
+  return chunkableExports;
+};
+
+const analyzeRouteModule = (
+  code: string,
+  cache: RouteChunkCache | undefined,
+  cacheKey: string
+): RouteChunkAnalysis => {
+  return getOrSetFromCache(cache, `${cacheKey}::analysis`, code, () => {
+    const exportDependencies = new Map<string, ExportDependencyIndex>();
+    const ast = parse(code, { sourceType: 'module' });
+    const topLevel = ast.program.body;
+
+    function handleExport(
+      exportName: string,
+      exportPath: NodePath,
+      identifiersPath: NodePath = exportPath
+    ) {
+      const identifiers = getDependentIdentifiersForPath(identifiersPath);
+      const topLevelStatementIndices = new Set<number>([
+        getTopLevelStatementIndexForPath(exportPath, topLevel),
+        ...getTopLevelStatementIndicesForPaths(identifiers, topLevel),
+      ]);
+      const topLevelNonModuleStatementIndices = new Set(
+        Array.from(topLevelStatementIndices).filter(index => {
+          const statement = topLevel[index];
+          return (
+            !t.isImportDeclaration(statement) &&
+            !t.isExportDeclaration(statement)
+          );
+        })
+      );
+      const importedIdentifierNames = new Set<string>();
+      for (const identifier of identifiers) {
+        if (
+          t.isIdentifier(identifier.node) &&
+          identifier.parentPath?.parentPath?.isImportDeclaration()
+        ) {
+          importedIdentifierNames.add(identifier.node.name);
+        }
       }
-      if (dependencies.exportedVariableDeclarators.size > 0) {
-        for (const [
-          currentExportName,
-          currentDependencies,
-        ] of exportDependencies) {
-          if (currentExportName === exportName) {
+      const exportedVariableDeclaratorKeys = new Set<string>();
+      for (const identifier of identifiers) {
+        if (identifier.parentPath?.isVariableDeclarator()) {
+          const parentPath = identifier.parentPath;
+          if (parentPath.parentPath?.parentPath?.isExportNamedDeclaration()) {
+            exportedVariableDeclaratorKeys.add(
+              getExportedVariableDeclaratorKey(parentPath, topLevel)
+            );
             continue;
           }
-          if (
-            setsIntersect(
-              currentDependencies.exportedVariableDeclarators,
-              dependencies.exportedVariableDeclarators
+        }
+        const isWithinExportDestructuring = Boolean(
+          identifier.findParent(path =>
+            Boolean(
+              path.isPattern() &&
+              path.parentPath?.isVariableDeclarator() &&
+              path.parentPath.parentPath?.parentPath?.isExportNamedDeclaration()
             )
-          ) {
-            return false;
-          }
-        }
-      }
-      return true;
-    }
-  );
-};
-
-const getChunkedExport = (
-  code: string,
-  exportName: string,
-  generateOptions: Record<string, unknown> = {},
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
-): string | undefined => {
-  return getOrSetFromCache(
-    cache,
-    `${cacheKey}::getChunkedExport::${exportName}::${JSON.stringify(
-      generateOptions
-    )}`,
-    code,
-    () => {
-      if (!hasChunkableExport(code, exportName, cache, cacheKey)) {
-        return undefined;
-      }
-      const exportDependencies = getExportDependencies(code, cache, cacheKey);
-      const dependencies = exportDependencies.get(exportName);
-      invariant(dependencies, 'Expected export to have dependencies');
-
-      const topLevelStatementsArray = Array.from(
-        dependencies.topLevelStatements
-      );
-      const exportedVariableDeclaratorsArray = Array.from(
-        dependencies.exportedVariableDeclarators
-      );
-
-      const ast = codeToAst(code, cache, cacheKey);
-      ast.program.body = ast.program.body
-        .filter(node =>
-          topLevelStatementsArray.some(statement =>
-            t.isNodesEquivalent(node, statement)
           )
-        )
-        .map(node => {
-          if (!t.isImportDeclaration(node)) {
-            return node;
-          }
-          if (dependencies.importedIdentifierNames.size === 0) {
-            return null;
-          }
-          node.specifiers = node.specifiers.filter(specifier =>
-            dependencies.importedIdentifierNames.has(specifier.local.name)
-          );
-          invariant(
-            node.specifiers.length > 0,
-            'Expected import statement to have used specifiers'
-          );
-          return node;
-        })
-        .map(node => {
-          if (!t.isExportDeclaration(node)) {
-            return node;
-          }
-          if (t.isExportAllDeclaration(node)) {
-            return null;
-          }
-          if (t.isExportDefaultDeclaration(node)) {
-            return exportName === 'default' ? node : null;
-          }
-          const { declaration } = node;
-          if (t.isVariableDeclaration(declaration)) {
-            declaration.declarations = declaration.declarations.filter(
-              declarationNode =>
-                exportedVariableDeclaratorsArray.some(declarator =>
-                  t.isNodesEquivalent(declarationNode, declarator)
-                )
-            );
-            if (declaration.declarations.length === 0) {
-              return null;
-            }
-            return node;
-          }
-          if (
-            t.isFunctionDeclaration(node.declaration) ||
-            t.isClassDeclaration(node.declaration)
-          ) {
-            return node.declaration.id?.name === exportName ? node : null;
-          }
-          if (t.isExportNamedDeclaration(node)) {
-            if (node.specifiers.length === 0) {
-              return null;
-            }
-            node.specifiers = node.specifiers.filter(
-              specifier => getExportedName(specifier.exported) === exportName
-            );
-            if (node.specifiers.length === 0) {
-              return null;
-            }
-            return node;
-          }
-          throw new Error('Unknown export node type');
-        })
-        .filter(Boolean) as t.Statement[];
-
-      return generate(ast, generateOptions).code;
-    }
-  );
-};
-
-const omitChunkedExports = (
-  code: string,
-  exportNames: string[],
-  generateOptions: Record<string, unknown> = {},
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
-): string | undefined => {
-  return getOrSetFromCache(
-    cache,
-    `${cacheKey}::omitChunkedExports::${exportNames.join(',')}::${JSON.stringify(
-      generateOptions
-    )}`,
-    code,
-    () => {
-      const isChunkable = (exportName: string) =>
-        hasChunkableExport(code, exportName, cache, cacheKey);
-      const isOmitted = (exportName: string) =>
-        exportNames.includes(exportName) && isChunkable(exportName);
-      const isRetained = (exportName: string) => !isOmitted(exportName);
-
-      const exportDependencies = getExportDependencies(code, cache, cacheKey);
-      const allExportNames = Array.from(exportDependencies.keys());
-      const omittedExportNames = allExportNames.filter(isOmitted);
-      const retainedExportNames = allExportNames.filter(isRetained);
-
-      const omittedStatements = new Set<t.Statement>();
-      const omittedExportedVariableDeclarators =
-        new Set<t.VariableDeclarator>();
-
-      for (const omittedExportName of omittedExportNames) {
-        const dependencies = exportDependencies.get(omittedExportName);
-        invariant(
-          dependencies,
-          `Expected dependencies for ${omittedExportName}`
         );
-        for (const statement of dependencies.topLevelNonModuleStatements) {
-          omittedStatements.add(statement);
-        }
-        for (const declarator of dependencies.exportedVariableDeclarators) {
-          omittedExportedVariableDeclarators.add(declarator);
-        }
-      }
-
-      const ast = codeToAst(code, cache, cacheKey);
-      const omittedStatementsArray = Array.from(omittedStatements);
-      const omittedExportedVariableDeclaratorsArray = Array.from(
-        omittedExportedVariableDeclarators
-      );
-      ast.program.body = ast.program.body
-        .filter(node =>
-          omittedStatementsArray.every(
-            statement => !t.isNodesEquivalent(node, statement)
-          )
-        )
-        .map(node => {
-          if (!t.isImportDeclaration(node)) {
-            return node;
-          }
-          if (node.specifiers.length === 0) {
-            return node;
-          }
-          node.specifiers = node.specifiers.filter(specifier => {
-            const importedName = specifier.local.name;
-            for (const retainedExportName of retainedExportNames) {
-              const dependencies = exportDependencies.get(retainedExportName);
-              if (dependencies?.importedIdentifierNames?.has(importedName)) {
-                return true;
-              }
-            }
-            for (const omittedExportName of omittedExportNames) {
-              const dependencies = exportDependencies.get(omittedExportName);
-              if (dependencies?.importedIdentifierNames?.has(importedName)) {
-                return false;
-              }
-            }
-            return true;
-          });
-          if (node.specifiers.length === 0) {
-            return null;
-          }
-          return node;
-        })
-        .map(node => {
-          if (!t.isExportDeclaration(node)) {
-            return node;
-          }
-          if (t.isExportAllDeclaration(node)) {
-            return node;
-          }
-          if (t.isExportDefaultDeclaration(node)) {
-            return isOmitted('default') ? null : node;
-          }
-          if (t.isVariableDeclaration(node.declaration)) {
-            node.declaration.declarations =
-              node.declaration.declarations.filter(declarationNode =>
-                omittedExportedVariableDeclaratorsArray.every(
-                  declarator =>
-                    !t.isNodesEquivalent(declarationNode, declarator)
+        if (isWithinExportDestructuring) {
+          let currentPath: NodePath | null = identifier;
+          while (currentPath) {
+            if (
+              currentPath.parentPath?.isVariableDeclarator() &&
+              currentPath.parentKey === 'id'
+            ) {
+              exportedVariableDeclaratorKeys.add(
+                getExportedVariableDeclaratorKey(
+                  currentPath.parentPath,
+                  topLevel
                 )
               );
-            if (node.declaration.declarations.length === 0) {
-              return null;
+              break;
             }
-            return node;
+            currentPath = currentPath.parentPath;
           }
-          if (
-            t.isFunctionDeclaration(node.declaration) ||
-            t.isClassDeclaration(node.declaration)
-          ) {
-            const declarationId = node.declaration.id;
-            invariant(
-              declarationId,
-              'Expected exported function or class declaration to have a name when not the default export'
-            );
-            return isOmitted(declarationId.name) ? null : node;
-          }
-          if (t.isExportNamedDeclaration(node)) {
-            if (node.specifiers.length === 0) {
-              return node;
-            }
-            node.specifiers = node.specifiers.filter(specifier => {
-              const exportedName = getExportedName(specifier.exported);
-              return !isOmitted(exportedName);
-            });
-            if (node.specifiers.length === 0) {
-              return null;
-            }
-            return node;
-          }
-          throw new Error('Unknown node type');
-        })
-        .filter(Boolean) as t.Statement[];
-
-      if (ast.program.body.length === 0) {
-        return undefined;
+        }
       }
-      return generate(ast, generateOptions).code;
+      exportDependencies.set(exportName, {
+        topLevelStatementIndices,
+        topLevelNonModuleStatementIndices,
+        importedIdentifierNames,
+        exportedVariableDeclaratorKeys,
+      });
     }
+
+    traverse(ast, {
+      ExportDeclaration(exportPath) {
+        const { node } = exportPath;
+        if (t.isExportAllDeclaration(node)) {
+          return;
+        }
+        if (t.isExportDefaultDeclaration(node)) {
+          handleExport('default', exportPath);
+          return;
+        }
+        const { declaration } = node;
+        if (t.isVariableDeclaration(declaration)) {
+          const { declarations } = declaration;
+          for (let i = 0; i < declarations.length; i++) {
+            const declarator = declarations[i];
+            if (t.isIdentifier(declarator.id)) {
+              const declaratorPath = exportPath.get(
+                `declaration.declarations.${i}`
+              );
+              assertNodePathIsVariableDeclarator(declaratorPath);
+              handleExport(declarator.id.name, exportPath, declaratorPath);
+              continue;
+            }
+            if (t.isPattern(declarator.id)) {
+              const exportedPatternPath = exportPath.get(
+                `declaration.declarations.${i}.id`
+              );
+              assertNodePathIsPattern(exportedPatternPath);
+              const identifiers =
+                getIdentifiersForPatternPath(exportedPatternPath);
+              for (const identifier of identifiers) {
+                if (!t.isIdentifier(identifier.node)) {
+                  continue;
+                }
+                handleExport(identifier.node.name, exportPath, identifier);
+              }
+            }
+          }
+          return;
+        }
+        if (
+          t.isFunctionDeclaration(declaration) ||
+          t.isClassDeclaration(declaration)
+        ) {
+          invariant(
+            declaration.id,
+            'Expected exported function or class declaration to have a name when not the default export'
+          );
+          handleExport(declaration.id.name, exportPath);
+          return;
+        }
+        if (t.isExportNamedDeclaration(node)) {
+          for (const specifier of node.specifiers) {
+            if (t.isIdentifier(specifier.exported)) {
+              const name = specifier.exported.name;
+              const specifierPath = exportPath
+                .get('specifiers')
+                .find(path => path.node === specifier);
+              invariant(
+                specifierPath,
+                `Expected to find specifier path for ${name}`
+              );
+              handleExport(name, exportPath, specifierPath);
+            }
+          }
+          return;
+        }
+        throw new Error('Unknown export node type');
+      },
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      Object.freeze(topLevel);
+    }
+
+    return {
+      ast,
+      exports: exportDependencies,
+      topLevel,
+      chunkableExports: getChunkableExports(exportDependencies),
+    };
+  });
+};
+
+const assertAnalysisBodyLengthUnchanged = (
+  analysis: RouteChunkAnalysis,
+  expectedLength: number
+) => {
+  invariant(
+    analysis.ast.program.body.length === expectedLength,
+    'Expected route chunk analysis program body length to remain unchanged'
   );
+};
+
+const createProgramCode = (
+  body: t.Statement[],
+  generateOptions: Record<string, unknown>
+) => generate(t.file(t.program(body)), generateOptions).code;
+
+const cloneImportForNames = (
+  node: t.ImportDeclaration,
+  importedIdentifierNames: ReadonlySet<string>
+) => {
+  // Shallow clone is safe here: only the top-level specifiers array is reassigned.
+  const clonedNode = t.cloneNode(node, false);
+  clonedNode.specifiers = node.specifiers.filter(specifier =>
+    importedIdentifierNames.has(specifier.local.name)
+  );
+  invariant(
+    clonedNode.specifiers.length > 0,
+    'Expected import statement to have used specifiers'
+  );
+  return clonedNode;
+};
+
+const cloneVariableExportForKeys = (
+  node: t.ExportNamedDeclaration,
+  statementIndex: number,
+  declaratorKeys: ReadonlySet<string>
+) => {
+  invariant(
+    t.isVariableDeclaration(node.declaration),
+    'Expected export declaration to contain variable declarations'
+  );
+  // Shallow clones are safe here: only declaration/declarations array references are reassigned.
+  const clonedNode = t.cloneNode(node, false);
+  const clonedDeclaration = t.cloneNode(node.declaration, false);
+  clonedDeclaration.declarations = node.declaration.declarations.filter(
+    (_declarationNode, declarationIndex) =>
+      declaratorKeys.has(
+        getExportedVariableDeclaratorKeyForIndex(
+          statementIndex,
+          declarationIndex
+        )
+      )
+  );
+  if (clonedDeclaration.declarations.length === 0) {
+    return null;
+  }
+  clonedNode.declaration = clonedDeclaration;
+  return clonedNode;
+};
+
+const detectRouteChunksFromAnalysis = (
+  analysis: RouteChunkAnalysis
+): RouteChunkInfo => {
+  const hasRouteChunkByExportName = Object.fromEntries(
+    routeChunkExportNames.map(exportName => [
+      exportName,
+      analysis.chunkableExports.has(exportName),
+    ])
+  ) as Record<RouteChunkExportName, boolean>;
+  const chunkedExports = routeChunkExportNames.filter(
+    exportName => hasRouteChunkByExportName[exportName]
+  );
+  return {
+    hasRouteChunks: chunkedExports.length > 0,
+    hasRouteChunkByExportName,
+    chunkedExports,
+  };
+};
+
+const getChunkedExportFromAnalysis = (
+  analysis: RouteChunkAnalysis,
+  exportName: RouteChunkExportName,
+  generateOptions: Record<string, unknown> = {}
+): string | undefined => {
+  if (!analysis.chunkableExports.has(exportName)) {
+    return undefined;
+  }
+  const dependencies = analysis.exports.get(exportName);
+  invariant(dependencies, 'Expected export to have dependencies');
+
+  const bodyLength = analysis.topLevel.length;
+  const body = analysis.topLevel
+    .map((node, statementIndex) => {
+      if (!dependencies.topLevelStatementIndices.has(statementIndex)) {
+        return null;
+      }
+      if (t.isImportDeclaration(node)) {
+        if (dependencies.importedIdentifierNames.size === 0) {
+          return null;
+        }
+        return cloneImportForNames(node, dependencies.importedIdentifierNames);
+      }
+      if (!t.isExportDeclaration(node)) {
+        return t.cloneNode(node, false);
+      }
+      if (t.isExportAllDeclaration(node)) {
+        return null;
+      }
+      if (t.isExportDefaultDeclaration(node)) {
+        return null;
+      }
+      const { declaration } = node;
+      if (t.isVariableDeclaration(declaration)) {
+        return cloneVariableExportForKeys(
+          node,
+          statementIndex,
+          dependencies.exportedVariableDeclaratorKeys
+        );
+      }
+      if (
+        t.isFunctionDeclaration(node.declaration) ||
+        t.isClassDeclaration(node.declaration)
+      ) {
+        return node.declaration.id?.name === exportName
+          ? t.cloneNode(node, false)
+          : null;
+      }
+      if (t.isExportNamedDeclaration(node)) {
+        if (node.specifiers.length === 0) {
+          return null;
+        }
+        // Shallow clone is safe here: only the top-level specifiers array is reassigned.
+        const clonedNode = t.cloneNode(node, false);
+        clonedNode.specifiers = node.specifiers.filter(
+          specifier => getExportedName(specifier.exported) === exportName
+        );
+        if (clonedNode.specifiers.length === 0) {
+          return null;
+        }
+        return clonedNode;
+      }
+      throw new Error('Unknown export node type');
+    })
+    .filter(Boolean) as t.Statement[];
+
+  assertAnalysisBodyLengthUnchanged(analysis, bodyLength);
+  return createProgramCode(body, generateOptions);
+};
+
+const omitChunkedExportsFromAnalysis = (
+  analysis: RouteChunkAnalysis,
+  exportNames: string[],
+  generateOptions: Record<string, unknown> = {}
+): string | undefined => {
+  const isOmitted = (exportName: string) =>
+    exportNames.includes(exportName) &&
+    analysis.chunkableExports.has(exportName as RouteChunkExportName);
+  const isRetained = (exportName: string) => !isOmitted(exportName);
+
+  const allExportNames = Array.from(analysis.exports.keys());
+  const omittedExportNames = allExportNames.filter(isOmitted);
+  const retainedExportNames = allExportNames.filter(isRetained);
+
+  const omittedStatementIndices = new Set<number>();
+  const omittedExportedVariableDeclaratorKeys = new Set<string>();
+
+  for (const omittedExportName of omittedExportNames) {
+    const dependencies = analysis.exports.get(omittedExportName);
+    invariant(dependencies, `Expected dependencies for ${omittedExportName}`);
+    for (const statementIndex of dependencies.topLevelNonModuleStatementIndices) {
+      omittedStatementIndices.add(statementIndex);
+    }
+    for (const declaratorKey of dependencies.exportedVariableDeclaratorKeys) {
+      omittedExportedVariableDeclaratorKeys.add(declaratorKey);
+    }
+  }
+
+  const bodyLength = analysis.topLevel.length;
+  const body = analysis.topLevel
+    .map((node, statementIndex) => {
+      if (omittedStatementIndices.has(statementIndex)) {
+        return null;
+      }
+      if (t.isImportDeclaration(node)) {
+        if (node.specifiers.length === 0) {
+          return t.cloneNode(node, false);
+        }
+        // Shallow clone is safe here: only the top-level specifiers array is reassigned.
+        const clonedNode = t.cloneNode(node, false);
+        clonedNode.specifiers = node.specifiers.filter(specifier => {
+          const importedName = specifier.local.name;
+          for (const retainedExportName of retainedExportNames) {
+            const dependencies = analysis.exports.get(retainedExportName);
+            if (dependencies?.importedIdentifierNames?.has(importedName)) {
+              return true;
+            }
+          }
+          for (const omittedExportName of omittedExportNames) {
+            const dependencies = analysis.exports.get(omittedExportName);
+            if (dependencies?.importedIdentifierNames?.has(importedName)) {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (clonedNode.specifiers.length === 0) {
+          return null;
+        }
+        return clonedNode;
+      }
+      if (!t.isExportDeclaration(node)) {
+        return t.cloneNode(node, false);
+      }
+      if (t.isExportAllDeclaration(node)) {
+        return t.cloneNode(node, false);
+      }
+      if (t.isExportDefaultDeclaration(node)) {
+        return isOmitted('default') ? null : t.cloneNode(node, false);
+      }
+      if (t.isVariableDeclaration(node.declaration)) {
+        const retainedDeclaratorKeys = new Set<string>();
+        for (let i = 0; i < node.declaration.declarations.length; i++) {
+          const key = getExportedVariableDeclaratorKeyForIndex(
+            statementIndex,
+            i
+          );
+          if (!omittedExportedVariableDeclaratorKeys.has(key)) {
+            retainedDeclaratorKeys.add(key);
+          }
+        }
+        return cloneVariableExportForKeys(
+          node,
+          statementIndex,
+          retainedDeclaratorKeys
+        );
+      }
+      if (
+        t.isFunctionDeclaration(node.declaration) ||
+        t.isClassDeclaration(node.declaration)
+      ) {
+        const declarationId = node.declaration.id;
+        invariant(
+          declarationId,
+          'Expected exported function or class declaration to have a name when not the default export'
+        );
+        return isOmitted(declarationId.name) ? null : t.cloneNode(node, false);
+      }
+      if (t.isExportNamedDeclaration(node)) {
+        if (node.specifiers.length === 0) {
+          return t.cloneNode(node, false);
+        }
+        // Shallow clone is safe here: only the top-level specifiers array is reassigned.
+        const clonedNode = t.cloneNode(node, false);
+        clonedNode.specifiers = node.specifiers.filter(specifier => {
+          const exportedName = getExportedName(specifier.exported);
+          return !isOmitted(exportedName);
+        });
+        if (clonedNode.specifiers.length === 0) {
+          return null;
+        }
+        return clonedNode;
+      }
+      throw new Error('Unknown node type');
+    })
+    .filter(Boolean) as t.Statement[];
+
+  assertAnalysisBodyLengthUnchanged(analysis, bodyLength);
+  if (body.length === 0) {
+    return undefined;
+  }
+  return createProgramCode(body, generateOptions);
+};
+
+const getRouteChunkCodeFromAnalysis = (
+  analysis: RouteChunkAnalysis,
+  chunkName: RouteChunkName
+) => {
+  if (chunkName === 'main') {
+    return omitChunkedExportsFromAnalysis(analysis, routeChunkExportNames, {});
+  }
+  return getChunkedExportFromAnalysis(analysis, chunkName, {});
 };
 
 export const detectRouteChunks = (
   code: string,
   cache: RouteChunkCache | undefined,
   cacheKey: string
-): RouteChunkInfo => {
-  const hasRouteChunkByExportName = Object.fromEntries(
-    routeChunkExportNames.map(exportName => [
-      exportName,
-      hasChunkableExport(code, exportName, cache, cacheKey),
-    ])
-  ) as Record<RouteChunkExportName, boolean>;
-  const chunkedExports = Object.entries(hasRouteChunkByExportName)
-    .filter(([, isChunked]) => isChunked)
-    .map(([exportName]) => exportName as RouteChunkExportName);
-  const hasRouteChunks = chunkedExports.length > 0;
-  return {
-    hasRouteChunks,
-    hasRouteChunkByExportName,
-    chunkedExports,
-  };
-};
+): RouteChunkInfo =>
+  detectRouteChunksFromAnalysis(analyzeRouteModule(code, cache, cacheKey));
 
 export const getRouteChunkCode: (
   code: string,
@@ -791,10 +862,10 @@ export const getRouteChunkCode: (
   cache: RouteChunkCache | undefined,
   cacheKey: string
 ) => {
-  if (chunkName === 'main') {
-    return omitChunkedExports(code, routeChunkExportNames, {}, cache, cacheKey);
-  }
-  return getChunkedExport(code, chunkName, {}, cache, cacheKey);
+  return getRouteChunkCodeFromAnalysis(
+    analyzeRouteModule(code, cache, cacheKey),
+    chunkName
+  );
 };
 
 export const getRouteChunkModuleId = (
