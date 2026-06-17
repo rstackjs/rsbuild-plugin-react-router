@@ -1,28 +1,23 @@
-import {
-  deadCodeElimination,
-  findReferencedIdentifiers,
-} from 'babel-dead-code-elimination';
 import { normalize } from 'pathe';
 import { existsSync } from 'node:fs';
-import type { Babel, NodePath, ParseResult } from './babel.js';
-import { t, traverse } from './babel.js';
-import {
-  NAMED_COMPONENT_EXPORTS,
-  NAMED_COMPONENT_EXPORTS_SET,
-  JS_EXTENSIONS,
-} from './constants.js';
+import { walk, type ParseResult } from 'yuku-parser';
+import { NAMED_COMPONENT_EXPORTS, JS_EXTENSIONS } from './constants.js';
+
+type AnyNode = Record<string, any>;
+
+const getProgram = (ast: ParseResult | AnyNode): AnyNode =>
+  (ast as ParseResult).program ?? ast;
 
 export function validateDestructuredExports(
-  id: Babel.ArrayPattern | Babel.ObjectPattern,
-  exportsToRemove: readonly string[]
+  id: AnyNode,
+  exportsToRemove: string[]
 ): void {
   if (id.type === 'ArrayPattern') {
-    for (const element of id.elements) {
+    for (const element of id.elements ?? []) {
       if (!element) {
         continue;
       }
 
-      // [ foo ]
       if (
         element.type === 'Identifier' &&
         exportsToRemove.includes(element.name)
@@ -30,7 +25,6 @@ export function validateDestructuredExports(
         throw invalidDestructureError(element.name);
       }
 
-      // [ ...foo ]
       if (
         element.type === 'RestElement' &&
         element.argument.type === 'Identifier' &&
@@ -39,8 +33,6 @@ export function validateDestructuredExports(
         throw invalidDestructureError(element.argument.name);
       }
 
-      // [ [...] ]
-      // [ {...} ]
       if (element.type === 'ArrayPattern' || element.type === 'ObjectPattern') {
         validateDestructuredExports(element, exportsToRemove);
       }
@@ -48,16 +40,12 @@ export function validateDestructuredExports(
   }
 
   if (id.type === 'ObjectPattern') {
-    for (const property of id.properties) {
+    for (const property of id.properties ?? []) {
       if (!property) {
         continue;
       }
 
-      if (
-        property.type === 'ObjectProperty' &&
-        property.key.type === 'Identifier'
-      ) {
-        // { foo }
+      if (property.type === 'Property') {
         if (
           property.value.type === 'Identifier' &&
           exportsToRemove.includes(property.value.name)
@@ -65,8 +53,6 @@ export function validateDestructuredExports(
           throw invalidDestructureError(property.value.name);
         }
 
-        // { foo: [...] }
-        // { foo: {...} }
         if (
           property.value.type === 'ArrayPattern' ||
           property.value.type === 'ObjectPattern'
@@ -75,7 +61,6 @@ export function validateDestructuredExports(
         }
       }
 
-      // { ...foo }
       if (
         property.type === 'RestElement' &&
         property.argument.type === 'Identifier' &&
@@ -91,14 +76,12 @@ export function invalidDestructureError(name: string): Error {
   return new Error(`Cannot remove destructured export "${name}"`);
 }
 
-export function toFunctionExpression(decl: Babel.FunctionDeclaration): any {
-  return t.functionExpression(
-    decl.id,
-    decl.params,
-    decl.body,
-    decl.generator,
-    decl.async
-  );
+export function toFunctionExpression(decl: AnyNode): AnyNode {
+  return {
+    ...decl,
+    type: 'FunctionExpression',
+    declare: undefined,
+  };
 }
 
 export function combineURLs(baseURL: string, relativeURL: string): string {
@@ -177,278 +160,503 @@ export function generateWithProps() {
   `;
 }
 
+const removeFromArray = <T>(array: T[], value: T): void => {
+  const index = array.indexOf(value);
+  if (index >= 0) {
+    array.splice(index, 1);
+  }
+};
+
+const getPatternIdentifierNames = (
+  pattern: AnyNode | null | undefined,
+  names = new Set<string>()
+): Set<string> => {
+  if (!pattern) {
+    return names;
+  }
+  if (pattern.type === 'Identifier') {
+    names.add(pattern.name);
+    return names;
+  }
+  if (pattern.type === 'RestElement') {
+    return getPatternIdentifierNames(pattern.argument, names);
+  }
+  if (pattern.type === 'AssignmentPattern') {
+    return getPatternIdentifierNames(pattern.left, names);
+  }
+  if (pattern.type === 'ArrayPattern') {
+    for (const element of pattern.elements ?? []) {
+      getPatternIdentifierNames(element, names);
+    }
+    return names;
+  }
+  if (pattern.type === 'ObjectPattern') {
+    for (const property of pattern.properties ?? []) {
+      if (property.type === 'RestElement') {
+        getPatternIdentifierNames(property.argument, names);
+      } else {
+        getPatternIdentifierNames(property.value, names);
+      }
+    }
+  }
+  return names;
+};
+
+const getDeclaredNames = (node: AnyNode): Set<string> => {
+  const names = new Set<string>();
+  if (node.type === 'VariableDeclaration') {
+    for (const declarator of node.declarations ?? []) {
+      getPatternIdentifierNames(declarator.id, names);
+    }
+  } else if (
+    (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') &&
+    node.id?.name
+  ) {
+    names.add(node.id.name);
+  } else if (node.type === 'ImportDeclaration') {
+    for (const specifier of node.specifiers ?? []) {
+      if (specifier.local?.name) {
+        names.add(specifier.local.name);
+      }
+    }
+  }
+  return names;
+};
+
+const isIdentifierDeclaration = (node: AnyNode, parent: AnyNode | null) => {
+  if (!parent || node.type !== 'Identifier') {
+    return false;
+  }
+  if (
+    (parent.type === 'FunctionDeclaration' ||
+      parent.type === 'FunctionExpression' ||
+      parent.type === 'ClassDeclaration' ||
+      parent.type === 'ClassExpression') &&
+    parent.id === node
+  ) {
+    return true;
+  }
+  if (parent.type === 'VariableDeclarator') {
+    return getPatternIdentifierNames(parent.id).has(node.name);
+  }
+  if (
+    (parent.type === 'ImportSpecifier' ||
+      parent.type === 'ImportDefaultSpecifier' ||
+      parent.type === 'ImportNamespaceSpecifier') &&
+    parent.local === node
+  ) {
+    return true;
+  }
+  if (
+    (parent.type === 'FunctionDeclaration' ||
+      parent.type === 'FunctionExpression' ||
+      parent.type === 'ArrowFunctionExpression') &&
+    (parent.params ?? []).some((param: AnyNode) =>
+      getPatternIdentifierNames(param).has(node.name)
+    )
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const isNonReferenceIdentifier = (node: AnyNode, parent: AnyNode | null) => {
+  if (!parent || node.type !== 'Identifier') {
+    return false;
+  }
+  if (isIdentifierDeclaration(node, parent)) {
+    return true;
+  }
+  if (
+    parent.type === 'MemberExpression' &&
+    parent.property === node &&
+    !parent.computed
+  ) {
+    return true;
+  }
+  if (
+    parent.type === 'Property' &&
+    parent.key === node &&
+    !parent.computed &&
+    !parent.shorthand
+  ) {
+    return true;
+  }
+  if (
+    parent.type === 'MethodDefinition' &&
+    parent.key === node &&
+    !parent.computed
+  ) {
+    return true;
+  }
+  if (parent.type === 'LabeledStatement' || parent.type === 'BreakStatement') {
+    return true;
+  }
+  return false;
+};
+
+const collectReferencedNames = (program: AnyNode): Set<string> => {
+  const referenced = new Set<string>();
+  walk(program as any, {
+    Identifier(node: AnyNode, ctx: any) {
+      const parent = ctx.parent as AnyNode | null;
+      if (!isNonReferenceIdentifier(node, parent)) {
+        referenced.add(node.name);
+      }
+    },
+    ExportSpecifier(node: AnyNode) {
+      if (node.local?.name && node.exportKind !== 'type') {
+        referenced.add(node.local.name);
+      }
+    },
+  });
+  return referenced;
+};
+
+const getExportedName = (specifier: AnyNode): string | null => {
+  const exported = specifier.exported;
+  if (!exported) {
+    return null;
+  }
+  if (exported.type === 'Identifier') {
+    return exported.name;
+  }
+  if (exported.type === 'Literal') {
+    return String(exported.value);
+  }
+  return null;
+};
+
+const collectExportedLocalNames = (program: AnyNode): Set<string> => {
+  const names = new Set<string>();
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ExportDefaultDeclaration') {
+      if (statement.declaration?.id?.name) {
+        names.add(statement.declaration.id.name);
+      }
+      continue;
+    }
+    if (statement.type !== 'ExportNamedDeclaration') {
+      continue;
+    }
+    if (statement.declaration) {
+      for (const name of getDeclaredNames(statement.declaration)) {
+        names.add(name);
+      }
+    }
+    for (const specifier of statement.specifiers ?? []) {
+      if (specifier.local?.name && specifier.exportKind !== 'type') {
+        names.add(specifier.local.name);
+      }
+    }
+  }
+  return names;
+};
+
+const removeUnusedTopLevelDeclarations = (program: AnyNode): void => {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const referenced = collectReferencedNames(program);
+    const exported = collectExportedLocalNames(program);
+    for (const statement of [...program.body]) {
+      if (statement.type !== 'VariableDeclaration') {
+        if (
+          (statement.type === 'FunctionDeclaration' ||
+            statement.type === 'ClassDeclaration') &&
+          statement.id?.name &&
+          !referenced.has(statement.id.name) &&
+          !exported.has(statement.id.name)
+        ) {
+          removeFromArray(program.body, statement);
+          changed = true;
+        }
+        continue;
+      }
+      statement.declarations = statement.declarations.filter(
+        (declarator: AnyNode) => {
+          const names = getPatternIdentifierNames(declarator.id);
+          return Array.from(names).some(
+            name => referenced.has(name) || exported.has(name)
+          );
+        }
+      );
+      if (statement.declarations.length === 0) {
+        removeFromArray(program.body, statement);
+        changed = true;
+      }
+    }
+  }
+};
+
 export const removeExports = (
-  ast: ParseResult<Babel.File>,
-  exportsToRemove: readonly string[]
+  ast: ParseResult | AnyNode,
+  exportsToRemove: string[]
 ): void => {
-  const previouslyReferencedIdentifiers = findReferencedIdentifiers(ast);
+  const program = getProgram(ast);
   let exportsFiltered = false;
-  const markedForRemoval = new Set<NodePath<Babel.Node>>();
-  // Keep track of identifiers referenced by removed exports,
-  // e.g. export { localName as exportName }, export default function localName
   const removedExportLocalNames = new Set<string>();
 
-  traverse(ast, {
-    ExportDeclaration(path: NodePath) {
-      // export { foo };
-      // export { bar } from "./module";
-      if (path.node.type === 'ExportNamedDeclaration') {
-        if (path.node.specifiers.length) {
-          //@ts-ignore
-          path.node.specifiers = path.node.specifiers.filter(
-            (
-              specifier:
-                | Babel.ExportSpecifier
-                | Babel.ExportDefaultSpecifier
-                | Babel.ExportNamespaceSpecifier
-            ) => {
-              // Filter out individual specifiers
-              if (
-                specifier.type === 'ExportSpecifier' &&
-                specifier.exported.type === 'Identifier'
-              ) {
-                if (exportsToRemove.includes(specifier.exported.name)) {
-                  exportsFiltered = true;
-                  // Track the local identifier if it's different from the exported name
-                  if (
-                    specifier.local &&
-                    specifier.local.type === 'Identifier' &&
-                    specifier.local.name !== specifier.exported.name
-                  ) {
-                    removedExportLocalNames.add(specifier.local.name);
-                  }
-                  return false;
-                }
-              }
+  for (const statement of [...program.body]) {
+    if (statement.type === 'ExportNamedDeclaration') {
+      if (statement.specifiers?.length) {
+        statement.specifiers = statement.specifiers.filter(
+          (specifier: AnyNode) => {
+            if (specifier.type !== 'ExportSpecifier') {
               return true;
             }
-          );
-          // Remove the entire export statement if all specifiers were removed
-          if (path.node.specifiers.length === 0) {
-            markedForRemoval.add(path);
+            const exportedName = getExportedName(specifier);
+            if (exportedName && exportsToRemove.includes(exportedName)) {
+              exportsFiltered = true;
+              if (specifier.local?.name) {
+                removedExportLocalNames.add(specifier.local.name);
+              }
+              return false;
+            }
+            return true;
           }
+        );
+        if (statement.specifiers.length === 0 && !statement.declaration) {
+          removeFromArray(program.body, statement);
         }
+      }
 
-        // export const foo = ...;
-        // export const [ foo ] = ...;
-        if (path.node.declaration?.type === 'VariableDeclaration') {
-          const declaration = path.node.declaration;
-          declaration.declarations = declaration.declarations.filter(
-            (declaration: Babel.VariableDeclarator) => {
-              // export const foo = ...;
-              // export const foo = ..., bar = ...;
-              if (
-                declaration.id.type === 'Identifier' &&
-                exportsToRemove.includes(declaration.id.name)
-              ) {
-                // Filter out individual variables
+      const declaration = statement.declaration;
+      if (declaration?.type === 'VariableDeclaration') {
+        declaration.declarations = declaration.declarations.filter(
+          (declarator: AnyNode) => {
+            if (declarator.id.type === 'Identifier') {
+              if (exportsToRemove.includes(declarator.id.name)) {
                 exportsFiltered = true;
+                removedExportLocalNames.add(declarator.id.name);
                 return false;
               }
-
-              // export const [ foo ] = ...;
-              // export const { foo } = ...;
-              if (
-                declaration.id.type === 'ArrayPattern' ||
-                declaration.id.type === 'ObjectPattern'
-              ) {
-                // NOTE: These exports cannot be safely removed, so instead we
-                // validate them to ensure that any exports that are intended to
-                // be removed are not present
-                validateDestructuredExports(declaration.id, exportsToRemove);
-              }
-
               return true;
             }
-          );
-          // Remove the entire export statement if all variables were removed
-          if (declaration.declarations.length === 0) {
-            markedForRemoval.add(path);
-          }
-        }
 
-        // export function foo() {}
-        if (path.node.declaration?.type === 'FunctionDeclaration') {
-          const id = path.node.declaration.id;
-          if (id && exportsToRemove.includes(id.name)) {
-            markedForRemoval.add(path);
+            validateDestructuredExports(declarator.id, exportsToRemove);
+            return true;
           }
-        }
-
-        // export class Foo() {}
-        if (path.node.declaration?.type === 'ClassDeclaration') {
-          const id = path.node.declaration.id;
-          if (id && exportsToRemove.includes(id.name)) {
-            markedForRemoval.add(path);
-          }
+        );
+        if (declaration.declarations.length === 0) {
+          removeFromArray(program.body, statement);
         }
       }
 
-      // export default ...;
       if (
-        path.node.type === 'ExportDefaultDeclaration' &&
-        exportsToRemove.includes('default')
+        (declaration?.type === 'FunctionDeclaration' ||
+          declaration?.type === 'ClassDeclaration') &&
+        declaration.id?.name &&
+        exportsToRemove.includes(declaration.id.name)
       ) {
-        markedForRemoval.add(path);
-        // Track the identifier being exported as default
-        if (path.node.declaration) {
-          if (path.node.declaration.type === 'Identifier') {
-            removedExportLocalNames.add(path.node.declaration.name);
-          } else if (
-            (path.node.declaration.type === 'FunctionDeclaration' ||
-              path.node.declaration.type === 'ClassDeclaration') &&
-            path.node.declaration.id
-          ) {
-            removedExportLocalNames.add(path.node.declaration.id.name);
-          }
-        }
+        removedExportLocalNames.add(declaration.id.name);
+        removeFromArray(program.body, statement);
       }
-    },
-  });
-
-  // Remove top-level property assignments to removed exports. Handles
-  // `clientLoader.hydrate = true`, `Component.displayName = "..."`, etc.
-  traverse(ast, {
-    ExpressionStatement(path: NodePath<Babel.ExpressionStatement>) {
-      // Only handle top-level statements
-      if (!path.parentPath.isProgram()) {
-        return;
-      }
-
-      const expr = path.node.expression;
-      if (expr.type !== 'AssignmentExpression') {
-        return;
-      }
-
-      const left = expr.left;
-      if (
-        left.type === 'MemberExpression' &&
-        left.object.type === 'Identifier' &&
-        (exportsToRemove.includes(left.object.name) ||
-          removedExportLocalNames.has(left.object.name))
-      ) {
-        markedForRemoval.add(path as any);
-      }
-    },
-  });
-
-  if (markedForRemoval.size > 0 || exportsFiltered) {
-    for (const path of markedForRemoval) {
-      path.remove();
     }
 
-    // Run dead code elimination on any newly unreferenced identifiers
-    deadCodeElimination(ast, previouslyReferencedIdentifiers);
+    if (
+      statement.type === 'ExportDefaultDeclaration' &&
+      exportsToRemove.includes('default')
+    ) {
+      const declaration = statement.declaration;
+      if (declaration?.type === 'Identifier') {
+        removedExportLocalNames.add(declaration.name);
+      } else if (declaration?.id?.name) {
+        removedExportLocalNames.add(declaration.id.name);
+      }
+      removeFromArray(program.body, statement);
+    }
+  }
+
+  for (const statement of [...program.body]) {
+    const expression =
+      statement.type === 'ExpressionStatement' ? statement.expression : null;
+    const left =
+      expression?.type === 'AssignmentExpression' ? expression.left : null;
+    if (
+      left?.type === 'MemberExpression' &&
+      left.object?.type === 'Identifier' &&
+      (exportsToRemove.includes(left.object.name) ||
+        removedExportLocalNames.has(left.object.name))
+    ) {
+      removeFromArray(program.body, statement);
+    }
+  }
+
+  if (exportsFiltered || removedExportLocalNames.size > 0) {
+    removeUnusedTopLevelDeclarations(program);
   }
 };
 
-export const removeUnusedImports = (ast: ParseResult<Babel.File>): void => {
-  let scopeCrawled = false;
-  traverse(ast, {
-    Program(path: NodePath<Babel.Program>) {
-      if (!scopeCrawled) {
-        path.scope.crawl();
-        scopeCrawled = true;
-      }
-    },
-    ImportDeclaration(path: NodePath<Babel.ImportDeclaration>) {
-      if (path.node.specifiers.length === 0) {
-        return;
-      }
-
-      const specifierPaths = path.get('specifiers') as NodePath<
-        | Babel.ImportSpecifier
-        | Babel.ImportDefaultSpecifier
-        | Babel.ImportNamespaceSpecifier
-      >[];
-
-      for (const specifierPath of specifierPaths) {
-        const local = specifierPath.node.local;
-        const binding = local ? path.scope.getBinding(local.name) : null;
-        if (!binding || !binding.referenced) {
-          specifierPath.remove();
+export const removeUnusedImports = (ast: ParseResult | AnyNode): void => {
+  const program = getProgram(ast);
+  const referenced = collectReferencedNames(program);
+  for (const statement of [...program.body]) {
+    if (statement.type !== 'ImportDeclaration') {
+      continue;
+    }
+    if ((statement.specifiers ?? []).length === 0) {
+      continue;
+    }
+    statement.specifiers = (statement.specifiers ?? []).filter(
+      (specifier: AnyNode) => {
+        if (specifier.importKind === 'type') {
+          return false;
         }
+        return !specifier.local?.name || referenced.has(specifier.local.name);
       }
-
-      if (path.node.specifiers.length === 0) {
-        path.remove();
-      }
-    },
-  });
+    );
+    if (statement.specifiers.length === 0) {
+      removeFromArray(program.body, statement);
+    }
+  }
 };
 
-export const transformRoute = (ast: ParseResult<Babel.File>): void => {
-  const hocs: Array<[string, Babel.Identifier]> = [];
-  function getHocUid(path: NodePath, hocName: string) {
-    const uid = path.scope.generateUidIdentifier(hocName);
+const identifier = (name: string): AnyNode => ({
+  type: 'Identifier',
+  start: 0,
+  end: 0,
+  name,
+  decorators: [],
+  optional: false,
+  typeAnnotation: null,
+});
+
+const literal = (value: string): AnyNode => ({
+  type: 'Literal',
+  start: 0,
+  end: 0,
+  value,
+  raw: JSON.stringify(value),
+});
+
+const callExpression = (callee: AnyNode, args: AnyNode[]): AnyNode => ({
+  type: 'CallExpression',
+  start: 0,
+  end: 0,
+  callee,
+  arguments: args,
+  optional: false,
+});
+
+const importDeclaration = (
+  specifiers: Array<{ local: string; imported: string }>,
+  source: string
+): AnyNode => ({
+  type: 'ImportDeclaration',
+  start: 0,
+  end: 0,
+  specifiers: specifiers.map(specifier => ({
+    type: 'ImportSpecifier',
+    start: 0,
+    end: 0,
+    imported: identifier(specifier.imported),
+    local: identifier(specifier.local),
+    importKind: 'value',
+  })),
+  source: literal(source),
+  attributes: [],
+  phase: null,
+  importKind: 'value',
+});
+
+const variableDeclaration = (name: string, init: AnyNode): AnyNode => ({
+  type: 'VariableDeclaration',
+  start: 0,
+  end: 0,
+  kind: 'const',
+  declare: false,
+  declarations: [
+    {
+      type: 'VariableDeclarator',
+      start: 0,
+      end: 0,
+      id: identifier(name),
+      init,
+      definite: false,
+    },
+  ],
+});
+
+const collectUsedNames = (program: AnyNode): Set<string> => {
+  const names = new Set<string>();
+  walk(program as any, {
+    Identifier(node: AnyNode) {
+      names.add(node.name);
+    },
+  });
+  return names;
+};
+
+export const transformRoute = (ast: ParseResult | AnyNode): void => {
+  const program = getProgram(ast);
+  const usedNames = collectUsedNames(program);
+  const hocs: Array<[string, string]> = [];
+
+  function getHocUid(hocName: string) {
+    let uid = `_${hocName}`;
+    let index = 2;
+    while (usedNames.has(uid)) {
+      uid = `_${hocName}${index++}`;
+    }
+    usedNames.add(uid);
     hocs.push([hocName, uid]);
-    return uid;
+    return identifier(uid);
   }
 
-  traverse(ast, {
-    ExportDeclaration(path: NodePath) {
-      if (path.isExportDefaultDeclaration()) {
-        const declaration = path.get('declaration');
-        // prettier-ignore
-        const expr =
-              declaration.isExpression() ? declaration.node :
-                  declaration.isFunctionDeclaration() ? toFunctionExpression(declaration.node) :
-                      undefined
-        if (expr) {
-          const uid = getHocUid(path, 'withComponentProps');
-          declaration.replaceWith(t.callExpression(uid, [expr]) as any);
-        }
-        return;
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ExportDefaultDeclaration') {
+      const declaration = statement.declaration;
+      const expr =
+        declaration?.type === 'FunctionDeclaration'
+          ? toFunctionExpression(declaration)
+          : declaration;
+      if (expr && expr.type !== 'ClassDeclaration') {
+        const uid = getHocUid('withComponentProps');
+        statement.declaration = callExpression(uid, [expr]);
       }
+      continue;
+    }
 
-      if (path.isExportNamedDeclaration()) {
-        const decl = path.get('declaration');
-
-        if (decl.isVariableDeclaration()) {
-          // biome-ignore lint/complexity/noForEach: <explanation>
-          decl.get('declarations').forEach((varDeclarator: NodePath) => {
-            const id = varDeclarator.get('id') as any;
-            const init = varDeclarator.get('init') as any;
-            const expr = init.node as any;
-            if (!expr) return;
-            if (!id.isIdentifier()) return;
-            const { name } = id.node;
-            if (!isNamedComponentExport(name)) return;
-
-            const uid = getHocUid(path, `with${name}Props`);
-            init.replaceWith(t.callExpression(uid, [expr]));
-          });
-          return;
+    if (statement.type !== 'ExportNamedDeclaration') {
+      continue;
+    }
+    const declaration = statement.declaration;
+    if (declaration?.type === 'VariableDeclaration') {
+      for (const declarator of declaration.declarations ?? []) {
+        if (
+          declarator.id?.type !== 'Identifier' ||
+          !declarator.init ||
+          !isNamedComponentExport(declarator.id.name)
+        ) {
+          continue;
         }
-
-        if (decl.isFunctionDeclaration()) {
-          const { id } = decl.node;
-          if (!id) return;
-          const { name } = id;
-          if (!isNamedComponentExport(name)) return;
-
-          const uid = getHocUid(path, `with${name}Props`);
-          decl.replaceWith(
-            t.variableDeclaration('const', [
-              t.variableDeclarator(
-                t.identifier(name),
-                t.callExpression(uid, [toFunctionExpression(decl.node)])
-              ),
-            ]) as any
-          );
-        }
+        const uid = getHocUid(`with${declarator.id.name}Props`);
+        declarator.init = callExpression(uid, [declarator.init]);
       }
-    },
-  });
+      continue;
+    }
+
+    if (
+      declaration?.type === 'FunctionDeclaration' &&
+      declaration.id?.name &&
+      isNamedComponentExport(declaration.id.name)
+    ) {
+      const name = declaration.id.name;
+      const uid = getHocUid(`with${name}Props`);
+      statement.declaration = variableDeclaration(
+        name,
+        callExpression(uid, [toFunctionExpression(declaration)])
+      );
+    }
+  }
 
   if (hocs.length > 0) {
-    ast.program.body.unshift(
-      t.importDeclaration(
-        hocs.map(([name, identifier]) =>
-          t.importSpecifier(identifier, t.identifier(name))
-        ),
-        t.stringLiteral('virtual/react-router/with-props')
-      ) as any
+    program.body.unshift(
+      importDeclaration(
+        hocs.map(([name, local]) => ({ imported: name, local })),
+        'virtual/react-router/with-props'
+      )
     );
   }
 };
@@ -456,5 +664,5 @@ export const transformRoute = (ast: ParseResult<Babel.File>): void => {
 function isNamedComponentExport(
   name: string
 ): name is (typeof NAMED_COMPONENT_EXPORTS)[number] {
-  return NAMED_COMPONENT_EXPORTS_SET.has(name);
+  return (NAMED_COMPONENT_EXPORTS as readonly string[]).includes(name);
 }

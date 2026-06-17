@@ -1,266 +1,180 @@
-import { readFile, stat } from 'node:fs/promises';
-import { extname } from 'pathe';
-import * as esbuild from 'esbuild';
-import { init, parse as parseExports } from 'es-module-lexer';
-import { JS_LOADERS } from './constants.js';
-import {
-  detectRouteChunksIfEnabled,
-  type RouteChunkCache,
-  type RouteChunkConfig,
-  type RouteChunkInfo,
-} from './route-chunks.js';
+import { readFile } from 'node:fs/promises';
+import { langFromPath, parse } from 'yuku-parser';
+import { strip } from 'yuku-codegen';
 
-type TransformCacheEntry = {
-  source: string;
-  transformed: Promise<string>;
+type AnyNode = Record<string, any>;
+
+const parseProgram = (code: string, resourcePath?: string) => {
+  const result = parse(code, {
+    sourceType: 'module',
+    lang: resourcePath ? langFromPath(resourcePath) : 'tsx',
+    preserveParens: false,
+  });
+  const errors = result.diagnostics.filter(
+    diagnostic => diagnostic.severity === 'error'
+  );
+  if (errors.length > 0) {
+    throw new Error(errors.map(error => error.message).join('\n'));
+  }
+  return result.program as AnyNode;
 };
 
-export type BundlerRouteAnalysis = {
-  code: string;
-  getExportNames: () => Promise<string[]>;
-  getRouteChunkInfo: (
-    cache: RouteChunkCache | undefined,
-    config: RouteChunkConfig
-  ) => Promise<RouteChunkInfo>;
-};
-
-type BundlerRouteAnalysisCacheEntry = {
-  source: string;
-  analysis: Promise<BundlerRouteAnalysis>;
-};
-
-type RouteModuleAnalysis = {
-  code: string;
-  exports: string[];
-  exportAllModules: string[];
-};
-
-type RouteModuleAnalysisCacheEntry = {
-  mtimeMs: number;
-  size: number;
-  analysis: Promise<RouteModuleAnalysis>;
-};
-
-const transformCache = new Map<string, TransformCacheEntry>();
-const exportInfoCache = new Map<
-  string,
-  Promise<{ exportNames: string[]; exportAllModules: string[] }>
->();
-const bundlerRouteAnalysisCache = new Map<
-  string,
-  BundlerRouteAnalysisCacheEntry
->();
-const routeModuleAnalysisCache = new Map<
-  string,
-  RouteModuleAnalysisCacheEntry
->();
-
-const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
-
-const setBoundedCacheEntry = <Key, Value>(
-  cache: Map<Key, Value>,
-  key: Key,
-  value: Value
-) => {
-  if (!cache.has(key) && cache.size >= MAX_EXPORT_UTILS_CACHE_ENTRIES) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
+const getIdentifierNamesFromPattern = (
+  pattern: AnyNode | null | undefined,
+  names: string[] = []
+): string[] => {
+  if (!pattern) {
+    return names;
+  }
+  if (pattern.type === 'Identifier') {
+    names.push(pattern.name);
+    return names;
+  }
+  if (pattern.type === 'RestElement') {
+    return getIdentifierNamesFromPattern(pattern.argument, names);
+  }
+  if (pattern.type === 'AssignmentPattern') {
+    return getIdentifierNamesFromPattern(pattern.left, names);
+  }
+  if (pattern.type === 'ArrayPattern') {
+    for (const element of pattern.elements ?? []) {
+      getIdentifierNamesFromPattern(element, names);
+    }
+    return names;
+  }
+  if (pattern.type === 'ObjectPattern') {
+    for (const property of pattern.properties ?? []) {
+      if (property.type === 'RestElement') {
+        getIdentifierNamesFromPattern(property.argument, names);
+      } else {
+        getIdentifierNamesFromPattern(property.value, names);
+      }
     }
   }
-  cache.set(key, value);
+  return names;
 };
 
-const cachePromiseOnReject = <T>(
-  promise: Promise<T>,
-  invalidate: () => void
-): Promise<T> =>
-  promise.catch(error => {
-    invalidate();
-    throw error;
-  });
-
-const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
-  const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
-  return JS_LOADERS[ext] ?? 'js';
+const getExportedName = (node: AnyNode): string | null => {
+  if (!node) {
+    return null;
+  }
+  if (node.type === 'Identifier') {
+    return node.name;
+  }
+  if (node.type === 'Literal' || node.type === 'StringLiteral') {
+    return String(node.value);
+  }
+  return null;
 };
 
-const getRouteChunkConfigCacheKey = (config: RouteChunkConfig) =>
-  `${String(config.splitRouteModules ?? false)}\0${config.appDirectory}\0${config.rootRouteFile}`;
+const isTypeOnlyExport = (node: AnyNode): boolean =>
+  node.exportKind === 'type' || node.type === 'TSExportAssignment';
+
+const collectExportNames = (program: AnyNode): string[] => {
+  const exportNames = new Set<string>();
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ExportAllDeclaration') {
+      const exported = getExportedName(statement.exported);
+      if (exported) {
+        exportNames.add(exported);
+      }
+      continue;
+    }
+
+    if (statement.type === 'ExportDefaultDeclaration') {
+      exportNames.add('default');
+      continue;
+    }
+
+    if (statement.type !== 'ExportNamedDeclaration') {
+      continue;
+    }
+    if (isTypeOnlyExport(statement)) {
+      continue;
+    }
+
+    const declaration = statement.declaration;
+    if (declaration) {
+      if (declaration.type === 'VariableDeclaration') {
+        for (const declarator of declaration.declarations ?? []) {
+          for (const name of getIdentifierNamesFromPattern(declarator.id)) {
+            exportNames.add(name);
+          }
+        }
+      } else if (
+        (declaration.type === 'FunctionDeclaration' ||
+          declaration.type === 'ClassDeclaration') &&
+        declaration.id?.name
+      ) {
+        exportNames.add(declaration.id.name);
+      }
+      continue;
+    }
+
+    for (const specifier of statement.specifiers ?? []) {
+      if (specifier.exportKind === 'type') {
+        continue;
+      }
+      const exported = getExportedName(specifier.exported);
+      if (exported) {
+        exportNames.add(exported);
+      }
+    }
+  }
+  return Array.from(exportNames);
+};
+
+const collectExportAllModules = (program: AnyNode): string[] => {
+  const modules: string[] = [];
+  for (const statement of program.body ?? []) {
+    if (statement.type !== 'ExportAllDeclaration') {
+      continue;
+    }
+    if (statement.exported) {
+      continue;
+    }
+    const source = statement.source?.value;
+    if (typeof source === 'string') {
+      modules.push(source);
+    }
+  }
+  return modules;
+};
 
 export const transformToEsm = async (
   code: string,
   resourcePath: string
 ): Promise<string> => {
-  const cached = transformCache.get(resourcePath);
-  if (cached?.source === code) {
-    return cached.transformed;
-  }
-
-  let transformed: Promise<string>;
-  transformed = cachePromiseOnReject(
-    esbuild
-      .transform(code, {
-        jsx: 'automatic',
-        format: 'esm',
-        platform: 'neutral',
-        loader: getEsbuildLoader(resourcePath),
-      })
-      .then(result => result.code),
-    () => {
-      if (transformCache.get(resourcePath)?.transformed === transformed) {
-        transformCache.delete(resourcePath);
-      }
-    }
-  );
-
-  setBoundedCacheEntry(transformCache, resourcePath, {
-    source: code,
-    transformed,
+  const result = parse(code, {
+    sourceType: 'module',
+    lang: langFromPath(resourcePath),
+    preserveParens: false,
   });
-  return transformed;
+  const transformed = strip(result.program, { comments: 'some' });
+  if (transformed.errors.length > 0) {
+    throw new Error(transformed.errors.map(error => error.message).join('\n'));
+  }
+  return transformed.code;
 };
 
 export const getExportNames = async (code: string): Promise<string[]> => {
-  return (await getExportNamesAndExportAll(code)).exportNames;
-};
-
-export const getBundlerRouteAnalysis = async (
-  source: string,
-  resourcePath: string
-): Promise<BundlerRouteAnalysis> => {
-  const cached = bundlerRouteAnalysisCache.get(resourcePath);
-  if (cached?.source === source) {
-    return cached.analysis;
-  }
-
-  const analysis = (async () => {
-    const code = await transformToEsm(source, resourcePath);
-    let exportNames: Promise<string[]> | undefined;
-    const routeChunkInfoCache = new Map<string, Promise<RouteChunkInfo>>();
-
-    return {
-      code,
-      getExportNames: () => {
-        exportNames ??= getExportNames(code);
-        return exportNames;
-      },
-      getRouteChunkInfo: (
-        cache: RouteChunkCache | undefined,
-        config: RouteChunkConfig
-      ) => {
-        const cacheKey = getRouteChunkConfigCacheKey(config);
-        const cachedRouteChunkInfo = routeChunkInfoCache.get(cacheKey);
-        if (cachedRouteChunkInfo) {
-          return cachedRouteChunkInfo;
-        }
-
-        let routeChunkInfo: Promise<RouteChunkInfo>;
-        routeChunkInfo = cachePromiseOnReject(
-          detectRouteChunksIfEnabled(cache, config, resourcePath, code),
-          () => {
-            if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
-              routeChunkInfoCache.delete(cacheKey);
-            }
-          }
-        );
-
-        routeChunkInfoCache.set(cacheKey, routeChunkInfo);
-        return routeChunkInfo;
-      },
-    };
-  })();
-
-  let trackedAnalysis: Promise<BundlerRouteAnalysis>;
-  trackedAnalysis = cachePromiseOnReject(analysis, () => {
-    if (
-      bundlerRouteAnalysisCache.get(resourcePath)?.analysis === trackedAnalysis
-    ) {
-      bundlerRouteAnalysisCache.delete(resourcePath);
-    }
-  });
-
-  setBoundedCacheEntry(bundlerRouteAnalysisCache, resourcePath, {
-    source,
-    analysis: trackedAnalysis,
-  });
-  return trackedAnalysis;
+  return collectExportNames(parseProgram(code));
 };
 
 export const getExportNamesAndExportAll = async (
   code: string
 ): Promise<{ exportNames: string[]; exportAllModules: string[] }> => {
-  const cached = exportInfoCache.get(code);
-  if (cached) {
-    return cached;
-  }
-
-  const exportInfo = (async () => {
-    await init;
-    const [imports, exportSpecifiers] = await parseExports(code);
-    const exportNames = new Set<string>();
-    for (const specifier of exportSpecifiers) {
-      if (specifier.n) {
-        exportNames.add(specifier.n);
-      }
-    }
-    const exportAllModules: string[] = [];
-    for (const entry of imports) {
-      if (!entry.n) {
-        continue;
-      }
-      const statement = code.slice(entry.ss, entry.se);
-      if (/^\s*export\s*\*\s*from\s*['"]/.test(statement)) {
-        exportAllModules.push(entry.n);
-      }
-    }
-    return { exportNames: Array.from(exportNames), exportAllModules };
-  })();
-
-  let trackedExportInfo: Promise<{
-    exportNames: string[];
-    exportAllModules: string[];
-  }>;
-  trackedExportInfo = cachePromiseOnReject(exportInfo, () => {
-    if (exportInfoCache.get(code) === trackedExportInfo) {
-      exportInfoCache.delete(code);
-    }
-  });
-
-  setBoundedCacheEntry(exportInfoCache, code, trackedExportInfo);
-  return trackedExportInfo;
+  const program = parseProgram(code);
+  return {
+    exportNames: collectExportNames(program),
+    exportAllModules: collectExportAllModules(program),
+  };
 };
 
-export const getRouteModuleAnalysis = async (
+export const getRouteModuleExports = async (
   resourcePath: string
-): Promise<RouteModuleAnalysis> => {
-  const stats = await stat(resourcePath);
-  const cached = routeModuleAnalysisCache.get(resourcePath);
-  if (cached?.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
-    return cached.analysis;
-  }
-
-  const analysis = (async () => {
-    const source = await readFile(resourcePath, 'utf8');
-    const code = await transformToEsm(source, resourcePath);
-    const { exportNames, exportAllModules } =
-      await getExportNamesAndExportAll(code);
-    return { code, exports: exportNames, exportAllModules };
-  })();
-
-  let trackedAnalysis: Promise<RouteModuleAnalysis>;
-  trackedAnalysis = cachePromiseOnReject(analysis, () => {
-    if (
-      routeModuleAnalysisCache.get(resourcePath)?.analysis === trackedAnalysis
-    ) {
-      routeModuleAnalysisCache.delete(resourcePath);
-    }
-  });
-
-  setBoundedCacheEntry(routeModuleAnalysisCache, resourcePath, {
-    mtimeMs: stats.mtimeMs,
-    size: stats.size,
-    analysis: trackedAnalysis,
-  });
-  return trackedAnalysis;
+): Promise<string[]> => {
+  const source = await readFile(resourcePath, 'utf8');
+  const code = await transformToEsm(source, resourcePath);
+  return getExportNames(code);
 };
