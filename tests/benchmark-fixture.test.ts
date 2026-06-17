@@ -107,6 +107,81 @@ describe('benchmark fixture generator', () => {
     }
   });
 
+  it('generates deterministic named stress fixture shapes', async () => {
+    const { benchmarkFixtureNames, generateSyntheticFixture } = await import(
+      '../scripts/benchmark/fixture.mjs'
+    );
+    expect(benchmarkFixtureNames).toEqual([
+      'default',
+      'export-heavy',
+      'reexports',
+      'import-fanout',
+      'chunk-saturated',
+    ]);
+
+    const expectations = [
+      {
+        fixture: 'export-heavy',
+        routeFile: 'app/routes/route-0001.tsx',
+        snippets: ['unusedExport0001_31', 'export async function clientLoader'],
+      },
+      {
+        fixture: 'reexports',
+        routeFile: 'app/routes/route-0001.tsx',
+        snippets: [
+          "export * from '../route-reexports/reexport-all-0001'",
+          'app/route-reexports/reexport-0001.ts',
+        ],
+      },
+      {
+        fixture: 'import-fanout',
+        routeFile: 'app/routes/route-0001.tsx',
+        snippets: ["from '../fanout/fanout-15'", 'fanoutValues'],
+      },
+      {
+        fixture: 'chunk-saturated',
+        routeFile: 'app/routes/route-0001.tsx',
+        snippets: ['export async function clientAction', 'HydrateFallback'],
+      },
+    ];
+
+    for (const { fixture, routeFile, snippets } of expectations) {
+      const rootA = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-a-'));
+      const rootB = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-b-'));
+
+      try {
+        const result = await generateSyntheticFixture({
+          root: rootA,
+          routeCount: 4,
+          variant: 'ssr-esm-split',
+          fixture,
+        });
+        await generateSyntheticFixture({
+          root: rootB,
+          routeCount: 4,
+          variant: 'ssr-esm-split',
+          fixture,
+        });
+
+        expect(result.fixture).toBe(fixture);
+        const routeModuleA = readFileSync(join(rootA, routeFile), 'utf8');
+        const routeModuleB = readFileSync(join(rootB, routeFile), 'utf8');
+        expect(routeModuleA).toBe(routeModuleB);
+
+        for (const snippet of snippets) {
+          if (snippet.startsWith('app/')) {
+            expect(existsSync(join(rootA, snippet))).toBe(true);
+          } else {
+            expect(routeModuleA).toContain(snippet);
+          }
+        }
+      } finally {
+        rmSync(rootA, { recursive: true, force: true });
+        rmSync(rootB, { recursive: true, force: true });
+      }
+    }
+  });
+
   it('accepts equals-form CLI options before benchmark selection', () => {
     const result = spawnSync(
       process.execPath,

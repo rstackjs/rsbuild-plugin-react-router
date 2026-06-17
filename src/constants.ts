@@ -65,6 +65,10 @@ export const NAMED_COMPONENT_EXPORTS = [
   'ErrorBoundary',
 ] as const;
 
+export const NAMED_COMPONENT_EXPORTS_SET: ReadonlySet<string> = new Set(
+  NAMED_COMPONENT_EXPORTS
+);
+
 export const SERVER_EXPORTS = {
   loader: 'loader',
   action: 'action',

@@ -7,6 +7,7 @@ import { combineURLs, createRouteId } from './plugin-utils.js';
 import { SERVER_EXPORTS, CLIENT_EXPORTS } from './constants.js';
 import {
   detectRouteChunksIfEnabled,
+  EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME,
   getRouteChunkEntryName,
   validateRouteChunks,
   type RouteChunkCache,
@@ -14,7 +15,6 @@ import {
 } from './route-chunks.js';
 import { getRouteModuleAnalysis } from './export-utils.js';
 
-// Helper functions
 export function configRoutesToRouteManifest(
   appDirectory: string,
   routes: RouteConfigEntry[],
@@ -189,12 +189,7 @@ export async function getReactRouterManifestForDev(
         | 'clientMiddleware'
         | 'HydrateFallback',
         boolean
-      > = {
-        clientAction: false,
-        clientLoader: false,
-        clientMiddleware: false,
-        HydrateFallback: false,
-      };
+      > = { ...EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME };
 
       try {
         const { code, exports: exportNames } =

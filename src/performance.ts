@@ -19,6 +19,8 @@ type EnvironmentTimings = Map<string, MutableOperationTiming>;
 
 const MAX_SLOWEST_ENTRIES = 5;
 
+export const roundMs = (value: number): number => Math.round(value * 10) / 10;
+
 export type ReactRouterPerformanceReport = {
   environment: string;
   compilerLifecycleMs?: number;
@@ -76,8 +78,6 @@ export const createReactRouterPerformanceProfiler = ({
     }
     return timing;
   };
-
-  const roundMs = (value: number) => Math.round(value * 10) / 10;
 
   const computeWallMs = (intervals: OperationInterval[]) => {
     if (intervals.length === 0) {

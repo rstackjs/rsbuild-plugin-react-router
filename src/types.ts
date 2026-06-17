@@ -36,19 +36,6 @@ export type PluginOptions = {
   logPerformance?: boolean;
 };
 
-/**
- * Arguments passed to transform functions
- */
-export type TransformArgs = {
-  code: string;
-  resource: string;
-  resourcePath: string;
-  context?: string | null;
-  environment?: {
-    name: string;
-  };
-};
-
 export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {
   module: string;
   clientActionModule?: string;

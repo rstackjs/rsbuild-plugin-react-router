@@ -6,11 +6,15 @@ import { normalize } from 'pathe';
 import { existsSync } from 'node:fs';
 import type { Babel, NodePath, ParseResult } from './babel.js';
 import { t, traverse } from './babel.js';
-import { NAMED_COMPONENT_EXPORTS, JS_EXTENSIONS } from './constants.js';
+import {
+  NAMED_COMPONENT_EXPORTS,
+  NAMED_COMPONENT_EXPORTS_SET,
+  JS_EXTENSIONS,
+} from './constants.js';
 
 export function validateDestructuredExports(
   id: Babel.ArrayPattern | Babel.ObjectPattern,
-  exportsToRemove: string[]
+  exportsToRemove: readonly string[]
 ): void {
   if (id.type === 'ArrayPattern') {
     for (const element of id.elements) {
@@ -175,7 +179,7 @@ export function generateWithProps() {
 
 export const removeExports = (
   ast: ParseResult<Babel.File>,
-  exportsToRemove: string[]
+  exportsToRemove: readonly string[]
 ): void => {
   const previouslyReferencedIdentifiers = findReferencedIdentifiers(ast);
   let exportsFiltered = false;
@@ -452,5 +456,5 @@ export const transformRoute = (ast: ParseResult<Babel.File>): void => {
 function isNamedComponentExport(
   name: string
 ): name is (typeof NAMED_COMPONENT_EXPORTS)[number] {
-  return (NAMED_COMPONENT_EXPORTS as readonly string[]).includes(name);
+  return NAMED_COMPONENT_EXPORTS_SET.has(name);
 }
