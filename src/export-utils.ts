@@ -8,7 +8,7 @@ const parseProgram = (code: string, resourcePath?: string) => {
   const result = parse(code, {
     sourceType: 'module',
     lang: resourcePath ? langFromPath(resourcePath) : 'tsx',
-    preserveParens: false,
+    preserveParens: true,
   });
   const errors = result.diagnostics.filter(
     diagnostic => diagnostic.severity === 'error'
@@ -148,7 +148,7 @@ export const transformToEsm = async (
   const result = parse(code, {
     sourceType: 'module',
     lang: langFromPath(resourcePath),
-    preserveParens: false,
+    preserveParens: true,
   });
   const transformed = strip(result.program, { comments: 'some' });
   if (transformed.errors.length > 0) {
