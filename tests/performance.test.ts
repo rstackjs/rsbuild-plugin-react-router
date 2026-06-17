@@ -34,6 +34,16 @@ describe('React Router performance profiler', () => {
     expect(report.operations['route:client-entry'].slowest).toHaveLength(2);
     expect(report.operations['manifest:stage'].count).toBe(1);
     expect(report.operations['route:module']).toBeUndefined();
+
+    await profiler.record('web', 'route:client-entry', 'app/routes/c.tsx', async () => {
+      return 'client-entry';
+    });
+    profiler.flush('web');
+
+    expect(logs).toHaveLength(2);
+    const secondReport = JSON.parse(logs[1].replace(/^.*?\{/, '{'));
+    expect(secondReport.operations['route:client-entry'].count).toBe(1);
+    expect(secondReport.operations['manifest:stage']).toBeUndefined();
   });
 
   it('does not evaluate timers or log output when disabled', async () => {

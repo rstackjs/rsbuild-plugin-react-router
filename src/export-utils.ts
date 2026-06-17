@@ -28,14 +28,14 @@ const routeModuleAnalysisCache = new Map<
   RouteModuleAnalysisCacheEntry
 >();
 
-const MAX_MODULE_ANALYSIS_CACHE_ENTRIES = 2048;
+const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
 
 const setBoundedCacheEntry = <Key, Value>(
   cache: Map<Key, Value>,
   key: Key,
   value: Value
 ) => {
-  if (!cache.has(key) && cache.size >= MAX_MODULE_ANALYSIS_CACHE_ENTRIES) {
+  if (!cache.has(key) && cache.size >= MAX_EXPORT_UTILS_CACHE_ENTRIES) {
     const oldestKey = cache.keys().next().value;
     if (oldestKey !== undefined) {
       cache.delete(oldestKey);

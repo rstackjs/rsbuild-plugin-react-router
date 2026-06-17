@@ -2,9 +2,10 @@
 import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
+import { parseArgs as parseCliArgs } from 'node:util';
+import { execa } from 'execa';
 import { generateSyntheticFixture } from './benchmark/fixture.mjs';
 
 const rootDir = process.cwd();
@@ -59,34 +60,37 @@ const profiles = {
 };
 
 const parseArgs = argv => {
-  const args = {
-    profile: 'default',
-    iterations: 5,
-    warmup: 1,
-    format: 'both',
-    out: path.join('.benchmark', 'results', 'baseline'),
-    clean: 'build',
-    filter: null,
-    failFast: false,
-    skipRootBuild: false,
-  };
+  const { values } = parseCliArgs({
+    args: argv,
+    allowPositionals: false,
+    strict: true,
+    options: {
+      profile: { type: 'string', default: 'default' },
+      iterations: { type: 'string', default: '5' },
+      warmup: { type: 'string', default: '1' },
+      format: { type: 'string', default: 'both' },
+      out: {
+        type: 'string',
+        default: path.join('.benchmark', 'results', 'baseline'),
+      },
+      clean: { type: 'string', default: 'build' },
+      filter: { type: 'string' },
+      'fail-fast': { type: 'boolean', default: false },
+      'skip-root-build': { type: 'boolean', default: false },
+    },
+  });
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const [arg, inlineValue] = argv[index].split('=', 2);
-    const next = () => inlineValue ?? argv[++index];
-    if (arg === '--profile') args.profile = next();
-    else if (arg === '--iterations') args.iterations = Number(next());
-    else if (arg === '--warmup') args.warmup = Number(next());
-    else if (arg === '--format') args.format = next();
-    else if (arg === '--out') args.out = next();
-    else if (arg === '--clean') args.clean = next();
-    else if (arg === '--filter') args.filter = next();
-    else if (arg === '--fail-fast') args.failFast = true;
-    else if (arg === '--skip-root-build') args.skipRootBuild = true;
-    else {
-      throw new Error(`Unknown benchmark argument: ${argv[index]}`);
-    }
-  }
+  const args = {
+    profile: values.profile,
+    iterations: Number(values.iterations),
+    warmup: Number(values.warmup),
+    format: values.format,
+    out: values.out,
+    clean: values.clean,
+    filter: values.filter ?? null,
+    failFast: values['fail-fast'],
+    skipRootBuild: values['skip-root-build'],
+  };
 
   if (!profiles[args.profile]) {
     throw new Error(
@@ -129,33 +133,22 @@ const runCommand = async ({
   const childCommand = useTime ? '/usr/bin/time' : command;
   const childArgs = useTime ? ['-v', command, ...args] : args;
 
-  return new Promise((resolve, reject) => {
-    const child = spawn(childCommand, childArgs, {
-      cwd,
-      env: { ...process.env, ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', chunk => {
-      stdout += chunk;
-      process.stdout.write(chunk);
-    });
-    child.stderr.on('data', chunk => {
-      stderr += chunk;
-      process.stderr.write(chunk);
-    });
-    child.on('close', status => {
-      resolve({
-        status,
-        stdout,
-        stderr,
-        wallMs: performance.now() - startedAt,
-      });
-    });
-    child.on('error', reject);
+  const child = execa(childCommand, childArgs, {
+    cwd,
+    env,
+    reject: false,
   });
+
+  child.stdout?.pipe(process.stdout);
+  child.stderr?.pipe(process.stderr);
+
+  const result = await child;
+  return {
+    status: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    wallMs: performance.now() - startedAt,
+  };
 };
 
 const parseTimeStats = stderr => {
@@ -373,11 +366,13 @@ const pnpmVersion = async () => {
 };
 
 const cleanBuildOutputs = async fixtureRoot => {
-  await rm(path.join(fixtureRoot, 'build'), { recursive: true, force: true });
-  await rm(path.join(fixtureRoot, '.react-router'), {
-    recursive: true,
-    force: true,
-  });
+  await Promise.all([
+    rm(path.join(fixtureRoot, 'build'), { recursive: true, force: true }),
+    rm(path.join(fixtureRoot, '.react-router'), {
+      recursive: true,
+      force: true,
+    }),
+  ]);
 };
 
 const main = async () => {

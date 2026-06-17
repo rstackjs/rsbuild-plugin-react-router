@@ -195,13 +195,16 @@ export async function generateSyntheticFixture({
     `export const serverValue = 'server';\n`
   );
 
-  for (let index = 1; index <= routeCount; index += 1) {
-    const profile = routeExportProfiles[index % routeExportProfiles.length];
-    await writeFile(
-      path.join(root, 'app', routeFile(index)),
-      `${createRouteModule(index, profile, { isSpa })}\n`
-    );
-  }
+  await Promise.all(
+    Array.from({ length: routeCount }, (_, routeIndex) => {
+      const index = routeIndex + 1;
+      const profile = routeExportProfiles[index % routeExportProfiles.length];
+      return writeFile(
+        path.join(root, 'app', routeFile(index)),
+        `${createRouteModule(index, profile, { isSpa })}\n`
+      );
+    })
+  );
 
   return {
     root,
