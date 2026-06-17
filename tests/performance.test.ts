@@ -46,6 +46,59 @@ describe('React Router performance profiler', () => {
     expect(secondReport.operations['manifest:stage']).toBeUndefined();
   });
 
+  it('reports interval-union wall time without changing summed timing fields', async () => {
+    const logs: string[] = [];
+    const originalNow = performance.now;
+    let now = 0;
+    let resolveFirst: (value: string) => void = () => {};
+    let resolveSecond: (value: string) => void = () => {};
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+
+    try {
+      performance.now = () => now;
+
+      const first = profiler.record('web', 'route:module', 'app/routes/a.tsx', () => {
+        return new Promise<string>(resolve => {
+          resolveFirst = resolve;
+        });
+      });
+
+      now = 10;
+      const second = profiler.record('web', 'route:module', 'app/routes/b.tsx', () => {
+        return new Promise<string>(resolve => {
+          resolveSecond = resolve;
+        });
+      });
+
+      now = 25;
+      resolveSecond('second');
+      await second;
+
+      now = 40;
+      resolveFirst('first');
+      await first;
+
+      profiler.flush('web');
+
+      const report = JSON.parse(logs[0].replace(/^.*?\{/, '{'));
+      expect(report.operations['route:module']).toMatchObject({
+        count: 2,
+        totalMs: 55,
+        wallMs: 40,
+        maxMs: 40,
+      });
+      expect(report.operations['route:module'].slowest).toEqual([
+        { durationMs: 40, resource: 'app/routes/a.tsx' },
+        { durationMs: 15, resource: 'app/routes/b.tsx' },
+      ]);
+    } finally {
+      performance.now = originalNow;
+    }
+  });
+
   it('does not evaluate timers or log output when disabled', async () => {
     const logs: string[] = [];
     const originalNow = performance.now;

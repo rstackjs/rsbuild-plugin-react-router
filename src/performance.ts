@@ -1,6 +1,7 @@
 type OperationTiming = {
   count: number;
   totalMs: number;
+  wallMs: number;
   maxMs: number;
   slowest: Array<{
     durationMs: number;
@@ -8,7 +9,15 @@ type OperationTiming = {
   }>;
 };
 
-type EnvironmentTimings = Map<string, OperationTiming>;
+type OperationInterval = { startMs: number; endMs: number };
+
+type MutableOperationTiming = Omit<OperationTiming, 'wallMs'> & {
+  intervals: OperationInterval[];
+};
+
+type EnvironmentTimings = Map<string, MutableOperationTiming>;
+
+const MAX_SLOWEST_ENTRIES = 5;
 
 export type ReactRouterPerformanceReport = {
   environment: string;
@@ -47,7 +56,7 @@ export const createReactRouterPerformanceProfiler = ({
   const getOperationTiming = (
     environment: string,
     operation: string
-  ): OperationTiming => {
+  ): MutableOperationTiming => {
     let timings = timingsByEnvironment.get(environment);
     if (!timings) {
       timings = new Map();
@@ -61,36 +70,68 @@ export const createReactRouterPerformanceProfiler = ({
         totalMs: 0,
         maxMs: 0,
         slowest: [],
+        intervals: [],
       };
       timings.set(operation, timing);
     }
     return timing;
   };
 
+  const roundMs = (value: number) => Math.round(value * 10) / 10;
+
+  const computeWallMs = (intervals: OperationInterval[]) => {
+    if (intervals.length === 0) {
+      return 0;
+    }
+
+    const sortedIntervals = [...intervals].sort(
+      (a, b) => a.startMs - b.startMs || a.endMs - b.endMs
+    );
+    let mergedStart = sortedIntervals[0].startMs;
+    let mergedEnd = sortedIntervals[0].endMs;
+    let wallMs = 0;
+
+    for (const interval of sortedIntervals.slice(1)) {
+      if (interval.startMs <= mergedEnd) {
+        mergedEnd = Math.max(mergedEnd, interval.endMs);
+        continue;
+      }
+
+      wallMs += mergedEnd - mergedStart;
+      mergedStart = interval.startMs;
+      mergedEnd = interval.endMs;
+    }
+
+    wallMs += mergedEnd - mergedStart;
+    return roundMs(wallMs);
+  };
+
+  const toOperationTiming = (
+    timing: MutableOperationTiming
+  ): OperationTiming => ({
+    count: timing.count,
+    totalMs: timing.totalMs,
+    wallMs: computeWallMs(timing.intervals),
+    maxMs: timing.maxMs,
+    slowest: timing.slowest,
+  });
+
   const recordDuration = (
     environment: string,
     operation: string,
     resource: string,
-    durationMs: number
+    startMs: number,
+    endMs: number
   ) => {
-    const roundedDuration = Math.round(durationMs * 10) / 10;
+    const roundedDuration = roundMs(endMs - startMs);
     const timing = getOperationTiming(environment, operation);
     timing.count += 1;
-    timing.totalMs = Math.round((timing.totalMs + roundedDuration) * 10) / 10;
+    timing.totalMs = roundMs(timing.totalMs + roundedDuration);
     timing.maxMs = Math.max(timing.maxMs, roundedDuration);
+    timing.intervals.push({ startMs, endMs });
     timing.slowest.push({ durationMs: roundedDuration, resource });
-    for (let index = timing.slowest.length - 1; index > 0; index -= 1) {
-      if (
-        timing.slowest[index].durationMs <= timing.slowest[index - 1].durationMs
-      ) {
-        break;
-      }
-      [timing.slowest[index - 1], timing.slowest[index]] = [
-        timing.slowest[index],
-        timing.slowest[index - 1],
-      ];
-    }
-    if (timing.slowest.length > 5) {
+    timing.slowest.sort((a, b) => b.durationMs - a.durationMs);
+    if (timing.slowest.length > MAX_SLOWEST_ENTRIES) {
       timing.slowest.pop();
     }
   };
@@ -101,23 +142,16 @@ export const createReactRouterPerformanceProfiler = ({
         return callback();
       }
 
+      const resolvedEnvironment = environment ?? 'unknown';
       const start = performance.now();
       try {
         return callback().finally(() => {
-          recordDuration(
-            environment ?? 'unknown',
-            operation,
-            resource,
-            performance.now() - start
-          );
+          const end = performance.now();
+          recordDuration(resolvedEnvironment, operation, resource, start, end);
         });
       } catch (error) {
-        recordDuration(
-          environment ?? 'unknown',
-          operation,
-          resource,
-          performance.now() - start
-        );
+        const end = performance.now();
+        recordDuration(resolvedEnvironment, operation, resource, start, end);
         return Promise.reject(error);
       }
     },
@@ -126,16 +160,13 @@ export const createReactRouterPerformanceProfiler = ({
         return callback();
       }
 
+      const resolvedEnvironment = environment ?? 'unknown';
       const start = performance.now();
       try {
         return callback();
       } finally {
-        recordDuration(
-          environment ?? 'unknown',
-          operation,
-          resource,
-          performance.now() - start
-        );
+        const end = performance.now();
+        recordDuration(resolvedEnvironment, operation, resource, start, end);
       }
     },
     flush(environment, details = {}) {
@@ -148,7 +179,12 @@ export const createReactRouterPerformanceProfiler = ({
         return;
       }
 
-      const operations = Object.fromEntries(timings.entries());
+      const operations = Object.fromEntries(
+        [...timings.entries()].map(([operation, timing]) => [
+          operation,
+          toOperationTiming(timing),
+        ])
+      );
       const report: ReactRouterPerformanceReport = {
         environment,
         ...details,

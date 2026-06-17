@@ -3,10 +3,30 @@ import { extname } from 'pathe';
 import * as esbuild from 'esbuild';
 import { init, parse as parseExports } from 'es-module-lexer';
 import { JS_LOADERS } from './constants.js';
+import {
+  detectRouteChunksIfEnabled,
+  type RouteChunkCache,
+  type RouteChunkConfig,
+  type RouteChunkInfo,
+} from './route-chunks.js';
 
 type TransformCacheEntry = {
   source: string;
   transformed: Promise<string>;
+};
+
+export type BundlerRouteAnalysis = {
+  code: string;
+  getExportNames: () => Promise<string[]>;
+  getRouteChunkInfo: (
+    cache: RouteChunkCache | undefined,
+    config: RouteChunkConfig
+  ) => Promise<RouteChunkInfo>;
+};
+
+type BundlerRouteAnalysisCacheEntry = {
+  source: string;
+  analysis: Promise<BundlerRouteAnalysis>;
 };
 
 type RouteModuleAnalysis = {
@@ -23,6 +43,10 @@ type RouteModuleAnalysisCacheEntry = {
 
 const transformCache = new Map<string, TransformCacheEntry>();
 const exportNamesCache = new Map<string, Promise<string[]>>();
+const bundlerRouteAnalysisCache = new Map<
+  string,
+  BundlerRouteAnalysisCacheEntry
+>();
 const routeModuleAnalysisCache = new Map<
   string,
   RouteModuleAnalysisCacheEntry
@@ -48,6 +72,9 @@ const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
   const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
   return JS_LOADERS[ext] ?? 'js';
 };
+
+const getRouteChunkConfigCacheKey = (config: RouteChunkConfig) =>
+  `${String(config.splitRouteModules ?? false)}\0${config.appDirectory}\0${config.rootRouteFile}`;
 
 export const transformToEsm = async (
   code: string,
@@ -101,6 +128,66 @@ export const getExportNames = async (code: string): Promise<string[]> => {
 
   setBoundedCacheEntry(exportNamesCache, code, exports);
   return exports;
+};
+
+export const getBundlerRouteAnalysis = async (
+  source: string,
+  resourcePath: string
+): Promise<BundlerRouteAnalysis> => {
+  const cached = bundlerRouteAnalysisCache.get(resourcePath);
+  if (cached?.source === source) {
+    return cached.analysis;
+  }
+
+  const analysis = (async () => {
+    const code = await transformToEsm(source, resourcePath);
+    let exportNames: Promise<string[]> | undefined;
+    const routeChunkInfoCache = new Map<string, Promise<RouteChunkInfo>>();
+
+    return {
+      code,
+      getExportNames: () => {
+        exportNames ??= getExportNames(code);
+        return exportNames;
+      },
+      getRouteChunkInfo: (
+        cache: RouteChunkCache | undefined,
+        config: RouteChunkConfig
+      ) => {
+        const cacheKey = getRouteChunkConfigCacheKey(config);
+        const cachedRouteChunkInfo = routeChunkInfoCache.get(cacheKey);
+        if (cachedRouteChunkInfo) {
+          return cachedRouteChunkInfo;
+        }
+
+        const routeChunkInfo = detectRouteChunksIfEnabled(
+          cache,
+          config,
+          resourcePath,
+          code
+        ).catch(error => {
+          if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
+            routeChunkInfoCache.delete(cacheKey);
+          }
+          throw error;
+        });
+
+        routeChunkInfoCache.set(cacheKey, routeChunkInfo);
+        return routeChunkInfo;
+      },
+    };
+  })().catch(error => {
+    if (bundlerRouteAnalysisCache.get(resourcePath)?.analysis === analysis) {
+      bundlerRouteAnalysisCache.delete(resourcePath);
+    }
+    throw error;
+  });
+
+  setBoundedCacheEntry(bundlerRouteAnalysisCache, resourcePath, {
+    source,
+    analysis,
+  });
+  return analysis;
 };
 
 export const getExportNamesAndExportAll = async (

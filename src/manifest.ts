@@ -63,6 +63,32 @@ type RouteChunkManifestOptions = {
   cache?: RouteChunkCache;
 };
 
+export type ReactRouterManifestForDev = {
+  version: string;
+  url: string;
+  hmr?: {
+    runtime: string;
+  };
+  entry: {
+    module: string;
+    imports: string[];
+    css: string[];
+  };
+  sri?: Record<string, string>;
+  routes: Record<string, RouteManifestItem>;
+};
+
+export type RouteManifestModuleExports = Record<string, readonly string[]>;
+
+const routeManifestModuleExports = new WeakMap<
+  ReactRouterManifestForDev,
+  RouteManifestModuleExports
+>();
+
+export const getRouteManifestModuleExports = (
+  manifest: ReactRouterManifestForDev
+): RouteManifestModuleExports => routeManifestModuleExports.get(manifest) ?? {};
+
 const DEFAULT_MANIFEST_DIR = 'static/js';
 
 const getManifestDirFromEntryAsset = (entryModulePath?: string): string => {
@@ -115,20 +141,7 @@ export async function getReactRouterManifestForDev(
   context: string,
   assetPrefix = '/',
   routeChunkOptions?: RouteChunkManifestOptions
-): Promise<{
-  version: string;
-  url: string;
-  hmr?: {
-    runtime: string;
-  };
-  entry: {
-    module: string;
-    imports: string[];
-    css: string[];
-  };
-  sri?: Record<string, string>;
-  routes: Record<string, RouteManifestItem>;
-}> {
+): Promise<ReactRouterManifestForDev> {
   const result: Record<string, RouteManifestItem> = {};
   const splitRouteModules = routeChunkOptions?.splitRouteModules ?? false;
   const enforceSplitRouteModules = splitRouteModules === 'enforce';
@@ -169,6 +182,7 @@ export async function getReactRouterManifestForDev(
       // Read and analyze the route file to check for exports
       const routeFilePath = resolve(context, route.file);
       let exports = new Set<string>();
+      let routeModuleExports: string[] = [];
       let hasRouteChunkByExportName: Record<
         | 'clientAction'
         | 'clientLoader'
@@ -183,20 +197,18 @@ export async function getReactRouterManifestForDev(
       };
 
       try {
-        const {
-          source,
-          code,
-          exports: exportNames,
-        } = await getRouteModuleAnalysis(routeFilePath);
+        const { code, exports: exportNames } =
+          await getRouteModuleAnalysis(routeFilePath);
         if (
           !isBuild &&
           cssAssets.length === 0 &&
-          /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/.test(source)
+          /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/.test(code)
         ) {
           cssAssets = [
             `${DEFAULT_MANIFEST_DIR.replace('/js', '/css')}/${routeEntryName}.css`,
           ];
         }
+        routeModuleExports = exportNames;
         exports = new Set(exportNames);
 
         if (isBuild && routeChunkConfig) {
@@ -280,12 +292,15 @@ export async function getReactRouterManifestForDev(
           imports: jsAssets.map(asset => combineURLs(assetPrefix, asset)),
           css: cssAssets.map(asset => combineURLs(assetPrefix, asset)),
         },
+        routeModuleExports,
       ] as const;
     })
   );
 
-  for (const [key, routeManifestItem] of manifestEntries) {
+  const routeModuleExportsByRouteId: RouteManifestModuleExports = {};
+  for (const [key, routeManifestItem, routeModuleExports] of manifestEntries) {
     result[key] = routeManifestItem;
+    routeModuleExportsByRouteId[key] = routeModuleExports;
   }
 
   const entryAssets = getAssetsForChunk('entry.client');
@@ -307,7 +322,7 @@ export async function getReactRouterManifestForDev(
     entryModulePath: entryJsAssets[0],
   });
 
-  return {
+  const manifest = {
     version,
     url: combineURLs(assetPrefix, manifestPath),
     hmr: undefined,
@@ -315,4 +330,7 @@ export async function getReactRouterManifestForDev(
     sri: undefined,
     routes: result,
   };
+
+  routeManifestModuleExports.set(manifest, routeModuleExportsByRouteId);
+  return manifest;
 }

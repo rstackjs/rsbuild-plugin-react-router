@@ -44,18 +44,18 @@ import {
 } from './react-router-config.js';
 import {
   getReactRouterManifestForDev,
+  getRouteManifestModuleExports,
   configRoutesToRouteManifest,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
 import { createRequestHandler, matchRoutes } from 'react-router';
 import {
+  getBundlerRouteAnalysis,
   getExportNames,
   getExportNamesAndExportAll,
-  getRouteModuleExports,
   transformToEsm,
 } from './export-utils.js';
 import {
-  detectRouteChunksIfEnabled,
   getRouteChunkEntryName,
   getRouteChunkIfEnabled,
   getRouteChunkModuleId,
@@ -755,11 +755,7 @@ export const pluginReactRouter = (
         );
       }
 
-      const routeExports: Record<string, string[]> = {};
-      for (const route of Object.values(routes)) {
-        const filePath = resolve(appDirectory, route.file);
-        routeExports[route.id] = await getRouteModuleExports(filePath);
-      }
+      const routeExports = getRouteManifestModuleExports(manifest);
 
       const errors: string[] = [];
       for (const [routeId, route] of Object.entries(manifest.routes)) {
@@ -1374,17 +1370,18 @@ export const pluginReactRouter = (
           'route:client-entry',
           args.resource,
           async () => {
-            const code = await transformToEsm(args.code, args.resourcePath);
-            const exportNames = await getExportNames(code);
+            const analysis = await getBundlerRouteAnalysis(
+              args.code,
+              args.resourcePath
+            );
+            const exportNames = await analysis.getExportNames();
             const isServer = args.environment?.name === 'node';
             const chunkedExports =
               !isServer && isBuild && splitRouteModules
                 ? (
-                    await detectRouteChunksIfEnabled(
+                    await analysis.getRouteChunkInfo(
                       routeChunkCache,
-                      routeChunkConfig,
-                      args.resourcePath,
-                      code
+                      routeChunkConfig
                     )
                   ).chunkedExports
                 : [];
@@ -1501,22 +1498,20 @@ export const pluginReactRouter = (
               return { code: args.code, map: null };
             }
 
-            const transformed = await transformToEsm(
+            const analysis = await getBundlerRouteAnalysis(
               args.code,
               args.resourcePath
             );
             const { hasRouteChunks, chunkedExports } =
-              await detectRouteChunksIfEnabled(
+              await analysis.getRouteChunkInfo(
                 routeChunkCache,
-                routeChunkConfig,
-                args.resourcePath,
-                transformed
+                routeChunkConfig
               );
             if (!hasRouteChunks) {
               return { code: args.code, map: null };
             }
 
-            const sourceExports = await getExportNames(transformed);
+            const sourceExports = await analysis.getExportNames();
             const chunkedExportSet = new Set<string>(chunkedExports);
             const isMainChunkExport = (name: string) =>
               !chunkedExportSet.has(name);
@@ -1745,8 +1740,16 @@ export const pluginReactRouter = (
           args.resource,
           async () => {
             let code: string;
+            let exportNames: string[] | undefined;
             try {
-              code = await transformToEsm(args.code, args.resourcePath);
+              const analysis = await getBundlerRouteAnalysis(
+                args.code,
+                args.resourcePath
+              );
+              code = analysis.code;
+              if (args.environment.name === 'web' && !ssr && isSpaMode) {
+                exportNames = await analysis.getExportNames();
+              }
             } catch (error) {
               console.error(args.resourcePath);
               throw error;
@@ -1759,11 +1762,12 @@ export const pluginReactRouter = (
             // Important: `es-module-lexer` can't parse TS/TSX directly, so we scan
             // the ESBuild-transformed JS output.
             if (args.environment.name === 'web' && !ssr && isSpaMode) {
-              const exportNames = await getExportNames(code);
+              const resolvedExportNames =
+                exportNames ?? (await getExportNames(code));
 
               const isRootRoute = args.resourcePath === rootRoutePath;
 
-              const invalidServerOnly = exportNames.filter(exp => {
+              const invalidServerOnly = resolvedExportNames.filter(exp => {
                 if (isRootRoute && exp === 'loader') return false;
                 return (
                   SERVER_ONLY_ROUTE_EXPORTS as readonly string[]
@@ -1779,7 +1783,10 @@ export const pluginReactRouter = (
                 );
               }
 
-              if (!isRootRoute && exportNames.includes('HydrateFallback')) {
+              if (
+                !isRootRoute &&
+                resolvedExportNames.includes('HydrateFallback')
+              ) {
                 throw new Error(
                   `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
                     `\`${relative(process.cwd(), args.resourcePath)}\`. ` +

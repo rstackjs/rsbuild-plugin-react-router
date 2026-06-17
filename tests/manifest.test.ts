@@ -1,5 +1,45 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
-import { configRoutesToRouteManifest } from '../src/manifest';
+import {
+  configRoutesToRouteManifest,
+  getReactRouterManifestForDev,
+  getRouteManifestModuleExports,
+} from '../src/manifest';
+
+const createTempApp = (routeCode: string) => {
+  const root = mkdtempSync(join(tmpdir(), 'rr-manifest-'));
+  const appDir = join(root, 'app');
+  const routesDir = join(appDir, 'routes');
+  mkdirSync(routesDir, { recursive: true });
+
+  writeFileSync(
+    join(appDir, 'root.tsx'),
+    `export default function Root() { return null; }`
+  );
+  writeFileSync(join(routesDir, 'page.tsx'), routeCode);
+
+  return { root, appDir };
+};
+
+const routes = {
+  root: { id: 'root', file: 'root.tsx', path: '' },
+  'routes/page': {
+    id: 'routes/page',
+    parentId: 'root',
+    file: 'routes/page.tsx',
+    path: 'page',
+  },
+};
+
+const clientStats = {
+  assetsByChunkName: {
+    'entry.client': ['static/js/entry.client.js'],
+    root: ['static/js/root.js'],
+    'routes/page': ['static/js/routes/page.js'],
+  },
+};
 
 describe('manifest', () => {
   describe('configRoutesToRouteManifest', () => {
@@ -171,5 +211,74 @@ describe('manifest', () => {
 
     expect(item).toHaveProperty('hasClientMiddleware', false);
     expect(item).toHaveProperty('hasDefaultExport', false);
+  });
+
+  it('keeps route export names available without serializing internal analysis fields', async () => {
+    const { root, appDir } = createTempApp(`
+      export function headers() { return {}; }
+      export async function action() { return null; }
+      export async function loader() { return null; }
+      export default function Page() { return null; }
+    `);
+    try {
+      const manifest = await getReactRouterManifestForDev(
+        routes,
+        {},
+        clientStats,
+        appDir,
+        '/',
+        {
+          isBuild: true,
+          rootRouteFile: 'root.tsx',
+          splitRouteModules: false,
+        }
+      );
+
+      expect(manifest.routes['routes/page']).toMatchObject({
+        hasAction: true,
+        hasLoader: true,
+      });
+      expect(getRouteManifestModuleExports(manifest)['routes/page']).toEqual(
+        expect.arrayContaining(['headers', 'action', 'loader', 'default'])
+      );
+      expect(Object.keys(manifest).sort()).toEqual([
+        'entry',
+        'hmr',
+        'routes',
+        'sri',
+        'url',
+        'version',
+      ]);
+      expect(JSON.stringify(manifest)).not.toContain('headers');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves dev css fallback when route analysis uses transformed code', async () => {
+    const { root, appDir } = createTempApp(`
+      import './page.css';
+      export default function Page() { return <h1>Page</h1>; }
+    `);
+    try {
+      const manifest = await getReactRouterManifestForDev(
+        routes,
+        {},
+        clientStats,
+        appDir,
+        '/',
+        {
+          isBuild: false,
+          rootRouteFile: 'root.tsx',
+          splitRouteModules: false,
+        }
+      );
+
+      expect(manifest.routes['routes/page'].css).toEqual([
+        '/static/css/routes/page.css',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
