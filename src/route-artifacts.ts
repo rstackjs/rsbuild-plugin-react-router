@@ -73,11 +73,6 @@ export const buildRouteClientEntryCode = ({
   };
 };
 
-/**
- * Generate the route entry reexport module from bundler-transformed route
- * analysis. Web builds omit server-only exports and split-route chunk exports;
- * node entries keep server-only exports and never exclude chunked exports.
- */
 export const createRouteClientEntryArtifact = async ({
   code,
   resourcePath,
@@ -105,11 +100,6 @@ export const createRouteClientEntryArtifact = async ({
   };
 };
 
-/**
- * Generate a split route chunk artifact from route source transformed to ESM.
- * This mirrors the route:chunk transform behavior, including disabled-split
- * empty chunks, invalid chunk-name validation, and enforce-mode main validation.
- */
 export const createRouteChunkArtifact = async ({
   code,
   resource,
