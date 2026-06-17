@@ -16,7 +16,7 @@ export const parse = (
   const result = yukuParse(code, {
     sourceType: options.sourceType ?? 'module',
     lang: options.lang ?? 'tsx',
-    preserveParens: false,
+    preserveParens: true,
   });
   const errors = result.diagnostics.filter(
     diagnostic => diagnostic.severity === 'error'
