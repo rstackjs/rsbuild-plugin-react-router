@@ -1516,9 +1516,7 @@ export const pluginReactRouter = (
               return { code: args.code, map: null };
             }
 
-            const sourceExports = await getRouteModuleExports(
-              args.resourcePath
-            );
+            const sourceExports = await getExportNames(transformed);
             const chunkedExportSet = new Set<string>(chunkedExports);
             const isMainChunkExport = (name: string) =>
               !chunkedExportSet.has(name);

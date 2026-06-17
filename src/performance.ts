@@ -96,21 +96,29 @@ export const createReactRouterPerformanceProfiler = ({
   };
 
   return {
-    async record(environment, operation, resource, callback) {
+    record(environment, operation, resource, callback) {
       if (!enabled) {
         return callback();
       }
 
       const start = performance.now();
       try {
-        return await callback();
-      } finally {
+        return callback().finally(() => {
+          recordDuration(
+            environment ?? 'unknown',
+            operation,
+            resource,
+            performance.now() - start
+          );
+        });
+      } catch (error) {
         recordDuration(
           environment ?? 'unknown',
           operation,
           resource,
           performance.now() - start
         );
+        return Promise.reject(error);
       }
     },
     recordSync(environment, operation, resource, callback) {
@@ -147,6 +155,7 @@ export const createReactRouterPerformanceProfiler = ({
         operations,
       };
       log(`[react-router:performance] ${JSON.stringify(report)}`);
+      timingsByEnvironment.delete(environment);
     },
   };
 };
