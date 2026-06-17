@@ -30,7 +30,6 @@ type BundlerRouteAnalysisCacheEntry = {
 };
 
 type RouteModuleAnalysis = {
-  source: string;
   code: string;
   exports: string[];
   exportAllModules: string[];
@@ -72,6 +71,15 @@ const setBoundedCacheEntry = <Key, Value>(
   cache.set(key, value);
 };
 
+const cachePromiseOnReject = <T>(
+  promise: Promise<T>,
+  invalidate: () => void
+): Promise<T> =>
+  promise.catch(error => {
+    invalidate();
+    throw error;
+  });
+
 const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
   const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
   return JS_LOADERS[ext] ?? 'js';
@@ -89,20 +97,22 @@ export const transformToEsm = async (
     return cached.transformed;
   }
 
-  const transformed = esbuild
-    .transform(code, {
-      jsx: 'automatic',
-      format: 'esm',
-      platform: 'neutral',
-      loader: getEsbuildLoader(resourcePath),
-    })
-    .then(result => result.code)
-    .catch(error => {
+  let transformed: Promise<string>;
+  transformed = cachePromiseOnReject(
+    esbuild
+      .transform(code, {
+        jsx: 'automatic',
+        format: 'esm',
+        platform: 'neutral',
+        loader: getEsbuildLoader(resourcePath),
+      })
+      .then(result => result.code),
+    () => {
       if (transformCache.get(resourcePath)?.transformed === transformed) {
         transformCache.delete(resourcePath);
       }
-      throw error;
-    });
+    }
+  );
 
   setBoundedCacheEntry(transformCache, resourcePath, {
     source: code,
@@ -145,34 +155,36 @@ export const getBundlerRouteAnalysis = async (
           return cachedRouteChunkInfo;
         }
 
-        const routeChunkInfo = detectRouteChunksIfEnabled(
-          cache,
-          config,
-          resourcePath,
-          code
-        ).catch(error => {
-          if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
-            routeChunkInfoCache.delete(cacheKey);
+        let routeChunkInfo: Promise<RouteChunkInfo>;
+        routeChunkInfo = cachePromiseOnReject(
+          detectRouteChunksIfEnabled(cache, config, resourcePath, code),
+          () => {
+            if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
+              routeChunkInfoCache.delete(cacheKey);
+            }
           }
-          throw error;
-        });
+        );
 
         routeChunkInfoCache.set(cacheKey, routeChunkInfo);
         return routeChunkInfo;
       },
     };
-  })().catch(error => {
-    if (bundlerRouteAnalysisCache.get(resourcePath)?.analysis === analysis) {
+  })();
+
+  let trackedAnalysis: Promise<BundlerRouteAnalysis>;
+  trackedAnalysis = cachePromiseOnReject(analysis, () => {
+    if (
+      bundlerRouteAnalysisCache.get(resourcePath)?.analysis === trackedAnalysis
+    ) {
       bundlerRouteAnalysisCache.delete(resourcePath);
     }
-    throw error;
   });
 
   setBoundedCacheEntry(bundlerRouteAnalysisCache, resourcePath, {
     source,
-    analysis,
+    analysis: trackedAnalysis,
   });
-  return analysis;
+  return trackedAnalysis;
 };
 
 export const getExportNamesAndExportAll = async (
@@ -203,15 +215,20 @@ export const getExportNamesAndExportAll = async (
       }
     }
     return { exportNames: Array.from(exportNames), exportAllModules };
-  })().catch(error => {
-    if (exportInfoCache.get(code) === exportInfo) {
+  })();
+
+  let trackedExportInfo: Promise<{
+    exportNames: string[];
+    exportAllModules: string[];
+  }>;
+  trackedExportInfo = cachePromiseOnReject(exportInfo, () => {
+    if (exportInfoCache.get(code) === trackedExportInfo) {
       exportInfoCache.delete(code);
     }
-    throw error;
   });
 
-  setBoundedCacheEntry(exportInfoCache, code, exportInfo);
-  return exportInfo;
+  setBoundedCacheEntry(exportInfoCache, code, trackedExportInfo);
+  return trackedExportInfo;
 };
 
 export const getRouteModuleAnalysis = async (
@@ -228,24 +245,22 @@ export const getRouteModuleAnalysis = async (
     const code = await transformToEsm(source, resourcePath);
     const { exportNames, exportAllModules } =
       await getExportNamesAndExportAll(code);
-    return { source, code, exports: exportNames, exportAllModules };
-  })().catch(error => {
-    if (routeModuleAnalysisCache.get(resourcePath)?.analysis === analysis) {
+    return { code, exports: exportNames, exportAllModules };
+  })();
+
+  let trackedAnalysis: Promise<RouteModuleAnalysis>;
+  trackedAnalysis = cachePromiseOnReject(analysis, () => {
+    if (
+      routeModuleAnalysisCache.get(resourcePath)?.analysis === trackedAnalysis
+    ) {
       routeModuleAnalysisCache.delete(resourcePath);
     }
-    throw error;
   });
 
   setBoundedCacheEntry(routeModuleAnalysisCache, resourcePath, {
     mtimeMs: stats.mtimeMs,
     size: stats.size,
-    analysis,
+    analysis: trackedAnalysis,
   });
-  return analysis;
-};
-
-export const getRouteModuleExports = async (
-  resourcePath: string
-): Promise<string[]> => {
-  return (await getRouteModuleAnalysis(resourcePath)).exports;
+  return trackedAnalysis;
 };

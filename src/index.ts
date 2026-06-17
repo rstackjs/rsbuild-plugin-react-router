@@ -5,15 +5,14 @@ import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import type { RsbuildPlugin, Rspack } from '@rsbuild/core';
+import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
 import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
-import { RspackVirtualModulePlugin } from 'rspack-plugin-virtual-module';
+
 import { generate, parse } from './babel.js';
 import {
   BUILD_CLIENT_ROUTE_QUERY_STRING,
-  CLIENT_ROUTE_EXPORTS_SET,
   JS_EXTENSIONS,
   PLUGIN_NAME,
   SERVER_ONLY_ROUTE_EXPORTS,
@@ -52,21 +51,21 @@ import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js'
 import { createRequestHandler, matchRoutes } from 'react-router';
 import {
   getBundlerRouteAnalysis,
-  getExportNames,
   getExportNamesAndExportAll,
   getRouteModuleAnalysis,
   transformToEsm,
 } from './export-utils.js';
 import {
   getRouteChunkEntryName,
-  getRouteChunkIfEnabled,
   getRouteChunkModuleId,
-  getRouteChunkNameFromModuleId,
   routeChunkExportNames,
-  validateRouteChunks,
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
+import {
+  createRouteChunkArtifact,
+  createRouteClientEntryArtifact,
+} from './route-artifacts.js';
 import { validateRouteConfig } from './route-config.js';
 import {
   getBuildManifest,
@@ -75,7 +74,11 @@ import {
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
-import { createReactRouterPerformanceProfiler } from './performance.js';
+import {
+  createReactRouterPerformanceProfiler,
+  roundMs,
+} from './performance.js';
+import { mapVirtualModules } from './virtual-modules.js';
 
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 
@@ -396,7 +399,6 @@ export const pluginReactRouter = (
 
     const isBuild = api.context.action === 'build';
     const splitRouteModules = future?.v8_splitRouteModules ?? false;
-    const enforceSplitRouteModules = splitRouteModules === 'enforce';
     const routeChunkConfig: RouteChunkConfig = {
       splitRouteModules,
       appDirectory,
@@ -481,8 +483,7 @@ export const pluginReactRouter = (
       }
       if (logPerformance) {
         performanceProfiler.flush(environment.name, {
-          compilerLifecycleMs:
-            Math.round((performance.now() - setupStartMs) * 10) / 10,
+          compilerLifecycleMs: roundMs(performance.now() - setupStartMs),
         });
       }
     });
@@ -1006,10 +1007,10 @@ export const pluginReactRouter = (
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
 
-    // Create virtual modules for React Router
-    const vmodTempDir = `rspack-virtual-module-${process.pid}-${Math.random()
-      .toString(16)
-      .slice(2)}`;
+    // Create virtual modules for React Router. Rspack's built-in
+    // VirtualModulesPlugin registers resolvable file paths, so keep public
+    // requests as bare `virtual/react-router/*` ids and seed matching
+    // `node_modules/virtual/react-router/*.js` virtual files.
     const createVirtualModulePlugin = (publicPath: string) => {
       const bundleVirtualModules = Object.fromEntries(
         Object.entries(routesByServerBundleId).map(
@@ -1044,8 +1045,8 @@ export const pluginReactRouter = (
           ])
       );
 
-      return new RspackVirtualModulePlugin(
-        {
+      return new rspack.experiments.VirtualModulesPlugin(
+        mapVirtualModules({
           'virtual/react-router/browser-manifest': 'export default {};',
           'virtual/react-router/server-manifest': 'export default {};',
           'virtual/react-router/server-build': generateServerBuild(routes, {
@@ -1064,8 +1065,7 @@ export const pluginReactRouter = (
           ...bundleVirtualModules,
           ...bundleManifestModules,
           'virtual/react-router/with-props': generateWithProps(),
-        },
-        vmodTempDir
+        })
       );
     };
 
@@ -1175,42 +1175,35 @@ export const pluginReactRouter = (
           // Always include node environment, even for SPA mode (`ssr:false`),
           // because React Router still needs a server build to prerender the
           // root route into a hydratable `index.html` at build time.
-          ...(true
-            ? {
-                node: {
-                  source: {
-                    entry: nodeEntries,
-                  },
-                  output: {
-                    distPath: {
-                      root: resolve(buildDirectory, 'server'),
-                    },
-                    target: config.environments?.node?.output?.target || 'node',
-                    filename: {
-                      js: '[name].js',
-                    },
-                  },
-                  tools: {
-                    rspack: {
-                      target: options.federation ? 'async-node' : 'node',
-                      externals: nodeExternals,
-                      dependencies: ['web'],
-                      externalsType: resolvedServerOutput,
-                      output: {
-                        chunkFormat: resolvedServerOutput,
-                        chunkLoading: nodeChunkLoading,
-                        workerChunkLoading: nodeChunkLoading,
-                        wasmLoading: 'fetch',
-                        module: resolvedServerOutput === 'module',
-                      },
-                      // optimization: {
-                      //     runtimeChunk: 'single',
-                      // },
-                    },
-                  },
+          node: {
+            source: {
+              entry: nodeEntries,
+            },
+            output: {
+              distPath: {
+                root: resolve(buildDirectory, 'server'),
+              },
+              target: config.environments?.node?.output?.target || 'node',
+              filename: {
+                js: '[name].js',
+              },
+            },
+            tools: {
+              rspack: {
+                target: options.federation ? 'async-node' : 'node',
+                externals: nodeExternals,
+                dependencies: ['web'],
+                externalsType: resolvedServerOutput,
+                output: {
+                  chunkFormat: resolvedServerOutput,
+                  chunkLoading: nodeChunkLoading,
+                  workerChunkLoading: nodeChunkLoading,
+                  wasmLoading: 'fetch',
+                  module: resolvedServerOutput === 'module',
                 },
-              }
-            : {}),
+              },
+            },
+          },
         },
       });
     });
@@ -1372,37 +1365,14 @@ export const pluginReactRouter = (
           'route:client-entry',
           args.resource,
           async () => {
-            const analysis = await getBundlerRouteAnalysis(
-              args.code,
-              args.resourcePath
-            );
-            const exportNames = await analysis.getExportNames();
-            const isServer = args.environment?.name === 'node';
-            const chunkedExports =
-              !isServer && isBuild && splitRouteModules
-                ? (
-                    await analysis.getRouteChunkInfo(
-                      routeChunkCache,
-                      routeChunkConfig
-                    )
-                  ).chunkedExports
-                : [];
-            const chunkedExportSet = new Set<string>(chunkedExports);
-            const reexports = exportNames.filter(exp => {
-              if (chunkedExportSet.has(exp)) {
-                return false;
-              }
-              return (
-                CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
-                (isServer && SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp))
-              );
+            return createRouteClientEntryArtifact({
+              code: args.code,
+              resourcePath: args.resourcePath,
+              environmentName: args.environment?.name,
+              isBuild,
+              routeChunkCache,
+              routeChunkConfig,
             });
-            const target = `${args.resourcePath}?react-router-route`;
-            return {
-              code: `export { ${reexports.join(', ')} } from ${JSON.stringify(
-                target
-              )};`,
-            };
           }
         )
     );
@@ -1418,54 +1388,14 @@ export const pluginReactRouter = (
           'route:chunk',
           args.resource,
           async () => {
-            if (args.environment?.name !== 'web') {
-              return { code: args.code, map: null };
-            }
-            const preventEmptyChunkSnippet = (reason: string) =>
-              `Math.random()<0&&console.log(${JSON.stringify(reason)});`;
-
-            if (!isBuild || !splitRouteModules) {
-              return {
-                code: preventEmptyChunkSnippet('Split route modules disabled'),
-                map: null,
-              };
-            }
-
-            const chunkName = getRouteChunkNameFromModuleId(args.resource);
-            if (!chunkName) {
-              throw new Error(`Invalid route chunk name in "${args.resource}"`);
-            }
-
-            const transformed = await transformToEsm(
-              args.code,
-              args.resourcePath
-            );
-            const chunk = await getRouteChunkIfEnabled(
+            return createRouteChunkArtifact({
+              code: args.code,
+              resource: args.resource,
+              resourcePath: args.resourcePath,
+              isBuild,
               routeChunkCache,
               routeChunkConfig,
-              args.resourcePath,
-              chunkName,
-              transformed
-            );
-
-            if (enforceSplitRouteModules && chunkName === 'main' && chunk) {
-              const exportNames = await getExportNames(chunk);
-              validateRouteChunks({
-                config: routeChunkConfig,
-                id: args.resourcePath,
-                valid: {
-                  clientAction: !exportNames.includes('clientAction'),
-                  clientLoader: !exportNames.includes('clientLoader'),
-                  clientMiddleware: !exportNames.includes('clientMiddleware'),
-                  HydrateFallback: !exportNames.includes('HydrateFallback'),
-                },
-              });
-            }
-
-            return {
-              code: chunk ?? preventEmptyChunkSnippet(`No ${chunkName} chunk`),
-              map: null,
-            };
+            });
           }
         )
     );
@@ -1481,9 +1411,6 @@ export const pluginReactRouter = (
           'route:split-exports',
           args.resource,
           async () => {
-            if (args.environment?.name !== 'web') {
-              return { code: args.code, map: null };
-            }
             if (!isBuild || !splitRouteModules) {
               return { code: args.code, map: null };
             }
@@ -1556,10 +1483,6 @@ export const pluginReactRouter = (
           'module:server-only-guard',
           args.resource,
           async () => {
-            if (args.environment?.name !== 'web') {
-              return { code: args.code, map: null };
-            }
-
             const relativePath = relative(process.cwd(), args.resourcePath);
             throw new Error(
               `[${PLUGIN_NAME}] Server-only module referenced by client: ${relativePath}`
@@ -1579,10 +1502,6 @@ export const pluginReactRouter = (
           'module:client-only-stub',
           args.resource,
           async () => {
-            if (args.environment?.name !== 'node') {
-              return { code: args.code, map: null };
-            }
-
             const code = await transformToEsm(args.code, args.resourcePath);
             const { exportNames: directExportNames, exportAllModules } =
               await getExportNamesAndExportAll(code);
@@ -1741,58 +1660,51 @@ export const pluginReactRouter = (
           args.resource,
           async () => {
             let code: string;
-            let exportNames: string[] | undefined;
             try {
               const analysis = await getBundlerRouteAnalysis(
                 args.code,
                 args.resourcePath
               );
               code = analysis.code;
+
+              // Match React Router Vite behavior:
+              // In SPA mode, server-only route exports are invalid (except root `loader`),
+              // and `HydrateFallback` is only allowed on the root route.
               if (args.environment.name === 'web' && !ssr && isSpaMode) {
-                exportNames = await analysis.getExportNames();
+                const resolvedExportNames = await analysis.getExportNames();
+                const isRootRoute = args.resourcePath === rootRoutePath;
+
+                const invalidServerOnly = resolvedExportNames.filter(exp => {
+                  if (isRootRoute && exp === 'loader') return false;
+                  return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
+                });
+
+                if (invalidServerOnly.length > 0) {
+                  const list = invalidServerOnly
+                    .map(e => `\`${e}\``)
+                    .join(', ');
+                  throw new Error(
+                    `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
+                      `\`${relative(process.cwd(), args.resourcePath)}\`: ${list}. ` +
+                      `See https://reactrouter.com/how-to/spa for more information.`
+                  );
+                }
+
+                if (
+                  !isRootRoute &&
+                  resolvedExportNames.includes('HydrateFallback')
+                ) {
+                  throw new Error(
+                    `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
+                      `\`${relative(process.cwd(), args.resourcePath)}\`. ` +
+                      `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
+                      `See https://reactrouter.com/how-to/spa for more information.`
+                  );
+                }
               }
             } catch (error) {
               console.error(args.resourcePath);
               throw error;
-            }
-
-            // Match React Router Vite behavior:
-            // In SPA mode, server-only route exports are invalid (except root `loader`),
-            // and `HydrateFallback` is only allowed on the root route.
-            //
-            // Important: `es-module-lexer` can't parse TS/TSX directly, so we scan
-            // the ESBuild-transformed JS output.
-            if (args.environment.name === 'web' && !ssr && isSpaMode) {
-              const resolvedExportNames =
-                exportNames ?? (await getExportNames(code));
-
-              const isRootRoute = args.resourcePath === rootRoutePath;
-
-              const invalidServerOnly = resolvedExportNames.filter(exp => {
-                if (isRootRoute && exp === 'loader') return false;
-                return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
-              });
-
-              if (invalidServerOnly.length > 0) {
-                const list = invalidServerOnly.map(e => `\`${e}\``).join(', ');
-                throw new Error(
-                  `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
-                    `\`${relative(process.cwd(), args.resourcePath)}\`: ${list}. ` +
-                    `See https://reactrouter.com/how-to/spa for more information.`
-                );
-              }
-
-              if (
-                !isRootRoute &&
-                resolvedExportNames.includes('HydrateFallback')
-              ) {
-                throw new Error(
-                  `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
-                    `\`${relative(process.cwd(), args.resourcePath)}\`. ` +
-                    `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
-                    `See https://reactrouter.com/how-to/spa for more information.`
-                );
-              }
             }
 
             const defaultExportMatch = code.match(
@@ -1812,10 +1724,7 @@ export const pluginReactRouter = (
 
             const ast = parse(code, { sourceType: 'module' });
             if (args.environment.name === 'web') {
-              const mutableServerOnlyRouteExports = [
-                ...SERVER_ONLY_ROUTE_EXPORTS,
-              ];
-              removeExports(ast, mutableServerOnlyRouteExports);
+              removeExports(ast, SERVER_ONLY_ROUTE_EXPORTS);
             }
             transformRoute(ast);
             if (args.environment.name === 'web') {

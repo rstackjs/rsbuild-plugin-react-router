@@ -91,7 +91,7 @@ rstest.mock('@scripts/test-helper', () => ({
       tools: {
         rspack: {
           plugins: [
-            { constructor: { name: 'RspackVirtualModulePlugin' } },
+            { constructor: { name: 'VirtualModulesPlugin' } },
           ],
         },
       },

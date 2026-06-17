@@ -55,6 +55,13 @@ export const routeChunkNames: RouteChunkName[] = [
   ...routeChunkExportNames,
 ];
 
+const createRouteChunkExportMap = (
+  getValue: (exportName: RouteChunkExportName) => boolean
+): Record<RouteChunkExportName, boolean> =>
+  Object.fromEntries(
+    routeChunkExportNames.map(exportName => [exportName, getValue(exportName)])
+  ) as Record<RouteChunkExportName, boolean>;
+
 const routeChunkQueryStringPrefix = '?route-chunk=';
 
 const routeChunkQueryStrings: Record<RouteChunkName, string> = {
@@ -624,12 +631,9 @@ const cloneVariableExportForKeys = (
 const detectRouteChunksFromAnalysis = (
   analysis: RouteChunkAnalysis
 ): RouteChunkInfo => {
-  const hasRouteChunkByExportName = Object.fromEntries(
-    routeChunkExportNames.map(exportName => [
-      exportName,
-      analysis.chunkableExports.has(exportName),
-    ])
-  ) as Record<RouteChunkExportName, boolean>;
+  const hasRouteChunkByExportName = createRouteChunkExportMap(exportName =>
+    analysis.chunkableExports.has(exportName)
+  );
   const chunkedExports = routeChunkExportNames.filter(
     exportName => hasRouteChunkByExportName[exportName]
   );
@@ -903,6 +907,20 @@ const normalizeRelativeFilePath = (file: string, appDirectory: string) => {
 const isRootRouteModuleId = (config: RouteChunkConfig, id: string) =>
   normalizeRelativeFilePath(id, config.appDirectory) === config.rootRouteFile;
 
+export const EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME: Record<
+  RouteChunkExportName,
+  boolean
+> = createRouteChunkExportMap(() => false);
+
+export const buildEnforceChunkValidity = (
+  exportNames: readonly string[]
+): Record<RouteChunkExportName, boolean> => {
+  const exportNameSet = new Set(exportNames);
+  return createRouteChunkExportMap(
+    exportName => !exportNameSet.has(exportName)
+  );
+};
+
 export const detectRouteChunksIfEnabled: (
   cache: RouteChunkCache | undefined,
   config: RouteChunkConfig,
@@ -917,12 +935,7 @@ export const detectRouteChunksIfEnabled: (
   const noRouteChunks = (): RouteChunkInfo => ({
     chunkedExports: [] as RouteChunkExportName[],
     hasRouteChunks: false,
-    hasRouteChunkByExportName: {
-      clientAction: false,
-      clientLoader: false,
-      clientMiddleware: false,
-      HydrateFallback: false,
-    } as Record<RouteChunkExportName, boolean>,
+    hasRouteChunkByExportName: { ...EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME },
   });
 
   if (!config.splitRouteModules) {

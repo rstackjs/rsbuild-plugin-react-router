@@ -1,6 +1,8 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
+import { rspack } from '@rsbuild/core';
 import { pluginReactRouter } from '../src';
+import { getVirtualModuleFilePath } from '../src/virtual-modules';
 
 describe('pluginReactRouter', () => {
   describe('basic configuration', () => {
@@ -85,10 +87,55 @@ describe('pluginReactRouter', () => {
 
       const plugins = config.tools?.rspack?.plugins || [];
       const virtualModulePlugin = plugins.find(
-        (p) => p.constructor.name === 'RspackVirtualModulePlugin'
+        (p: any) => p.constructor.name === 'VirtualModulesPlugin'
       );
 
       expect(virtualModulePlugin).toBeDefined();
+
+      const compiler = {
+        context: '/virtual/project',
+        hooks: {
+          afterEnvironment: {
+            tap: (_name: string, handler: () => void) => handler(),
+          },
+        },
+      } as any;
+      virtualModulePlugin.apply(compiler);
+
+      const virtualFiles =
+        rspack.experiments.VirtualModulesPlugin.__internal__take_virtual_files(
+          compiler
+        );
+      const virtualFilePaths = virtualFiles?.map(file => file.path) || [];
+
+      expect(virtualFilePaths).toContain(
+        '/virtual/project/node_modules/virtual/react-router/browser-manifest.js'
+      );
+      expect(virtualFilePaths).toContain(
+        '/virtual/project/node_modules/virtual/react-router/server-build.js'
+      );
+      expect(virtualFilePaths).toContain(
+        '/virtual/project/node_modules/virtual/react-router/with-props.js'
+      );
+      expect(virtualFilePaths).not.toContain(
+        '/virtual/project/virtual/react-router/browser-manifest'
+      );
+    });
+
+    it('should map bare React Router virtual module ids to resolvable files', () => {
+      expect(
+        getVirtualModuleFilePath('virtual/react-router/browser-manifest')
+      ).toBe('node_modules/virtual/react-router/browser-manifest.js');
+      expect(
+        getVirtualModuleFilePath('virtual/react-router/server-build-edge')
+      ).toBe('node_modules/virtual/react-router/server-build-edge.js');
+
+      expect(() =>
+        getVirtualModuleFilePath('virtual/react-router/../server-build')
+      ).toThrow('Invalid virtual module id');
+      expect(() =>
+        getVirtualModuleFilePath('virtual/other/server-build')
+      ).toThrow('Virtual module id must start');
     });
   });
 
