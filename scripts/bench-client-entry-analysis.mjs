@@ -343,7 +343,7 @@ const main = async () => {
           environment,
           cacheMode: args.cache,
           splitRouteModules,
-          routeChunkCache: args.cache === 'cold' ? new Map() : routeChunkCache,
+          routeChunkCache: args.cache === 'cold' ? undefined : routeChunkCache,
           routeChunkConfig,
           internals,
         });

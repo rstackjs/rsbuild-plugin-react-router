@@ -10,15 +10,15 @@ const routeExportProfiles = [
   'client-server-imports',
 ];
 
-const stressFixtureNames = new Set([
+export const benchmarkFixtureNames = [
   'default',
   'export-heavy',
   'reexports',
   'import-fanout',
   'chunk-saturated',
-]);
+];
 
-export const benchmarkFixtureNames = [...stressFixtureNames];
+const stressFixtureNames = new Set(benchmarkFixtureNames);
 
 export const padRoute = number => String(number).padStart(4, '0');
 
@@ -334,7 +334,7 @@ export async function generateSyntheticFixture({
 }) {
   if (!stressFixtureNames.has(fixture)) {
     throw new Error(
-      `Unknown benchmark fixture "${fixture}". Use ${[...stressFixtureNames].join(', ')}.`
+      `Unknown benchmark fixture "${fixture}". Use ${benchmarkFixtureNames.join(', ')}.`
     );
   }
 

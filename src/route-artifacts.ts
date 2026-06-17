@@ -9,6 +9,7 @@ import {
 } from './export-utils.js';
 import {
   buildEnforceChunkValidity,
+  emptyRouteChunkSnippet,
   getRouteChunkIfEnabled,
   getRouteChunkNameFromModuleId,
   validateRouteChunks,
@@ -21,11 +22,11 @@ export type RouteClientEntryArtifactOptions = {
   resourcePath: string;
   environmentName?: string;
   isBuild: boolean;
-  routeChunkCache: RouteChunkCache | undefined;
+  routeChunkCache?: RouteChunkCache;
   routeChunkConfig: RouteChunkConfig;
 };
 
-export type RouteClientEntryArtifact = {
+type RouteClientEntryArtifact = {
   code: string;
 };
 
@@ -34,17 +35,14 @@ export type RouteChunkArtifactOptions = {
   resource: string;
   resourcePath: string;
   isBuild: boolean;
-  routeChunkCache: RouteChunkCache | undefined;
+  routeChunkCache?: RouteChunkCache;
   routeChunkConfig: RouteChunkConfig;
 };
 
-export type RouteChunkArtifact = {
+type RouteChunkArtifact = {
   code: string;
   map: null;
 };
-
-const preventEmptyChunkSnippet = (reason: string) =>
-  `Math.random()<0&&console.log(${JSON.stringify(reason)});`;
 
 export const buildRouteClientEntryCode = ({
   exportNames,
@@ -57,9 +55,10 @@ export const buildRouteClientEntryCode = ({
   isServer: boolean;
   resourcePath: string;
 }): { code: string; reexports: string[] } => {
-  const chunkedExportSet = new Set<string>(chunkedExports);
+  const chunkedExportSet =
+    chunkedExports.length > 0 ? new Set<string>(chunkedExports) : undefined;
   const reexports = exportNames.filter(exp => {
-    if (chunkedExportSet.has(exp)) {
+    if (chunkedExportSet?.has(exp)) {
       return false;
     }
     return (
@@ -122,7 +121,7 @@ export const createRouteChunkArtifact = async ({
   const splitRouteModules = routeChunkConfig.splitRouteModules;
   if (!isBuild || !splitRouteModules) {
     return {
-      code: preventEmptyChunkSnippet('Split route modules disabled'),
+      code: emptyRouteChunkSnippet('Split route modules disabled'),
       map: null,
     };
   }
@@ -151,7 +150,7 @@ export const createRouteChunkArtifact = async ({
   }
 
   return {
-    code: chunk ?? preventEmptyChunkSnippet(`No ${chunkName} chunk`),
+    code: chunk ?? emptyRouteChunkSnippet(`No ${chunkName} chunk`),
     map: null,
   };
 };

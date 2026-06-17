@@ -6,8 +6,9 @@ import type { Rspack } from '@rsbuild/core';
 import { combineURLs, createRouteId } from './plugin-utils.js';
 import { SERVER_EXPORTS, CLIENT_EXPORTS } from './constants.js';
 import {
+  buildManifestChunkValidity,
+  createEmptyRouteChunkByExportName,
   detectRouteChunksIfEnabled,
-  EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME,
   getRouteChunkEntryName,
   validateRouteChunks,
   type RouteChunkCache,
@@ -183,13 +184,7 @@ export async function getReactRouterManifestForDev(
       const routeFilePath = resolve(context, route.file);
       let exports = new Set<string>();
       let routeModuleExports: string[] = [];
-      let hasRouteChunkByExportName: Record<
-        | 'clientAction'
-        | 'clientLoader'
-        | 'clientMiddleware'
-        | 'HydrateFallback',
-        boolean
-      > = { ...EMPTY_ROUTE_CHUNK_BY_EXPORT_NAME };
+      let hasRouteChunkByExportName = createEmptyRouteChunkByExportName();
 
       try {
         const { code, exports: exportNames } =
@@ -223,24 +218,16 @@ export async function getReactRouterManifestForDev(
       const hasClientAction = exports.has(CLIENT_EXPORTS.clientAction);
       const hasClientLoader = exports.has(CLIENT_EXPORTS.clientLoader);
       const hasClientMiddleware = exports.has(CLIENT_EXPORTS.clientMiddleware);
-      const hasHydrateFallback = exports.has(CLIENT_EXPORTS.HydrateFallback);
       const hasDefaultExport = exports.has('default');
 
       if (isBuild && enforceSplitRouteModules && routeChunkConfig) {
         validateRouteChunks({
           config: routeChunkConfig,
           id: routeFilePath,
-          valid: {
-            clientAction:
-              !hasClientAction || hasRouteChunkByExportName.clientAction,
-            clientLoader:
-              !hasClientLoader || hasRouteChunkByExportName.clientLoader,
-            clientMiddleware:
-              !hasClientMiddleware ||
-              hasRouteChunkByExportName.clientMiddleware,
-            HydrateFallback:
-              !hasHydrateFallback || hasRouteChunkByExportName.HydrateFallback,
-          },
+          valid: buildManifestChunkValidity(
+            exports,
+            hasRouteChunkByExportName
+          ),
         });
       }
 
