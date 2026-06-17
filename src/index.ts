@@ -1688,8 +1688,8 @@ export const pluginReactRouter = (
         // In SPA mode, server-only route exports are invalid (except root `loader`),
         // and `HydrateFallback` is only allowed on the root route.
         //
-        // Important: `es-module-lexer` can't parse TS/TSX directly, so we scan
-        // the ESBuild-transformed JS output.
+        // Scan the Yuku-stripped output so TypeScript-only exports do not
+        // participate in route export validation.
         if (args.environment.name === 'web' && !ssr && isSpaMode) {
           const exportNames = await getExportNames(code);
 
