@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
@@ -53,6 +53,7 @@ import {
   getBundlerRouteAnalysis,
   getExportNames,
   getExportNamesAndExportAll,
+  getRouteModuleAnalysis,
   transformToEsm,
 } from './export-utils.js';
 import {
@@ -1669,12 +1670,10 @@ export const pluginReactRouter = (
                 return;
               }
               visitedModules.add(modulePath);
-              const source = await readFile(modulePath, 'utf8');
-              const moduleCode = await transformToEsm(source, modulePath);
               const {
-                exportNames: moduleExportNames,
+                exports: moduleExportNames,
                 exportAllModules: moduleExportAll,
-              } = await getExportNamesAndExportAll(moduleCode);
+              } = await getRouteModuleAnalysis(modulePath);
               for (const name of moduleExportNames) {
                 if (name !== 'default') {
                   exportNames.add(name);
