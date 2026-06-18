@@ -33,9 +33,9 @@ export type PluginOptions = {
   /**
    * Configure Rsbuild's dev-only lazy compilation behavior.
    *
-   * This forwards to `dev.lazyCompilation` and does not affect production
-   * builds.
-   * @default true
+   * This forwards to `dev.lazyCompilation` when set and does not affect
+   * production builds. Route modules are loaded synchronously during hydration,
+   * so this remains opt-in.
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
 
