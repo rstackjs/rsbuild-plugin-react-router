@@ -5,7 +5,12 @@ import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
+import {
+  rspack,
+  type RsbuildConfig,
+  type RsbuildPlugin,
+  type Rspack,
+} from '@rsbuild/core';
 import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
 import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
@@ -86,6 +91,26 @@ type ModuleFederationPluginLike = {
   name?: string;
   _options?: { experiments?: { asyncStartup?: boolean } };
   options?: { experiments?: { asyncStartup?: boolean } };
+};
+
+type WatchFilesConfig = NonNullable<
+  NonNullable<RsbuildConfig['dev']>['watchFiles']
+>;
+type WatchFileConfig =
+  | Exclude<WatchFilesConfig, readonly unknown[]>
+  | Extract<WatchFilesConfig, readonly unknown[]>[number];
+
+const mergeWatchFiles = (
+  existing: WatchFilesConfig | undefined,
+  additions: WatchFileConfig[]
+): WatchFilesConfig => {
+  if (!existing) {
+    return additions as WatchFilesConfig;
+  }
+  return [
+    ...(Array.isArray(existing) ? existing : [existing]),
+    ...additions,
+  ] as WatchFilesConfig;
 };
 
 const ensureFederationAsyncStartup = (
@@ -411,6 +436,16 @@ export const pluginReactRouter = (
       isBuild,
       cache: routeChunkCache,
     };
+    const routeWatchFiles: WatchFileConfig[] = [
+      {
+        paths: routesPath,
+        type: 'reload-server',
+      },
+      {
+        paths: resolve(appDirectory, 'routes/**/*'),
+        type: 'reload-server',
+      },
+    ];
 
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
@@ -1149,6 +1184,7 @@ export const pluginReactRouter = (
         dev: {
           writeToDisk: true,
           ...lazyCompilation,
+          watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
           // Only add SSR middleware if SSR is enabled and not using a custom server
           // In SPA mode (ssr: false), we just serve static files from the client build
           setupMiddlewares:

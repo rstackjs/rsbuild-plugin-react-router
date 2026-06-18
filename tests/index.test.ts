@@ -18,6 +18,39 @@ describe('pluginReactRouter', () => {
     expect(config.dev.lazyCompilation).toBeUndefined();
   });
 
+  it('should restart the dev server when route entries are added', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: {
+          watchFiles: {
+            paths: 'custom.config.ts',
+            type: 'reload-server',
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.watchFiles).toEqual(
+      expect.arrayContaining([
+        {
+          paths: 'custom.config.ts',
+          type: 'reload-server',
+        },
+        {
+          paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
+          type: 'reload-server',
+        },
+        {
+          paths: expect.stringMatching(/app\/routes\/\*\*\/\*$/),
+          type: 'reload-server',
+        },
+      ])
+    );
+  });
+
   it('should respect server output format', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
