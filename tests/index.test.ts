@@ -44,7 +44,7 @@ describe('pluginReactRouter', () => {
           type: 'reload-server',
         },
         {
-          paths: expect.stringMatching(/app\/routes\/\*\*\/\*$/),
+          paths: expect.stringMatching(/app\/routes$/),
           type: 'reload-server',
         },
       ])

@@ -442,7 +442,7 @@ export const pluginReactRouter = (
         type: 'reload-server',
       },
       {
-        paths: resolve(appDirectory, 'routes/**/*'),
+        paths: resolve(appDirectory, 'routes'),
         type: 'reload-server',
       },
     ];
