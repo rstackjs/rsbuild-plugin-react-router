@@ -57,15 +57,17 @@ export const buildRouteClientEntryCode = ({
 }): { code: string; reexports: string[] } => {
   const chunkedExportSet =
     chunkedExports.length > 0 ? new Set<string>(chunkedExports) : undefined;
-  const reexports = exportNames.filter(exp => {
-    if (chunkedExportSet?.has(exp)) {
-      return false;
-    }
-    return (
-      CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
-      (isServer && SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp))
-    );
-  });
+  const reexports = exportNames
+    .filter(exp => {
+      if (chunkedExportSet?.has(exp)) {
+        return false;
+      }
+      return (
+        CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
+        (isServer && SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp))
+      );
+    })
+    .sort();
   const target = `${resourcePath}?react-router-route`;
   return {
     code: `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`,

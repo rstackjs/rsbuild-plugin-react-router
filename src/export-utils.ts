@@ -1,8 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
-import { extname } from 'pathe';
-import * as esbuild from 'esbuild';
-import { init, parse as parseExports } from 'es-module-lexer';
-import { JS_LOADERS } from './constants.js';
+import { strip } from 'yuku-codegen';
+import { langFromPath, parse } from 'yuku-parser';
 import {
   detectRouteChunksIfEnabled,
   type RouteChunkCache,
@@ -57,6 +55,8 @@ const routeModuleAnalysisCache = new Map<
 
 const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
 
+type AnyNode = Record<string, any>;
+
 const setBoundedCacheEntry = <Key, Value>(
   cache: Map<Key, Value>,
   key: Key,
@@ -80,13 +80,145 @@ const cachePromiseOnReject = <T>(
     throw error;
   });
 
-const getEsbuildLoader = (resourcePath: string): esbuild.Loader => {
-  const ext = extname(resourcePath) as keyof typeof JS_LOADERS;
-  return JS_LOADERS[ext] ?? 'js';
-};
-
 const getRouteChunkConfigCacheKey = (config: RouteChunkConfig) =>
   `${String(config.splitRouteModules ?? false)}\0${config.appDirectory}\0${config.rootRouteFile}`;
+
+const parseProgram = (code: string, resourcePath?: string) => {
+  const result = parse(code, {
+    sourceType: 'module',
+    lang: resourcePath ? langFromPath(resourcePath) : 'tsx',
+    preserveParens: true,
+  });
+  const errors = result.diagnostics.filter(
+    diagnostic => diagnostic.severity === 'error'
+  );
+  if (errors.length > 0) {
+    throw new Error(errors.map(error => error.message).join('\n'));
+  }
+  return result.program as AnyNode;
+};
+
+const getIdentifierNamesFromPattern = (
+  pattern: AnyNode | null | undefined,
+  names: string[] = []
+): string[] => {
+  if (!pattern) {
+    return names;
+  }
+  if (pattern.type === 'Identifier') {
+    names.push(pattern.name);
+    return names;
+  }
+  if (pattern.type === 'RestElement') {
+    return getIdentifierNamesFromPattern(pattern.argument, names);
+  }
+  if (pattern.type === 'AssignmentPattern') {
+    return getIdentifierNamesFromPattern(pattern.left, names);
+  }
+  if (pattern.type === 'ArrayPattern') {
+    for (const element of pattern.elements ?? []) {
+      getIdentifierNamesFromPattern(element, names);
+    }
+    return names;
+  }
+  if (pattern.type === 'ObjectPattern') {
+    for (const property of pattern.properties ?? []) {
+      if (property.type === 'RestElement') {
+        getIdentifierNamesFromPattern(property.argument, names);
+      } else {
+        getIdentifierNamesFromPattern(property.value, names);
+      }
+    }
+  }
+  return names;
+};
+
+const getExportedName = (node: AnyNode): string | null => {
+  if (!node) {
+    return null;
+  }
+  if (node.type === 'Identifier') {
+    return node.name;
+  }
+  if (node.type === 'Literal' || node.type === 'StringLiteral') {
+    return String(node.value);
+  }
+  return null;
+};
+
+const isTypeOnlyExport = (node: AnyNode): boolean =>
+  node.exportKind === 'type' || node.type === 'TSExportAssignment';
+
+const collectExportNames = (program: AnyNode): string[] => {
+  const exportNames = new Set<string>();
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ExportAllDeclaration') {
+      const exported = getExportedName(statement.exported);
+      if (exported) {
+        exportNames.add(exported);
+      }
+      continue;
+    }
+
+    if (statement.type === 'ExportDefaultDeclaration') {
+      exportNames.add('default');
+      continue;
+    }
+
+    if (statement.type !== 'ExportNamedDeclaration') {
+      continue;
+    }
+    if (isTypeOnlyExport(statement)) {
+      continue;
+    }
+
+    const declaration = statement.declaration;
+    if (declaration) {
+      if (declaration.type === 'VariableDeclaration') {
+        for (const declarator of declaration.declarations ?? []) {
+          for (const name of getIdentifierNamesFromPattern(declarator.id)) {
+            exportNames.add(name);
+          }
+        }
+      } else if (
+        (declaration.type === 'FunctionDeclaration' ||
+          declaration.type === 'ClassDeclaration') &&
+        declaration.id?.name
+      ) {
+        exportNames.add(declaration.id.name);
+      }
+      continue;
+    }
+
+    for (const specifier of statement.specifiers ?? []) {
+      if (specifier.exportKind === 'type') {
+        continue;
+      }
+      const exported = getExportedName(specifier.exported);
+      if (exported) {
+        exportNames.add(exported);
+      }
+    }
+  }
+  return Array.from(exportNames);
+};
+
+const collectExportAllModules = (program: AnyNode): string[] => {
+  const modules: string[] = [];
+  for (const statement of program.body ?? []) {
+    if (statement.type !== 'ExportAllDeclaration') {
+      continue;
+    }
+    if (statement.exported) {
+      continue;
+    }
+    const source = statement.source?.value;
+    if (typeof source === 'string') {
+      modules.push(source);
+    }
+  }
+  return modules;
+};
 
 export const transformToEsm = async (
   code: string,
@@ -99,14 +231,24 @@ export const transformToEsm = async (
 
   let transformed: Promise<string>;
   transformed = cachePromiseOnReject(
-    esbuild
-      .transform(code, {
-        jsx: 'automatic',
-        format: 'esm',
-        platform: 'neutral',
-        loader: getEsbuildLoader(resourcePath),
-      })
-      .then(result => result.code),
+    (async () => {
+      const result = parse(code, {
+        sourceType: 'module',
+        lang: langFromPath(resourcePath),
+        preserveParens: true,
+      });
+      const errors = result.diagnostics.filter(
+        diagnostic => diagnostic.severity === 'error'
+      );
+      if (errors.length > 0) {
+        throw new Error(errors.map(error => error.message).join('\n'));
+      }
+      const stripped = strip(result.program, { comments: 'some' });
+      if (stripped.errors.length > 0) {
+        throw new Error(stripped.errors.map(error => error.message).join('\n'));
+      }
+      return stripped.code;
+    })(),
     () => {
       if (transformCache.get(resourcePath)?.transformed === transformed) {
         transformCache.delete(resourcePath);
@@ -196,25 +338,11 @@ export const getExportNamesAndExportAll = async (
   }
 
   const exportInfo = (async () => {
-    await init;
-    const [imports, exportSpecifiers] = await parseExports(code);
-    const exportNames = new Set<string>();
-    for (const specifier of exportSpecifiers) {
-      if (specifier.n) {
-        exportNames.add(specifier.n);
-      }
-    }
-    const exportAllModules: string[] = [];
-    for (const entry of imports) {
-      if (!entry.n) {
-        continue;
-      }
-      const statement = code.slice(entry.ss, entry.se);
-      if (/^\s*export\s*\*\s*from\s*['"]/.test(statement)) {
-        exportAllModules.push(entry.n);
-      }
-    }
-    return { exportNames: Array.from(exportNames), exportAllModules };
+    const program = parseProgram(code);
+    return {
+      exportNames: collectExportNames(program),
+      exportAllModules: collectExportAllModules(program),
+    };
   })();
 
   let trackedExportInfo: Promise<{

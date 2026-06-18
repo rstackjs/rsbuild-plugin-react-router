@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
-import { parse, traverse } from '../src/babel';
+import { generate, parse, traverse } from '../src/babel';
 import { removeExports, removeUnusedImports } from '../src/plugin-utils';
 
 function hasTopLevelAssignment(ast: any, textIncludes: string): boolean {
@@ -72,5 +72,29 @@ describe('removeExports', () => {
     });
 
     expect(hasThemeImport).toBe(false);
+  });
+
+  it('keeps top-level declarations referenced from JSX after removing exports', () => {
+    const code = `
+      export function loader() {
+        return null;
+      }
+
+      function ProgressBar() {
+        return null;
+      }
+
+      export default function Route() {
+        return <ProgressBar />;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    removeExports(ast, ['loader']);
+
+    const result = generate(ast).code;
+
+    expect(result).toContain('function ProgressBar');
+    expect(result).toContain('<ProgressBar');
   });
 });

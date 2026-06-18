@@ -27,8 +27,8 @@ export const pluginCleanTscCache: RsbuildPlugin = {
   setup(api) {
     api.onBeforeBuild(() => {
       const tsbuildinfo = path.join(
-          api.context.rootPath,
-          'tsconfig.tsbuildinfo',
+        api.context.rootPath,
+        'tsconfig.tsbuildinfo'
       );
       if (fs.existsSync(tsbuildinfo)) {
         fs.rmSync(tsbuildinfo);
@@ -42,8 +42,8 @@ export const esmConfig: LibConfig = {
   syntax: 'es2021',
   shims: {
     esm: {
-      __dirname: true
-    }
+      __dirname: true,
+    },
   },
   dts: {
     build: true,
@@ -51,10 +51,6 @@ export const esmConfig: LibConfig = {
   plugins: [pluginCleanTscCache],
   output: {
     minify: nodeMinifyConfig,
-    externals: {
-      '@babel/traverse': 'commonjs @babel/traverse',
-      '@babel/generator': 'commonjs @babel/generator',
-    }
   },
 };
 
