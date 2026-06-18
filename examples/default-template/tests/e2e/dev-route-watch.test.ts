@@ -41,6 +41,25 @@ const readRestartMarker = (): string | null =>
     ? readFileSync(restartMarkerPath, 'utf8')
     : null;
 
+const expectRestartMarkerStable = async (
+  expectedMarker: string | null,
+  quietMs = 750
+) => {
+  const startedAt = Date.now();
+  await expect
+    .poll(
+      () => {
+        const marker = readRestartMarker();
+        if (marker !== expectedMarker) {
+          return `changed:${marker ?? 'missing'}`;
+        }
+        return Date.now() - startedAt >= quietMs ? 'stable' : 'waiting';
+      },
+      { intervals: [100], timeout: quietMs + 1000 }
+    )
+    .toBe('stable');
+};
+
 const waitForRouteText = async (
   page: Page,
   url: string,
@@ -127,6 +146,6 @@ test.describe('dev route watch', () => {
     );
 
     await waitForRouteText(page, addedRouteUrl, editedAddedRouteText);
-    expect(readRestartMarker()).toBe(restartMarkerBefore);
+    await expectRestartMarkerStable(restartMarkerBefore);
   });
 });

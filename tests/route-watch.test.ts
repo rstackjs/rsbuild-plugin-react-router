@@ -9,7 +9,10 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
-import { ensureRestartMarker } from '../src/index';
+import {
+  createRouteManifestSnapshot,
+  ensureRestartMarker,
+} from '../src/route-watch';
 
 describe('route watch restart marker', () => {
   it('creates the restart marker when missing', async () => {
@@ -38,5 +41,55 @@ describe('route watch restart marker', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('route watch topology snapshot', () => {
+  it('changes when route topology changes but route files stay the same', () => {
+    const baseRoutes = {
+      root: { id: 'root', path: '', file: 'root.tsx' },
+      'routes/demo': {
+        id: 'routes/demo',
+        parentId: 'root',
+        path: 'demo',
+        file: 'routes/demo.tsx',
+      },
+    };
+
+    const changedRoutes = {
+      ...baseRoutes,
+      'routes/demo': {
+        ...baseRoutes['routes/demo'],
+        path: 'renamed-demo',
+      },
+    };
+
+    expect(createRouteManifestSnapshot(baseRoutes)).not.toEqual(
+      createRouteManifestSnapshot(changedRoutes)
+    );
+  });
+
+  it('is stable for equivalent route manifests with different object insertion order', () => {
+    const first = createRouteManifestSnapshot({
+      root: { id: 'root', path: '', file: 'root.tsx' },
+      'routes/demo': {
+        id: 'routes/demo',
+        parentId: 'root',
+        path: 'demo',
+        file: 'routes/demo.tsx',
+      },
+    });
+
+    const second = createRouteManifestSnapshot({
+      'routes/demo': {
+        id: 'routes/demo',
+        parentId: 'root',
+        path: 'demo',
+        file: 'routes/demo.tsx',
+      },
+      root: { id: 'root', path: '', file: 'root.tsx' },
+    });
+
+    expect(second).toEqual(first);
   });
 });

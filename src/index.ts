@@ -5,7 +5,7 @@ import {
   watch,
   type FSWatcher,
 } from 'node:fs';
-import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
@@ -77,6 +77,10 @@ import {
   createRouteChunkArtifact,
   createRouteClientEntryArtifact,
 } from './route-artifacts.js';
+import {
+  createRouteManifestSnapshot,
+  ensureRestartMarker,
+} from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
   getBuildManifest,
@@ -121,7 +125,7 @@ const mergeWatchFiles = (
 
 type RouteDirectoryState = {
   directories: Set<string>;
-  routeFiles: Set<string>;
+  routeTopology: Set<string>;
 };
 
 const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
@@ -138,10 +142,10 @@ const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
 
 const readRouteDirectoryState = async ({
   watchDirectory,
-  getRouteFiles,
+  getRouteTopology,
 }: {
   watchDirectory: string;
-  getRouteFiles: () => Promise<Set<string>>;
+  getRouteTopology: () => Promise<Set<string>>;
 }): Promise<RouteDirectoryState> => {
   const directories = new Set<string>();
 
@@ -167,24 +171,24 @@ const readRouteDirectoryState = async ({
   await walkDirectory(watchDirectory);
   return {
     directories,
-    routeFiles: await getRouteFiles(),
+    routeTopology: await getRouteTopology(),
   };
 };
 
-const createRouteFileSetWatcher = async ({
+const createRouteTopologyWatcher = async ({
   watchDirectory,
-  getRouteFiles,
+  getRouteTopology,
   restartMarkerPath,
   onError,
 }: {
   watchDirectory: string;
-  getRouteFiles: () => Promise<Set<string>>;
+  getRouteTopology: () => Promise<Set<string>>;
   restartMarkerPath: string;
   onError: (error: unknown) => void;
 }): Promise<() => void> => {
   let state = await readRouteDirectoryState({
     watchDirectory,
-    getRouteFiles,
+    getRouteTopology,
   });
   let closed = false;
   let rescanTimer: ReturnType<typeof setTimeout> | undefined;
@@ -236,10 +240,10 @@ const createRouteFileSetWatcher = async ({
     try {
       const nextState = await readRouteDirectoryState({
         watchDirectory,
-        getRouteFiles,
+        getRouteTopology,
       });
       syncDirectoryWatchers(nextState.directories);
-      if (!areSetsEqual(state.routeFiles, nextState.routeFiles)) {
+      if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
         state = nextState;
         await touchRestartMarker();
         return;
@@ -277,17 +281,6 @@ const createRouteFileSetWatcher = async ({
     }
     directoryWatchers.clear();
   };
-};
-
-export const ensureRestartMarker = async (
-  restartMarkerPath: string
-): Promise<void> => {
-  await mkdir(dirname(restartMarkerPath), { recursive: true });
-  try {
-    await access(restartMarkerPath);
-  } catch {
-    await writeFile(restartMarkerPath, String(Date.now()));
-  }
 };
 
 const ensureFederationAsyncStartup = (
@@ -579,17 +572,13 @@ export const pluginReactRouter = (
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
-    const getWatchedRouteFiles = async (): Promise<Set<string>> => {
+    const getWatchedRouteTopology = async (): Promise<Set<string>> => {
       const latestRouteConfig = await loadRouteConfig();
       const latestRoutes = {
         root: { path: '', id: 'root', file: rootRouteFile },
         ...configRoutesToRouteManifest(appDirectory, latestRouteConfig),
       };
-      return new Set(
-        Object.values(latestRoutes).map(route =>
-          resolve(appDirectory, route.file)
-        )
-      );
+      return createRouteManifestSnapshot(latestRoutes);
     };
 
     const routes = {
@@ -642,25 +631,25 @@ export const pluginReactRouter = (
         type: 'reload-server',
       },
     ];
-    let closeRouteFileSetWatcher: (() => void) | undefined;
+    let closeRouteTopologyWatcher: (() => void) | undefined;
 
     api.onBeforeStartDevServer(async () => {
       await ensureRestartMarker(routeRestartMarkerPath);
-      closeRouteFileSetWatcher = await createRouteFileSetWatcher({
+      closeRouteTopologyWatcher = await createRouteTopologyWatcher({
         watchDirectory,
-        getRouteFiles: getWatchedRouteFiles,
+        getRouteTopology: getWatchedRouteTopology,
         restartMarkerPath: routeRestartMarkerPath,
         onError: error => {
           api.logger.warn(
-            `[${PLUGIN_NAME}] Failed to watch route file set changes: ${error}`
+            `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
           );
         },
       });
     });
 
     api.onCloseDevServer(() => {
-      closeRouteFileSetWatcher?.();
-      closeRouteFileSetWatcher = undefined;
+      closeRouteTopologyWatcher?.();
+      closeRouteTopologyWatcher = undefined;
     });
 
     type ReactRouterManifest = Awaited<
