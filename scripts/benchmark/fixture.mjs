@@ -229,6 +229,7 @@ const createRsbuildConfig = ({ variant, sourceMap, pluginImportPath }) => {
     '  plugins: [',
     '    pluginReactRouter({',
     ...(ssr ? [`      serverOutput: 'module',`] : []),
+    `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '1' ? { lazyCompilation: true } : {}),`,
     `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
     '    }),',
     '  ],',

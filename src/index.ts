@@ -539,6 +539,24 @@ export const pluginReactRouter = (
     const normalizePrerenderMatchPath = (path: string) =>
       `/${path}/`.replace(/^\/\/+/, '/');
 
+    const withBuildRequest = async <T>(
+      input: string | URL,
+      init: RequestInit | undefined,
+      handle: (request: Request) => Promise<T>
+    ): Promise<T> => {
+      const controller = new AbortController();
+      try {
+        return await handle(
+          new Request(input, {
+            ...init,
+            signal: controller.signal,
+          })
+        );
+      } finally {
+        controller.abort();
+      }
+    };
+
     const prerenderData = async (
       handler: (request: Request) => Promise<Response>,
       prerenderPath: string,
@@ -568,28 +586,29 @@ export const pluginReactRouter = (
       if (onlyRoutes?.length) {
         url.searchParams.set('_routes', onlyRoutes.join(','));
       }
-      const request = new Request(url, requestInit);
-      const response = await handler(request);
-      const data = await response.text();
+      return withBuildRequest(url, requestInit, async request => {
+        const response = await handler(request);
+        const data = await response.text();
 
-      if (response.status !== 200 && response.status !== 202) {
-        throw new Error(
-          `Prerender (data): Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering the \`${prerenderPath}\` path.\n` +
-            `${normalizedPath}`
+        if (response.status !== 200 && response.status !== 202) {
+          throw new Error(
+            `Prerender (data): Received a ${response.status} status code from ` +
+              `\`entry.server.tsx\` while prerendering the \`${prerenderPath}\` path.\n` +
+              `${normalizedPath}`
+          );
+        }
+
+        const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
+        await mkdir(dirname(outputPath), { recursive: true });
+        await writeFile(outputPath, data);
+        api.logger.info(
+          `Prerender (data): ${prerenderPath} -> ${relative(
+            process.cwd(),
+            outputPath
+          )}`
         );
-      }
-
-      const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, data);
-      api.logger.info(
-        `Prerender (data): ${prerenderPath} -> ${relative(
-          process.cwd(),
-          outputPath
-        )}`
-      );
-      return data;
+        return data;
+      });
     };
 
     const prerenderRoute = async (
@@ -602,17 +621,17 @@ export const pluginReactRouter = (
         /\/\/+/g,
         '/'
       );
-      const request = new Request(
+      await withBuildRequest(
         `http://localhost${normalizedPath}`,
-        requestInit
-      );
-      const response = await handler(request);
-      let html = await response.text();
+        requestInit,
+        async request => {
+          const response = await handler(request);
+          let html = await response.text();
 
-      if (redirectStatusCodes.has(response.status)) {
-        const location = response.headers.get('Location');
-        const delay = response.status === 302 ? 2 : 0;
-        html = `<!doctype html>
+          if (redirectStatusCodes.has(response.status)) {
+            const location = response.headers.get('Location');
+            const delay = response.status === 302 ? 2 : 0;
+            html = `<!doctype html>
 <head>
 <title>Redirecting to: ${location}</title>
 <meta http-equiv="refresh" content="${delay};url=${location}">
@@ -624,26 +643,28 @@ export const pluginReactRouter = (
   </a>
 </body>
 </html>`;
-      } else if (response.status !== 200) {
-        throw new Error(
-          `Prerender (html): Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
-            html
-        );
-      }
+          } else if (response.status !== 200) {
+            throw new Error(
+              `Prerender (html): Received a ${response.status} status code from ` +
+                `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
+                html
+            );
+          }
 
-      const outputPath = resolve(
-        clientBuildDir,
-        ...normalizedPath.split('/'),
-        'index.html'
-      );
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, html);
-      api.logger.info(
-        `Prerender (html): ${prerenderPath} -> ${relative(
-          process.cwd(),
-          outputPath
-        )}`
+          const outputPath = resolve(
+            clientBuildDir,
+            ...normalizedPath.split('/'),
+            'index.html'
+          );
+          await mkdir(dirname(outputPath), { recursive: true });
+          await writeFile(outputPath, html);
+          api.logger.info(
+            `Prerender (html): ${prerenderPath} -> ${relative(
+              process.cwd(),
+              outputPath
+            )}`
+          );
+        }
       );
     };
 
@@ -656,29 +677,34 @@ export const pluginReactRouter = (
       const normalizedPath = `${basename}${prerenderPath}/`
         .replace(/\/\/+/g, '/')
         .replace(/\/$/g, '');
-      const request = new Request(
+      await withBuildRequest(
         `http://localhost${normalizedPath}`,
-        requestInit
-      );
-      const response = await handler(request);
-      const content = Buffer.from(await response.arrayBuffer());
+        requestInit,
+        async request => {
+          const response = await handler(request);
+          const content = Buffer.from(await response.arrayBuffer());
 
-      if (response.status !== 200) {
-        throw new Error(
-          `Prerender (resource): Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
-            content.toString('utf8')
-        );
-      }
+          if (response.status !== 200) {
+            throw new Error(
+              `Prerender (resource): Received a ${response.status} status code from ` +
+                `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
+                content.toString('utf8')
+            );
+          }
 
-      const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, content);
-      api.logger.info(
-        `Prerender (resource): ${prerenderPath} -> ${relative(
-          process.cwd(),
-          outputPath
-        )}`
+          const outputPath = resolve(
+            clientBuildDir,
+            ...normalizedPath.split('/')
+          );
+          await mkdir(dirname(outputPath), { recursive: true });
+          await writeFile(outputPath, content);
+          api.logger.info(
+            `Prerender (resource): ${prerenderPath} -> ${relative(
+              process.cwd(),
+              outputPath
+            )}`
+          );
+        }
       );
     };
 
@@ -687,51 +713,56 @@ export const pluginReactRouter = (
       build: any,
       clientBuildDir: string
     ): Promise<void> => {
-      const request = new Request(`http://localhost${basename}`, {
-        headers: {
-          'X-React-Router-SPA-Mode': 'yes',
+      await withBuildRequest(
+        `http://localhost${basename}`,
+        {
+          headers: {
+            'X-React-Router-SPA-Mode': 'yes',
+          },
         },
-      });
-      const response = await handler(request);
-      const html = await response.text();
-      const isPrerenderSpaFallback = build.prerender?.includes('/');
-      const filename = isPrerenderSpaFallback
-        ? '__spa-fallback.html'
-        : 'index.html';
+        async request => {
+          const response = await handler(request);
+          const html = await response.text();
+          const isPrerenderSpaFallback = build.prerender?.includes('/');
+          const filename = isPrerenderSpaFallback
+            ? '__spa-fallback.html'
+            : 'index.html';
 
-      if (response.status !== 200) {
-        if (isPrerenderSpaFallback) {
-          throw new Error(
-            `Prerender: Received a ${response.status} status code from ` +
-              `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
-              html
-          );
+          if (response.status !== 200) {
+            if (isPrerenderSpaFallback) {
+              throw new Error(
+                `Prerender: Received a ${response.status} status code from ` +
+                  `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
+                  html
+              );
+            }
+            throw new Error(
+              `SPA Mode: Received a ${response.status} status code from ` +
+                `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
+                html
+            );
+          }
+
+          if (
+            !html.includes('window.__reactRouterContext =') ||
+            !html.includes('window.__reactRouterRouteModules =')
+          ) {
+            throw new Error(
+              'SPA Mode: Did you forget to include `<Scripts/>` in your root route? ' +
+                'Your pre-rendered HTML cannot hydrate without `<Scripts />`.'
+            );
+          }
+
+          const outputPath = resolve(clientBuildDir, filename);
+          await writeFile(outputPath, html);
+          const prettyPath = relative(process.cwd(), outputPath);
+          if (build.prerender?.length) {
+            api.logger.info(`Prerender (html): SPA Fallback -> ${prettyPath}`);
+          } else {
+            api.logger.info(`SPA Mode: Generated ${prettyPath}`);
+          }
         }
-        throw new Error(
-          `SPA Mode: Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
-            html
-        );
-      }
-
-      if (
-        !html.includes('window.__reactRouterContext =') ||
-        !html.includes('window.__reactRouterRouteModules =')
-      ) {
-        throw new Error(
-          'SPA Mode: Did you forget to include `<Scripts/>` in your root route? ' +
-            'Your pre-rendered HTML cannot hydrate without `<Scripts />`.'
-        );
-      }
-
-      const outputPath = resolve(clientBuildDir, filename);
-      await writeFile(outputPath, html);
-      const prettyPath = relative(process.cwd(), outputPath);
-      if (build.prerender?.length) {
-        api.logger.info(`Prerender (html): SPA Fallback -> ${prettyPath}`);
-      } else {
-        api.logger.info(`SPA Mode: Generated ${prettyPath}`);
-      }
+      );
     };
 
     const validateSsrFalsePrerenderExports = async (
@@ -815,7 +846,6 @@ export const pluginReactRouter = (
       }
     };
 
-    // Handle SPA mode and prerendering after build
     api.onAfterBuild(async ({ environments }) => {
       const webEnv = environments.web;
       if (!webEnv) {
@@ -1104,12 +1134,18 @@ export const pluginReactRouter = (
           `virtual/react-router/server-build-${bundleId}`;
       }
 
+      const lazyCompilation =
+        pluginOptions.lazyCompilation === undefined
+          ? {}
+          : { lazyCompilation: pluginOptions.lazyCompilation };
+
       return mergeRsbuildConfig(config, {
         output: {
           assetPrefix: config.output?.assetPrefix || '/',
         },
         dev: {
           writeToDisk: true,
+          ...lazyCompilation,
           // Only add SSR middleware if SSR is enabled and not using a custom server
           // In SPA mode (ssr: false), we just serve static files from the client build
           setupMiddlewares:
