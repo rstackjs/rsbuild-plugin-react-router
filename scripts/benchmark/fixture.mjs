@@ -220,6 +220,11 @@ const createRoutesConfig = routeCount => {
 
 const createRsbuildConfig = ({ variant, sourceMap, pluginImportPath }) => {
   const ssr = variant !== 'spa';
+  const lazyCompilationOption =
+    `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '0'` +
+    ` ? { lazyCompilation: false }` +
+    ` : process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '1'` +
+    ` ? { lazyCompilation: true } : {}),`;
 
   return [
     `import { defineConfig } from '@rsbuild/core';`,
@@ -229,7 +234,7 @@ const createRsbuildConfig = ({ variant, sourceMap, pluginImportPath }) => {
     '  plugins: [',
     '    pluginReactRouter({',
     ...(ssr ? [`      serverOutput: 'module',`] : []),
-    `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '0' ? { lazyCompilation: false } : process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '1' ? { lazyCompilation: true } : {}),`,
+    lazyCompilationOption,
     `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
     '    }),',
     '  ],',
