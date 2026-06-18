@@ -1,3 +1,5 @@
+import type { RsbuildConfig } from '@rsbuild/core';
+
 export type Route = {
   id: string;
   parentId?: string;
@@ -27,6 +29,15 @@ export type PluginOptions = {
    * Federation mode configuration
    */
   federation?: boolean;
+
+  /**
+   * Opt in to Rsbuild's dev-only lazy compilation behavior.
+   *
+   * This forwards to `dev.lazyCompilation` and does not affect production
+   * builds.
+   * @default undefined
+   */
+  lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
 
   /**
    * Emit structured React Router plugin timing logs after each compiler

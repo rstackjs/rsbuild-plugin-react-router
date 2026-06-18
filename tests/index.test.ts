@@ -31,6 +31,27 @@ describe('pluginReactRouter', () => {
     expect(nodeConfig.output.module).toBe(false);
   });
 
+  it('should forward lazy compilation when explicitly configured', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([
+      pluginReactRouter({
+        lazyCompilation: {
+          entries: true,
+          imports: true,
+        },
+      }),
+    ]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toEqual({
+      entries: true,
+      imports: true,
+    });
+  });
+
   it('should configure web environment correctly', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},

@@ -30,11 +30,17 @@ export default function handleRequest(
       (userAgent && isbot(userAgent)) || routerContext.isSpaMode
         ? 'onAllReady'
         : 'onShellReady';
+    let abortDelay: ReturnType<typeof setTimeout> | undefined;
+    let ready = false;
 
     const { pipe, abort } = renderToPipeableStream(
       <ServerRouter context={routerContext} url={request.url} />,
       {
         [readyOption]() {
+          ready = true;
+          if (readyOption === 'onAllReady' && abortDelay) {
+            clearTimeout(abortDelay);
+          }
           shellRendered = true;
           const body = new PassThrough();
           const stream = createReadableStreamFromReadable(body);
@@ -62,6 +68,9 @@ export default function handleRequest(
       }
     );
 
-    setTimeout(abort, ABORT_DELAY);
+    abortDelay = setTimeout(abort, ABORT_DELAY);
+    if (readyOption === 'onAllReady' && ready) {
+      clearTimeout(abortDelay);
+    }
   });
 }
