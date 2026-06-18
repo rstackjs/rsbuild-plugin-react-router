@@ -121,11 +121,8 @@ const mergeWatchFiles = (
 
 type RouteDirectoryState = {
   directories: Set<string>;
-  files: Set<string>;
+  routeFiles: Set<string>;
 };
-
-const isRouteModuleFile = (filePath: string): boolean =>
-  JS_EXTENSIONS.some(extension => filePath.endsWith(extension));
 
 const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
   if (left.size !== right.size) {
@@ -139,13 +136,14 @@ const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
   return true;
 };
 
-const readRouteDirectoryState = async (
-  routesDirectory: string
-): Promise<RouteDirectoryState> => {
-  const state: RouteDirectoryState = {
-    directories: new Set(),
-    files: new Set(),
-  };
+const readRouteDirectoryState = async ({
+  watchDirectory,
+  getRouteFiles,
+}: {
+  watchDirectory: string;
+  getRouteFiles: () => Promise<Set<string>>;
+}): Promise<RouteDirectoryState> => {
+  const directories = new Set<string>();
 
   const walkDirectory = async (directory: string): Promise<void> => {
     let entries;
@@ -155,37 +153,42 @@ const readRouteDirectoryState = async (
       return;
     }
 
-    state.directories.add(directory);
+    directories.add(directory);
     await Promise.all(
       entries.map(async entry => {
         const entryPath = resolve(directory, entry.name);
         if (entry.isDirectory()) {
           await walkDirectory(entryPath);
-          return;
-        }
-        if (entry.isFile() && isRouteModuleFile(entryPath)) {
-          state.files.add(entryPath);
         }
       })
     );
   };
 
-  await walkDirectory(routesDirectory);
-  return state;
+  await walkDirectory(watchDirectory);
+  return {
+    directories,
+    routeFiles: await getRouteFiles(),
+  };
 };
 
 const createRouteFileSetWatcher = async ({
-  routesDirectory,
+  watchDirectory,
+  getRouteFiles,
   restartMarkerPath,
   onError,
 }: {
-  routesDirectory: string;
+  watchDirectory: string;
+  getRouteFiles: () => Promise<Set<string>>;
   restartMarkerPath: string;
   onError: (error: unknown) => void;
 }): Promise<() => void> => {
-  let state = await readRouteDirectoryState(routesDirectory);
+  let state = await readRouteDirectoryState({
+    watchDirectory,
+    getRouteFiles,
+  });
   let closed = false;
   let rescanTimer: ReturnType<typeof setTimeout> | undefined;
+  let rescanQueue = Promise.resolve();
   const directoryWatchers = new Map<string, FSWatcher>();
 
   const touchRestartMarker = async (): Promise<void> => {
@@ -210,10 +213,8 @@ const createRouteFileSetWatcher = async ({
         continue;
       }
       try {
-        const watcher = watch(directory, (eventType: string) => {
-          if (eventType === 'rename') {
-            scheduleRescan();
-          }
+        const watcher = watch(directory, () => {
+          scheduleRescan();
         });
         watcher.on('error', onError);
         directoryWatchers.set(directory, watcher);
@@ -228,14 +229,17 @@ const createRouteFileSetWatcher = async ({
     watchNewDirectories(nextDirectories);
   };
 
-  const rescan = async (): Promise<void> => {
+  const runRescan = async (): Promise<void> => {
     if (closed) {
       return;
     }
     try {
-      const nextState = await readRouteDirectoryState(routesDirectory);
+      const nextState = await readRouteDirectoryState({
+        watchDirectory,
+        getRouteFiles,
+      });
       syncDirectoryWatchers(nextState.directories);
-      if (!areSetsEqual(state.files, nextState.files)) {
+      if (!areSetsEqual(state.routeFiles, nextState.routeFiles)) {
         state = nextState;
         await touchRestartMarker();
         return;
@@ -244,6 +248,11 @@ const createRouteFileSetWatcher = async ({
     } catch (error) {
       onError(error);
     }
+  };
+
+  const rescan = (): Promise<void> => {
+    rescanQueue = rescanQueue.then(runRescan, runRescan);
+    return rescanQueue;
   };
 
   const scheduleRescan = (): void => {
@@ -521,21 +530,24 @@ export const pluginReactRouter = (
       );
     }
 
-    const routeConfigExport = await jiti.import<RouteConfigEntry[]>(
-      routesPath,
-      {
-        default: true,
+    const loadRouteConfig = async (): Promise<RouteConfigEntry[]> => {
+      const routeConfigExport = await jiti.import<RouteConfigEntry[]>(
+        routesPath,
+        {
+          default: true,
+        }
+      );
+      const routeConfigValue = await routeConfigExport;
+      const validation = validateRouteConfig({
+        routeConfigFile: relative(process.cwd(), routesPath),
+        routeConfig: routeConfigValue,
+      });
+      if (!validation.valid) {
+        throw new Error(validation.message);
       }
-    );
-    const routeConfigValue = await routeConfigExport;
-    const validation = validateRouteConfig({
-      routeConfigFile: relative(process.cwd(), routesPath),
-      routeConfig: routeConfigValue,
-    });
-    if (!validation.valid) {
-      throw new Error(validation.message);
-    }
-    const routeConfig = validation.routeConfig;
+      return validation.routeConfig;
+    };
+    const routeConfig = await loadRouteConfig();
 
     const entryClientPath = findEntryFile(
       resolve(appDirectory, 'entry.client')
@@ -567,6 +579,18 @@ export const pluginReactRouter = (
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
+    const getWatchedRouteFiles = async (): Promise<Set<string>> => {
+      const latestRouteConfig = await loadRouteConfig();
+      const latestRoutes = {
+        root: { path: '', id: 'root', file: rootRouteFile },
+        ...configRoutesToRouteManifest(appDirectory, latestRouteConfig),
+      };
+      return new Set(
+        Object.values(latestRoutes).map(route =>
+          resolve(appDirectory, route.file)
+        )
+      );
+    };
 
     const routes = {
       root: { path: '', id: 'root', file: rootRouteFile },
@@ -606,7 +630,7 @@ export const pluginReactRouter = (
       isBuild,
       cache: routeChunkCache,
     };
-    const routesDirectory = resolve(appDirectory, 'routes');
+    const watchDirectory = resolve(appDirectory);
     const routeRestartMarkerPath = resolve('.react-router', 'route-watch');
     const routeWatchFiles: WatchFileConfig[] = [
       {
@@ -623,7 +647,8 @@ export const pluginReactRouter = (
     api.onBeforeStartDevServer(async () => {
       await ensureRestartMarker(routeRestartMarkerPath);
       closeRouteFileSetWatcher = await createRouteFileSetWatcher({
-        routesDirectory,
+        watchDirectory,
+        getRouteFiles: getWatchedRouteFiles,
         restartMarkerPath: routeRestartMarkerPath,
         onError: error => {
           api.logger.warn(
