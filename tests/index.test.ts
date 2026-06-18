@@ -44,7 +44,7 @@ describe('pluginReactRouter', () => {
           type: 'reload-server',
         },
         {
-          paths: expect.stringMatching(/build\/\.react-router-route-watch$/),
+          paths: expect.stringMatching(/\.react-router\/route-watch$/),
           type: 'reload-server',
         },
       ])

@@ -5,7 +5,7 @@ import {
   watch,
   type FSWatcher,
 } from 'node:fs';
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
@@ -270,6 +270,17 @@ const createRouteFileSetWatcher = async ({
   };
 };
 
+export const ensureRestartMarker = async (
+  restartMarkerPath: string
+): Promise<void> => {
+  await mkdir(dirname(restartMarkerPath), { recursive: true });
+  try {
+    await access(restartMarkerPath);
+  } catch {
+    await writeFile(restartMarkerPath, String(Date.now()));
+  }
+};
+
 const ensureFederationAsyncStartup = (
   rspackConfig: Rspack.Configuration | undefined
 ): void => {
@@ -380,7 +391,9 @@ export const pluginReactRouter = (
       });
     });
 
-    const jiti = createJiti(process.cwd());
+    const jiti = createJiti(process.cwd(), {
+      moduleCache: false,
+    });
 
     // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
     const configPath = findEntryFile(resolve('react-router.config'));
@@ -594,10 +607,7 @@ export const pluginReactRouter = (
       cache: routeChunkCache,
     };
     const routesDirectory = resolve(appDirectory, 'routes');
-    const routeRestartMarkerPath = resolve(
-      buildDirectory,
-      '.react-router-route-watch'
-    );
+    const routeRestartMarkerPath = resolve('.react-router', 'route-watch');
     const routeWatchFiles: WatchFileConfig[] = [
       {
         paths: routesPath,
@@ -611,8 +621,7 @@ export const pluginReactRouter = (
     let closeRouteFileSetWatcher: (() => void) | undefined;
 
     api.onBeforeStartDevServer(async () => {
-      await mkdir(dirname(routeRestartMarkerPath), { recursive: true });
-      await writeFile(routeRestartMarkerPath, String(Date.now()));
+      await ensureRestartMarker(routeRestartMarkerPath);
       closeRouteFileSetWatcher = await createRouteFileSetWatcher({
         routesDirectory,
         restartMarkerPath: routeRestartMarkerPath,
