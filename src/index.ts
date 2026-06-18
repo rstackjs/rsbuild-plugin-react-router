@@ -1311,7 +1311,6 @@ export const pluginReactRouter = (
       }
     );
 
-    // Add manifest transformations
     api.transform(
       {
         test: /virtual\/react-router\/(browser|server)-manifest/,
@@ -1322,7 +1321,6 @@ export const pluginReactRouter = (
           'manifest:transform',
           args.resource,
           async () => {
-            // For browser manifest, return a placeholder that will be modified by the plugin
             if (args.environment.name === 'web') {
               return {
                 code: `window.__reactRouterManifest = "PLACEHOLDER";`,

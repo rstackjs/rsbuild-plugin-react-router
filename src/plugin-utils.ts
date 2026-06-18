@@ -109,11 +109,6 @@ export function createRouteId(file: string): string {
   return normalize(stripFileExtension(file));
 }
 
-/**
- * Find a file with any of the supported JavaScript extensions
- * @param basePath - The base path without extension
- * @returns The file path with extension if found, or a default path
- */
 export function findEntryFile(basePath: string): string {
   for (const ext of JS_EXTENSIONS) {
     const filePath = `${basePath}${ext}`;
@@ -121,7 +116,7 @@ export function findEntryFile(basePath: string): string {
       return filePath;
     }
   }
-  return `${basePath}.tsx`; // Default to .tsx if no file exists
+  return `${basePath}.tsx`;
 }
 
 export function generateWithProps() {

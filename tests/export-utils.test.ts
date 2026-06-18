@@ -1,7 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
-import { getBundlerRouteAnalysis } from '../src/export-utils';
 import { parse } from '../src/babel';
-import { transformToEsm } from '../src/export-utils';
+import { getBundlerRouteAnalysis, transformToEsm } from '../src/export-utils';
 
 const routeChunkConfig = {
   splitRouteModules: true as const,

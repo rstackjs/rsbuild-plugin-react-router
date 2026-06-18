@@ -23,7 +23,7 @@ export type RouteChunkConfig = {
   rootRouteFile: string;
 };
 
-export type RouteChunkCacheEntry<T> = {
+type RouteChunkCacheEntry<T> = {
   value: T;
   version: string;
 };

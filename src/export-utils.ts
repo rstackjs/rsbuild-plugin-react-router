@@ -95,7 +95,7 @@ const parseProgram = (code: string, resourcePath?: string) => {
   if (errors.length > 0) {
     throw new Error(errors.map(error => error.message).join('\n'));
   }
-  return result.program as AnyNode;
+  return result.program;
 };
 
 const getIdentifierNamesFromPattern = (
@@ -232,18 +232,8 @@ export const transformToEsm = async (
   let transformed: Promise<string>;
   transformed = cachePromiseOnReject(
     (async () => {
-      const result = parse(code, {
-        sourceType: 'module',
-        lang: langFromPath(resourcePath),
-        preserveParens: true,
-      });
-      const errors = result.diagnostics.filter(
-        diagnostic => diagnostic.severity === 'error'
-      );
-      if (errors.length > 0) {
-        throw new Error(errors.map(error => error.message).join('\n'));
-      }
-      const stripped = strip(result.program, { comments: 'some' });
+      const program = parseProgram(code, resourcePath);
+      const stripped = strip(program, { comments: 'some' });
       if (stripped.errors.length > 0) {
         throw new Error(stripped.errors.map(error => error.message).join('\n'));
       }

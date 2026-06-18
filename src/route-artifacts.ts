@@ -122,6 +122,12 @@ export const createRouteChunkArtifact = async ({
   if (!chunkName) {
     throw new Error(`Invalid route chunk name in "${resource}"`);
   }
+  if (chunkName !== 'main' && !code.includes(chunkName)) {
+    return {
+      code: emptyRouteChunkSnippet(`No ${chunkName} chunk`),
+      map: null,
+    };
+  }
 
   const transformed = await transformToEsm(code, resourcePath);
   const chunk = await getRouteChunkIfEnabled(
