@@ -126,6 +126,7 @@ export const pluginReactRouter = (
   async setup(api) {
     const defaultOptions = {
       customServer: false,
+      lazyCompilation: true,
       serverOutput: 'module' as const,
     };
 

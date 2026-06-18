@@ -15,6 +15,7 @@ describe('pluginReactRouter', () => {
     expect(config.dev.hmr).toBe(true);
     expect(config.dev.liveReload).toBe(true);
     expect(config.dev.writeToDisk).toBe(true);
+    expect(config.dev.lazyCompilation).toBe(true);
   });
 
   it('should respect server output format', async () => {
@@ -50,6 +51,17 @@ describe('pluginReactRouter', () => {
       entries: true,
       imports: true,
     });
+  });
+
+  it('should allow lazy compilation to be disabled', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ lazyCompilation: false })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toBe(false);
   });
 
   it('should configure web environment correctly', async () => {

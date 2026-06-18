@@ -31,11 +31,11 @@ export type PluginOptions = {
   federation?: boolean;
 
   /**
-   * Opt in to Rsbuild's dev-only lazy compilation behavior.
+   * Configure Rsbuild's dev-only lazy compilation behavior.
    *
    * This forwards to `dev.lazyCompilation` and does not affect production
    * builds.
-   * @default undefined
+   * @default true
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
 
