@@ -3,6 +3,7 @@ import {
   detectRouteChunksIfEnabled,
   getRouteChunkIfEnabled,
   routeChunkNames,
+  type RouteChunkCache,
   type RouteChunkConfig,
   type RouteChunkInfo,
   type RouteChunkName,
@@ -36,7 +37,7 @@ const nonChunkableCode = `
 `;
 
 const collectRouteChunkOracle = async (
-  cache: Map<string, unknown> | undefined,
+  cache: RouteChunkCache | undefined,
   code = chunkableCode
 ) => {
   const info = await detectRouteChunksIfEnabled(cache, config, routeId, code);

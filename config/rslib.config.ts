@@ -13,7 +13,6 @@ export const nodeMinifyConfig: Minify = {
   css: false,
   jsOptions: {
     minimizerOptions: {
-      // preserve variable name and disable minify for easier debugging
       mangle: false,
       minify: false,
       compress: true,
@@ -21,7 +20,6 @@ export const nodeMinifyConfig: Minify = {
   },
 };
 
-// Clean tsc cache to ensure the dts files can be generated correctly
 export const pluginCleanTscCache: RsbuildPlugin = {
   name: 'plugin-clean-tsc-cache',
   setup(api) {
