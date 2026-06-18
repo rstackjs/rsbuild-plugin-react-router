@@ -230,6 +230,30 @@ describe('removeExports', () => {
     expect(result).toContain('Route');
   });
 
+  it('removes multiple pre-existing unused declarations through shared removed export dependencies', () => {
+    const code = `
+      const shared = () => loader();
+      const first = () => shared();
+      const second = () => shared();
+      export function loader() {
+        return null;
+      }
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    removeExports(ast, ['loader']);
+
+    const result = generate(ast).code;
+    expect(result).not.toContain('shared');
+    expect(result).not.toContain('first');
+    expect(result).not.toContain('second');
+    expect(result).not.toContain('loader');
+    expect(result).toContain('Route');
+  });
+
   it('does not treat an exported alias as a reference to its exported name', () => {
     const code = `
       const loader = register();

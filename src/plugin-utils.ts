@@ -463,10 +463,17 @@ const declarationReferencesName = (
   declaration: TopLevelDeclaration,
   names: ReadonlySet<string>,
   graph: TopLevelDeclarationGraph,
+  cache: Map<TopLevelDeclaration, boolean>,
   visitedNames = new Set<string>()
 ): boolean => {
+  const cached = cache.get(declaration);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   for (const referencedName of declaration.referencedNames) {
     if (names.has(referencedName)) {
+      cache.set(declaration, true);
       return true;
     }
     if (visitedNames.has(referencedName)) {
@@ -481,13 +488,16 @@ const declarationReferencesName = (
           referencedDeclaration,
           names,
           graph,
+          cache,
           visitedNames
         )
       ) {
+        cache.set(declaration, true);
         return true;
       }
     }
   }
+  cache.set(declaration, false);
   return false;
 };
 
@@ -498,6 +508,7 @@ const removeNewlyDeadTopLevelDeclarations = (
   removedExportReferencedNames: ReadonlySet<string>
 ): void => {
   const currentlyLive = collectLiveTopLevelDeclarations(program, graph);
+  const removedReferenceCache = new Map<TopLevelDeclaration, boolean>();
   const isRemovableDeadDeclaration = (node: AnyNode) => {
     const declaration = graph.declarationsByNode.get(node);
     if (!declaration || currentlyLive.has(declaration)) {
@@ -508,7 +519,8 @@ const removeNewlyDeadTopLevelDeclarations = (
       declarationReferencesName(
         declaration,
         removedExportReferencedNames,
-        graph
+        graph,
+        removedReferenceCache
       )
     );
   };
