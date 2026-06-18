@@ -1,6 +1,10 @@
 import { describe, expect, it } from '@rstest/core';
 import { parse } from '../src/babel';
-import { getBundlerRouteAnalysis, transformToEsm } from '../src/export-utils';
+import {
+  getBundlerRouteAnalysis,
+  getExportNamesAndExportAll,
+  transformToEsm,
+} from '../src/export-utils';
 
 const routeChunkConfig = {
   splitRouteModules: true as const,
@@ -21,12 +25,12 @@ describe('getBundlerRouteAnalysis', () => {
 
     expect(second).toBe(first);
     expect(second.code).toBe(first.code);
-    expect(second.getExportNames()).toBe(first.getExportNames());
+    expect(second.exportNames).toBe(first.exportNames);
     expect(second.getRouteChunkInfo(undefined, routeChunkConfig)).toBe(
       first.getRouteChunkInfo(undefined, routeChunkConfig)
     );
 
-    expect(await first.getExportNames()).toEqual(['clientAction', 'default']);
+    expect(first.exportNames).toEqual(['clientAction', 'default']);
     await expect(
       first.getRouteChunkInfo(undefined, routeChunkConfig)
     ).resolves.toMatchObject({
@@ -48,7 +52,75 @@ describe('getBundlerRouteAnalysis', () => {
     );
 
     expect(updated).not.toBe(initial);
-    await expect(updated.getExportNames()).resolves.toEqual(['clientLoader']);
+    expect(updated.exportNames).toEqual(['clientLoader']);
+  });
+
+  it('collects runtime exports and export-all modules from the initial parse', async () => {
+    const analysis = await getBundlerRouteAnalysis(
+      `
+        export type LoaderData = { value: string };
+        export interface RouteHandle { title: string }
+        export type * from './types';
+        export type * as typeHelpers from './type-helpers';
+        export * from './shared';
+        export * as helpers from './helpers';
+        export const loader = () => null;
+        export default function Route() { return null; }
+      `,
+      '/app/routes/runtime-exports.tsx'
+    );
+
+    const exportInfo = {
+      exportNames: analysis.exportNames,
+      exportAllModules: analysis.exportAllModules,
+    };
+    expect(exportInfo).toEqual({
+      exportNames: ['helpers', 'loader', 'default'],
+      exportAllModules: ['./shared'],
+    });
+    await expect(getExportNamesAndExportAll(analysis.code)).resolves.toEqual(
+      exportInfo
+    );
+  });
+
+  it('does not report an erased default interface as a runtime export', async () => {
+    const analysis = await getBundlerRouteAnalysis(
+      `export default interface RouteType { value: string }`,
+      '/app/routes/type-only-default.tsx'
+    );
+    const exportInfo = {
+      exportNames: analysis.exportNames,
+      exportAllModules: analysis.exportAllModules,
+    };
+
+    expect(exportInfo).toEqual({ exportNames: [], exportAllModules: [] });
+    await expect(getExportNamesAndExportAll(analysis.code)).resolves.toEqual(
+      exportInfo
+    );
+  });
+
+  it('does not report erased ambient declarations as runtime exports', async () => {
+    const analysis = await getBundlerRouteAnalysis(
+      `
+        export declare function loader(): void;
+        export declare const action: () => void;
+        export declare class ServerOnly {}
+        export const clientLoader = () => null;
+      `,
+      '/app/routes/ambient-exports.tsx'
+    );
+    const exportInfo = {
+      exportNames: analysis.exportNames,
+      exportAllModules: analysis.exportAllModules,
+    };
+
+    expect(exportInfo).toEqual({
+      exportNames: ['clientLoader'],
+      exportAllModules: [],
+    });
+    await expect(getExportNamesAndExportAll(analysis.code)).resolves.toEqual(
+      exportInfo
+    );
   });
 });
 

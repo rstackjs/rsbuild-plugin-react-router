@@ -82,7 +82,6 @@ export const createRouteClientEntryArtifact = async ({
   routeChunkConfig,
 }: RouteClientEntryArtifactOptions): Promise<RouteClientEntryArtifact> => {
   const analysis = await getBundlerRouteAnalysis(code, resourcePath);
-  const exportNames = await analysis.getExportNames();
   const isServer = environmentName === 'node';
   const splitRouteModules = routeChunkConfig.splitRouteModules;
   const chunkedExports =
@@ -92,7 +91,7 @@ export const createRouteClientEntryArtifact = async ({
       : [];
   return {
     code: buildRouteClientEntryCode({
-      exportNames,
+      exportNames: analysis.exportNames,
       chunkedExports,
       isServer,
       resourcePath,

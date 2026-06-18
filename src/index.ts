@@ -46,14 +46,14 @@ import {
   getReactRouterManifestForDev,
   getRouteManifestModuleExports,
   configRoutesToRouteManifest,
+  REACT_ROUTER_MANIFEST_STATS_OPTIONS,
+  type ReactRouterManifestStats,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
 import { createRequestHandler, matchRoutes } from 'react-router';
 import {
   getBundlerRouteAnalysis,
-  getExportNamesAndExportAll,
   getRouteModuleAnalysis,
-  transformToEsm,
 } from './export-utils.js';
 import {
   getRouteChunkEntryName,
@@ -415,6 +415,7 @@ export const pluginReactRouter = (
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
     >;
+    let latestBrowserManifest: ReactRouterManifest | null = null;
     let latestServerManifest: ReactRouterManifest | null = null;
     const latestServerManifestsByBundleId: Record<string, ReactRouterManifest> =
       {};
@@ -468,10 +469,10 @@ export const pluginReactRouter = (
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
 
-    let clientStats: Rspack.StatsCompilation | undefined;
+    let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
       if (environment.name === 'web') {
-        clientStats = stats?.toJson();
+        clientStats = stats?.toJson(REACT_ROUTER_MANIFEST_STATS_OPTIONS);
       }
       if (pluginOptions.federation && ssr) {
         const serverBuildDir = resolve(buildDirectory, 'server');
@@ -895,15 +896,17 @@ export const pluginReactRouter = (
         const requestHandler = createRequestHandler(build, 'production');
 
         if (isPrerenderEnabled) {
-          const manifest = await getReactRouterManifestForDev(
-            routes,
-            pluginOptions,
-            clientStats,
-            appDirectory,
-            assetPrefix,
-            routeChunkOptions
-          );
           if (!ssr) {
+            const manifest =
+              latestBrowserManifest ??
+              (await getReactRouterManifestForDev(
+                routes,
+                pluginOptions,
+                clientStats,
+                appDirectory,
+                assetPrefix,
+                routeChunkOptions
+              ));
             await validateSsrFalsePrerenderExports(manifest, prerenderPaths);
           }
 
@@ -1021,11 +1024,6 @@ export const pluginReactRouter = (
       }
 
       if (buildEnd) {
-        const buildManifest = await getBuildManifest({
-          reactRouterConfig: resolvedConfigWithRoutes,
-          routes,
-          rootDirectory: process.cwd(),
-        });
         await buildEnd({
           buildManifest,
           reactRouterConfig: resolvedConfigWithRoutes,
@@ -1292,6 +1290,7 @@ export const pluginReactRouter = (
                           'manifest:stage',
                           'virtual/react-router/browser-manifest',
                           () => {
+                            latestBrowserManifest = manifest;
                             const baseServerManifest = {
                               ...manifest,
                               sri,
@@ -1473,7 +1472,7 @@ export const pluginReactRouter = (
               return { code: args.code, map: null };
             }
 
-            const sourceExports = await analysis.getExportNames();
+            const sourceExports = analysis.exportNames;
             const chunkedExportSet = new Set<string>(chunkedExports);
             const isMainChunkExport = (name: string) =>
               !chunkedExportSet.has(name);
@@ -1536,9 +1535,12 @@ export const pluginReactRouter = (
           'module:client-only-stub',
           args.resource,
           async () => {
-            const code = await transformToEsm(args.code, args.resourcePath);
+            const analysis = await getBundlerRouteAnalysis(
+              args.code,
+              args.resourcePath
+            );
             const { exportNames: directExportNames, exportAllModules } =
-              await getExportNamesAndExportAll(code);
+              analysis;
             const exportNames = new Set(directExportNames);
             const unresolvedExportAll = new Set<string>();
             const visitedModules = new Set<string>();
@@ -1703,7 +1705,7 @@ export const pluginReactRouter = (
             // In SPA mode, server-only route exports are invalid (except root `loader`),
             // and `HydrateFallback` is only allowed on the root route.
             if (args.environment.name === 'web' && !ssr && isSpaMode) {
-              const resolvedExportNames = await analysis.getExportNames();
+              const resolvedExportNames = analysis.exportNames;
               const isRootRoute = args.resourcePath === rootRoutePath;
               const relativePath = relative(process.cwd(), args.resourcePath);
 
@@ -1713,9 +1715,7 @@ export const pluginReactRouter = (
               });
 
               if (invalidServerOnly.length > 0) {
-                const list = invalidServerOnly
-                  .map(e => `\`${e}\``)
-                  .join(', ');
+                const list = invalidServerOnly.map(e => `\`${e}\``).join(', ');
                 throw new Error(
                   `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
                     `\`${relativePath}\`: ${list}. ` +
