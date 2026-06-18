@@ -126,7 +126,6 @@ export const pluginReactRouter = (
   async setup(api) {
     const defaultOptions = {
       customServer: false,
-      lazyCompilation: true,
       serverOutput: 'module' as const,
     };
 
@@ -599,7 +598,10 @@ export const pluginReactRouter = (
           );
         }
 
-        const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
+        const outputPath = resolve(
+          clientBuildDir,
+          ...normalizedPath.split('/')
+        );
         await mkdir(dirname(outputPath), { recursive: true });
         await writeFile(outputPath, data);
         api.logger.info(

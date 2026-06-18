@@ -15,7 +15,7 @@ describe('pluginReactRouter', () => {
     expect(config.dev.hmr).toBe(true);
     expect(config.dev.liveReload).toBe(true);
     expect(config.dev.writeToDisk).toBe(true);
-    expect(config.dev.lazyCompilation).toBe(true);
+    expect(config.dev.lazyCompilation).toBeUndefined();
   });
 
   it('should respect server output format', async () => {
