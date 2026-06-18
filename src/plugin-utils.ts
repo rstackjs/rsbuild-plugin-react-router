@@ -288,7 +288,21 @@ const isNonReferenceIdentifier = (node: AnyNode, parent: AnyNode | null) => {
   ) {
     return true;
   }
-  if (parent.type === 'LabeledStatement' || parent.type === 'BreakStatement') {
+  if (
+    parent.type === 'ExportSpecifier' ||
+    parent.type === 'ExportDefaultSpecifier' ||
+    parent.type === 'ExportNamespaceSpecifier'
+  ) {
+    return true;
+  }
+  if (parent.type === 'ImportSpecifier' && parent.imported === node) {
+    return true;
+  }
+  if (
+    parent.type === 'LabeledStatement' ||
+    parent.type === 'BreakStatement' ||
+    parent.type === 'ContinueStatement'
+  ) {
     return true;
   }
   return false;
@@ -296,9 +310,9 @@ const isNonReferenceIdentifier = (node: AnyNode, parent: AnyNode | null) => {
 
 const isUppercaseName = (name: string): boolean => /^[A-Z]/.test(name);
 
-const collectReferencedNames = (program: AnyNode): Set<string> => {
+const collectReferencedNames = (node: AnyNode): Set<string> => {
   const referenced = new Set<string>();
-  walk(program as any, {
+  walk(node as any, {
     Identifier(node: AnyNode, ctx: any) {
       const parent = ctx.parent as AnyNode | null;
       if (!isNonReferenceIdentifier(node, parent)) {
@@ -322,8 +336,14 @@ const collectReferencedNames = (program: AnyNode): Set<string> => {
         referenced.add(node.name);
       }
     },
-    ExportSpecifier(node: AnyNode) {
-      if (node.local?.name && node.exportKind !== 'type') {
+    ExportSpecifier(node: AnyNode, ctx: any) {
+      const declaration = ctx.parent as AnyNode | null;
+      if (
+        !declaration?.source &&
+        declaration?.exportKind !== 'type' &&
+        node.local?.name &&
+        node.exportKind !== 'type'
+      ) {
         referenced.add(node.local.name);
       }
     },
@@ -345,66 +365,124 @@ const getExportedName = (specifier: AnyNode): string | null => {
   return null;
 };
 
-const collectExportedLocalNames = (program: AnyNode): Set<string> => {
-  const names = new Set<string>();
-  for (const statement of program.body ?? []) {
-    if (statement.type === 'ExportDefaultDeclaration') {
-      if (statement.declaration?.id?.name) {
-        names.add(statement.declaration.id.name);
-      }
-      continue;
-    }
-    if (statement.type !== 'ExportNamedDeclaration') {
-      continue;
-    }
-    if (statement.declaration) {
-      for (const name of getDeclaredNames(statement.declaration)) {
-        names.add(name);
-      }
-    }
-    for (const specifier of statement.specifiers ?? []) {
-      if (specifier.local?.name && specifier.exportKind !== 'type') {
-        names.add(specifier.local.name);
-      }
-    }
-  }
-  return names;
+type TopLevelDeclaration = {
+  referencedNames: Set<string>;
 };
 
-const removeUnusedTopLevelDeclarations = (program: AnyNode): void => {
-  let changed = true;
-  while (changed) {
-    changed = false;
-    const referenced = collectReferencedNames(program);
-    const exported = collectExportedLocalNames(program);
-    for (const statement of [...program.body]) {
-      if (statement.type !== 'VariableDeclaration') {
-        if (
-          (statement.type === 'FunctionDeclaration' ||
-            statement.type === 'ClassDeclaration') &&
-          statement.id?.name &&
-          !referenced.has(statement.id.name) &&
-          !exported.has(statement.id.name)
-        ) {
-          removeFromArray(program.body, statement);
-          changed = true;
-        }
-        continue;
+type TopLevelDeclarationGraph = {
+  declarationsByNode: Map<AnyNode, TopLevelDeclaration>;
+  declarationsByName: Map<string, Set<TopLevelDeclaration>>;
+};
+
+const createTopLevelDeclarationGraph = (
+  program: AnyNode
+): TopLevelDeclarationGraph => {
+  const declarationsByNode = new Map<AnyNode, TopLevelDeclaration>();
+  const declarationsByName = new Map<string, Set<TopLevelDeclaration>>();
+
+  const registerDeclaration = (
+    node: AnyNode,
+    declarationNode: AnyNode,
+    declaredNames: Set<string>
+  ) => {
+    const declaration: TopLevelDeclaration = {
+      referencedNames: collectReferencedNames(declarationNode),
+    };
+    declarationsByNode.set(node, declaration);
+    for (const name of declaredNames) {
+      const namedDeclarations = declarationsByName.get(name) ?? new Set();
+      namedDeclarations.add(declaration);
+      declarationsByName.set(name, namedDeclarations);
+    }
+  };
+
+  for (const statement of program.body) {
+    if (statement.type === 'VariableDeclaration') {
+      for (const declarator of statement.declarations) {
+        registerDeclaration(
+          declarator,
+          declarator,
+          getPatternIdentifierNames(declarator.id)
+        );
       }
-      statement.declarations = statement.declarations.filter(
-        (declarator: AnyNode) => {
-          const names = getPatternIdentifierNames(declarator.id);
-          return Array.from(names).some(
-            name => referenced.has(name) || exported.has(name)
-          );
+      continue;
+    }
+    if (
+      statement.type === 'FunctionDeclaration' ||
+      statement.type === 'ClassDeclaration'
+    ) {
+      registerDeclaration(statement, statement, getDeclaredNames(statement));
+    }
+  }
+
+  return { declarationsByNode, declarationsByName };
+};
+
+const collectLiveTopLevelDeclarations = (
+  program: AnyNode,
+  graph: TopLevelDeclarationGraph
+): Set<TopLevelDeclaration> => {
+  const pendingNames: string[] = [];
+
+  for (const statement of program.body) {
+    if (statement.type === 'VariableDeclaration') {
+      continue;
+    }
+    if (graph.declarationsByNode.has(statement)) {
+      continue;
+    }
+    for (const name of collectReferencedNames(statement)) {
+      pendingNames.push(name);
+    }
+  }
+
+  // This is intentionally name-based and conservative: shadowing may retain a
+  // declaration, but it must never make a live declaration removable.
+  const visitedNames = new Set<string>();
+  const liveDeclarations = new Set<TopLevelDeclaration>();
+  while (pendingNames.length > 0) {
+    const name = pendingNames.pop();
+    if (!name || visitedNames.has(name)) {
+      continue;
+    }
+    visitedNames.add(name);
+    for (const declaration of graph.declarationsByName.get(name) ?? []) {
+      if (!liveDeclarations.has(declaration)) {
+        liveDeclarations.add(declaration);
+        for (const referencedName of declaration.referencedNames) {
+          pendingNames.push(referencedName);
         }
-      );
-      if (statement.declarations.length === 0) {
-        removeFromArray(program.body, statement);
-        changed = true;
       }
     }
   }
+
+  return liveDeclarations;
+};
+
+const removeNewlyDeadTopLevelDeclarations = (
+  program: AnyNode,
+  graph: TopLevelDeclarationGraph,
+  previouslyLive: ReadonlySet<TopLevelDeclaration>
+): void => {
+  const currentlyLive = collectLiveTopLevelDeclarations(program, graph);
+  const isNewlyDead = (node: AnyNode) => {
+    const declaration = graph.declarationsByNode.get(node);
+    return (
+      declaration &&
+      previouslyLive.has(declaration) &&
+      !currentlyLive.has(declaration)
+    );
+  };
+
+  program.body = program.body.filter((statement: AnyNode) => {
+    if (statement.type === 'VariableDeclaration') {
+      statement.declarations = statement.declarations.filter(
+        (declarator: AnyNode) => !isNewlyDead(declarator)
+      );
+      return statement.declarations.length > 0;
+    }
+    return !isNewlyDead(statement);
+  });
 };
 
 export const removeExports = (
@@ -412,7 +490,12 @@ export const removeExports = (
   exportsToRemove: readonly string[]
 ): void => {
   const program = getProgram(ast);
-  let exportsFiltered = false;
+  const declarationGraph = createTopLevelDeclarationGraph(program);
+  const previouslyLive = collectLiveTopLevelDeclarations(
+    program,
+    declarationGraph
+  );
+  let exportsChanged = false;
   const removedExportLocalNames = new Set<string>();
 
   for (const statement of [...program.body]) {
@@ -425,7 +508,7 @@ export const removeExports = (
             }
             const exportedName = getExportedName(specifier);
             if (exportedName && exportsToRemove.includes(exportedName)) {
-              exportsFiltered = true;
+              exportsChanged = true;
               if (specifier.local?.name) {
                 removedExportLocalNames.add(specifier.local.name);
               }
@@ -445,7 +528,7 @@ export const removeExports = (
           (declarator: AnyNode) => {
             if (declarator.id.type === 'Identifier') {
               if (exportsToRemove.includes(declarator.id.name)) {
-                exportsFiltered = true;
+                exportsChanged = true;
                 removedExportLocalNames.add(declarator.id.name);
                 return false;
               }
@@ -467,6 +550,7 @@ export const removeExports = (
         declaration.id?.name &&
         exportsToRemove.includes(declaration.id.name)
       ) {
+        exportsChanged = true;
         removedExportLocalNames.add(declaration.id.name);
         removeFromArray(program.body, statement);
       }
@@ -476,6 +560,7 @@ export const removeExports = (
       statement.type === 'ExportDefaultDeclaration' &&
       exportsToRemove.includes('default')
     ) {
+      exportsChanged = true;
       const declaration = statement.declaration;
       if (declaration?.type === 'Identifier') {
         removedExportLocalNames.add(declaration.name);
@@ -494,15 +579,18 @@ export const removeExports = (
     if (
       left?.type === 'MemberExpression' &&
       left.object?.type === 'Identifier' &&
-      (exportsToRemove.includes(left.object.name) ||
-        removedExportLocalNames.has(left.object.name))
+      removedExportLocalNames.has(left.object.name)
     ) {
       removeFromArray(program.body, statement);
     }
   }
 
-  if (exportsFiltered || removedExportLocalNames.size > 0) {
-    removeUnusedTopLevelDeclarations(program);
+  if (exportsChanged) {
+    removeNewlyDeadTopLevelDeclarations(
+      program,
+      declarationGraph,
+      previouslyLive
+    );
   }
 };
 

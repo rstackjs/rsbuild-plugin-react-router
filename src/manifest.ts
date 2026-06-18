@@ -79,6 +79,16 @@ export type ReactRouterManifestForDev = {
   routes: Record<string, RouteManifestItem>;
 };
 
+export type ReactRouterManifestStats = Pick<
+  Rspack.StatsCompilation,
+  'assetsByChunkName'
+>;
+
+export const REACT_ROUTER_MANIFEST_STATS_OPTIONS = {
+  all: false,
+  assets: true,
+} as const;
+
 export type RouteManifestModuleExports = Record<string, readonly string[]>;
 
 const routeManifestModuleExports = new WeakMap<
@@ -138,7 +148,7 @@ export async function getReactRouterManifestForDev(
   routes: Record<string, Route>,
   //@ts-ignore
   options: PluginOptions,
-  clientStats: Rspack.StatsCompilation | undefined,
+  clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix = '/',
   routeChunkOptions?: RouteChunkManifestOptions
@@ -182,7 +192,7 @@ export async function getReactRouterManifestForDev(
       let cssAssets = assets.filter(asset => asset.endsWith('.css')) || [];
       const routeFilePath = resolve(context, route.file);
       let exports = new Set<string>();
-      let routeModuleExports: string[] = [];
+      let routeModuleExports: readonly string[] = [];
       let hasRouteChunkByExportName = createEmptyRouteChunkByExportName();
 
       try {
@@ -223,10 +233,7 @@ export async function getReactRouterManifestForDev(
         validateRouteChunks({
           config: routeChunkConfig,
           id: routeFilePath,
-          valid: buildManifestChunkValidity(
-            exports,
-            hasRouteChunkByExportName
-          ),
+          valid: buildManifestChunkValidity(exports, hasRouteChunkByExportName),
         });
       }
 

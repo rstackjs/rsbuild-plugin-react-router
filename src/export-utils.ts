@@ -10,12 +10,19 @@ import {
 
 type TransformCacheEntry = {
   source: string;
-  transformed: Promise<string>;
+  transformed: Promise<TransformedModule>;
 };
 
-export type BundlerRouteAnalysis = {
-  code: string;
-  getExportNames: () => Promise<string[]>;
+type ExportInfo = {
+  readonly exportNames: readonly string[];
+  readonly exportAllModules: readonly string[];
+};
+
+type TransformedModule = ExportInfo & {
+  readonly code: string;
+};
+
+export type BundlerRouteAnalysis = TransformedModule & {
   getRouteChunkInfo: (
     cache: RouteChunkCache | undefined,
     config: RouteChunkConfig
@@ -28,9 +35,9 @@ type BundlerRouteAnalysisCacheEntry = {
 };
 
 type RouteModuleAnalysis = {
-  code: string;
-  exports: string[];
-  exportAllModules: string[];
+  readonly code: string;
+  readonly exports: readonly string[];
+  readonly exportAllModules: readonly string[];
 };
 
 type RouteModuleAnalysisCacheEntry = {
@@ -40,10 +47,7 @@ type RouteModuleAnalysisCacheEntry = {
 };
 
 const transformCache = new Map<string, TransformCacheEntry>();
-const exportInfoCache = new Map<
-  string,
-  Promise<{ exportNames: string[]; exportAllModules: string[] }>
->();
+const exportInfoCache = new Map<string, Promise<ExportInfo>>();
 const bundlerRouteAnalysisCache = new Map<
   string,
   BundlerRouteAnalysisCacheEntry
@@ -147,11 +151,18 @@ const getExportedName = (node: AnyNode): string | null => {
 };
 
 const isTypeOnlyExport = (node: AnyNode): boolean =>
-  node.exportKind === 'type' || node.type === 'TSExportAssignment';
+  node.exportKind === 'type' ||
+  node.type === 'TSExportAssignment' ||
+  (node.type === 'ExportDefaultDeclaration' &&
+    node.declaration?.type === 'TSInterfaceDeclaration');
 
 const collectExportNames = (program: AnyNode): string[] => {
   const exportNames = new Set<string>();
   for (const statement of program.body ?? []) {
+    if (isTypeOnlyExport(statement)) {
+      continue;
+    }
+
     if (statement.type === 'ExportAllDeclaration') {
       const exported = getExportedName(statement.exported);
       if (exported) {
@@ -168,10 +179,6 @@ const collectExportNames = (program: AnyNode): string[] => {
     if (statement.type !== 'ExportNamedDeclaration') {
       continue;
     }
-    if (isTypeOnlyExport(statement)) {
-      continue;
-    }
-
     const declaration = statement.declaration;
     if (declaration) {
       if (declaration.type === 'VariableDeclaration') {
@@ -206,7 +213,10 @@ const collectExportNames = (program: AnyNode): string[] => {
 const collectExportAllModules = (program: AnyNode): string[] => {
   const modules: string[] = [];
   for (const statement of program.body ?? []) {
-    if (statement.type !== 'ExportAllDeclaration') {
+    if (
+      statement.type !== 'ExportAllDeclaration' ||
+      isTypeOnlyExport(statement)
+    ) {
       continue;
     }
     if (statement.exported) {
@@ -220,16 +230,16 @@ const collectExportAllModules = (program: AnyNode): string[] => {
   return modules;
 };
 
-export const transformToEsm = async (
+const getTransformedModule = async (
   code: string,
   resourcePath: string
-): Promise<string> => {
+): Promise<TransformedModule> => {
   const cached = transformCache.get(resourcePath);
   if (cached?.source === code) {
     return cached.transformed;
   }
 
-  let transformed: Promise<string>;
+  let transformed: Promise<TransformedModule>;
   transformed = cachePromiseOnReject(
     (async () => {
       const program = parseProgram(code, resourcePath);
@@ -237,7 +247,11 @@ export const transformToEsm = async (
       if (stripped.errors.length > 0) {
         throw new Error(stripped.errors.map(error => error.message).join('\n'));
       }
-      return stripped.code;
+      return {
+        code: stripped.code,
+        exportNames: collectExportNames(program),
+        exportAllModules: collectExportAllModules(program),
+      };
     })(),
     () => {
       if (transformCache.get(resourcePath)?.transformed === transformed) {
@@ -253,7 +267,14 @@ export const transformToEsm = async (
   return transformed;
 };
 
-export const getExportNames = async (code: string): Promise<string[]> => {
+export const transformToEsm = async (
+  code: string,
+  resourcePath: string
+): Promise<string> => (await getTransformedModule(code, resourcePath)).code;
+
+export const getExportNames = async (
+  code: string
+): Promise<readonly string[]> => {
   return (await getExportNamesAndExportAll(code)).exportNames;
 };
 
@@ -267,16 +288,11 @@ export const getBundlerRouteAnalysis = async (
   }
 
   const analysis = (async () => {
-    const code = await transformToEsm(source, resourcePath);
-    let exportNames: Promise<string[]> | undefined;
+    const transformed = await getTransformedModule(source, resourcePath);
     const routeChunkInfoCache = new Map<string, Promise<RouteChunkInfo>>();
 
     return {
-      code,
-      getExportNames: () => {
-        exportNames ??= getExportNames(code);
-        return exportNames;
-      },
+      ...transformed,
       getRouteChunkInfo: (
         cache: RouteChunkCache | undefined,
         config: RouteChunkConfig
@@ -289,7 +305,12 @@ export const getBundlerRouteAnalysis = async (
 
         let routeChunkInfo: Promise<RouteChunkInfo>;
         routeChunkInfo = cachePromiseOnReject(
-          detectRouteChunksIfEnabled(cache, config, resourcePath, code),
+          detectRouteChunksIfEnabled(
+            cache,
+            config,
+            resourcePath,
+            transformed.code
+          ),
           () => {
             if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
               routeChunkInfoCache.delete(cacheKey);
@@ -321,7 +342,7 @@ export const getBundlerRouteAnalysis = async (
 
 export const getExportNamesAndExportAll = async (
   code: string
-): Promise<{ exportNames: string[]; exportAllModules: string[] }> => {
+): Promise<ExportInfo> => {
   const cached = exportInfoCache.get(code);
   if (cached) {
     return cached;
@@ -335,10 +356,7 @@ export const getExportNamesAndExportAll = async (
     };
   })();
 
-  let trackedExportInfo: Promise<{
-    exportNames: string[];
-    exportAllModules: string[];
-  }>;
+  let trackedExportInfo: Promise<ExportInfo>;
   trackedExportInfo = cachePromiseOnReject(exportInfo, () => {
     if (exportInfoCache.get(code) === trackedExportInfo) {
       exportInfoCache.delete(code);
@@ -360,10 +378,12 @@ export const getRouteModuleAnalysis = async (
 
   const analysis = (async () => {
     const source = await readFile(resourcePath, 'utf8');
-    const code = await transformToEsm(source, resourcePath);
-    const { exportNames, exportAllModules } =
-      await getExportNamesAndExportAll(code);
-    return { code, exports: exportNames, exportAllModules };
+    const transformed = await getTransformedModule(source, resourcePath);
+    return {
+      code: transformed.code,
+      exports: transformed.exportNames,
+      exportAllModules: transformed.exportAllModules,
+    };
   })();
 
   let trackedAnalysis: Promise<RouteModuleAnalysis>;
