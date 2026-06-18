@@ -172,7 +172,7 @@ const runRoute = async ({
       benchmarkSource,
       benchmarkResourcePath
     );
-    const exportNames = await analysis.getExportNames();
+    const exportNames = analysis.exportNames;
     return { analysis, exportNames };
   });
 

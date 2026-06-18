@@ -98,6 +98,30 @@ describe('getBundlerRouteAnalysis', () => {
       exportInfo
     );
   });
+
+  it('does not report erased ambient declarations as runtime exports', async () => {
+    const analysis = await getBundlerRouteAnalysis(
+      `
+        export declare function loader(): void;
+        export declare const action: () => void;
+        export declare class ServerOnly {}
+        export const clientLoader = () => null;
+      `,
+      '/app/routes/ambient-exports.tsx'
+    );
+    const exportInfo = {
+      exportNames: analysis.exportNames,
+      exportAllModules: analysis.exportAllModules,
+    };
+
+    expect(exportInfo).toEqual({
+      exportNames: ['clientLoader'],
+      exportAllModules: [],
+    });
+    await expect(getExportNamesAndExportAll(analysis.code)).resolves.toEqual(
+      exportInfo
+    );
+  });
 });
 
 describe('transformToEsm', () => {

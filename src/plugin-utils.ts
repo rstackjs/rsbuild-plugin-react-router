@@ -396,7 +396,7 @@ const createTopLevelDeclarationGraph = (
     }
   };
 
-  for (const statement of program.body) {
+  for (const statement of program.body ?? []) {
     if (statement.type === 'VariableDeclaration') {
       for (const declarator of statement.declarations) {
         registerDeclaration(
@@ -424,7 +424,7 @@ const collectLiveTopLevelDeclarations = (
 ): Set<TopLevelDeclaration> => {
   const pendingNames: string[] = [];
 
-  for (const statement of program.body) {
+  for (const statement of program.body ?? []) {
     if (statement.type === 'VariableDeclaration') {
       continue;
     }
@@ -459,29 +459,68 @@ const collectLiveTopLevelDeclarations = (
   return liveDeclarations;
 };
 
+const declarationReferencesName = (
+  declaration: TopLevelDeclaration,
+  names: ReadonlySet<string>,
+  graph: TopLevelDeclarationGraph,
+  visitedNames = new Set<string>()
+): boolean => {
+  for (const referencedName of declaration.referencedNames) {
+    if (names.has(referencedName)) {
+      return true;
+    }
+    if (visitedNames.has(referencedName)) {
+      continue;
+    }
+    visitedNames.add(referencedName);
+    for (const referencedDeclaration of graph.declarationsByName.get(
+      referencedName
+    ) ?? []) {
+      if (
+        declarationReferencesName(
+          referencedDeclaration,
+          names,
+          graph,
+          visitedNames
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
 const removeNewlyDeadTopLevelDeclarations = (
   program: AnyNode,
   graph: TopLevelDeclarationGraph,
-  previouslyLive: ReadonlySet<TopLevelDeclaration>
+  previouslyLive: ReadonlySet<TopLevelDeclaration>,
+  removedExportReferencedNames: ReadonlySet<string>
 ): void => {
   const currentlyLive = collectLiveTopLevelDeclarations(program, graph);
-  const isNewlyDead = (node: AnyNode) => {
+  const isRemovableDeadDeclaration = (node: AnyNode) => {
     const declaration = graph.declarationsByNode.get(node);
+    if (!declaration || currentlyLive.has(declaration)) {
+      return false;
+    }
     return (
-      declaration &&
-      previouslyLive.has(declaration) &&
-      !currentlyLive.has(declaration)
+      previouslyLive.has(declaration) ||
+      declarationReferencesName(
+        declaration,
+        removedExportReferencedNames,
+        graph
+      )
     );
   };
 
   program.body = program.body.filter((statement: AnyNode) => {
     if (statement.type === 'VariableDeclaration') {
       statement.declarations = statement.declarations.filter(
-        (declarator: AnyNode) => !isNewlyDead(declarator)
+        (declarator: AnyNode) => !isRemovableDeadDeclaration(declarator)
       );
       return statement.declarations.length > 0;
     }
-    return !isNewlyDead(statement);
+    return !isRemovableDeadDeclaration(statement);
   });
 };
 
@@ -497,6 +536,17 @@ export const removeExports = (
   );
   let exportsChanged = false;
   const removedExportLocalNames = new Set<string>();
+  const removedExportReferencedNames = new Set<string>();
+  const trackRemovedExportReferences = (node: AnyNode | null | undefined) => {
+    if (!node) {
+      return;
+    }
+    const declaration = declarationGraph.declarationsByNode.get(node);
+    for (const name of declaration?.referencedNames ??
+      collectReferencedNames(node)) {
+      removedExportReferencedNames.add(name);
+    }
+  };
 
   for (const statement of [...program.body]) {
     if (statement.type === 'ExportNamedDeclaration') {
@@ -511,6 +561,7 @@ export const removeExports = (
               exportsChanged = true;
               if (specifier.local?.name) {
                 removedExportLocalNames.add(specifier.local.name);
+                removedExportReferencedNames.add(specifier.local.name);
               }
               return false;
             }
@@ -530,6 +581,8 @@ export const removeExports = (
               if (exportsToRemove.includes(declarator.id.name)) {
                 exportsChanged = true;
                 removedExportLocalNames.add(declarator.id.name);
+                removedExportReferencedNames.add(declarator.id.name);
+                trackRemovedExportReferences(declarator);
                 return false;
               }
               return true;
@@ -552,6 +605,8 @@ export const removeExports = (
       ) {
         exportsChanged = true;
         removedExportLocalNames.add(declaration.id.name);
+        removedExportReferencedNames.add(declaration.id.name);
+        trackRemovedExportReferences(statement);
         removeFromArray(program.body, statement);
       }
     }
@@ -564,9 +619,12 @@ export const removeExports = (
       const declaration = statement.declaration;
       if (declaration?.type === 'Identifier') {
         removedExportLocalNames.add(declaration.name);
+        removedExportReferencedNames.add(declaration.name);
       } else if (declaration?.id?.name) {
         removedExportLocalNames.add(declaration.id.name);
+        removedExportReferencedNames.add(declaration.id.name);
       }
+      trackRemovedExportReferences(statement);
       removeFromArray(program.body, statement);
     }
   }
@@ -589,7 +647,8 @@ export const removeExports = (
     removeNewlyDeadTopLevelDeclarations(
       program,
       declarationGraph,
-      previouslyLive
+      previouslyLive,
+      removedExportReferencedNames
     );
   }
 };

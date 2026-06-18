@@ -187,6 +187,49 @@ describe('removeExports', () => {
     expect(result).not.toContain('loader');
   });
 
+  it('removes pre-existing unused declarations that reference removed export locals', () => {
+    const code = `
+      const leaked = loader;
+      export function loader() {
+        return null;
+      }
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    removeExports(ast, ['loader']);
+
+    const result = generate(ast).code;
+    expect(result).not.toContain('leaked');
+    expect(result).not.toContain('loader');
+    expect(result).toContain('Route');
+  });
+
+  it('removes pre-existing unused declarations that retain server-only imports', () => {
+    const code = `
+      import { readSecret } from './data.server';
+      const leaked = readSecret();
+      export function loader() {
+        return readSecret();
+      }
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    removeExports(ast, ['loader']);
+    removeUnusedImports(ast);
+
+    const result = generate(ast).code;
+    expect(result).not.toContain('./data.server');
+    expect(result).not.toContain('leaked');
+    expect(result).not.toContain('readSecret');
+    expect(result).toContain('Route');
+  });
+
   it('does not treat an exported alias as a reference to its exported name', () => {
     const code = `
       const loader = register();
