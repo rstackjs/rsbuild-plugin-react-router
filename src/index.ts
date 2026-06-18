@@ -1,5 +1,11 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import {
+  existsSync,
+  readFileSync,
+  statSync,
+  watch,
+  type FSWatcher,
+} from 'node:fs';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
@@ -111,6 +117,157 @@ const mergeWatchFiles = (
     ...(Array.isArray(existing) ? existing : [existing]),
     ...additions,
   ] as WatchFilesConfig;
+};
+
+type RouteDirectoryState = {
+  directories: Set<string>;
+  files: Set<string>;
+};
+
+const isRouteModuleFile = (filePath: string): boolean =>
+  JS_EXTENSIONS.some(extension => filePath.endsWith(extension));
+
+const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
+  if (left.size !== right.size) {
+    return false;
+  }
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const readRouteDirectoryState = async (
+  routesDirectory: string
+): Promise<RouteDirectoryState> => {
+  const state: RouteDirectoryState = {
+    directories: new Set(),
+    files: new Set(),
+  };
+
+  const walkDirectory = async (directory: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    state.directories.add(directory);
+    await Promise.all(
+      entries.map(async entry => {
+        const entryPath = resolve(directory, entry.name);
+        if (entry.isDirectory()) {
+          await walkDirectory(entryPath);
+          return;
+        }
+        if (entry.isFile() && isRouteModuleFile(entryPath)) {
+          state.files.add(entryPath);
+        }
+      })
+    );
+  };
+
+  await walkDirectory(routesDirectory);
+  return state;
+};
+
+const createRouteFileSetWatcher = async ({
+  routesDirectory,
+  restartMarkerPath,
+  onError,
+}: {
+  routesDirectory: string;
+  restartMarkerPath: string;
+  onError: (error: unknown) => void;
+}): Promise<() => void> => {
+  let state = await readRouteDirectoryState(routesDirectory);
+  let closed = false;
+  let rescanTimer: ReturnType<typeof setTimeout> | undefined;
+  const directoryWatchers = new Map<string, FSWatcher>();
+
+  const touchRestartMarker = async (): Promise<void> => {
+    await mkdir(dirname(restartMarkerPath), { recursive: true });
+    await writeFile(restartMarkerPath, String(Date.now()));
+  };
+
+  const closeRemovedDirectoryWatchers = (
+    nextDirectories: Set<string>
+  ): void => {
+    for (const [directory, watcher] of directoryWatchers) {
+      if (!nextDirectories.has(directory)) {
+        watcher.close();
+        directoryWatchers.delete(directory);
+      }
+    }
+  };
+
+  const watchNewDirectories = (nextDirectories: Set<string>): void => {
+    for (const directory of nextDirectories) {
+      if (directoryWatchers.has(directory)) {
+        continue;
+      }
+      try {
+        const watcher = watch(directory, (eventType: string) => {
+          if (eventType === 'rename') {
+            scheduleRescan();
+          }
+        });
+        watcher.on('error', onError);
+        directoryWatchers.set(directory, watcher);
+      } catch (error) {
+        onError(error);
+      }
+    }
+  };
+
+  const syncDirectoryWatchers = (nextDirectories: Set<string>): void => {
+    closeRemovedDirectoryWatchers(nextDirectories);
+    watchNewDirectories(nextDirectories);
+  };
+
+  const rescan = async (): Promise<void> => {
+    if (closed) {
+      return;
+    }
+    try {
+      const nextState = await readRouteDirectoryState(routesDirectory);
+      syncDirectoryWatchers(nextState.directories);
+      if (!areSetsEqual(state.files, nextState.files)) {
+        state = nextState;
+        await touchRestartMarker();
+        return;
+      }
+      state = nextState;
+    } catch (error) {
+      onError(error);
+    }
+  };
+
+  const scheduleRescan = (): void => {
+    if (rescanTimer) {
+      clearTimeout(rescanTimer);
+    }
+    rescanTimer = setTimeout(() => {
+      rescanTimer = undefined;
+      void rescan();
+    }, 100);
+  };
+
+  syncDirectoryWatchers(state.directories);
+
+  return () => {
+    closed = true;
+    if (rescanTimer) {
+      clearTimeout(rescanTimer);
+    }
+    for (const watcher of directoryWatchers.values()) {
+      watcher.close();
+    }
+    directoryWatchers.clear();
+  };
 };
 
 const ensureFederationAsyncStartup = (
@@ -436,16 +593,41 @@ export const pluginReactRouter = (
       isBuild,
       cache: routeChunkCache,
     };
+    const routesDirectory = resolve(appDirectory, 'routes');
+    const routeRestartMarkerPath = resolve(
+      buildDirectory,
+      '.react-router-route-watch'
+    );
     const routeWatchFiles: WatchFileConfig[] = [
       {
         paths: routesPath,
         type: 'reload-server',
       },
       {
-        paths: resolve(appDirectory, 'routes'),
+        paths: routeRestartMarkerPath,
         type: 'reload-server',
       },
     ];
+    let closeRouteFileSetWatcher: (() => void) | undefined;
+
+    api.onBeforeStartDevServer(async () => {
+      await mkdir(dirname(routeRestartMarkerPath), { recursive: true });
+      await writeFile(routeRestartMarkerPath, String(Date.now()));
+      closeRouteFileSetWatcher = await createRouteFileSetWatcher({
+        routesDirectory,
+        restartMarkerPath: routeRestartMarkerPath,
+        onError: error => {
+          api.logger.warn(
+            `[${PLUGIN_NAME}] Failed to watch route file set changes: ${error}`
+          );
+        },
+      });
+    });
+
+    api.onCloseDevServer(() => {
+      closeRouteFileSetWatcher?.();
+      closeRouteFileSetWatcher = undefined;
+    });
 
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
