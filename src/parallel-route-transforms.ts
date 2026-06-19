@@ -63,6 +63,8 @@ const DEFAULT_RESERVED_CORES = 2;
 const DEFAULT_MIN_PARALLEL_ROUTES = 128;
 const DEFAULT_MAX_WORKERS = 8;
 const DEFAULT_SPLIT_ROUTE_MAX_WORKERS = 8;
+const DEFAULT_LARGE_SPLIT_ROUTE_MIN_ROUTES = 1024;
+const DEFAULT_LARGE_SPLIT_ROUTE_MAX_WORKERS = 12;
 
 const getAvailableCpuCount = (): number =>
   typeof availableParallelism === 'function'
@@ -86,9 +88,14 @@ export const getDefaultWorkerCount = (
     return 0;
   }
 
-  const maxWorkers = splitRouteModules
-    ? DEFAULT_SPLIT_ROUTE_MAX_WORKERS
-    : DEFAULT_MAX_WORKERS;
+  const maxWorkers =
+    splitRouteModules &&
+    typeof routeCount === 'number' &&
+    routeCount >= DEFAULT_LARGE_SPLIT_ROUTE_MIN_ROUTES
+      ? DEFAULT_LARGE_SPLIT_ROUTE_MAX_WORKERS
+      : splitRouteModules
+        ? DEFAULT_SPLIT_ROUTE_MAX_WORKERS
+        : DEFAULT_MAX_WORKERS;
   const workerCount = Math.floor(cpuCount) - DEFAULT_RESERVED_CORES;
   if (workerCount < 2) {
     return 0;
