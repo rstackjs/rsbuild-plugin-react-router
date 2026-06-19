@@ -11,7 +11,6 @@ import {
 } from './constants.js';
 import {
   collectProgramExportNames,
-  getBundlerRouteAnalysis,
   getExportNamesAndExportAll,
   getRouteModuleAnalysis,
 } from './export-utils.js';
@@ -25,6 +24,7 @@ import {
   createRouteClientEntryArtifact,
 } from './route-artifacts.js';
 import {
+  detectRouteChunksIfEnabled,
   getRouteChunkModuleId,
   shouldAnalyzeRouteChunks,
   type RouteChunkCache,
@@ -107,18 +107,19 @@ const splitRouteExports = async (
     return { code: task.code, map: null };
   }
 
-  const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
-  const { hasRouteChunks, chunkedExports } = await analysis.getRouteChunkInfo(
-    getRouteChunkCache(options),
-    task.routeChunkConfig
-  );
+  const { exportNames, hasRouteChunks, chunkedExports } =
+    await detectRouteChunksIfEnabled(
+      getRouteChunkCache(options),
+      task.routeChunkConfig,
+      task.resourcePath,
+      task.code
+    );
   if (!hasRouteChunks) {
     return { code: task.code, map: null };
   }
 
-  const sourceExports = analysis.exportNames;
   const chunkedExportSet = new Set<string>(chunkedExports);
-  const mainChunkReexports = sourceExports
+  const mainChunkReexports = exportNames
     .filter(name => !chunkedExportSet.has(name))
     .join(', ');
   const chunkBasePath = `./${pathBasename(task.resourcePath)}`;
