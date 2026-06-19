@@ -10,6 +10,16 @@ rstest.mock('jiti', () => ({
   createJiti: () => ({
     import: rstest.fn().mockImplementation((path) => {
       if (path.includes('routes.ts')) {
+        const routeCount = Number(process.env.RR_TEST_ROUTE_COUNT ?? 0);
+        if (routeCount > 0) {
+          return Promise.resolve(
+            Array.from({ length: routeCount }, (_, index) => ({
+              id: `routes/route-${index}`,
+              file: `routes/route-${index}.tsx`,
+              index: index === 0,
+            }))
+          );
+        }
         return Promise.resolve([
           {
             id: 'routes/index',
@@ -17,6 +27,13 @@ rstest.mock('jiti', () => ({
             index: true,
           },
         ]);
+      }
+      if (process.env.RR_TEST_SPLIT_ROUTE_MODULES === 'true') {
+        return Promise.resolve({
+          future: {
+            v8_splitRouteModules: true,
+          },
+        });
       }
       return Promise.resolve({});
     }),

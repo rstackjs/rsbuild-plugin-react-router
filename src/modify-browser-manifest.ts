@@ -3,9 +3,10 @@ import type { Route, PluginOptions } from './types.js';
 import { rspack } from '@rsbuild/core';
 import type { Rspack } from '@rsbuild/core';
 import {
+  createReactRouterManifestStats,
+  getReactRouterManifestChunkNames,
   getReactRouterManifestForDev,
   getReactRouterManifestPath,
-  REACT_ROUTER_MANIFEST_STATS_OPTIONS,
 } from './manifest.js';
 import { combineURLs } from './plugin-utils.js';
 import jsesc from 'jsesc';
@@ -25,20 +26,29 @@ export function createModifyBrowserManifestPlugin(
   routeChunkOptions?: Parameters<typeof getReactRouterManifestForDev>[5],
   options?: {
     future?: { unstable_subResourceIntegrity?: boolean };
+    manifestChunkNames?: ReadonlySet<string>;
     onManifest?: (
       manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
       sri: Record<string, string> | undefined
     ) => void;
   }
 ) {
+  const manifestChunkNames =
+    options?.manifestChunkNames ??
+    getReactRouterManifestChunkNames(
+      routes,
+      routeChunkOptions?.splitRouteModules
+    );
+
   return {
     apply(compiler: Rspack.Compiler): void {
       compiler.hooks.emit.tapAsync(
         'ModifyBrowserManifest',
         async (compilation: Rspack.Compilation, callback) => {
-          const stats = compilation
-            .getStats()
-            .toJson(REACT_ROUTER_MANIFEST_STATS_OPTIONS);
+          const stats = createReactRouterManifestStats(
+            compilation,
+            manifestChunkNames
+          );
           const manifest = await getReactRouterManifestForDev(
             routes,
             pluginOptions,

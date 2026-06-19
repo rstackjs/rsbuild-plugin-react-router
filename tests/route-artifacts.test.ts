@@ -1,5 +1,5 @@
-import { describe, expect, it } from '@rstest/core';
-import { getBundlerRouteAnalysis } from '../src/export-utils';
+import { describe, expect, it, rstest } from '@rstest/core';
+import * as exportUtils from '../src/export-utils';
 import {
   createRouteChunkArtifact,
   createRouteClientEntryArtifact,
@@ -96,21 +96,62 @@ describe('route artifact helpers', () => {
     });
 
     it('excludes split client exports from web build route entries', async () => {
-      const result = await createRouteClientEntryArtifact({
-        code: `
-          export const clientAction = async () => {};
-          export async function clientLoader() { return null; }
-          export default function Route() { return null; }
-        `,
-        resourcePath,
-        environmentName: 'web',
-        isBuild: true,
-        routeChunkConfig,
-      });
+      const getBundlerRouteAnalysis = rstest.spyOn(
+        exportUtils,
+        'getBundlerRouteAnalysis'
+      );
 
-      expect(result).toEqual({
-        code: `export { default } from ${JSON.stringify(routeRequest)};`,
-      });
+      try {
+        const result = await createRouteClientEntryArtifact({
+          code: `
+            export const clientAction = async () => {};
+            export async function clientLoader() { return null; }
+            export default function Route() { return null; }
+          `,
+          resourcePath,
+          environmentName: 'web',
+          isBuild: true,
+          routeChunkConfig,
+        });
+
+        expect(result).toEqual({
+          code: `export { default } from ${JSON.stringify(routeRequest)};`,
+        });
+        expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
+      } finally {
+        getBundlerRouteAnalysis.mockRestore();
+      }
+    });
+
+    it('does not run split analysis for root route client entries', async () => {
+      const getBundlerRouteAnalysis = rstest.spyOn(
+        exportUtils,
+        'getBundlerRouteAnalysis'
+      );
+      const rootResourcePath = '/app/root.tsx';
+
+      try {
+        const result = await createRouteClientEntryArtifact({
+          code: `
+            export async function clientLoader() { return null; }
+            export function HydrateFallback() { return null; }
+            export default function Root() { return null; }
+          `,
+          resourcePath: rootResourcePath,
+          environmentName: 'web',
+          isBuild: true,
+          routeChunkConfig,
+        });
+
+        expect(result).toEqual({
+          code: `export { HydrateFallback, clientLoader, default } from ${JSON.stringify(
+            `${rootResourcePath}?react-router-route`
+          )};`,
+        });
+        expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
+      } finally {
+        getBundlerRouteAnalysis.mockRestore();
+      }
     });
   });
 
@@ -145,7 +186,10 @@ describe('route artifact helpers', () => {
         export default function Route() { return null; }
       `;
       const cache: RouteChunkCache = new Map();
-      const analysis = await getBundlerRouteAnalysis(source, resourcePath);
+      const analysis = await exportUtils.getBundlerRouteAnalysis(
+        source,
+        resourcePath
+      );
       const expectedCode = await getRouteChunkIfEnabled(
         cache,
         routeChunkConfig,
@@ -157,6 +201,21 @@ describe('route artifact helpers', () => {
       const result = await createRouteChunk(source, 'clientAction', { cache });
 
       expect(result).toEqual({ code: expectedCode, map: null });
+    });
+
+    it('skips ESM transforms for named chunks when no route chunk exports exist', async () => {
+      await expect(
+        createRouteChunkArtifact({
+          code: `export default function Route() { return null; }`,
+          resource: getRouteChunkModuleId(resourcePath, 'clientLoader'),
+          resourcePath: '/app/routes/demo.cts',
+          routeChunkConfig,
+          isBuild: true,
+        })
+      ).resolves.toEqual({
+        code: emptyRouteChunkSnippet('No clientLoader chunk'),
+        map: null,
+      });
     });
 
     it('validates enforce-mode main chunks against generated chunk exports', async () => {

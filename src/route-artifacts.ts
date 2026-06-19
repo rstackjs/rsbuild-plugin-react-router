@@ -2,16 +2,14 @@ import {
   CLIENT_ROUTE_EXPORTS_SET,
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
-import {
-  getBundlerRouteAnalysis,
-  getExportNames,
-  transformToEsm,
-} from './export-utils.js';
+import { getExportNames } from './export-utils.js';
 import {
   buildEnforceChunkValidity,
+  detectRouteChunksIfEnabled,
   emptyRouteChunkSnippet,
   getRouteChunkIfEnabled,
   getRouteChunkNameFromModuleId,
+  shouldAnalyzeRouteChunks,
   validateRouteChunks,
   type RouteChunkCache,
   type RouteChunkConfig,
@@ -83,17 +81,25 @@ export const createRouteClientEntryArtifact = async ({
   routeChunkCache,
   routeChunkConfig,
 }: RouteClientEntryArtifactOptions): Promise<RouteClientEntryArtifact> => {
-  const analysis = await getBundlerRouteAnalysis(code, resourcePath);
   const isServer = environmentName === 'node';
-  const splitRouteModules = routeChunkConfig.splitRouteModules;
-  const chunkedExports =
-    !isServer && isBuild && splitRouteModules
-      ? (await analysis.getRouteChunkInfo(routeChunkCache, routeChunkConfig))
-          .chunkedExports
-      : [];
+  const mightHaveRouteChunks =
+    !isServer &&
+    isBuild &&
+    shouldAnalyzeRouteChunks(routeChunkConfig, resourcePath, code);
+  const routeChunkInfo = mightHaveRouteChunks
+    ? await detectRouteChunksIfEnabled(
+        routeChunkCache,
+        routeChunkConfig,
+        resourcePath,
+        code
+      )
+    : null;
+  const exportNames =
+    routeChunkInfo?.exportNames ?? (await getExportNames(code));
+  const chunkedExports = routeChunkInfo?.chunkedExports ?? [];
   return {
     code: buildRouteClientEntryCode({
-      exportNames: analysis.exportNames,
+      exportNames,
       chunkedExports,
       isServer,
       resourcePath,
@@ -128,13 +134,12 @@ export const createRouteChunkArtifact = async ({
     };
   }
 
-  const transformed = await transformToEsm(code, resourcePath);
   const chunk = await getRouteChunkIfEnabled(
     routeChunkCache,
     routeChunkConfig,
     resourcePath,
     chunkName,
-    transformed
+    code
   );
 
   if (splitRouteModules === 'enforce' && chunkName === 'main' && chunk) {

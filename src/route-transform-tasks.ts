@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs';
+import { statSync, type Stats } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
@@ -10,7 +10,8 @@ import {
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
 import {
-  getBundlerRouteAnalysis,
+  collectProgramExportNames,
+  getExportNamesAndExportAll,
   getRouteModuleAnalysis,
 } from './export-utils.js';
 import {
@@ -23,6 +24,7 @@ import {
   createRouteClientEntryArtifact,
 } from './route-artifacts.js';
 import {
+  detectRouteChunksIfEnabled,
   getRouteChunkModuleId,
   type RouteChunkCache,
   type RouteChunkConfig,
@@ -30,7 +32,7 @@ import {
 
 export type RouteTransformResult = {
   code: string;
-  map?: any;
+  map?: ReturnType<typeof generate>['map'];
 };
 
 type BaseRouteTransformTask = {
@@ -66,6 +68,7 @@ export type RouteModuleTransformTask = BaseRouteTransformTask & {
   resource: string;
   environmentName: string;
   ssr: boolean;
+  isBuild: boolean;
   isSpaMode: boolean;
   rootRoutePath: string | null;
 };
@@ -86,22 +89,26 @@ const defaultRouteChunkCache: RouteChunkCache = new Map();
 const getRouteChunkCache = (options?: RouteTransformTaskOptions) =>
   options?.routeChunkCache ?? defaultRouteChunkCache;
 
+const tryStat = (path: string): Stats | null =>
+  statSync(path, { throwIfNoEntry: false }) ?? null;
+
 const splitRouteExports = async (
   task: SplitRouteExportsTransformTask,
   options?: RouteTransformTaskOptions
 ): Promise<RouteTransformResult> => {
-  const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
-  const { hasRouteChunks, chunkedExports } = await analysis.getRouteChunkInfo(
-    getRouteChunkCache(options),
-    task.routeChunkConfig
-  );
+  const { exportNames, hasRouteChunks, chunkedExports } =
+    await detectRouteChunksIfEnabled(
+      getRouteChunkCache(options),
+      task.routeChunkConfig,
+      task.resourcePath,
+      task.code
+    );
   if (!hasRouteChunks) {
     return { code: task.code, map: null };
   }
 
-  const sourceExports = analysis.exportNames;
   const chunkedExportSet = new Set<string>(chunkedExports);
-  const mainChunkReexports = sourceExports
+  const mainChunkReexports = exportNames
     .filter(name => !chunkedExportSet.has(name))
     .join(', ');
   const chunkBasePath = `./${pathBasename(task.resourcePath)}`;
@@ -131,47 +138,31 @@ const splitRouteExports = async (
 const resolveIndexFile = (dirPath: string): string | null => {
   for (const ext of JS_EXTENSIONS) {
     const candidate = resolve(dirPath, `index${ext}`);
-    if (!existsSync(candidate)) {
+    const stats = tryStat(candidate);
+    if (!stats?.isFile()) {
       continue;
     }
-    try {
-      if (statSync(candidate).isFile()) {
-        return candidate;
-      }
-    } catch {
-      continue;
-    }
+    return candidate;
   }
   return null;
 };
 
 const resolvePathWithExtensions = (basePath: string): string | null => {
-  if (existsSync(basePath)) {
-    try {
-      const stats = statSync(basePath);
-      if (stats.isFile()) {
-        return basePath;
-      }
-      if (stats.isDirectory()) {
-        return resolveIndexFile(basePath);
-      }
-    } catch {
-      // Ignore invalid paths and fall back to extension probing.
-    }
+  const stats = tryStat(basePath);
+  if (stats?.isFile()) {
+    return basePath;
+  }
+  if (stats?.isDirectory()) {
+    return resolveIndexFile(basePath);
   }
 
   for (const ext of JS_EXTENSIONS) {
     const candidate = `${basePath}${ext}`;
-    if (!existsSync(candidate)) {
+    const candidateStats = tryStat(candidate);
+    if (!candidateStats?.isFile()) {
       continue;
     }
-    try {
-      if (statSync(candidate).isFile()) {
-        return candidate;
-      }
-    } catch {
-      continue;
-    }
+    return candidate;
   }
 
   return resolveIndexFile(basePath);
@@ -202,8 +193,8 @@ const resolveExportAllModule = (
 const createClientOnlyStub = async (
   task: ClientOnlyStubTransformTask
 ): Promise<RouteTransformResult> => {
-  const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
-  const { exportNames: directExportNames, exportAllModules } = analysis;
+  const { exportNames: directExportNames, exportAllModules } =
+    await getExportNamesAndExportAll(task.code);
   const exportNames = new Set(directExportNames);
   const unresolvedExportAll = new Set<string>();
   const visitedModules = new Set<string>();
@@ -215,10 +206,8 @@ const createClientOnlyStub = async (
       return;
     }
     visitedModules.add(modulePath);
-    const {
-      exports: moduleExportNames,
-      exportAllModules: moduleExportAll,
-    } = await getRouteModuleAnalysis(modulePath);
+    const { exports: moduleExportNames, exportAllModules: moduleExportAll } =
+      await getRouteModuleAnalysis(modulePath);
     for (const name of moduleExportNames) {
       if (name !== 'default') {
         exportNames.add(name);
@@ -269,11 +258,19 @@ const createClientOnlyStub = async (
 const transformRouteModule = async (
   task: RouteModuleTransformTask
 ): Promise<RouteTransformResult> => {
-  const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
-  let code = analysis.code;
+  let code = task.code;
 
+  const defaultExportMatch = code.match(/\n\s{0,}([\w\d_]+)\sas default,?/);
+  if (defaultExportMatch && typeof defaultExportMatch.index === 'number') {
+    code =
+      code.slice(0, defaultExportMatch.index) +
+      code.slice(defaultExportMatch.index + defaultExportMatch[0].length);
+    code += `\nexport default ${defaultExportMatch[1]};`;
+  }
+
+  const ast = parse(code, { sourceType: 'module' });
   if (task.environmentName === 'web' && !task.ssr && task.isSpaMode) {
-    const resolvedExportNames = analysis.exportNames;
+    const resolvedExportNames = collectProgramExportNames(ast.program);
     const isRootRoute = task.resourcePath === task.rootRoutePath;
     const relativePath = relative(process.cwd(), task.resourcePath);
 
@@ -301,25 +298,21 @@ const transformRouteModule = async (
     }
   }
 
-  const defaultExportMatch = code.match(/\n\s{0,}([\w\d_]+)\sas default,?/);
-  if (defaultExportMatch && typeof defaultExportMatch.index === 'number') {
-    code =
-      code.slice(0, defaultExportMatch.index) +
-      code.slice(defaultExportMatch.index + defaultExportMatch[0].length);
-    code += `\nexport default ${defaultExportMatch[1]};`;
-  }
-
-  const ast = parse(code, { sourceType: 'module' });
-  if (task.environmentName === 'web') {
-    removeExports(ast, SERVER_ONLY_ROUTE_EXPORTS);
-  }
+  const removedServerOnlyExports =
+    task.environmentName === 'web'
+      ? removeExports(
+          ast,
+          SERVER_ONLY_ROUTE_EXPORTS,
+          SERVER_ONLY_ROUTE_EXPORTS_SET
+        )
+      : false;
   transformRoute(ast);
-  if (task.environmentName === 'web') {
+  if (removedServerOnlyExports) {
     removeUnusedImports(ast);
   }
 
   return generate(ast, {
-    sourceMaps: true,
+    sourceMaps: !task.isBuild,
     filename: task.resource,
     sourceFileName: task.resourcePath,
   });

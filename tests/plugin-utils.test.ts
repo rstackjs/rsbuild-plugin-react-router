@@ -165,5 +165,40 @@ describe('plugin-utils', () => {
       );
       expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
     });
+
+    it('avoids top-level generated helper name collisions', () => {
+      const result = transformRouteCode(`
+        const _withComponentProps = 'reserved';
+        export default function Route() { return null; }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps2');
+      expect(result).toContain('export default _withComponentProps2');
+    });
+
+    it('does not reserve generated helper names used only in local scopes', () => {
+      const result = transformRouteCode(`
+        export default function Route() {
+          const _withComponentProps = 'local';
+          return _withComponentProps;
+        }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps');
+      expect(result).toContain('export default _withComponentProps(function Route');
+      expect(result).not.toContain('_withComponentProps2');
+    });
+
+    it('does not reserve generated helper names from re-export specifiers', () => {
+      const result = transformRouteCode(`
+        export { foo as _withComponentProps } from './foo';
+        export default function Route() { return null; }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps');
+      expect(result).toContain('export default _withComponentProps');
+      expect(result).not.toContain('_withComponentProps2');
+    });
   });
+
 });
