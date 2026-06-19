@@ -10,6 +10,16 @@ rstest.mock('jiti', () => ({
   createJiti: () => ({
     import: rstest.fn().mockImplementation((path) => {
       if (path.includes('routes.ts')) {
+        const routeCount = Number(process.env.RR_TEST_ROUTE_COUNT ?? 0);
+        if (routeCount > 0) {
+          return Promise.resolve(
+            Array.from({ length: routeCount }, (_, index) => ({
+              id: `routes/route-${index}`,
+              file: `routes/route-${index}.tsx`,
+              index: index === 0,
+            }))
+          );
+        }
         return Promise.resolve([
           {
             id: 'routes/index',

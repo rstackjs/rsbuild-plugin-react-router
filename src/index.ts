@@ -411,6 +411,7 @@ export const pluginReactRouter = (
     const isPrerenderEnabled =
       prerenderConfig !== undefined && prerenderConfig !== false;
     const isSpaMode = !ssr && !isPrerenderEnabled;
+    const routeCount = Object.keys(routes).length;
     const routeChunkConfig: RouteChunkConfig = {
       splitRouteModules,
       appDirectory,
@@ -420,7 +421,7 @@ export const pluginReactRouter = (
     const routeTransformExecutor = createRouteTransformExecutor({
       parallelTransforms: pluginOptions.parallelTransforms,
       routeChunkCache,
-      routeCount: Object.keys(routes).length,
+      routeCount,
       splitRouteModules: Boolean(splitRouteModules),
     });
     const routeChunkOptions = {
@@ -1190,8 +1191,25 @@ export const pluginReactRouter = (
         pluginOptions.lazyCompilation === undefined
           ? {}
           : { lazyCompilation: pluginOptions.lazyCompilation };
+      const shouldCompactFileSizeReport =
+        isBuild &&
+        splitRouteModules &&
+        routeCount >= 1024 &&
+        (config.performance?.printFileSize === undefined ||
+          config.performance.printFileSize === true);
 
       return mergeRsbuildConfig(config, {
+        ...(shouldCompactFileSizeReport
+          ? {
+              performance: {
+                printFileSize: {
+                  total: true,
+                  detail: false,
+                  compressed: false,
+                },
+              },
+            }
+          : {}),
         output: {
           assetPrefix: config.output?.assetPrefix || '/',
         },

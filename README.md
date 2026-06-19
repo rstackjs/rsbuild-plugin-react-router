@@ -317,6 +317,10 @@ If no configuration is provided, the following defaults will be used:
 worker count is `availableParallelism - 2`, capped at 8 workers, or 12 for split
 builds with 1024+ routes.
 
+For split builds with 1024+ routes, detailed file-size reporting is compacted to
+totals by default to avoid gzipping and printing thousands of assets. Set
+`performance.printFileSize` to an object to customize that output.
+
 Route transform source maps are generated in development only. If you enable
 Rsbuild source maps for faster local debugging, prefer a cheap JS map:
 `output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
