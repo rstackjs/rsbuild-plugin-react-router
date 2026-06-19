@@ -77,11 +77,7 @@ class WorkerStartupError extends Error {
 
 const DEFAULT_RESERVED_CORES = 2;
 const DEFAULT_MIN_PARALLEL_ROUTES = 128;
-const DEFAULT_MAX_WORKERS = 8;
-const DEFAULT_ROUTE_MAX_WORKERS = 6;
-const DEFAULT_SPLIT_ROUTE_MAX_WORKERS = 6;
-const DEFAULT_LARGE_ROUTE_MIN_ROUTES = 1024;
-const DEFAULT_LARGE_ROUTE_MAX_WORKERS = 2;
+const DEFAULT_SHARE_ROUTE_MODULE_BUILD_RESULTS_MIN_ROUTES = 1024;
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const MAX_ROUTE_MODULE_RESULT_CACHE_ENTRIES = 2048;
 
@@ -92,10 +88,7 @@ const getAvailableCpuCount = (): number =>
 
 export const getDefaultWorkerCount = (
   cpuCount: number = getAvailableCpuCount(),
-  {
-    routeCount,
-    splitRouteModules = false,
-  }: Pick<
+  { routeCount }: Pick<
     RouteTransformExecutorOptions,
     'routeCount' | 'splitRouteModules'
   > = {}
@@ -107,20 +100,11 @@ export const getDefaultWorkerCount = (
     return 0;
   }
 
-  const maxWorkers =
-    typeof routeCount === 'number' &&
-    routeCount >= DEFAULT_LARGE_ROUTE_MIN_ROUTES
-      ? DEFAULT_LARGE_ROUTE_MAX_WORKERS
-      : splitRouteModules
-        ? DEFAULT_SPLIT_ROUTE_MAX_WORKERS
-        : typeof routeCount === 'number'
-          ? DEFAULT_ROUTE_MAX_WORKERS
-          : DEFAULT_MAX_WORKERS;
   const workerCount = Math.floor(cpuCount) - DEFAULT_RESERVED_CORES;
   if (workerCount < 2) {
     return 0;
   }
-  return Math.min(maxWorkers, workerCount);
+  return workerCount;
 };
 
 const getConfiguredWorkerCount = (
@@ -435,7 +419,7 @@ export const createRouteTransformExecutor = ({
     Boolean(
       splitRouteModules &&
       typeof routeCount === 'number' &&
-      routeCount >= DEFAULT_LARGE_ROUTE_MIN_ROUTES
+      routeCount >= DEFAULT_SHARE_ROUTE_MODULE_BUILD_RESULTS_MIN_ROUTES
     )
   );
 };
