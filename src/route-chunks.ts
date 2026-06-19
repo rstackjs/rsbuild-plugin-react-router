@@ -306,63 +306,71 @@ const getExportDependencies = (
   );
 };
 
+const isExportChunkable = (
+  exportName: string,
+  exportDependencies: Map<string, ExportDependencies>
+) => {
+  const dependencies = exportDependencies.get(exportName);
+  if (!dependencies) {
+    return false;
+  }
+  for (const [currentExportName, currentDependencies] of exportDependencies) {
+    if (currentExportName === exportName) {
+      continue;
+    }
+    if (
+      setsIntersect(
+        currentDependencies.topLevelNonModuleStatements,
+        dependencies.topLevelNonModuleStatements
+      )
+    ) {
+      return false;
+    }
+  }
+  if (dependencies.exportedVariableDeclarators.size > 1) {
+    return false;
+  }
+  if (dependencies.exportedVariableDeclarators.size > 0) {
+    for (const [currentExportName, currentDependencies] of exportDependencies) {
+      if (currentExportName === exportName) {
+        continue;
+      }
+      if (
+        setsIntersect(
+          currentDependencies.exportedVariableDeclarators,
+          dependencies.exportedVariableDeclarators
+        )
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+const getChunkableExportMap = (
+  code: string,
+  cache: RouteChunkCache,
+  cacheKey: string
+): Record<RouteChunkExportName, boolean> =>
+  getOrSetFromCache(cache, `${cacheKey}::getChunkableExportMap`, code, () => {
+    const exportDependencies = getExportDependencies(code, cache, cacheKey);
+    return createRouteChunkExportMap(exportName =>
+      isExportChunkable(exportName, exportDependencies)
+    );
+  });
+
 const hasChunkableExport = (
   code: string,
   exportName: string,
   cache: RouteChunkCache,
   cacheKey: string
-) => {
-  return getOrSetFromCache(
-    cache,
-    `${cacheKey}::hasChunkableExport::${exportName}`,
-    code,
-    () => {
-      const exportDependencies = getExportDependencies(code, cache, cacheKey);
-      const dependencies = exportDependencies.get(exportName);
-      if (!dependencies) {
-        return false;
-      }
-      for (const [
-        currentExportName,
-        currentDependencies,
-      ] of exportDependencies) {
-        if (currentExportName === exportName) {
-          continue;
-        }
-        if (
-          setsIntersect(
-            currentDependencies.topLevelNonModuleStatements,
-            dependencies.topLevelNonModuleStatements
-          )
-        ) {
-          return false;
-        }
-      }
-      if (dependencies.exportedVariableDeclarators.size > 1) {
-        return false;
-      }
-      if (dependencies.exportedVariableDeclarators.size > 0) {
-        for (const [
-          currentExportName,
-          currentDependencies,
-        ] of exportDependencies) {
-          if (currentExportName === exportName) {
-            continue;
-          }
-          if (
-            setsIntersect(
-              currentDependencies.exportedVariableDeclarators,
-              dependencies.exportedVariableDeclarators
-            )
-          ) {
-            return false;
-          }
-        }
-      }
-      return true;
-    }
-  );
-};
+) =>
+  (routeChunkExportNames as string[]).includes(exportName)
+    ? getChunkableExportMap(code, cache, cacheKey)[
+        exportName as RouteChunkExportName
+      ]
+    : false;
 
 const generateCode = (program: AnyNode): string | undefined => {
   if (program.body.length === 0) {
@@ -476,10 +484,10 @@ const omitChunkedExports = (
     `${cacheKey}::omitChunkedExports::${exportNames.join(',')}`,
     code,
     () => {
-      const isChunkable = (exportName: string) =>
-        hasChunkableExport(code, exportName, cache, cacheKey);
+      const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
       const isOmitted = (exportName: string) =>
-        exportNames.includes(exportName) && isChunkable(exportName);
+        exportNames.includes(exportName) &&
+        Boolean(chunkableExportMap[exportName as RouteChunkExportName]);
       const isRetained = (exportName: string) => !isOmitted(exportName);
 
       const exportDependencies = getExportDependencies(code, cache, cacheKey);
@@ -489,6 +497,8 @@ const omitChunkedExports = (
 
       const omittedStatements = new Set<AnyNode>();
       const omittedExportedVariableDeclarators = new Set<AnyNode>();
+      const retainedImportedIdentifierNames = new Set<string>();
+      const omittedImportedIdentifierNames = new Set<string>();
 
       for (const omittedExportName of omittedExportNames) {
         const dependencies = exportDependencies.get(omittedExportName);
@@ -502,6 +512,19 @@ const omitChunkedExports = (
         for (const declarator of dependencies.exportedVariableDeclarators) {
           omittedExportedVariableDeclarators.add(declarator);
         }
+        for (const importedName of dependencies.importedIdentifierNames) {
+          omittedImportedIdentifierNames.add(importedName);
+        }
+      }
+
+      for (const retainedExportName of retainedExportNames) {
+        const dependencies = exportDependencies.get(retainedExportName);
+        if (!dependencies) {
+          continue;
+        }
+        for (const importedName of dependencies.importedIdentifierNames) {
+          retainedImportedIdentifierNames.add(importedName);
+        }
       }
 
       const program = analyzeCode(code, cache, cacheKey).program;
@@ -512,18 +535,8 @@ const omitChunkedExports = (
             return node;
           }
           return filterImportSpecifiers(node, importedName => {
-            for (const retainedExportName of retainedExportNames) {
-              const dependencies = exportDependencies.get(retainedExportName);
-              if (dependencies?.importedIdentifierNames.has(importedName)) {
-                return true;
-              }
-            }
-            for (const omittedExportName of omittedExportNames) {
-              const dependencies = exportDependencies.get(omittedExportName);
-              if (dependencies?.importedIdentifierNames.has(importedName)) {
-                return false;
-              }
-            }
+            if (retainedImportedIdentifierNames.has(importedName)) return true;
+            if (omittedImportedIdentifierNames.has(importedName)) return false;
             return true;
           });
         })
@@ -579,8 +592,10 @@ export const detectRouteChunks = (
   cacheKey: string
 ): RouteChunkInfo => {
   const analysisCache = cache ?? new Map();
-  const hasRouteChunkByExportName = createRouteChunkExportMap(exportName =>
-    hasChunkableExport(code, exportName, analysisCache, cacheKey)
+  const hasRouteChunkByExportName = getChunkableExportMap(
+    code,
+    analysisCache,
+    cacheKey
   );
   const chunkedExports = Object.entries(hasRouteChunkByExportName)
     .filter(([, isChunked]) => isChunked)

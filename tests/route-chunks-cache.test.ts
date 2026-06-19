@@ -120,15 +120,12 @@ describe('route chunk cache', () => {
 
     expect(Array.from(cache.keys()).sort()).toEqual([
       'routes/demo.tsx::analyzeCode',
+      'routes/demo.tsx::getChunkableExportMap',
       'routes/demo.tsx::getChunkedExport::HydrateFallback',
       'routes/demo.tsx::getChunkedExport::clientAction',
       'routes/demo.tsx::getChunkedExport::clientLoader',
       'routes/demo.tsx::getChunkedExport::clientMiddleware',
       'routes/demo.tsx::getExportDependencies',
-      'routes/demo.tsx::hasChunkableExport::HydrateFallback',
-      'routes/demo.tsx::hasChunkableExport::clientAction',
-      'routes/demo.tsx::hasChunkableExport::clientLoader',
-      'routes/demo.tsx::hasChunkableExport::clientMiddleware',
       'routes/demo.tsx::omitChunkedExports::clientAction,clientLoader,clientMiddleware,HydrateFallback',
     ]);
   });
