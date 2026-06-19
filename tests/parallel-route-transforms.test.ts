@@ -263,6 +263,59 @@ describe('parallel route transforms', () => {
     }
   });
 
+  it('shares build route module results across environments when output is identical', async () => {
+    const executor = createRouteTransformExecutor({
+      parallelTransforms: { maxWorkers: 2 },
+      routeCount: 1024,
+      splitRouteModules: true,
+    });
+    const task = createRouteModuleTask({
+      code: `
+        export async function clientLoader() { return null; }
+        export default function Route() { return null; }
+      `,
+      environmentName: 'node',
+      isBuild: true,
+    });
+
+    try {
+      const nodeResult = await executor.run(task);
+      const webResult = await executor.run({
+        ...task,
+        environmentName: 'web',
+      });
+
+      expect(webResult).toEqual(nodeResult);
+    } finally {
+      await executor.close();
+    }
+  });
+
+  it('does not share build route module results when web removes server-only exports', async () => {
+    const executor = createRouteTransformExecutor({
+      parallelTransforms: { maxWorkers: 2 },
+      routeCount: 1024,
+      splitRouteModules: true,
+    });
+    const task = createRouteModuleTask({
+      environmentName: 'node',
+      isBuild: true,
+    });
+
+    try {
+      const nodeResult = await executor.run(task);
+      const webResult = await executor.run({
+        ...task,
+        environmentName: 'web',
+      });
+
+      expect(nodeResult.code).toContain('loader');
+      expect(webResult.code).not.toContain('loader');
+    } finally {
+      await executor.close();
+    }
+  });
+
   it('preserves value imports when web route modules have no server-only exports', async () => {
     const result = await executeRouteTransformTask(
       createRouteModuleTask({
