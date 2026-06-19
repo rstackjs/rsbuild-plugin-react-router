@@ -111,6 +111,7 @@ rstest.mock('@scripts/test-helper', () => ({
       processAssets: rstest.fn(),
       onBeforeStartDevServer: rstest.fn(),
       onCloseDevServer: rstest.fn(),
+      onCloseBuild: rstest.fn(),
       onBeforeBuild: rstest.fn(),
       onAfterBuild: rstest.fn(),
       getNormalizedConfig: rstest.fn().mockImplementation(() => mergedConfig),

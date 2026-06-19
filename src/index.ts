@@ -1,6 +1,5 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
@@ -8,24 +7,17 @@ import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
-import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
+import { dirname, relative, resolve } from 'pathe';
 
-import { generate, parse } from './babel.js';
 import {
   BUILD_CLIENT_ROUTE_QUERY_STRING,
-  JS_EXTENSIONS,
   PLUGIN_NAME,
-  SERVER_ONLY_ROUTE_EXPORTS,
-  SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import {
   generateWithProps,
-  removeExports,
-  transformRoute,
   findEntryFile,
   normalizeAssetPrefix,
-  removeUnusedImports,
 } from './plugin-utils.js';
 import type { PluginOptions } from './types.js';
 import {
@@ -52,20 +44,13 @@ import {
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
 import { createRequestHandler, matchRoutes } from 'react-router';
 import {
-  getBundlerRouteAnalysis,
-  getRouteModuleAnalysis,
-} from './export-utils.js';
-import {
   getRouteChunkEntryName,
   getRouteChunkModuleId,
   routeChunkExportNames,
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
-import {
-  createRouteChunkArtifact,
-  createRouteClientEntryArtifact,
-} from './route-artifacts.js';
+import { createRouteTransformExecutor } from './parallel-route-transforms.js';
 import {
   createRouteTopologyWatcher,
   createRouteManifestSnapshot,
@@ -427,6 +412,10 @@ export const pluginReactRouter = (
       rootRouteFile,
     };
     const routeChunkCache: RouteChunkCache = new Map();
+    const routeTransformExecutor = createRouteTransformExecutor({
+      parallelTransforms: pluginOptions.parallelTransforms,
+      routeChunkCache,
+    });
     const routeChunkOptions = {
       splitRouteModules,
       rootRouteFile,
@@ -466,6 +455,12 @@ export const pluginReactRouter = (
     api.onCloseDevServer(() => {
       closeRouteTopologyWatcher?.();
       closeRouteTopologyWatcher = undefined;
+    });
+    api.onCloseBuild(async () => {
+      await routeTransformExecutor.close();
+    });
+    api.onCloseDevServer(async () => {
+      await routeTransformExecutor.close();
     });
 
     type ReactRouterManifest = Awaited<
@@ -1467,16 +1462,15 @@ export const pluginReactRouter = (
           args.environment?.name,
           'route:client-entry',
           args.resource,
-          async () => {
-            return createRouteClientEntryArtifact({
+          async () =>
+            routeTransformExecutor.run({
+              kind: 'routeClientEntry',
               code: args.code,
               resourcePath: args.resourcePath,
               environmentName: args.environment?.name,
               isBuild,
-              routeChunkCache,
               routeChunkConfig,
-            });
-          }
+            })
         )
     );
 
@@ -1490,16 +1484,15 @@ export const pluginReactRouter = (
           args.environment?.name,
           'route:chunk',
           args.resource,
-          async () => {
-            return createRouteChunkArtifact({
+          async () =>
+            routeTransformExecutor.run({
+              kind: 'routeChunk',
               code: args.code,
               resource: args.resource,
               resourcePath: args.resourcePath,
               isBuild,
-              routeChunkCache,
               routeChunkConfig,
-            });
-          }
+            })
         )
     );
 
@@ -1529,48 +1522,12 @@ export const pluginReactRouter = (
               return { code: args.code, map: null };
             }
 
-            const analysis = await getBundlerRouteAnalysis(
-              args.code,
-              args.resourcePath
-            );
-            const { hasRouteChunks, chunkedExports } =
-              await analysis.getRouteChunkInfo(
-                routeChunkCache,
-                routeChunkConfig
-              );
-            if (!hasRouteChunks) {
-              return { code: args.code, map: null };
-            }
-
-            const sourceExports = analysis.exportNames;
-            const chunkedExportSet = new Set<string>(chunkedExports);
-            const isMainChunkExport = (name: string) =>
-              !chunkedExportSet.has(name);
-            const mainChunkReexports = sourceExports
-              .filter(isMainChunkExport)
-              .join(', ');
-            const chunkBasePath = `./${pathBasename(args.resourcePath)}`;
-
-            return {
-              code: [
-                mainChunkReexports
-                  ? `export { ${mainChunkReexports} } from "${getRouteChunkModuleId(
-                      chunkBasePath,
-                      'main'
-                    )}";`
-                  : null,
-                ...chunkedExports.map(
-                  exportName =>
-                    `export { ${exportName} } from "${getRouteChunkModuleId(
-                      chunkBasePath,
-                      exportName
-                    )}";`
-                ),
-              ]
-                .filter(Boolean)
-                .join('\n'),
-              map: null,
-            };
+            return routeTransformExecutor.run({
+              kind: 'splitRouteExports',
+              code: args.code,
+              resourcePath: args.resourcePath,
+              routeChunkConfig,
+            });
           }
         )
     );
@@ -1604,154 +1561,12 @@ export const pluginReactRouter = (
           args.environment?.name,
           'module:client-only-stub',
           args.resource,
-          async () => {
-            const analysis = await getBundlerRouteAnalysis(
-              args.code,
-              args.resourcePath
-            );
-            const { exportNames: directExportNames, exportAllModules } =
-              analysis;
-            const exportNames = new Set(directExportNames);
-            const unresolvedExportAll = new Set<string>();
-            const visitedModules = new Set<string>();
-
-            const resolveIndexFile = (dirPath: string): string | null => {
-              for (const ext of JS_EXTENSIONS) {
-                const candidate = resolve(dirPath, `index${ext}`);
-                if (!existsSync(candidate)) {
-                  continue;
-                }
-                try {
-                  if (statSync(candidate).isFile()) {
-                    return candidate;
-                  }
-                } catch {
-                  continue;
-                }
-              }
-              return null;
-            };
-
-            const resolvePathWithExtensions = (
-              basePath: string
-            ): string | null => {
-              if (existsSync(basePath)) {
-                try {
-                  const stats = statSync(basePath);
-                  if (stats.isFile()) {
-                    return basePath;
-                  }
-                  if (stats.isDirectory()) {
-                    return resolveIndexFile(basePath);
-                  }
-                } catch {
-                  // Ignore invalid paths and fall back to extension probing.
-                }
-              }
-
-              for (const ext of JS_EXTENSIONS) {
-                const candidate = `${basePath}${ext}`;
-                if (!existsSync(candidate)) {
-                  continue;
-                }
-                try {
-                  if (statSync(candidate).isFile()) {
-                    return candidate;
-                  }
-                } catch {
-                  continue;
-                }
-              }
-
-              return resolveIndexFile(basePath);
-            };
-
-            const resolveExportAllModule = (
-              specifier: string,
-              importerPath: string
-            ): string | null => {
-              if (specifier.startsWith('.') || specifier.startsWith('/')) {
-                const basePath = specifier.startsWith('/')
-                  ? specifier
-                  : resolve(dirname(importerPath), specifier);
-                const resolvedPath = resolvePathWithExtensions(basePath);
-                if (resolvedPath) {
-                  return resolvedPath;
-                }
-              }
-
-              try {
-                const resolver = createRequire(
-                  pathToFileURL(importerPath).href
-                );
-                return resolver.resolve(specifier);
-              } catch {
-                return null;
-              }
-            };
-
-            const collectExportNamesFromModule = async (
-              modulePath: string
-            ): Promise<void> => {
-              if (visitedModules.has(modulePath)) {
-                return;
-              }
-              visitedModules.add(modulePath);
-              const {
-                exports: moduleExportNames,
-                exportAllModules: moduleExportAll,
-              } = await getRouteModuleAnalysis(modulePath);
-              for (const name of moduleExportNames) {
-                if (name !== 'default') {
-                  exportNames.add(name);
-                }
-              }
-              for (const nestedSpecifier of moduleExportAll) {
-                const nestedPath = resolveExportAllModule(
-                  nestedSpecifier,
-                  modulePath
-                );
-                if (!nestedPath) {
-                  unresolvedExportAll.add(nestedSpecifier);
-                  continue;
-                }
-                await collectExportNamesFromModule(nestedPath);
-              }
-            };
-
-            for (const specifier of exportAllModules) {
-              const resolvedPath = resolveExportAllModule(
-                specifier,
-                args.resourcePath
-              );
-              if (!resolvedPath) {
-                unresolvedExportAll.add(specifier);
-                continue;
-              }
-              await collectExportNamesFromModule(resolvedPath);
-            }
-
-            if (unresolvedExportAll.size > 0) {
-              throw new Error(
-                `[${PLUGIN_NAME}] Client-only module uses \`export * from\` with ` +
-                  `unresolvable specifier(s): ${Array.from(unresolvedExportAll)
-                    .map(spec => `\`${spec}\``)
-                    .join(', ')}. ` +
-                  `Please explicitly re-export named bindings in ` +
-                  `\`${relative(process.cwd(), args.resourcePath)}\`.`
-              );
-            }
-            return {
-              code: Array.from(exportNames)
-                .map(name =>
-                  name === 'default'
-                    ? 'export default undefined;'
-                    : `export const ${name} = undefined;`
-                )
-                .join('\n'),
-              map: null,
-            };
-          }
+          async () =>
+            routeTransformExecutor.run({
+              kind: 'clientOnlyStub',
+              code: args.code,
+              resourcePath: args.resourcePath,
+            })
         )
     );
 
@@ -1764,78 +1579,17 @@ export const pluginReactRouter = (
           args.environment?.name,
           'route:module',
           args.resource,
-          async () => {
-            const analysis = await getBundlerRouteAnalysis(
-              args.code,
-              args.resourcePath
-            );
-            let code = analysis.code;
-
-            // Match React Router Vite behavior:
-            // In SPA mode, server-only route exports are invalid (except root `loader`),
-            // and `HydrateFallback` is only allowed on the root route.
-            if (args.environment.name === 'web' && !ssr && isSpaMode) {
-              const resolvedExportNames = analysis.exportNames;
-              const isRootRoute = args.resourcePath === rootRoutePath;
-              const relativePath = relative(process.cwd(), args.resourcePath);
-
-              const invalidServerOnly = resolvedExportNames.filter(exp => {
-                if (isRootRoute && exp === 'loader') return false;
-                return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
-              });
-
-              if (invalidServerOnly.length > 0) {
-                const list = invalidServerOnly.map(e => `\`${e}\``).join(', ');
-                throw new Error(
-                  `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
-                    `\`${relativePath}\`: ${list}. ` +
-                    `See https://reactrouter.com/how-to/spa for more information.`
-                );
-              }
-
-              if (
-                !isRootRoute &&
-                resolvedExportNames.includes('HydrateFallback')
-              ) {
-                throw new Error(
-                  `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
-                    `\`${relativePath}\`. ` +
-                    `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
-                    `See https://reactrouter.com/how-to/spa for more information.`
-                );
-              }
-            }
-
-            const defaultExportMatch = code.match(
-              /\n\s{0,}([\w\d_]+)\sas default,?/
-            );
-            if (
-              defaultExportMatch &&
-              typeof defaultExportMatch.index === 'number'
-            ) {
-              code =
-                code.slice(0, defaultExportMatch.index) +
-                code.slice(
-                  defaultExportMatch.index + defaultExportMatch[0].length
-                );
-              code += `\nexport default ${defaultExportMatch[1]};`;
-            }
-
-            const ast = parse(code, { sourceType: 'module' });
-            if (args.environment.name === 'web') {
-              removeExports(ast, SERVER_ONLY_ROUTE_EXPORTS);
-            }
-            transformRoute(ast);
-            if (args.environment.name === 'web') {
-              removeUnusedImports(ast);
-            }
-
-            return generate(ast, {
-              sourceMaps: true,
-              filename: args.resource,
-              sourceFileName: args.resourcePath,
-            });
-          }
+          async () =>
+            routeTransformExecutor.run({
+              kind: 'routeModule',
+              code: args.code,
+              resource: args.resource,
+              resourcePath: args.resourcePath,
+              environmentName: args.environment.name,
+              ssr,
+              isSpaMode,
+              rootRoutePath,
+            })
         )
     );
   },
