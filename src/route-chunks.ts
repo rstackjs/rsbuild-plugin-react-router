@@ -154,21 +154,6 @@ const getTopLevelStatementForNode = (
   return current;
 };
 
-const addTopLevelStatement = (
-  module: Module,
-  dependencies: ExportDependencies,
-  node: AnyNode
-) => {
-  const statement = getTopLevelStatementForNode(module, node);
-  dependencies.topLevelStatements.add(statement);
-  if (
-    statement.type !== 'ImportDeclaration' &&
-    !statement.type.startsWith('Export')
-  ) {
-    dependencies.topLevelNonModuleStatements.add(statement);
-  }
-};
-
 const getVariableDeclaratorForNode = (
   module: Module,
   node: AnyNode
@@ -217,6 +202,44 @@ const getExportDependencies = (
     () => {
       const { module } = analyzeCode(code, cache, cacheKey);
       const exportDependencies = new Map<string, ExportDependencies>();
+      const topLevelStatementCache = new Map<AnyNode, AnyNode>();
+      const variableDeclaratorCache = new Map<AnyNode, AnyNode | null>();
+
+      const getCachedTopLevelStatementForNode = (node: AnyNode): AnyNode => {
+        const cached = topLevelStatementCache.get(node);
+        if (cached) {
+          return cached;
+        }
+        const statement = getTopLevelStatementForNode(module, node);
+        topLevelStatementCache.set(node, statement);
+        return statement;
+      };
+
+      const getCachedVariableDeclaratorForNode = (
+        node: AnyNode
+      ): AnyNode | null => {
+        if (variableDeclaratorCache.has(node)) {
+          return variableDeclaratorCache.get(node) ?? null;
+        }
+        const declarator = getVariableDeclaratorForNode(module, node);
+        variableDeclaratorCache.set(node, declarator);
+        return declarator;
+      };
+
+      const addCachedTopLevelStatement = (
+        dependencies: ExportDependencies,
+        node: AnyNode
+      ) => {
+        const statement = getCachedTopLevelStatementForNode(node);
+        dependencies.topLevelStatements.add(statement);
+        if (
+          statement.type !== 'ImportDeclaration' &&
+          !statement.type.startsWith('Export')
+        ) {
+          dependencies.topLevelNonModuleStatements.add(statement);
+        }
+        return statement;
+      };
 
       const handleExport = (
         exportName: string,
@@ -254,18 +277,17 @@ const getExportDependencies = (
           visitedSymbols.add(symbol);
 
           for (const declaration of symbol.declarations as AnyNode[]) {
-            const statement = getTopLevelStatementForNode(module, declaration);
-            addTopLevelStatement(module, dependencies, declaration);
+            const statement = addCachedTopLevelStatement(
+              dependencies,
+              declaration
+            );
             if (statement.type === 'ImportDeclaration') {
               dependencies.importedIdentifierNames.add(symbol.name);
             }
-            const declarator = getVariableDeclaratorForNode(
-              module,
-              declaration
-            );
+            const declarator = getCachedVariableDeclaratorForNode(declaration);
             if (
               declarator &&
-              getTopLevelStatementForNode(module, declarator).type ===
+              getCachedTopLevelStatementForNode(declarator).type ===
                 'ExportNamedDeclaration'
             ) {
               dependencies.exportedVariableDeclarators.add(declarator);
@@ -274,25 +296,23 @@ const getExportDependencies = (
           }
 
           for (const reference of symbol.references as any[]) {
-            const statement = getTopLevelStatementForNode(
-              module,
+            const statement = addCachedTopLevelStatement(
+              dependencies,
               reference.node
             );
-            addTopLevelStatement(module, dependencies, reference.node);
-            const declarator = getVariableDeclaratorForNode(
-              module,
+            const declarator = getCachedVariableDeclaratorForNode(
               reference.node
             );
             scanNode(declarator ?? statement);
           }
         };
 
-        addTopLevelStatement(module, dependencies, exportNode);
+        addCachedTopLevelStatement(dependencies, exportNode);
 
         if (localSymbol) {
           visitSymbol(localSymbol);
         } else {
-          const statement = getTopLevelStatementForNode(module, exportNode);
+          const statement = getCachedTopLevelStatementForNode(exportNode);
           scanNode(statement);
         }
 
