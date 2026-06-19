@@ -44,8 +44,8 @@ export type PluginOptions = {
 
   /**
    * Run route transforms in a worker-thread pool.
-   * Pass `{ maxWorkers }` to cap the pool size.
-   * @default false
+   * Pass `false` to disable or `{ maxWorkers }` to cap the pool size.
+   * @default true
    */
   parallelTransforms?:
     | boolean

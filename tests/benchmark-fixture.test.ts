@@ -38,8 +38,16 @@ describe('benchmark fixture generator', () => {
       expect(routeModule).toContain('export default function Route0003');
 
       const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
+      expect(rsbuildConfig).toContain(
+        "import { pluginReact } from '@rsbuild/plugin-react';"
+      );
+      expect(rsbuildConfig).toContain('pluginReact(),');
+      expect(rsbuildConfig.indexOf('pluginReact(),')).toBeLessThan(
+        rsbuildConfig.indexOf('pluginReactRouter({')
+      );
       expect(rsbuildConfig).toContain('logPerformance');
       expect(rsbuildConfig).toContain('sourceMap: true');
+      expect(rsbuildConfig).not.toContain('parallelTransforms:');
 
       const reactRouterConfig = readFileSync(
         join(root, 'react-router.config.ts'),
@@ -94,6 +102,28 @@ describe('benchmark fixture generator', () => {
       expect(rsbuildConfig).toContain(
         'parallelTransforms: { maxWorkers: 3 },'
       );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('can explicitly disable parallel route transforms in benchmark config', async () => {
+    const { generateSyntheticFixture } = await import(
+      '../scripts/benchmark/fixture.mjs'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
+
+    try {
+      const result = await generateSyntheticFixture({
+        root,
+        routeCount: 1,
+        variant: 'ssr-esm',
+        parallelTransforms: false,
+      });
+
+      const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
+      expect(result.parallelTransforms).toBe(false);
+      expect(rsbuildConfig).toContain('parallelTransforms: false,');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -215,7 +245,8 @@ describe('benchmark fixture generator', () => {
         '--iterations=1',
         '--warmup=0',
         '--filter=missing',
-        '--parallel-transforms=true',
+        '--rspack-profile=ALL',
+        '--rspack-trace-output=rspack.log',
         '--skip-root-build',
       ],
       {

@@ -219,8 +219,11 @@ const createRoutesConfig = routeCount => {
 };
 
 const renderParallelTransformsOption = parallelTransforms => {
-  if (!parallelTransforms) {
+  if (parallelTransforms === undefined) {
     return [];
+  }
+  if (parallelTransforms === false) {
+    return [`      parallelTransforms: false,`];
   }
   if (parallelTransforms === true) {
     return [`      parallelTransforms: true,`];
@@ -245,10 +248,12 @@ const createRsbuildConfig = ({
 
   return [
     `import { defineConfig } from '@rsbuild/core';`,
+    `import { pluginReact } from '@rsbuild/plugin-react';`,
     `import { pluginReactRouter } from '${pluginImportPath}';`,
     '',
     'export default defineConfig({',
     '  plugins: [',
+    '    pluginReact(),',
     '    pluginReactRouter({',
     ...(ssr ? [`      serverOutput: 'module',`] : []),
     ...renderParallelTransformsOption(parallelTransforms),
@@ -355,7 +360,7 @@ export async function generateSyntheticFixture({
   sourceMap = false,
   pluginImportPath = 'rsbuild-plugin-react-router',
   fixture = 'default',
-  parallelTransforms = false,
+  parallelTransforms,
 }) {
   if (!stressFixtureNames.has(fixture)) {
     throw new Error(

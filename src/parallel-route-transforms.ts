@@ -223,13 +223,14 @@ export const createRouteTransformExecutor = ({
   routeChunkCache,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
   const options = { routeChunkCache };
-  if (!parallelTransforms) {
+  const effectiveParallelTransforms = parallelTransforms ?? true;
+  if (!effectiveParallelTransforms) {
     return {
       run: task => executeRouteTransformTask(task, options),
       close: async () => {},
     };
   }
 
-  const workerCount = getConfiguredWorkerCount(parallelTransforms);
+  const workerCount = getConfiguredWorkerCount(effectiveParallelTransforms);
   return new ParallelRouteTransformExecutor(workerCount, options);
 };

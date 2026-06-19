@@ -1,5 +1,13 @@
 #!/usr/bin/env node
-import { access, mkdir, rm, writeFile } from 'node:fs/promises';
+import {
+  access,
+  cp,
+  mkdir,
+  readdir,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -76,13 +84,18 @@ const parseArgs = argv => {
       clean: { type: 'string', default: 'build' },
       filter: { type: 'string' },
       'parallel-transforms': { type: 'string' },
+      'rspack-profile': { type: 'string' },
+      'rspack-trace-output': { type: 'string' },
       'fail-fast': { type: 'boolean', default: false },
       'skip-root-build': { type: 'boolean', default: false },
     },
   });
 
   const parseParallelTransforms = value => {
-    if (value === undefined || value === 'false' || value === '0') {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (value === 'false' || value === '0') {
       return false;
     }
     if (value === 'true' || value === '1' || value === 'auto') {
@@ -106,6 +119,8 @@ const parseArgs = argv => {
     clean: values.clean,
     filter: values.filter ?? null,
     parallelTransforms: parseParallelTransforms(values['parallel-transforms']),
+    rspackProfile: values['rspack-profile'] ?? null,
+    rspackTraceOutput: values['rspack-trace-output'] ?? null,
     failFast: values['fail-fast'],
     skipRootBuild: values['skip-root-build'],
   };
@@ -126,6 +141,15 @@ const parseArgs = argv => {
   }
   if (!['none', 'build', 'cold'].includes(args.clean)) {
     throw new Error('--clean must be none, build, or cold.');
+  }
+  if (args.rspackProfile !== null && args.rspackProfile.trim() === '') {
+    throw new Error('--rspack-profile must not be empty.');
+  }
+  if (
+    args.rspackTraceOutput !== null &&
+    args.rspackTraceOutput.trim() === ''
+  ) {
+    throw new Error('--rspack-trace-output must not be empty.');
   }
 
   return args;
@@ -289,6 +313,10 @@ const renderMarkdown = result => {
     `- Iterations: ${result.iterations}`,
     `- Warmup: ${result.warmup}`,
     `- Parallel transforms: ${formatParallelTransforms(result.parallelTransforms)}`,
+    `- Rspack profile: ${result.rspackProfile ?? 'false'}`,
+    ...(result.rspackTraceOutput
+      ? [`- Rspack trace output: ${result.rspackTraceOutput}`]
+      : []),
     '',
     '| Benchmark | Routes | Variant | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports |',
     '|---|---:|---|---:|---:|---:|---:|---:|',
@@ -347,31 +375,59 @@ const renderMarkdown = result => {
   return `${lines.join('\n')}\n`;
 };
 
-const writeOutputs = async (result, args) => {
+const resolveOutputPaths = args => {
   const outPath = path.resolve(rootDir, args.out);
   const format = args.format === 'markdown' ? 'md' : args.format;
   const writeJson = format === 'json' || format === 'both';
   const writeMd = format === 'md' || format === 'both';
 
   if (writeJson && writeMd) {
+    return {
+      artifactRoot: outPath,
+      jsonPath: path.join(outPath, 'baseline.json'),
+      mdPath: path.join(outPath, 'baseline.md'),
+      outPath,
+      writeJson,
+      writeMd,
+    };
+  }
+
+  const artifactRoot = path.extname(outPath)
+    ? path.join(path.dirname(outPath), `${path.basename(outPath)}.artifacts`)
+    : `${outPath}.artifacts`;
+
+  return {
+    artifactRoot,
+    jsonPath: writeJson ? outPath : null,
+    mdPath: writeMd ? outPath : null,
+    outPath,
+    writeJson,
+    writeMd,
+  };
+};
+
+const writeOutputs = async (result, outputPaths) => {
+  const { jsonPath, mdPath, outPath, writeJson, writeMd } = outputPaths;
+
+  if (writeJson && writeMd) {
     await mkdir(outPath, { recursive: true });
-    await writeFile(
-      path.join(outPath, 'baseline.json'),
-      `${JSON.stringify(result, null, 2)}\n`
-    );
-    await writeFile(path.join(outPath, 'baseline.md'), renderMarkdown(result));
+    await writeFile(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
+    await writeFile(mdPath, renderMarkdown(result));
     return;
   }
 
   await mkdir(path.dirname(outPath), { recursive: true });
   if (writeJson) {
-    await writeFile(outPath, `${JSON.stringify(result, null, 2)}\n`);
+    await writeFile(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
   } else {
-    await writeFile(outPath, renderMarkdown(result));
+    await writeFile(mdPath, renderMarkdown(result));
   }
 };
 
 const formatParallelTransforms = parallelTransforms => {
+  if (parallelTransforms === undefined) {
+    return 'default';
+  }
   if (!parallelTransforms) {
     return 'false';
   }
@@ -411,9 +467,54 @@ const cleanBuildOutputs = async fixtureRoot => {
   ]);
 };
 
+const listRspackProfileDirs = async cwd => {
+  const entries = await readdir(cwd, { withFileTypes: true });
+  return entries
+    .filter(
+      entry => entry.isDirectory() && entry.name.startsWith('.rspack-profile-')
+    )
+    .map(entry => entry.name)
+    .sort();
+};
+
+const moveDirectory = async (source, destination) => {
+  await rm(destination, { recursive: true, force: true });
+  await mkdir(path.dirname(destination), { recursive: true });
+  try {
+    await rename(source, destination);
+  } catch (error) {
+    if (error?.code !== 'EXDEV') {
+      throw error;
+    }
+    await cp(source, destination, { recursive: true });
+    await rm(source, { recursive: true, force: true });
+  }
+};
+
+const collectRspackProfiles = async ({
+  fixtureRoot,
+  beforeProfiles,
+  destinationRoot,
+}) => {
+  const before = new Set(beforeProfiles);
+  const afterProfiles = await listRspackProfileDirs(fixtureRoot);
+  const createdProfiles = afterProfiles.filter(profile => !before.has(profile));
+  const collected = [];
+
+  for (const profile of createdProfiles) {
+    const source = path.join(fixtureRoot, profile);
+    const destination = path.join(destinationRoot, profile.slice(1));
+    await moveDirectory(source, destination);
+    collected.push(path.relative(rootDir, destination));
+  }
+
+  return collected;
+};
+
 const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   const useTime = await hasGnuTime();
+  const outputPaths = resolveOutputPaths(args);
   const pluginImportPath = pathToFileURL(
     path.join(rootDir, 'dist/index.js')
   ).href;
@@ -466,6 +567,10 @@ const main = async () => {
       console.log(
         `${measured ? 'Measuring' : 'Warming'} ${benchmark.id} (${index + 1}/${totalRuns})`
       );
+      const rspackProfileEnabled = Boolean(args.rspackProfile);
+      const beforeRspackProfiles = rspackProfileEnabled
+        ? await listRspackProfileDirs(fixtureRoot)
+        : [];
       const commandResult = await runCommand({
         command: process.execPath,
         args: [rsbuildBin, 'build', '--config', 'rsbuild.config.mjs'],
@@ -473,9 +578,29 @@ const main = async () => {
         env: {
           NODE_ENV: 'production',
           REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1',
+          ...(args.rspackProfile
+            ? { RSPACK_PROFILE: args.rspackProfile }
+            : {}),
+          ...(args.rspackTraceOutput
+            ? { RSPACK_TRACE_OUTPUT: args.rspackTraceOutput }
+            : {}),
         },
         useTime,
       });
+      const rspackProfiles = rspackProfileEnabled
+        ? await collectRspackProfiles({
+            fixtureRoot,
+            beforeProfiles: beforeRspackProfiles,
+            destinationRoot: path.join(
+              outputPaths.artifactRoot,
+              'rspack-profiles',
+              benchmark.id,
+              `${measured ? 'run' : 'warmup'}-${
+                measured ? index - args.warmup + 1 : index + 1
+              }`
+            ),
+          })
+        : [];
       const timeStats = useTime ? parseTimeStats(commandResult.stderr) : {};
       const pluginReports = parsePluginReports(
         `${commandResult.stdout}\n${commandResult.stderr}`
@@ -493,6 +618,7 @@ const main = async () => {
           sysMs: timeStats.sysMs ?? null,
           maxRssKb: timeStats.maxRssKb ?? null,
           pluginReports,
+          rspackProfiles,
         });
       }
     }
@@ -523,14 +649,14 @@ const main = async () => {
     iterations: args.iterations,
     warmup: args.warmup,
     parallelTransforms: args.parallelTransforms,
+    rspackProfile: args.rspackProfile,
+    rspackTraceOutput: args.rspackTraceOutput,
     failed,
     benchmarks,
   };
 
-  await writeOutputs(result, args);
-  console.log(
-    `Benchmark results written to ${path.resolve(rootDir, args.out)}`
-  );
+  await writeOutputs(result, outputPaths);
+  console.log(`Benchmark results written to ${outputPaths.outPath}`);
 
   if (failed) {
     console.error('One or more measured benchmark builds failed.');
