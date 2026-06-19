@@ -126,9 +126,9 @@ describe('pluginReactRouter', () => {
     ).toBe(true);
   });
 
-  it('reduces file size reporting overhead for large split route builds by default', async () => {
+  it('reduces file size reporting overhead for medium split route builds by default', async () => {
     process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
-    process.env.RR_TEST_ROUTE_COUNT = '1024';
+    process.env.RR_TEST_ROUTE_COUNT = '256';
     const readFileSync = rstest
       .spyOn(fs, 'readFileSync')
       .mockReturnValue('export default function Route() { return null; }');

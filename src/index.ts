@@ -1194,7 +1194,7 @@ export const pluginReactRouter = (
       const shouldCompactFileSizeReport =
         isBuild &&
         splitRouteModules &&
-        routeCount >= 1024 &&
+        routeCount >= 256 &&
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
 

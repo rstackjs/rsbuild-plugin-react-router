@@ -104,7 +104,7 @@ pluginReactRouter({
   /**
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
-   * @default true, inline for small route graphs or low-core CPUs; otherwise `available CPUs - 2`, capped at 8 workers, or 4 workers for split builds with 1024+ routes.
+   * @default true, inline for small route graphs or low-core CPUs; otherwise `available CPUs - 2`, capped at 8 workers, 2 workers for split builds, or 4 workers for split builds with 1024+ routes.
    */
   parallelTransforms?: boolean | { maxWorkers?: number },
 
@@ -314,10 +314,10 @@ If no configuration is provided, the following defaults will be used:
 ```
 
 `parallelTransforms: true` uses worker threads for large route builds. The default
-worker count is `availableParallelism - 2`, capped at 8 workers, or 4 workers for
-split builds with 1024+ routes.
+worker count is `availableParallelism - 2`, capped at 8 workers. Split builds
+cap at 2 workers, or 4 workers for 1024+ routes.
 
-For split builds with 1024+ routes, detailed file-size reporting is compacted to
+For split builds with 256+ routes, detailed file-size reporting is compacted to
 totals by default to avoid gzipping and printing thousands of assets. Set
 `performance.printFileSize` to an object to customize that output.
 
