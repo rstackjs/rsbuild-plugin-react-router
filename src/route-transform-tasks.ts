@@ -11,6 +11,7 @@ import {
 } from './constants.js';
 import {
   getBundlerRouteAnalysis,
+  getExportNamesAndExportAll,
   getRouteModuleAnalysis,
 } from './export-utils.js';
 import {
@@ -189,8 +190,8 @@ const resolveExportAllModule = (
 const createClientOnlyStub = async (
   task: ClientOnlyStubTransformTask
 ): Promise<RouteTransformResult> => {
-  const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
-  const { exportNames: directExportNames, exportAllModules } = analysis;
+  const { exportNames: directExportNames, exportAllModules } =
+    await getExportNamesAndExportAll(task.code);
   const exportNames = new Set(directExportNames);
   const unresolvedExportAll = new Set<string>();
   const visitedModules = new Set<string>();
@@ -256,10 +257,11 @@ const createClientOnlyStub = async (
 const transformRouteModule = async (
   task: RouteModuleTransformTask
 ): Promise<RouteTransformResult> => {
-  const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
-  let code = analysis.code;
+  let code = task.code;
 
   if (task.environmentName === 'web' && !task.ssr && task.isSpaMode) {
+    const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
+    code = analysis.code;
     const resolvedExportNames = analysis.exportNames;
     const isRootRoute = task.resourcePath === task.rootRoutePath;
     const relativePath = relative(process.cwd(), task.resourcePath);
