@@ -36,6 +36,14 @@ type WorkerResponse =
       error: WorkerErrorPayload;
     };
 
+type WorkerRequest = {
+  id: number;
+  task:
+    | RouteTransformTask
+    | (Omit<RouteTransformTask, 'code'> & { code?: string });
+  sourceCacheKey?: string;
+};
+
 type WorkerErrorPayload = {
   name?: string;
   message: string;
@@ -50,6 +58,7 @@ type PendingTask = {
 type WorkerState = {
   worker: Worker;
   pending: Map<number, PendingTask>;
+  sourceCache: Map<string, string>;
 };
 
 class WorkerStartupError extends Error {
@@ -65,6 +74,7 @@ const DEFAULT_MAX_WORKERS = 8;
 const DEFAULT_SPLIT_ROUTE_MAX_WORKERS = 8;
 const DEFAULT_LARGE_SPLIT_ROUTE_MIN_ROUTES = 1024;
 const DEFAULT_LARGE_SPLIT_ROUTE_MAX_WORKERS = 12;
+const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 
 const getAvailableCpuCount = (): number =>
   typeof availableParallelism === 'function'
@@ -203,6 +213,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     const state: WorkerState = {
       worker,
       pending: new Map(),
+      sourceCache: new Map(),
     };
 
     worker.on('message', (response: WorkerResponse) => {
@@ -251,10 +262,44 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     }
 
     const id = this.#nextId++;
+    const sourceCacheKey = task.resourcePath;
+    const requestTask = this.#createWorkerRequestTask(
+      state,
+      task,
+      sourceCacheKey
+    );
     return new Promise((resolve, reject) => {
       state.pending.set(id, { resolve, reject });
-      state.worker.postMessage({ id, task });
+      state.worker.postMessage({
+        id,
+        task: requestTask,
+        sourceCacheKey,
+      } satisfies WorkerRequest);
     });
+  }
+
+  #createWorkerRequestTask(
+    state: WorkerState,
+    task: RouteTransformTask,
+    sourceCacheKey: string
+  ): WorkerRequest['task'] {
+    const cachedSource = state.sourceCache.get(sourceCacheKey);
+    if (cachedSource === task.code) {
+      const { code: _code, ...cachedTask } = task;
+      return cachedTask;
+    }
+
+    if (
+      !state.sourceCache.has(sourceCacheKey) &&
+      state.sourceCache.size >= MAX_WORKER_SOURCE_CACHE_ENTRIES
+    ) {
+      const oldestKey = state.sourceCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        state.sourceCache.delete(oldestKey);
+      }
+    }
+    state.sourceCache.set(sourceCacheKey, task.code);
+    return task;
   }
 
   #getWorkerIndex(task: RouteTransformTask): number {
