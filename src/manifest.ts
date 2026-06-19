@@ -264,7 +264,9 @@ export async function getReactRouterManifestForDev(
       const routeFilePath = resolve(context, route.file);
       let exports = new Set<string>();
       let routeModuleExports: readonly string[] = [];
-      let hasRouteChunkByExportName = createEmptyRouteChunkByExportName();
+      let hasRouteChunkByExportName: ReturnType<
+        typeof createEmptyRouteChunkByExportName
+      > | null = null;
 
       try {
         const { code, exports: exportNames } =
@@ -302,12 +304,16 @@ export async function getReactRouterManifestForDev(
       const hasClientLoader = exports.has(CLIENT_EXPORTS.clientLoader);
       const hasClientMiddleware = exports.has(CLIENT_EXPORTS.clientMiddleware);
       const hasDefaultExport = exports.has('default');
+      const routeChunkMap = hasRouteChunkByExportName;
 
       if (isBuild && enforceSplitRouteModules && routeChunkConfig) {
         validateRouteChunks({
           config: routeChunkConfig,
           id: routeFilePath,
-          valid: buildManifestChunkValidity(exports, hasRouteChunkByExportName),
+          valid: buildManifestChunkValidity(
+            exports,
+            routeChunkMap ?? createEmptyRouteChunkByExportName()
+          ),
         });
       }
 
@@ -320,30 +326,26 @@ export async function getReactRouterManifestForDev(
           index: route.index,
           caseSensitive: route.caseSensitive,
           module: combineURLs(assetPrefix, jsAssets[0] || ''),
-          clientActionModule:
-            isBuild && hasRouteChunkByExportName.clientAction
-              ? getModulePathForChunk(
-                  getRouteChunkEntryName(route.id, 'clientAction')
-                )
-              : undefined,
-          clientLoaderModule:
-            isBuild && hasRouteChunkByExportName.clientLoader
-              ? getModulePathForChunk(
-                  getRouteChunkEntryName(route.id, 'clientLoader')
-                )
-              : undefined,
-          clientMiddlewareModule:
-            isBuild && hasRouteChunkByExportName.clientMiddleware
-              ? getModulePathForChunk(
-                  getRouteChunkEntryName(route.id, 'clientMiddleware')
-                )
-              : undefined,
-          hydrateFallbackModule:
-            isBuild && hasRouteChunkByExportName.HydrateFallback
-              ? getModulePathForChunk(
-                  getRouteChunkEntryName(route.id, 'HydrateFallback')
-                )
-              : undefined,
+          clientActionModule: routeChunkMap?.clientAction
+            ? getModulePathForChunk(
+                getRouteChunkEntryName(route.id, 'clientAction')
+              )
+            : undefined,
+          clientLoaderModule: routeChunkMap?.clientLoader
+            ? getModulePathForChunk(
+                getRouteChunkEntryName(route.id, 'clientLoader')
+              )
+            : undefined,
+          clientMiddlewareModule: routeChunkMap?.clientMiddleware
+            ? getModulePathForChunk(
+                getRouteChunkEntryName(route.id, 'clientMiddleware')
+              )
+            : undefined,
+          hydrateFallbackModule: routeChunkMap?.HydrateFallback
+            ? getModulePathForChunk(
+                getRouteChunkEntryName(route.id, 'HydrateFallback')
+              )
+            : undefined,
           hasAction: exports.has(SERVER_EXPORTS.action),
           hasLoader: exports.has(SERVER_EXPORTS.loader),
           hasClientAction,

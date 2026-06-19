@@ -745,8 +745,8 @@ export const shouldAnalyzeRouteChunks = (
   code: string
 ): boolean =>
   Boolean(config.splitRouteModules) &&
-  !isRootRouteModuleId(config, id) &&
-  mightContainRouteChunkExportName(code);
+  mightContainRouteChunkExportName(code) &&
+  !isRootRouteModuleId(config, id);
 
 export const createEmptyRouteChunkByExportName = (): Record<
   RouteChunkExportName,

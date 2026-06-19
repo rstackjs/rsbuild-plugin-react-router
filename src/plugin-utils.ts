@@ -624,10 +624,10 @@ const hasRemovableExport = (
 
 export const removeExports = (
   ast: ParseResult | AnyNode,
-  exportsToRemove: readonly string[]
+  exportsToRemove: readonly string[],
+  exportsToRemoveSet: ReadonlySet<string> = new Set(exportsToRemove)
 ): boolean => {
   const program = getProgram(ast);
-  const exportsToRemoveSet = new Set(exportsToRemove);
   if (!hasRemovableExport(program, exportsToRemoveSet)) {
     return false;
   }

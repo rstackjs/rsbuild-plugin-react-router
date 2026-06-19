@@ -300,7 +300,11 @@ const transformRouteModule = async (
 
   const removedServerOnlyExports =
     task.environmentName === 'web'
-      ? removeExports(ast, SERVER_ONLY_ROUTE_EXPORTS)
+      ? removeExports(
+          ast,
+          SERVER_ONLY_ROUTE_EXPORTS,
+          SERVER_ONLY_ROUTE_EXPORTS_SET
+        )
       : false;
   transformRoute(ast);
   if (removedServerOnlyExports) {
