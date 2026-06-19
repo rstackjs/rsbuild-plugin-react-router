@@ -75,10 +75,27 @@ const parseArgs = argv => {
       },
       clean: { type: 'string', default: 'build' },
       filter: { type: 'string' },
+      'parallel-transforms': { type: 'string' },
       'fail-fast': { type: 'boolean', default: false },
       'skip-root-build': { type: 'boolean', default: false },
     },
   });
+
+  const parseParallelTransforms = value => {
+    if (value === undefined || value === 'false' || value === '0') {
+      return false;
+    }
+    if (value === 'true' || value === '1' || value === 'auto') {
+      return true;
+    }
+    const maxWorkers = Number(value);
+    if (!Number.isInteger(maxWorkers) || maxWorkers < 1) {
+      throw new Error(
+        '--parallel-transforms must be true, false, auto, or a positive integer.'
+      );
+    }
+    return { maxWorkers };
+  };
 
   const args = {
     profile: values.profile,
@@ -88,6 +105,7 @@ const parseArgs = argv => {
     out: values.out,
     clean: values.clean,
     filter: values.filter ?? null,
+    parallelTransforms: parseParallelTransforms(values['parallel-transforms']),
     failFast: values['fail-fast'],
     skipRootBuild: values['skip-root-build'],
   };
@@ -270,6 +288,7 @@ const renderMarkdown = result => {
     `- Profile: ${result.profile}`,
     `- Iterations: ${result.iterations}`,
     `- Warmup: ${result.warmup}`,
+    `- Parallel transforms: ${formatParallelTransforms(result.parallelTransforms)}`,
     '',
     '| Benchmark | Routes | Variant | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports |',
     '|---|---:|---|---:|---:|---:|---:|---:|',
@@ -352,6 +371,16 @@ const writeOutputs = async (result, args) => {
   }
 };
 
+const formatParallelTransforms = parallelTransforms => {
+  if (!parallelTransforms) {
+    return 'false';
+  }
+  if (parallelTransforms === true) {
+    return 'true';
+  }
+  return `maxWorkers=${parallelTransforms.maxWorkers}`;
+};
+
 const git = async args => {
   const result = await runCommand({
     command: 'git',
@@ -417,6 +446,7 @@ const main = async () => {
       variant: benchmark.variant,
       sourceMap: benchmark.sourceMap ?? false,
       pluginImportPath,
+      parallelTransforms: args.parallelTransforms,
     });
 
     const runs = [];
@@ -469,6 +499,7 @@ const main = async () => {
 
     benchmarks.push({
       ...benchmark,
+      parallelTransforms: args.parallelTransforms,
       cwd: path.relative(rootDir, fixtureRoot),
       command:
         'node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs',
@@ -491,6 +522,7 @@ const main = async () => {
     profile: args.profile,
     iterations: args.iterations,
     warmup: args.warmup,
+    parallelTransforms: args.parallelTransforms,
     failed,
     benchmarks,
   };

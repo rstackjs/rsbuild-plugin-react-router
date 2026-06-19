@@ -45,6 +45,19 @@ export type PluginOptions = {
    * @default false
    */
   logPerformance?: boolean;
+
+  /**
+   * Run CPU-heavy route transforms in a worker-thread pool.
+   *
+   * Set to `true` to use an automatically sized pool, or pass
+   * `{ maxWorkers }` to cap the pool size.
+   * @default false
+   */
+  parallelTransforms?:
+    | boolean
+    | {
+        maxWorkers?: number;
+      };
 };
 
 export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {

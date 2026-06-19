@@ -218,7 +218,24 @@ const createRoutesConfig = routeCount => {
   ].join('\n');
 };
 
-const createRsbuildConfig = ({ variant, sourceMap, pluginImportPath }) => {
+const renderParallelTransformsOption = parallelTransforms => {
+  if (!parallelTransforms) {
+    return [];
+  }
+  if (parallelTransforms === true) {
+    return [`      parallelTransforms: true,`];
+  }
+  return [
+    `      parallelTransforms: { maxWorkers: ${parallelTransforms.maxWorkers} },`,
+  ];
+};
+
+const createRsbuildConfig = ({
+  variant,
+  sourceMap,
+  pluginImportPath,
+  parallelTransforms,
+}) => {
   const ssr = variant !== 'spa';
   const lazyCompilationOption =
     `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '0'` +
@@ -234,6 +251,7 @@ const createRsbuildConfig = ({ variant, sourceMap, pluginImportPath }) => {
     '  plugins: [',
     '    pluginReactRouter({',
     ...(ssr ? [`      serverOutput: 'module',`] : []),
+    ...renderParallelTransformsOption(parallelTransforms),
     lazyCompilationOption,
     `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
     '    }),',
@@ -337,6 +355,7 @@ export async function generateSyntheticFixture({
   sourceMap = false,
   pluginImportPath = 'rsbuild-plugin-react-router',
   fixture = 'default',
+  parallelTransforms = false,
 }) {
   if (!stressFixtureNames.has(fixture)) {
     throw new Error(
@@ -355,7 +374,12 @@ export async function generateSyntheticFixture({
   );
   await writeFile(
     path.join(root, 'rsbuild.config.mjs'),
-    createRsbuildConfig({ variant, sourceMap, pluginImportPath })
+    createRsbuildConfig({
+      variant,
+      sourceMap,
+      pluginImportPath,
+      parallelTransforms,
+    })
   );
   await writeFile(
     path.join(root, 'react-router.config.ts'),
@@ -415,5 +439,6 @@ export async function generateSyntheticFixture({
     variant,
     sourceMap,
     fixture,
+    parallelTransforms,
   };
 }

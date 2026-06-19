@@ -75,6 +75,30 @@ describe('benchmark fixture generator', () => {
     }
   });
 
+  it('can enable parallel route transforms in benchmark config', async () => {
+    const { generateSyntheticFixture } = await import(
+      '../scripts/benchmark/fixture.mjs'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
+
+    try {
+      const result = await generateSyntheticFixture({
+        root,
+        routeCount: 1,
+        variant: 'ssr-esm',
+        parallelTransforms: { maxWorkers: 3 },
+      });
+
+      const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
+      expect(result.parallelTransforms).toEqual({ maxWorkers: 3 });
+      expect(rsbuildConfig).toContain(
+        'parallelTransforms: { maxWorkers: 3 },'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('omits server-only route exports from SPA benchmark fixtures', async () => {
     const { generateSyntheticFixture } = await import(
       '../scripts/benchmark/fixture.mjs'
@@ -191,6 +215,7 @@ describe('benchmark fixture generator', () => {
         '--iterations=1',
         '--warmup=0',
         '--filter=missing',
+        '--parallel-transforms=true',
         '--skip-root-build',
       ],
       {
