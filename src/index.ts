@@ -1256,6 +1256,7 @@ export const pluginReactRouter = (
                   module: true,
                 },
                 optimization: {
+                  avoidEntryIife: true,
                   runtimeChunk: 'single',
                 },
               },

@@ -112,6 +112,19 @@ describe('pluginReactRouter', () => {
     expect(nodeConfig.output.module).toBe(false);
   });
 
+  it('configures web entries to avoid unnecessary entry IIFEs', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.avoidEntryIife
+    ).toBe(true);
+  });
+
   it('should forward lazy compilation when explicitly configured', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
