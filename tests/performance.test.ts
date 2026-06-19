@@ -180,6 +180,28 @@ describe('React Router performance profiler', () => {
     }
   });
 
+  it('records async operations without Promise finally overhead', async () => {
+    const logs: string[] = [];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+    const operation = Promise.resolve('route-module');
+    operation.finally = () => {
+      throw new Error('profiler should avoid Promise.prototype.finally');
+    };
+
+    await expect(
+      profiler.record('web', 'route:module', 'app/routes/a.tsx', () => {
+        return operation;
+      })
+    ).resolves.toBe('route-module');
+    profiler.flush('web');
+
+    const report = parsePerformanceReport(logs[0]);
+    expect(report.operations['route:module'].count).toBe(1);
+  });
+
   it('does not evaluate timers or log output when disabled', async () => {
     const logs: string[] = [];
     const originalNow = performance.now;

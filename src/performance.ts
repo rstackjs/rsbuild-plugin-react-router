@@ -177,10 +177,18 @@ export const createReactRouterPerformanceProfiler = ({
       const resolvedEnvironment = environment ?? 'unknown';
       const start = performance.now();
       try {
-        return callback().finally(() => {
-          const end = performance.now();
-          recordDuration(resolvedEnvironment, operation, resource, start, end);
-        });
+        return callback().then(
+          result => {
+            const end = performance.now();
+            recordDuration(resolvedEnvironment, operation, resource, start, end);
+            return result;
+          },
+          error => {
+            const end = performance.now();
+            recordDuration(resolvedEnvironment, operation, resource, start, end);
+            throw error;
+          }
+        );
       } catch (error) {
         const end = performance.now();
         recordDuration(resolvedEnvironment, operation, resource, start, end);
