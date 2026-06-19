@@ -249,6 +249,22 @@ describe('parallel route transforms', () => {
     }
   });
 
+  it('preserves value imports when web route modules have no server-only exports', async () => {
+    const result = await executeRouteTransformTask(
+      createRouteModuleTask({
+        code: `
+          import { setup } from './side-effect';
+          export default function Route() { return null; }
+        `,
+        environmentName: 'web',
+        ssr: false,
+        isBuild: true,
+      })
+    );
+
+    expect(result.code).toContain(`import { setup } from './side-effect';`);
+  });
+
   it('does not run bundler route analysis for non-SPA route module transforms', async () => {
     const getBundlerRouteAnalysis = rstest.spyOn(
       exportUtils,

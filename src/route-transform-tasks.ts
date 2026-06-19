@@ -297,11 +297,12 @@ const transformRouteModule = async (
     }
   }
 
-  if (task.environmentName === 'web') {
-    removeExports(ast, SERVER_ONLY_ROUTE_EXPORTS);
-  }
+  const removedServerOnlyExports =
+    task.environmentName === 'web'
+      ? removeExports(ast, SERVER_ONLY_ROUTE_EXPORTS)
+      : false;
   transformRoute(ast);
-  if (task.environmentName === 'web') {
+  if (removedServerOnlyExports) {
     removeUnusedImports(ast);
   }
 
