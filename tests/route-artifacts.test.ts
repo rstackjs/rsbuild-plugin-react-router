@@ -96,21 +96,31 @@ describe('route artifact helpers', () => {
     });
 
     it('excludes split client exports from web build route entries', async () => {
-      const result = await createRouteClientEntryArtifact({
-        code: `
-          export const clientAction = async () => {};
-          export async function clientLoader() { return null; }
-          export default function Route() { return null; }
-        `,
-        resourcePath,
-        environmentName: 'web',
-        isBuild: true,
-        routeChunkConfig,
-      });
+      const getBundlerRouteAnalysis = rstest.spyOn(
+        exportUtils,
+        'getBundlerRouteAnalysis'
+      );
 
-      expect(result).toEqual({
-        code: `export { default } from ${JSON.stringify(routeRequest)};`,
-      });
+      try {
+        const result = await createRouteClientEntryArtifact({
+          code: `
+            export const clientAction = async () => {};
+            export async function clientLoader() { return null; }
+            export default function Route() { return null; }
+          `,
+          resourcePath,
+          environmentName: 'web',
+          isBuild: true,
+          routeChunkConfig,
+        });
+
+        expect(result).toEqual({
+          code: `export { default } from ${JSON.stringify(routeRequest)};`,
+        });
+        expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
+      } finally {
+        getBundlerRouteAnalysis.mockRestore();
+      }
     });
 
     it('does not run split analysis for root route client entries', async () => {

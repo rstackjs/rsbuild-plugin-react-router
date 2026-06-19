@@ -2,9 +2,10 @@ import {
   CLIENT_ROUTE_EXPORTS_SET,
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
-import { getBundlerRouteAnalysis, getExportNames } from './export-utils.js';
+import { getExportNames } from './export-utils.js';
 import {
   buildEnforceChunkValidity,
+  detectRouteChunksIfEnabled,
   emptyRouteChunkSnippet,
   getRouteChunkIfEnabled,
   getRouteChunkNameFromModuleId,
@@ -85,14 +86,17 @@ export const createRouteClientEntryArtifact = async ({
     !isServer &&
     isBuild &&
     shouldAnalyzeRouteChunks(routeChunkConfig, resourcePath, code);
-  const analysis = mightHaveRouteChunks
-    ? await getBundlerRouteAnalysis(code, resourcePath)
+  const routeChunkInfo = mightHaveRouteChunks
+    ? await detectRouteChunksIfEnabled(
+        routeChunkCache,
+        routeChunkConfig,
+        resourcePath,
+        code
+      )
     : null;
-  const exportNames = analysis?.exportNames ?? (await getExportNames(code));
-  const chunkedExports = analysis
-    ? (await analysis.getRouteChunkInfo(routeChunkCache, routeChunkConfig))
-        .chunkedExports
-    : [];
+  const exportNames =
+    routeChunkInfo?.exportNames ?? (await getExportNames(code));
+  const chunkedExports = routeChunkInfo?.chunkedExports ?? [];
   return {
     code: buildRouteClientEntryCode({
       exportNames,

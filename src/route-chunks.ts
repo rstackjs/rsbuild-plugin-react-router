@@ -31,6 +31,7 @@ type RouteChunkCacheEntry<T> = {
 export type RouteChunkCache = Map<string, RouteChunkCacheEntry<unknown>>;
 
 export type RouteChunkInfo = {
+  exportNames: string[];
   hasRouteChunks: boolean;
   hasRouteChunkByExportName: Record<RouteChunkExportName, boolean>;
   chunkedExports: RouteChunkExportName[];
@@ -597,6 +598,11 @@ export const detectRouteChunks = (
   cacheKey: string
 ): RouteChunkInfo => {
   const analysisCache = cache ?? new Map();
+  const exportDependencies = getExportDependencies(
+    code,
+    analysisCache,
+    cacheKey
+  );
   const hasRouteChunkByExportName = getChunkableExportMap(
     code,
     analysisCache,
@@ -607,6 +613,7 @@ export const detectRouteChunks = (
     .map(([exportName]) => exportName as RouteChunkExportName);
   const hasRouteChunks = chunkedExports.length > 0;
   return {
+    exportNames: Array.from(exportDependencies.keys()),
     hasRouteChunks,
     hasRouteChunkByExportName,
     chunkedExports,
@@ -719,6 +726,7 @@ export const detectRouteChunksIfEnabled: (
   code: string
 ) => {
   const noRouteChunks = (): RouteChunkInfo => ({
+    exportNames: [],
     chunkedExports: [] as RouteChunkExportName[],
     hasRouteChunks: false,
     hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
