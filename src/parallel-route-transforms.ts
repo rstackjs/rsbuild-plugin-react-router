@@ -62,7 +62,7 @@ class WorkerStartupError extends Error {
 const DEFAULT_RESERVED_CORES = 2;
 const DEFAULT_MIN_PARALLEL_ROUTES = 128;
 const DEFAULT_MAX_WORKERS = 8;
-const DEFAULT_SPLIT_ROUTE_MAX_WORKERS = 6;
+const DEFAULT_SPLIT_ROUTE_MAX_WORKERS = 8;
 
 const getAvailableCpuCount = (): number =>
   typeof availableParallelism === 'function'

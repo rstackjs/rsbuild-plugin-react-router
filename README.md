@@ -104,7 +104,7 @@ pluginReactRouter({
   /**
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
-   * @default true, inline for small route graphs or low-core CPUs; otherwise `min(available CPUs - 2, 8)`, or `6` with split route modules.
+   * @default true, inline for small route graphs or low-core CPUs; otherwise `min(available CPUs - 2, 8)`.
    */
   parallelTransforms?: boolean | { maxWorkers?: number },
 
@@ -314,8 +314,7 @@ If no configuration is provided, the following defaults will be used:
 ```
 
 `parallelTransforms: true` uses worker threads for large route builds. The default
-worker count is `availableParallelism - 2`, capped at 8 workers, or 6 workers
-when `splitRouteModules` is enabled.
+worker count is `availableParallelism - 2`, capped at 8 workers.
 
 Route transform source maps are generated in development only. If you enable
 Rsbuild source maps for faster local debugging, prefer a cheap JS map:

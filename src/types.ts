@@ -45,7 +45,7 @@ export type PluginOptions = {
   /**
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
-   * @default true, inline for small route graphs or low-core CPUs; otherwise `min(available CPUs - 2, 8)`, or `6` with split route modules.
+   * @default true, inline for small route graphs or low-core CPUs; otherwise `min(available CPUs - 2, 8)`.
    */
   parallelTransforms?:
     | boolean
