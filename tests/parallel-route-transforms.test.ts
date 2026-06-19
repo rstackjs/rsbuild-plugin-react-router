@@ -49,12 +49,12 @@ describe('parallel route transforms', () => {
     [4, {}, 2],
     [6, {}, 4],
     [8, {}, 6],
-    [24, {}, 8],
+    [24, {}, 22],
     [24, { routeCount: 48 }, 0],
-    [24, { routeCount: 256 }, 6],
-    [24, { routeCount: 256, splitRouteModules: true }, 6],
-    [24, { routeCount: 1024 }, 2],
-    [24, { routeCount: 1024, splitRouteModules: true }, 2],
+    [24, { routeCount: 256 }, 22],
+    [24, { routeCount: 256, splitRouteModules: true }, 22],
+    [24, { routeCount: 1024 }, 22],
+    [24, { routeCount: 1024, splitRouteModules: true }, 22],
   ])('chooses the default worker count', (cpus, options, workers) => {
     expect(getDefaultWorkerCount(cpus, options)).toBe(workers);
   });
@@ -65,9 +65,9 @@ describe('parallel route transforms', () => {
     [3, 0],
     [4, 2],
     [8, 6],
-    [10, 6],
-    [24, 6],
-  ])('caps medium split route module builds at six workers', (cpus, workers) => {
+    [10, 8],
+    [24, 22],
+  ])('uses cpu count minus two workers for split route module builds', (cpus, workers) => {
     expect(
       getDefaultWorkerCount(cpus, {
         routeCount: 256,
@@ -78,10 +78,10 @@ describe('parallel route transforms', () => {
 
   it.each([
     [4, 2],
-    [6, 2],
-    [10, 2],
-    [24, 2],
-  ])('caps very large route module builds at two workers', (cpus, workers) => {
+    [6, 4],
+    [10, 8],
+    [24, 22],
+  ])('uses cpu count minus two workers for very large route module builds', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus, { routeCount: 1024 })).toBe(workers);
     expect(
       getDefaultWorkerCount(cpus, {
@@ -97,9 +97,9 @@ describe('parallel route transforms', () => {
     [3, 0],
     [4, 2],
     [6, 4],
-    [10, 6],
-    [24, 6],
-  ])('caps regular route builds at six workers', (cpus, workers) => {
+    [10, 8],
+    [24, 22],
+  ])('uses cpu count minus two workers for regular route builds', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus, { routeCount: 256 })).toBe(workers);
   });
 
@@ -150,9 +150,9 @@ describe('parallel route transforms', () => {
     [6, 4],
     [8, 6],
     [10, 8],
-    [12, 8],
-    [24, 8],
-  ])('defaults to cpu count minus two cores capped at eight workers', (cpus, workers) => {
+    [12, 10],
+    [24, 22],
+  ])('defaults to cpu count minus two cores', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
 
