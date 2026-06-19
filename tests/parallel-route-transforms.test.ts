@@ -45,12 +45,12 @@ describe('parallel route transforms', () => {
   it.each([
     [1, {}, 0],
     [2, {}, 0],
-    [3, {}, 0],
+    [3, {}, 1],
     [4, {}, 2],
     [6, {}, 4],
     [8, {}, 6],
     [24, {}, 22],
-    [24, { routeCount: 48 }, 0],
+    [24, { routeCount: 48 }, 22],
     [24, { routeCount: 256 }, 22],
     [24, { routeCount: 256, splitRouteModules: true }, 22],
     [24, { routeCount: 1024 }, 22],
@@ -62,7 +62,7 @@ describe('parallel route transforms', () => {
   it.each([
     [1, 0],
     [2, 0],
-    [3, 0],
+    [3, 1],
     [4, 2],
     [8, 6],
     [10, 8],
@@ -77,6 +77,7 @@ describe('parallel route transforms', () => {
   });
 
   it.each([
+    [3, 1],
     [4, 2],
     [6, 4],
     [10, 8],
@@ -94,7 +95,7 @@ describe('parallel route transforms', () => {
   it.each([
     [1, 0],
     [2, 0],
-    [3, 0],
+    [3, 1],
     [4, 2],
     [6, 4],
     [10, 8],
@@ -105,8 +106,10 @@ describe('parallel route transforms', () => {
 
   it.each([
     [1, 0],
-    [24, 0],
-  ])('runs small route builds inline by default', (cpus, workers) => {
+    [2, 0],
+    [3, 1],
+    [24, 22],
+  ])('uses cpu count minus two workers for small route builds', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus, { routeCount: 48 })).toBe(workers);
   });
 
@@ -126,9 +129,9 @@ describe('parallel route transforms', () => {
     }
   });
 
-  it('runs small route builds inline when no worker pool is needed', async () => {
+  it('runs route builds inline when parallel transforms are disabled', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: true,
+      parallelTransforms: false,
       routeCount: 48,
     });
 
@@ -145,7 +148,7 @@ describe('parallel route transforms', () => {
   it.each([
     [1, 0],
     [2, 0],
-    [3, 0],
+    [3, 1],
     [4, 2],
     [6, 4],
     [8, 6],

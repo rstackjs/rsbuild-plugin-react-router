@@ -1,3 +1,4 @@
+import { getDefaultConcurrency } from './concurrency.js';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
@@ -134,7 +135,10 @@ export const resolvePrerenderPaths = async (
   return pathsConfig ?? [];
 };
 
-export const getPrerenderConcurrency = (prerender: PrerenderConfig): number => {
+export const getPrerenderConcurrency = (
+  prerender: PrerenderConfig,
+  cpuCount?: number
+): number => {
   if (
     typeof prerender === 'object' &&
     prerender !== null &&
@@ -145,7 +149,7 @@ export const getPrerenderConcurrency = (prerender: PrerenderConfig): number => {
       return value;
     }
   }
-  return 1;
+  return getDefaultConcurrency(cpuCount);
 };
 
 const isValidPrerenderPathsConfig = (
