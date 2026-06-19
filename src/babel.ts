@@ -4,10 +4,8 @@ import {
   type ParseOptions,
   type ParseResult,
 } from 'yuku-parser';
+import type { Rspack } from '@rsbuild/core';
 import { strip } from 'yuku-codegen';
-
-export type Babel = any;
-export type NodePath<T = any> = T;
 
 export const parse = (
   code: string,
@@ -36,9 +34,9 @@ export const generate = (
     filename?: string;
     sourceFileName?: string;
   } = {}
-): { code: string; map: any } => {
+): { code: string; map: Rspack.RawSourceMap | null } => {
   const result = 'program' in ast ? ast : { program: ast, lineStarts: [] };
-  const generated = strip(result.program as any, {
+  const generated = strip(result.program as Parameters<typeof strip>[0], {
     comments: 'some',
     sourceMaps: options.sourceMaps
       ? {
@@ -48,7 +46,18 @@ export const generate = (
         }
       : undefined,
   });
-  return { code: generated.code, map: generated.map as any };
+  const map = generated.map
+    ? {
+        ...generated.map,
+        file: generated.map.file ?? options.filename ?? '',
+        sourceRoot: generated.map.sourceRoot ?? undefined,
+        sourcesContent:
+          generated.map.sourcesContent?.map(source => source ?? '') ??
+          undefined,
+      }
+    : null;
+
+  return { code: generated.code, map };
 };
 
 export const t = {};

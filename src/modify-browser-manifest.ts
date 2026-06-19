@@ -3,9 +3,9 @@ import type { Route, PluginOptions } from './types.js';
 import { rspack } from '@rsbuild/core';
 import type { Rspack } from '@rsbuild/core';
 import {
+  createReactRouterManifestStats,
   getReactRouterManifestForDev,
   getReactRouterManifestPath,
-  REACT_ROUTER_MANIFEST_STATS_OPTIONS,
 } from './manifest.js';
 import { combineURLs } from './plugin-utils.js';
 import jsesc from 'jsesc';
@@ -36,9 +36,7 @@ export function createModifyBrowserManifestPlugin(
       compiler.hooks.emit.tapAsync(
         'ModifyBrowserManifest',
         async (compilation: Rspack.Compilation, callback) => {
-          const stats = compilation
-            .getStats()
-            .toJson(REACT_ROUTER_MANIFEST_STATS_OPTIONS);
+          const stats = createReactRouterManifestStats(compilation);
           const manifest = await getReactRouterManifestForDev(
             routes,
             pluginOptions,

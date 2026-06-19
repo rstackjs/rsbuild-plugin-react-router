@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
+import type { Rspack } from '@rsbuild/core';
 import { generate, parse } from './babel.js';
 import {
   JS_EXTENSIONS,
@@ -30,7 +31,7 @@ import {
 
 export type RouteTransformResult = {
   code: string;
-  map?: any;
+  map?: string | Rspack.RawSourceMap | null;
 };
 
 type BaseRouteTransformTask = {
@@ -86,6 +87,14 @@ const defaultRouteChunkCache: RouteChunkCache = new Map();
 const getRouteChunkCache = (options?: RouteTransformTaskOptions) =>
   options?.routeChunkCache ?? defaultRouteChunkCache;
 
+const tryStat = (path: string): ReturnType<typeof statSync> | null => {
+  try {
+    return statSync(path);
+  } catch {
+    return null;
+  }
+};
+
 const splitRouteExports = async (
   task: SplitRouteExportsTransformTask,
   options?: RouteTransformTaskOptions
@@ -131,47 +140,33 @@ const splitRouteExports = async (
 const resolveIndexFile = (dirPath: string): string | null => {
   for (const ext of JS_EXTENSIONS) {
     const candidate = resolve(dirPath, `index${ext}`);
-    if (!existsSync(candidate)) {
+    const stats = existsSync(candidate) ? tryStat(candidate) : null;
+    if (!stats?.isFile()) {
       continue;
     }
-    try {
-      if (statSync(candidate).isFile()) {
-        return candidate;
-      }
-    } catch {
-      continue;
-    }
+    return candidate;
   }
   return null;
 };
 
 const resolvePathWithExtensions = (basePath: string): string | null => {
   if (existsSync(basePath)) {
-    try {
-      const stats = statSync(basePath);
-      if (stats.isFile()) {
-        return basePath;
-      }
-      if (stats.isDirectory()) {
-        return resolveIndexFile(basePath);
-      }
-    } catch {
-      // Ignore invalid paths and fall back to extension probing.
+    const stats = tryStat(basePath);
+    if (stats?.isFile()) {
+      return basePath;
+    }
+    if (stats?.isDirectory()) {
+      return resolveIndexFile(basePath);
     }
   }
 
   for (const ext of JS_EXTENSIONS) {
     const candidate = `${basePath}${ext}`;
-    if (!existsSync(candidate)) {
+    const stats = existsSync(candidate) ? tryStat(candidate) : null;
+    if (!stats?.isFile()) {
       continue;
     }
-    try {
-      if (statSync(candidate).isFile()) {
-        return candidate;
-      }
-    } catch {
-      continue;
-    }
+    return candidate;
   }
 
   return resolveIndexFile(basePath);

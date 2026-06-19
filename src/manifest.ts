@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import type { Rspack } from '@rsbuild/core';
 import { combineURLs, createRouteId } from './plugin-utils.js';
 import { SERVER_EXPORTS, CLIENT_EXPORTS } from './constants.js';
 import {
@@ -79,15 +78,47 @@ export type ReactRouterManifestForDev = {
   routes: Record<string, RouteManifestItem>;
 };
 
-export type ReactRouterManifestStats = Pick<
-  Rspack.StatsCompilation,
-  'assetsByChunkName'
->;
+export type ReactRouterManifestStats = {
+  assetsByChunkName?: Record<string, string[]>;
+};
 
-export const REACT_ROUTER_MANIFEST_STATS_OPTIONS = {
-  all: false,
-  assets: true,
-} as const;
+type ReactRouterManifestStatsChunk = {
+  files?: Iterable<string>;
+};
+
+type ReactRouterManifestStatsCompilation = {
+  namedChunks: Iterable<[string, ReactRouterManifestStatsChunk]>;
+};
+
+const orderChunkFiles = (chunkName: string, files: string[]): string[] => {
+  const ownChunkAsset = `${chunkName}.js`;
+  const ownFileIndex = files.findIndex(file => file.endsWith(ownChunkAsset));
+  if (ownFileIndex <= 0) {
+    return files;
+  }
+
+  return [
+    files[ownFileIndex],
+    ...files.slice(0, ownFileIndex),
+    ...files.slice(ownFileIndex + 1),
+  ];
+};
+
+export const createReactRouterManifestStats = (
+  compilation: ReactRouterManifestStatsCompilation | undefined
+): ReactRouterManifestStats | undefined => {
+  if (!compilation) {
+    return undefined;
+  }
+
+  const assetsByChunkName: Record<string, string[]> = {};
+  for (const [chunkName, chunk] of compilation.namedChunks) {
+    const files = Array.from(chunk.files ?? []);
+    assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
+  }
+
+  return { assetsByChunkName };
+};
 
 export type RouteManifestModuleExports = Record<string, readonly string[]>;
 
@@ -171,11 +202,10 @@ export async function getReactRouterManifestForDev(
     if (!assets) {
       return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`];
     }
-    const normalizedAssets = Array.isArray(assets) ? assets : [assets];
-    if (!normalizedAssets.some(asset => asset.endsWith('.js'))) {
-      return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`, ...normalizedAssets];
+    if (!assets.some(asset => asset.endsWith('.js'))) {
+      return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`, ...assets];
     }
-    return normalizedAssets;
+    return assets;
   };
 
   const getModulePathForChunk = (chunkName: string): string | undefined => {
@@ -188,8 +218,8 @@ export async function getReactRouterManifestForDev(
     Object.entries(routes).map(async ([key, route]) => {
       const routeEntryName = getRouteEntryName(route);
       const assets = getAssetsForChunk(routeEntryName);
-      const jsAssets = assets.filter(asset => asset.endsWith('.js')) || [];
-      let cssAssets = assets.filter(asset => asset.endsWith('.css')) || [];
+      const jsAssets = assets.filter(asset => asset.endsWith('.js'));
+      let cssAssets = assets.filter(asset => asset.endsWith('.css'));
       const routeFilePath = resolve(context, route.file);
       let exports = new Set<string>();
       let routeModuleExports: readonly string[] = [];

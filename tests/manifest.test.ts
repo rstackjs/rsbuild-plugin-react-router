@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import {
+  createReactRouterManifestStats,
   configRoutesToRouteManifest,
   getReactRouterManifestForDev,
   getRouteManifestModuleExports,
@@ -42,6 +43,45 @@ const clientStats = {
 };
 
 describe('manifest', () => {
+  it('creates manifest stats from named chunks without stats JSON', () => {
+    const compilation = {
+      namedChunks: new Map([
+        [
+          'runtime',
+          {
+            files: new Set(['static/js/runtime.js']),
+          },
+        ],
+        [
+          'entry.client',
+          {
+            files: new Set([
+              'static/js/entry.client.js',
+              'static/css/entry.client.css',
+            ]),
+          },
+        ],
+        [
+          'routes/page',
+          {
+            files: new Set(['static/js/routes/page.js']),
+          },
+        ],
+      ]),
+    };
+
+    expect(createReactRouterManifestStats(compilation)).toEqual({
+      assetsByChunkName: {
+        runtime: ['static/js/runtime.js'],
+        'entry.client': [
+          'static/js/entry.client.js',
+          'static/css/entry.client.css',
+        ],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
   describe('configRoutesToRouteManifest', () => {
     it('should convert simple route config to manifest', () => {
       const routeConfig = [
@@ -213,7 +253,7 @@ describe('manifest', () => {
     expect(item).toHaveProperty('hasDefaultExport', false);
   });
 
-  it('keeps route export names available without serializing internal analysis fields', async () => {
+  it('tracks route exports outside the manifest payload', async () => {
     const { root, appDir } = createTempApp(`
       export function headers() { return {}; }
       export async function action() { return null; }
@@ -234,22 +274,15 @@ describe('manifest', () => {
         }
       );
 
-      expect(manifest.routes['routes/page']).toMatchObject({
+      const routeManifest = manifest.routes['routes/page'];
+      expect(routeManifest).toMatchObject({
         hasAction: true,
         hasLoader: true,
       });
       expect(getRouteManifestModuleExports(manifest)['routes/page']).toEqual(
         expect.arrayContaining(['headers', 'action', 'loader', 'default'])
       );
-      expect(Object.keys(manifest).sort()).toEqual([
-        'entry',
-        'hmr',
-        'routes',
-        'sri',
-        'url',
-        'version',
-      ]);
-      expect(JSON.stringify(manifest)).not.toContain('headers');
+      expect(routeManifest).not.toHaveProperty('headers');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

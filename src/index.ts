@@ -38,7 +38,7 @@ import {
   getReactRouterManifestForDev,
   getRouteManifestModuleExports,
   configRoutesToRouteManifest,
-  REACT_ROUTER_MANIFEST_STATS_OPTIONS,
+  createReactRouterManifestStats,
   type ReactRouterManifestStats,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
@@ -487,21 +487,14 @@ export const pluginReactRouter = (
         };
 
         if (isBuild && splitRouteModules && route.id !== 'root') {
-          let source = '';
-          try {
-            source = readFileSync(routeFilePath, 'utf8');
-          } catch {
-            source = '';
-          }
-          if (source) {
-            for (const exportName of routeChunkExportNames) {
-              if (!source.includes(exportName)) {
-                continue;
-              }
-              acc[getRouteChunkEntryName(route.id, exportName)] = {
-                import: getRouteChunkModuleId(routeFilePath, exportName),
-              };
+          const source = readFileSync(routeFilePath, 'utf8');
+          for (const exportName of routeChunkExportNames) {
+            if (!source.includes(exportName)) {
+              continue;
             }
+            acc[getRouteChunkEntryName(route.id, exportName)] = {
+              import: getRouteChunkModuleId(routeFilePath, exportName),
+            };
           }
         }
 
@@ -520,7 +513,7 @@ export const pluginReactRouter = (
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
       if (environment.name === 'web') {
-        clientStats = stats?.toJson(REACT_ROUTER_MANIFEST_STATS_OPTIONS);
+        clientStats = createReactRouterManifestStats(stats?.compilation);
       }
       if (pluginOptions.federation && ssr) {
         const serverBuildDir = resolve(buildDirectory, 'server');
@@ -1086,10 +1079,7 @@ export const pluginReactRouter = (
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
 
-    // Create virtual modules for React Router. Rspack's built-in
-    // VirtualModulesPlugin registers resolvable file paths, so keep public
-    // requests as bare `virtual/react-router/*` ids and seed matching
-    // `node_modules/virtual/react-router/*.js` virtual files.
+    // Public requests stay bare while Rspack resolves seeded virtual files.
     const createVirtualModulePlugin = (publicPath: string) => {
       const bundleVirtualModules = Object.fromEntries(
         Object.entries(routesByServerBundleId).map(

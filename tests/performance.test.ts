@@ -1,6 +1,12 @@
 import { describe, expect, it } from '@rstest/core';
 import { createReactRouterPerformanceProfiler } from '../src/performance';
 
+const parsePerformanceReport = (message: string) => {
+  const prefix = '[react-router:performance] ';
+  expect(message.startsWith(prefix)).toBe(true);
+  return JSON.parse(message.slice(prefix.length));
+};
+
 describe('React Router performance profiler', () => {
   it('aggregates operation timings by environment and logs structured JSON', async () => {
     const logs: string[] = [];
@@ -27,7 +33,7 @@ describe('React Router performance profiler', () => {
     expect(logs).toHaveLength(1);
     expect(logs[0]).toContain('[react-router:performance]');
 
-    const report = JSON.parse(logs[0].replace(/^.*?\{/, '{'));
+    const report = parsePerformanceReport(logs[0]);
     expect(report.environment).toBe('web');
     expect(report.compilerLifecycleMs).toBe(123.4);
     expect(report.operations['route:client-entry'].count).toBe(2);
@@ -41,7 +47,7 @@ describe('React Router performance profiler', () => {
     profiler.flush('web');
 
     expect(logs).toHaveLength(2);
-    const secondReport = JSON.parse(logs[1].replace(/^.*?\{/, '{'));
+    const secondReport = parsePerformanceReport(logs[1]);
     expect(secondReport.operations['route:client-entry'].count).toBe(1);
     expect(secondReport.operations['manifest:stage']).toBeUndefined();
   });
@@ -83,7 +89,7 @@ describe('React Router performance profiler', () => {
 
       profiler.flush('web');
 
-      const report = JSON.parse(logs[0].replace(/^.*?\{/, '{'));
+      const report = parsePerformanceReport(logs[0]);
       expect(report.operations['route:module']).toMatchObject({
         count: 2,
         totalMs: 55,

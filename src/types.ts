@@ -31,27 +31,17 @@ export type PluginOptions = {
   federation?: boolean;
 
   /**
-   * Configure Rsbuild's dev-only lazy compilation behavior.
-   *
-   * This forwards to `dev.lazyCompilation` when set and does not affect
-   * production builds. Route modules are loaded synchronously during hydration,
-   * so this remains opt-in.
+   * Rsbuild dev-only lazy compilation behavior.
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
 
   /**
-   * Emit structured React Router plugin timing logs after each compiler
-   * environment finishes.
-   * @default false
+   * Emit structured React Router plugin timing logs.
    */
   logPerformance?: boolean;
 
   /**
-   * Run CPU-heavy route transforms in a worker-thread pool.
-   *
-   * Set to `true` to use an automatically sized pool, or pass
-   * `{ maxWorkers }` to cap the pool size.
-   * @default false
+   * Run route transforms in a worker-thread pool.
    */
   parallelTransforms?:
     | boolean
