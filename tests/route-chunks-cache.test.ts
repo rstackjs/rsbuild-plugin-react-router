@@ -129,4 +129,26 @@ describe('route chunk cache', () => {
       'routes/demo.tsx::omitChunkedExports::clientAction,clientLoader,clientMiddleware,HydrateFallback',
     ]);
   });
+
+  it('precomputes sibling named chunk entries for repeated chunk generation', async () => {
+    const cache = new Map();
+
+    await getRouteChunkIfEnabled(
+      cache,
+      config,
+      routeId,
+      'clientAction',
+      chunkableCode
+    );
+
+    expect(Array.from(cache.keys()).sort()).toEqual([
+      'routes/demo.tsx::analyzeCode',
+      'routes/demo.tsx::getChunkableExportMap',
+      'routes/demo.tsx::getChunkedExport::HydrateFallback',
+      'routes/demo.tsx::getChunkedExport::clientAction',
+      'routes/demo.tsx::getChunkedExport::clientLoader',
+      'routes/demo.tsx::getChunkedExport::clientMiddleware',
+      'routes/demo.tsx::getExportDependencies',
+    ]);
+  });
 });

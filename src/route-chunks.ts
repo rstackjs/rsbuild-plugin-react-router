@@ -611,6 +611,16 @@ const omitChunkedExports = (
   );
 };
 
+const precomputeChunkedExports = (
+  code: string,
+  cache: RouteChunkCache,
+  cacheKey: string
+) => {
+  for (const exportName of routeChunkExportNames) {
+    getChunkedExport(code, exportName, cache, cacheKey);
+  }
+};
+
 export const detectRouteChunks = (
   code: string,
   cache: RouteChunkCache | undefined,
@@ -659,6 +669,7 @@ export const getRouteChunkCode: (
       cacheKey
     );
   }
+  precomputeChunkedExports(code, analysisCache, cacheKey);
   return getChunkedExport(code, chunkName, analysisCache, cacheKey);
 };
 
