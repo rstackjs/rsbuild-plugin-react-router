@@ -51,7 +51,7 @@ const deepMerge = (base: any, overrides: any): any => {
 
 // Mock the @scripts/test-helper module
 rstest.mock('@scripts/test-helper', () => ({
-  createStubRsbuild: rstest.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => {
+  createStubRsbuild: rstest.fn().mockImplementation(async ({ action = 'dev', rsbuildConfig = {} } = {}) => {
     const baseConfig = {
       dev: {
         // Match Rsbuild defaults so plugin changes are observable in tests.
@@ -128,7 +128,7 @@ rstest.mock('@scripts/test-helper', () => ({
       },
       context: {
         rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
-        action: 'dev',
+        action,
       },
       compiler: {
         webpack: {

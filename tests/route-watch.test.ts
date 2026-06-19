@@ -11,16 +11,23 @@ import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import {
   createRouteManifestSnapshot,
-  ensureRestartMarker,
+  ensureDevRestartMarker,
+  getRouteRestartMarkerPath,
 } from '../src/route-watch';
 
 describe('route watch restart marker', () => {
+  it('places the restart marker in the client build output', () => {
+    expect(getRouteRestartMarkerPath('/project/build/client')).toBe(
+      '/project/build/client/.react-router/route-watch'
+    );
+  });
+
   it('creates the restart marker when missing', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
     try {
       const markerPath = join(root, 'build/.react-router-route-watch');
 
-      await ensureRestartMarker(markerPath);
+      await ensureDevRestartMarker(markerPath);
 
       expect(readFileSync(markerPath, 'utf8')).not.toBe('');
     } finally {
@@ -35,7 +42,7 @@ describe('route watch restart marker', () => {
       mkdirSync(join(root, 'build'), { recursive: true });
       writeFileSync(markerPath, 'existing');
 
-      await ensureRestartMarker(markerPath);
+      await ensureDevRestartMarker(markerPath);
 
       expect(readFileSync(markerPath, 'utf8')).toBe('existing');
     } finally {

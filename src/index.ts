@@ -1,22 +1,11 @@
-import {
-  existsSync,
-  readFileSync,
-  statSync,
-  watch,
-  type FSWatcher,
-} from 'node:fs';
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import {
-  rspack,
-  type RsbuildConfig,
-  type RsbuildPlugin,
-  type Rspack,
-} from '@rsbuild/core';
+import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
 import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
@@ -78,8 +67,13 @@ import {
   createRouteClientEntryArtifact,
 } from './route-artifacts.js';
 import {
+  createRouteTopologyWatcher,
   createRouteManifestSnapshot,
-  ensureRestartMarker,
+  emitRouteRestartMarkerAsset,
+  ensureDevRestartMarker,
+  getRouteRestartMarkerPath,
+  mergeWatchFiles,
+  type WatchFileConfig,
 } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
@@ -101,186 +95,6 @@ type ModuleFederationPluginLike = {
   name?: string;
   _options?: { experiments?: { asyncStartup?: boolean } };
   options?: { experiments?: { asyncStartup?: boolean } };
-};
-
-type WatchFilesConfig = NonNullable<
-  NonNullable<RsbuildConfig['dev']>['watchFiles']
->;
-type WatchFileConfig =
-  | Exclude<WatchFilesConfig, readonly unknown[]>
-  | Extract<WatchFilesConfig, readonly unknown[]>[number];
-
-const mergeWatchFiles = (
-  existing: WatchFilesConfig | undefined,
-  additions: WatchFileConfig[]
-): WatchFilesConfig => {
-  if (!existing) {
-    return additions as WatchFilesConfig;
-  }
-  return [
-    ...(Array.isArray(existing) ? existing : [existing]),
-    ...additions,
-  ] as WatchFilesConfig;
-};
-
-type RouteDirectoryState = {
-  directories: Set<string>;
-  routeTopology: Set<string>;
-};
-
-const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
-  if (left.size !== right.size) {
-    return false;
-  }
-  for (const value of left) {
-    if (!right.has(value)) {
-      return false;
-    }
-  }
-  return true;
-};
-
-const readRouteDirectoryState = async ({
-  watchDirectory,
-  getRouteTopology,
-}: {
-  watchDirectory: string;
-  getRouteTopology: () => Promise<Set<string>>;
-}): Promise<RouteDirectoryState> => {
-  const directories = new Set<string>();
-
-  const walkDirectory = async (directory: string): Promise<void> => {
-    let entries;
-    try {
-      entries = await readdir(directory, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    directories.add(directory);
-    await Promise.all(
-      entries.map(async entry => {
-        const entryPath = resolve(directory, entry.name);
-        if (entry.isDirectory()) {
-          await walkDirectory(entryPath);
-        }
-      })
-    );
-  };
-
-  await walkDirectory(watchDirectory);
-  return {
-    directories,
-    routeTopology: await getRouteTopology(),
-  };
-};
-
-const createRouteTopologyWatcher = async ({
-  watchDirectory,
-  getRouteTopology,
-  restartMarkerPath,
-  onError,
-}: {
-  watchDirectory: string;
-  getRouteTopology: () => Promise<Set<string>>;
-  restartMarkerPath: string;
-  onError: (error: unknown) => void;
-}): Promise<() => void> => {
-  let state = await readRouteDirectoryState({
-    watchDirectory,
-    getRouteTopology,
-  });
-  let closed = false;
-  let rescanTimer: ReturnType<typeof setTimeout> | undefined;
-  let rescanQueue = Promise.resolve();
-  const directoryWatchers = new Map<string, FSWatcher>();
-
-  const touchRestartMarker = async (): Promise<void> => {
-    await mkdir(dirname(restartMarkerPath), { recursive: true });
-    await writeFile(restartMarkerPath, String(Date.now()));
-  };
-
-  const closeRemovedDirectoryWatchers = (
-    nextDirectories: Set<string>
-  ): void => {
-    for (const [directory, watcher] of directoryWatchers) {
-      if (!nextDirectories.has(directory)) {
-        watcher.close();
-        directoryWatchers.delete(directory);
-      }
-    }
-  };
-
-  const watchNewDirectories = (nextDirectories: Set<string>): void => {
-    for (const directory of nextDirectories) {
-      if (directoryWatchers.has(directory)) {
-        continue;
-      }
-      try {
-        const watcher = watch(directory, () => {
-          scheduleRescan();
-        });
-        watcher.on('error', onError);
-        directoryWatchers.set(directory, watcher);
-      } catch (error) {
-        onError(error);
-      }
-    }
-  };
-
-  const syncDirectoryWatchers = (nextDirectories: Set<string>): void => {
-    closeRemovedDirectoryWatchers(nextDirectories);
-    watchNewDirectories(nextDirectories);
-  };
-
-  const runRescan = async (): Promise<void> => {
-    if (closed) {
-      return;
-    }
-    try {
-      const nextState = await readRouteDirectoryState({
-        watchDirectory,
-        getRouteTopology,
-      });
-      syncDirectoryWatchers(nextState.directories);
-      if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
-        state = nextState;
-        await touchRestartMarker();
-        return;
-      }
-      state = nextState;
-    } catch (error) {
-      onError(error);
-    }
-  };
-
-  const rescan = (): Promise<void> => {
-    rescanQueue = rescanQueue.then(runRescan, runRescan);
-    return rescanQueue;
-  };
-
-  const scheduleRescan = (): void => {
-    if (rescanTimer) {
-      clearTimeout(rescanTimer);
-    }
-    rescanTimer = setTimeout(() => {
-      rescanTimer = undefined;
-      void rescan();
-    }, 100);
-  };
-
-  syncDirectoryWatchers(state.directories);
-
-  return () => {
-    closed = true;
-    if (rescanTimer) {
-      clearTimeout(rescanTimer);
-    }
-    for (const watcher of directoryWatchers.values()) {
-      watcher.close();
-    }
-    directoryWatchers.clear();
-  };
 };
 
 const ensureFederationAsyncStartup = (
@@ -619,8 +433,10 @@ export const pluginReactRouter = (
       isBuild,
       cache: routeChunkCache,
     };
+    const outputClientPath = resolve(buildDirectory, 'client');
+    const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
     const watchDirectory = resolve(appDirectory);
-    const routeRestartMarkerPath = resolve('.react-router', 'route-watch');
+    const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
     const routeWatchFiles: WatchFileConfig[] = [
       {
         paths: routesPath,
@@ -634,7 +450,7 @@ export const pluginReactRouter = (
     let closeRouteTopologyWatcher: (() => void) | undefined;
 
     api.onBeforeStartDevServer(async () => {
-      await ensureRestartMarker(routeRestartMarkerPath);
+      await ensureDevRestartMarker(routeRestartMarkerPath);
       closeRouteTopologyWatcher = await createRouteTopologyWatcher({
         watchDirectory,
         getRouteTopology: getWatchedRouteTopology,
@@ -705,9 +521,6 @@ export const pluginReactRouter = (
       rootDirectory: process.cwd(),
     });
     const routesByServerBundleId = getRoutesByServerBundleId(buildManifest);
-
-    const outputClientPath = resolve(buildDirectory, 'client');
-    const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
@@ -1573,6 +1386,19 @@ export const pluginReactRouter = (
         });
       }
     );
+
+    if (isBuild) {
+      api.processAssets(
+        { stage: 'additional', targets: ['web'] },
+        ({ sources, compilation }) => {
+          emitRouteRestartMarkerAsset({
+            restartMarkerPath: routeRestartMarkerPath,
+            sources,
+            compilation,
+          });
+        }
+      );
+    }
 
     api.processAssets(
       { stage: 'additional', targets: ['node'] },

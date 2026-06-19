@@ -9,6 +9,10 @@ export default defineConfig({
   },
   // Run tests in files in parallel
   fullyParallel: false,
+  // This suite includes dev-route-watch, which mutates routes.ts and restarts
+  // the shared dev server. Keep this example serial so other tests do not race
+  // the intentional restart.
+  workers: 1,
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
   // Retry on CI only
@@ -47,4 +51,4 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
-}); 
+});

@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const appDirectory = join(__dirname, '../../app');
 const restartMarkerPath = join(
   __dirname,
-  '../../.react-router/route-watch'
+  '../../build/client/.react-router/route-watch'
 );
 const routesConfigPath = join(appDirectory, 'routes.ts');
 const addedRoutePath = join(appDirectory, 'routes/dev-added-route.tsx');
