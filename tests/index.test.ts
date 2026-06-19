@@ -133,6 +133,17 @@ describe('pluginReactRouter', () => {
     });
   });
 
+  it('should allow lazy compilation to be enabled with a boolean', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ lazyCompilation: true })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toBe(true);
+  });
+
   it('should allow lazy compilation to be disabled', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},

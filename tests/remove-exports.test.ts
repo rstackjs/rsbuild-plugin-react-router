@@ -74,6 +74,22 @@ describe('removeExports', () => {
     expect(hasThemeImport).toBe(false);
   });
 
+  it('removes export-all declarations when removing server-only exports', () => {
+    const code = `
+      export * from './data.server';
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    removeExports(ast, ['loader']);
+
+    const result = generate(ast).code;
+    expect(result).not.toContain("export * from './data.server'");
+    expect(result).toContain('Route');
+  });
+
   it('does not treat imported names as local references', () => {
     const code = `
       import {
@@ -138,6 +154,22 @@ describe('removeExports', () => {
     expect(result).not.toContain('middle');
     expect(result).not.toContain('loader');
     expect(result).toContain('Route');
+  });
+
+  it('rejects destructured defaults for removed server-only exports', () => {
+    const code = `
+      const route = { loader: async () => null };
+      export const { loader = async () => null } = route;
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+
+    expect(() => removeExports(ast, ['loader'])).toThrowError(
+      'Cannot remove destructured export "loader"'
+    );
   });
 
   it('removes every declaration in a deep dead dependency chain', () => {

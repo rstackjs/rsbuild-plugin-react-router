@@ -301,6 +301,8 @@ const renderMarkdown = result => {
       '',
       `## ${benchmark.id} Plugin Operations`,
       '',
+      'Total is the sum of all measured operation durations. Wall merges overlapping intervals to approximate elapsed plugin time. Max is the slowest single operation call.',
+      '',
       '| Environment | Operation | Count | Total | Wall | Max | Reports |',
       '|---|---|---:|---:|---:|---:|---:|'
     );
@@ -476,6 +478,9 @@ const main = async () => {
     });
   }
 
+  const failed = benchmarks.some(benchmark =>
+    benchmark.runs.some(run => run.status !== 0)
+  );
   const result = {
     repo: 'rsbuild-plugin-react-router',
     commit: await git(['rev-parse', 'HEAD']),
@@ -486,6 +491,7 @@ const main = async () => {
     profile: args.profile,
     iterations: args.iterations,
     warmup: args.warmup,
+    failed,
     benchmarks,
   };
 
@@ -494,9 +500,7 @@ const main = async () => {
     `Benchmark results written to ${path.resolve(rootDir, args.out)}`
   );
 
-  if (
-    benchmarks.some(benchmark => benchmark.runs.some(run => run.status !== 0))
-  ) {
+  if (failed) {
     console.error('One or more measured benchmark builds failed.');
     process.exitCode = 1;
   }

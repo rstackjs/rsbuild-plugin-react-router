@@ -214,6 +214,18 @@ describe('route chunks', () => {
       expect(result.hasRouteChunkByExportName.clientLoader).toBe(false);
     });
 
+    it('does not scan sibling declarators from shared export statements as dependencies', async () => {
+      const code = `
+        const serverOnly = () => null;
+        export const clientAction = async () => null, helper = serverOnly();
+        export default function Route() { return helper; }
+      `;
+
+      const result = await detect(code);
+
+      expectOnlyChunkedExport(result, 'clientAction');
+    });
+
     it('orders chunkedExports by routeChunkExportNames, not source order', async () => {
       const code = `
         export function HydrateFallback() { return null; }

@@ -1,11 +1,19 @@
 import { describe, expect, it } from '@rstest/core';
+import { generate, parse } from '../src/babel';
 import {
   combineURLs,
   stripFileExtension,
   createRouteId,
   generateWithProps,
   normalizeAssetPrefix,
+  transformRoute,
 } from '../src/plugin-utils';
+
+const transformRouteCode = (code: string) => {
+  const ast = parse(code, { sourceType: 'module' });
+  transformRoute(ast);
+  return generate(ast).code;
+};
 
 describe('plugin-utils', () => {
   describe('combineURLs', () => {
@@ -119,6 +127,43 @@ describe('plugin-utils', () => {
 
     it('should keep trailing slash intact', () => {
       expect(normalizeAssetPrefix('/assets/')).toBe('/assets/');
+    });
+  });
+
+  describe('transformRoute', () => {
+    it('wraps default class exports with component props', () => {
+      const result = transformRouteCode(`
+        export default class Route {}
+      `);
+
+      expect(result).toContain('withComponentProps');
+      expect(result).toMatch(/export default _withComponentProps\(class Route/);
+    });
+
+    it('wraps named class component exports', () => {
+      const result = transformRouteCode(`
+        export class ErrorBoundary {}
+      `);
+
+      expect(result).toContain('withErrorBoundaryProps');
+      expect(result).toMatch(
+        /export const ErrorBoundary = _withErrorBoundaryProps\(class ErrorBoundary/
+      );
+    });
+
+    it('wraps component exports declared through export specifiers', () => {
+      const result = transformRouteCode(`
+        function Boundary() {
+          return null;
+        }
+        export { Boundary as ErrorBoundary };
+      `);
+
+      expect(result).toContain('withErrorBoundaryProps');
+      expect(result).toMatch(
+        /const _ErrorBoundary = _withErrorBoundaryProps\(Boundary\)/
+      );
+      expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
     });
   });
 });

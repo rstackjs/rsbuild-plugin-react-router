@@ -1,5 +1,7 @@
 type OperationTiming = {
   count: number;
+  // Total sums every recorded duration, so parallel work can make it larger
+  // than elapsed wall-clock time. Use wallMs for non-overlapping elapsed time.
   totalMs: number;
   wallMs: number;
   maxMs: number;

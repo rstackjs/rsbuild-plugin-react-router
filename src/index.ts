@@ -1435,7 +1435,7 @@ export const pluginReactRouter = (
             const bundleMatch = args.resource.match(
               /virtual\/react-router\/server-manifest(?:-([^?]+))?/
             );
-            const bundleId = bundleMatch?.[1]?.replace(/\\.js$/, '');
+            const bundleId = bundleMatch?.[1]?.replace(/\.js$/, '');
 
             const manifest =
               (isBuild && latestServerManifest
