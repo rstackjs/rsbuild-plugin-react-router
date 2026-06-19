@@ -226,6 +226,31 @@ describe('parallel route transforms', () => {
     }
   });
 
+  it('does not run bundler route analysis for split route export modules without split export names', async () => {
+    const getBundlerRouteAnalysis = rstest.spyOn(
+      exportUtils,
+      'getBundlerRouteAnalysis'
+    );
+    const code = `
+      export async function loader() { return null; }
+      export default function Route() { return null; }
+    `;
+
+    try {
+      const result = await executeRouteTransformTask({
+        kind: 'splitRouteExports',
+        code,
+        resourcePath,
+        routeChunkConfig,
+      });
+
+      expect(result).toEqual({ code, map: null });
+      expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
+    } finally {
+      getBundlerRouteAnalysis.mockRestore();
+    }
+  });
+
   it('does not run bundler route analysis for client-only stubs', async () => {
     const getBundlerRouteAnalysis = rstest.spyOn(
       exportUtils,

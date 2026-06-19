@@ -26,6 +26,7 @@ import {
 } from './route-artifacts.js';
 import {
   getRouteChunkModuleId,
+  shouldAnalyzeRouteChunks,
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
@@ -96,6 +97,16 @@ const splitRouteExports = async (
   task: SplitRouteExportsTransformTask,
   options?: RouteTransformTaskOptions
 ): Promise<RouteTransformResult> => {
+  if (
+    !shouldAnalyzeRouteChunks(
+      task.routeChunkConfig,
+      task.resourcePath,
+      task.code
+    )
+  ) {
+    return { code: task.code, map: null };
+  }
+
   const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
   const { hasRouteChunks, chunkedExports } = await analysis.getRouteChunkInfo(
     getRouteChunkCache(options),
