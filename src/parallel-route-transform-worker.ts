@@ -1,4 +1,5 @@
 import { parentPort } from 'node:worker_threads';
+import { setBoundedCacheEntry } from './bounded-cache.js';
 import {
   executeRouteTransformTask,
   type RouteTransformResult,
@@ -53,16 +54,6 @@ if (!parentPort) {
 const MAX_SOURCE_CACHE_ENTRIES = 2048;
 const sourceCache = new Map<string, string>();
 
-const setSourceCacheEntry = (key: string, code: string) => {
-  if (!sourceCache.has(key) && sourceCache.size >= MAX_SOURCE_CACHE_ENTRIES) {
-    const oldestKey = sourceCache.keys().next().value;
-    if (oldestKey !== undefined) {
-      sourceCache.delete(oldestKey);
-    }
-  }
-  sourceCache.set(key, code);
-};
-
 const hydrateTaskSource = ({
   task,
   sourceCacheKey,
@@ -72,7 +63,12 @@ const hydrateTaskSource = ({
   }
 
   if (typeof task.code === 'string') {
-    setSourceCacheEntry(sourceCacheKey, task.code);
+    setBoundedCacheEntry(
+      sourceCache,
+      sourceCacheKey,
+      task.code,
+      MAX_SOURCE_CACHE_ENTRIES
+    );
     return task as RouteTransformTask;
   }
 

@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads';
+import { setBoundedCacheEntry } from './bounded-cache.js';
 import { SERVER_ONLY_ROUTE_EXPORTS } from './constants.js';
 import { getDefaultConcurrency } from './concurrency.js';
 import {
@@ -246,16 +247,6 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       return cached.result;
     }
 
-    if (
-      !this.#routeModuleResultCache.has(cacheKey) &&
-      this.#routeModuleResultCache.size >= MAX_ROUTE_MODULE_RESULT_CACHE_ENTRIES
-    ) {
-      const oldestKey = this.#routeModuleResultCache.keys().next().value;
-      if (oldestKey !== undefined) {
-        this.#routeModuleResultCache.delete(oldestKey);
-      }
-    }
-
     const result = this.#runInWorker(task).catch(error => {
       if (this.#routeModuleResultCache.get(cacheKey)?.result === result) {
         this.#routeModuleResultCache.delete(cacheKey);
@@ -265,10 +256,15 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       }
       throw error;
     });
-    this.#routeModuleResultCache.set(cacheKey, {
-      source: task.code,
-      result,
-    });
+    setBoundedCacheEntry(
+      this.#routeModuleResultCache,
+      cacheKey,
+      {
+        source: task.code,
+        result,
+      },
+      MAX_ROUTE_MODULE_RESULT_CACHE_ENTRIES
+    );
     return result;
   }
 
@@ -310,16 +306,12 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       return cachedTask;
     }
 
-    if (
-      !state.sourceCache.has(sourceCacheKey) &&
-      state.sourceCache.size >= MAX_WORKER_SOURCE_CACHE_ENTRIES
-    ) {
-      const oldestKey = state.sourceCache.keys().next().value;
-      if (oldestKey !== undefined) {
-        state.sourceCache.delete(oldestKey);
-      }
-    }
-    state.sourceCache.set(sourceCacheKey, task.code);
+    setBoundedCacheEntry(
+      state.sourceCache,
+      sourceCacheKey,
+      task.code,
+      MAX_WORKER_SOURCE_CACHE_ENTRIES
+    );
     return task;
   }
 
