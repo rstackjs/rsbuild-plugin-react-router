@@ -156,7 +156,7 @@ const isTypeOnlyExport = (node: AnyNode): boolean =>
   (node.type === 'ExportDefaultDeclaration' &&
     node.declaration?.type === 'TSInterfaceDeclaration');
 
-const collectExportNames = (program: AnyNode): string[] => {
+export const collectProgramExportNames = (program: AnyNode): string[] => {
   const exportNames = new Set<string>();
   for (const statement of program.body ?? []) {
     if (isTypeOnlyExport(statement)) {
@@ -250,7 +250,7 @@ const getTransformedModule = async (
       }
       return {
         code: stripped.code,
-        exportNames: collectExportNames(program),
+        exportNames: collectProgramExportNames(program),
         exportAllModules: collectExportAllModules(program),
       };
     })(),
@@ -289,11 +289,16 @@ export const getBundlerRouteAnalysis = async (
   }
 
   const analysis = (async () => {
-    const transformed = await getTransformedModule(source, resourcePath);
+    const program = parseProgram(source, resourcePath);
+    const sourceInfo: TransformedModule = {
+      code: source,
+      exportNames: collectProgramExportNames(program),
+      exportAllModules: collectExportAllModules(program),
+    };
     const routeChunkInfoCache = new Map<string, Promise<RouteChunkInfo>>();
 
     return {
-      ...transformed,
+      ...sourceInfo,
       getRouteChunkInfo: (
         cache: RouteChunkCache | undefined,
         config: RouteChunkConfig
@@ -306,12 +311,7 @@ export const getBundlerRouteAnalysis = async (
 
         let routeChunkInfo: Promise<RouteChunkInfo>;
         routeChunkInfo = cachePromiseOnReject(
-          detectRouteChunksIfEnabled(
-            cache,
-            config,
-            resourcePath,
-            transformed.code
-          ),
+          detectRouteChunksIfEnabled(cache, config, resourcePath, source),
           () => {
             if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
               routeChunkInfoCache.delete(cacheKey);
@@ -352,7 +352,7 @@ export const getExportNamesAndExportAll = async (
   const exportInfo = (async () => {
     const program = parseProgram(code);
     return {
-      exportNames: collectExportNames(program),
+      exportNames: collectProgramExportNames(program),
       exportAllModules: collectExportAllModules(program),
     };
   })();

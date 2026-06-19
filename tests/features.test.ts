@@ -1,6 +1,7 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { rspack } from '@rsbuild/core';
+import * as fs from 'node:fs';
 import path from 'node:path';
 import { pluginReactRouter } from '../src';
 import { getVirtualModuleFilePath } from '../src/virtual-modules';
@@ -160,12 +161,22 @@ describe('pluginReactRouter', () => {
     });
 
     it('should register build and dot file transforms', async () => {
+      process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
+      const readFileSync = rstest
+        .spyOn(fs, 'readFileSync')
+        .mockReturnValue('export default function Route() { return null; }');
       const rsbuild = await createStubRsbuild({
+        action: 'build',
         rsbuildConfig: {},
       });
 
-      const plugin = pluginReactRouter();
-      await plugin.setup(rsbuild as any);
+      try {
+        const plugin = pluginReactRouter();
+        await plugin.setup(rsbuild as any);
+      } finally {
+        delete process.env.RR_TEST_SPLIT_ROUTE_MODULES;
+        readFileSync.mockRestore();
+      }
 
       const calls = (rsbuild.transform as any).mock.calls.map(
         (call: any[]) => call[0]
@@ -186,13 +197,19 @@ describe('pluginReactRouter', () => {
         )
       ).toBe(true);
 
+      const splitRouteExportsTransform = calls.find(
+        (call: any) =>
+          typeof call.test === 'function' &&
+          call.resourceQuery?.not?.toString().includes('route-chunk=') &&
+          call.environments?.includes('web')
+      );
+      expect(splitRouteExportsTransform).toBeDefined();
       expect(
-        calls.some(
-          (call: any) =>
-            call.test?.toString().includes('\\.[cm]?') &&
-            call.environments?.includes('web')
-        )
+        splitRouteExportsTransform.test(path.resolve('app/routes/index.tsx'))
       ).toBe(true);
+      expect(splitRouteExportsTransform.test(path.resolve('app/other.tsx'))).toBe(
+        false
+      );
 
       expect(
         calls.some(

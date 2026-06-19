@@ -1,6 +1,12 @@
 import { describe, expect, it } from '@rstest/core';
 import { createReactRouterPerformanceProfiler } from '../src/performance';
 
+const parsePerformanceReport = (message: string) => {
+  const prefix = '[react-router:performance] ';
+  expect(message.startsWith(prefix)).toBe(true);
+  return JSON.parse(message.slice(prefix.length));
+};
+
 describe('React Router performance profiler', () => {
   it('aggregates operation timings by environment and logs structured JSON', async () => {
     const logs: string[] = [];
@@ -27,7 +33,7 @@ describe('React Router performance profiler', () => {
     expect(logs).toHaveLength(1);
     expect(logs[0]).toContain('[react-router:performance]');
 
-    const report = JSON.parse(logs[0].replace(/^.*?\{/, '{'));
+    const report = parsePerformanceReport(logs[0]);
     expect(report.environment).toBe('web');
     expect(report.compilerLifecycleMs).toBe(123.4);
     expect(report.operations['route:client-entry'].count).toBe(2);
@@ -41,7 +47,7 @@ describe('React Router performance profiler', () => {
     profiler.flush('web');
 
     expect(logs).toHaveLength(2);
-    const secondReport = JSON.parse(logs[1].replace(/^.*?\{/, '{'));
+    const secondReport = parsePerformanceReport(logs[1]);
     expect(secondReport.operations['route:client-entry'].count).toBe(1);
     expect(secondReport.operations['manifest:stage']).toBeUndefined();
   });
@@ -83,7 +89,7 @@ describe('React Router performance profiler', () => {
 
       profiler.flush('web');
 
-      const report = JSON.parse(logs[0].replace(/^.*?\{/, '{'));
+      const report = parsePerformanceReport(logs[0]);
       expect(report.operations['route:module']).toMatchObject({
         count: 2,
         totalMs: 55,
@@ -97,6 +103,103 @@ describe('React Router performance profiler', () => {
     } finally {
       performance.now = originalNow;
     }
+  });
+
+  it('keeps only the five slowest operation entries in descending order', () => {
+    const logs: string[] = [];
+    const originalNow = performance.now;
+    const times = [
+      0, 3, 3, 12, 12, 14, 14, 20, 20, 21, 21, 29, 29, 33,
+    ];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+
+    try {
+      performance.now = () => {
+        const time = times.shift();
+        if (time === undefined) {
+          throw new Error('unexpected timer read');
+        }
+        return time;
+      };
+
+      for (const resource of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) {
+        profiler.recordSync('web', 'route:module', resource, () => resource);
+      }
+      profiler.flush('web');
+
+      const report = parsePerformanceReport(logs[0]);
+      expect(report.operations['route:module'].slowest).toEqual([
+        { durationMs: 9, resource: 'b' },
+        { durationMs: 8, resource: 'f' },
+        { durationMs: 6, resource: 'd' },
+        { durationMs: 4, resource: 'g' },
+        { durationMs: 3, resource: 'a' },
+      ]);
+    } finally {
+      performance.now = originalNow;
+    }
+  });
+
+  it('rounds reported operation timings when flushing', () => {
+    const logs: string[] = [];
+    const originalNow = performance.now;
+    const times = [0, 1.04, 1.04, 1.16];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+
+    try {
+      performance.now = () => {
+        const time = times.shift();
+        if (time === undefined) {
+          throw new Error('unexpected timer read');
+        }
+        return time;
+      };
+
+      profiler.recordSync('web', 'route:module', 'app/routes/a.tsx', () => {});
+      profiler.recordSync('web', 'route:module', 'app/routes/b.tsx', () => {});
+      profiler.flush('web');
+
+      const report = parsePerformanceReport(logs[0]);
+      expect(report.operations['route:module']).toMatchObject({
+        totalMs: 1.2,
+        wallMs: 1.2,
+        maxMs: 1,
+      });
+      expect(report.operations['route:module'].slowest).toEqual([
+        { durationMs: 1, resource: 'app/routes/a.tsx' },
+        { durationMs: 0.1, resource: 'app/routes/b.tsx' },
+      ]);
+    } finally {
+      performance.now = originalNow;
+    }
+  });
+
+  it('records async operations without Promise finally overhead', async () => {
+    const logs: string[] = [];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+    const operation = Promise.resolve('route-module');
+    operation.finally = () => {
+      throw new Error('profiler should avoid Promise.prototype.finally');
+    };
+
+    await expect(
+      profiler.record('web', 'route:module', 'app/routes/a.tsx', () => {
+        return operation;
+      })
+    ).resolves.toBe('route-module');
+    profiler.flush('web');
+
+    const report = parsePerformanceReport(logs[0]);
+    expect(report.operations['route:module'].count).toBe(1);
   });
 
   it('does not evaluate timers or log output when disabled', async () => {

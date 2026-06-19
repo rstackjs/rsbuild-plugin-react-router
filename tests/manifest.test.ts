@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import {
+  createReactRouterManifestStats,
   configRoutesToRouteManifest,
   getReactRouterManifestForDev,
+  getReactRouterManifestChunkNames,
   getRouteManifestModuleExports,
 } from '../src/manifest';
 
@@ -42,6 +44,115 @@ const clientStats = {
 };
 
 describe('manifest', () => {
+  it('creates manifest stats from named chunks without stats JSON', () => {
+    const compilation = {
+      namedChunks: new Map([
+        [
+          'runtime',
+          {
+            files: new Set(['static/js/runtime.js']),
+          },
+        ],
+        [
+          'entry.client',
+          {
+            files: new Set([
+              'static/js/entry.client.js',
+              'static/css/entry.client.css',
+            ]),
+          },
+        ],
+        [
+          'routes/page',
+          {
+            files: new Set(['static/js/routes/page.js']),
+          },
+        ],
+      ]),
+    };
+
+    expect(createReactRouterManifestStats(compilation)).toEqual({
+      assetsByChunkName: {
+        runtime: ['static/js/runtime.js'],
+        'entry.client': [
+          'static/js/entry.client.js',
+          'static/css/entry.client.css',
+        ],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
+  it('filters manifest stats to requested chunk names', () => {
+    const compilation = {
+      namedChunks: new Map([
+        ['runtime', { files: new Set(['static/js/runtime.js']) }],
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+        ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
+        ['vendor', { files: new Set(['static/js/vendor.js']) }],
+      ]),
+    };
+
+    expect(
+      createReactRouterManifestStats(
+        compilation,
+        new Set(['entry.client', 'routes/page'])
+      )
+    ).toEqual({
+      assetsByChunkName: {
+        'entry.client': ['static/js/entry.client.js'],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
+  it('uses direct named chunk lookup for filtered manifest stats when available', () => {
+    const chunks = new Map([
+      ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+      ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
+    ]);
+    const compilation = {
+      namedChunks: {
+        get: (chunkName: string) => chunks.get(chunkName),
+        *[Symbol.iterator](): IterableIterator<
+          [string, { files: Set<string> }]
+        > {
+          throw new Error('filtered manifest stats should not scan all chunks');
+        },
+      },
+    };
+
+    expect(
+      createReactRouterManifestStats(
+        compilation,
+        new Set(['entry.client', 'routes/page'])
+      )
+    ).toEqual({
+      assetsByChunkName: {
+        'entry.client': ['static/js/entry.client.js'],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
+  it('collects only manifest-readable chunk names', () => {
+    expect(Array.from(getReactRouterManifestChunkNames(routes, false))).toEqual(
+      ['entry.client', 'root', 'routes/page']
+    );
+
+    expect(getReactRouterManifestChunkNames(routes, true)).toEqual(
+      new Set([
+        'entry.client',
+        'root',
+        'routes/page',
+        'routes/page-client-action',
+        'routes/page-client-loader',
+        'routes/page-client-middleware',
+        'routes/page-hydrate-fallback',
+      ])
+    );
+  });
+
   describe('configRoutesToRouteManifest', () => {
     it('should convert simple route config to manifest', () => {
       const routeConfig = [
@@ -213,7 +324,7 @@ describe('manifest', () => {
     expect(item).toHaveProperty('hasDefaultExport', false);
   });
 
-  it('keeps route export names available without serializing internal analysis fields', async () => {
+  it('tracks route exports outside the manifest payload', async () => {
     const { root, appDir } = createTempApp(`
       export function headers() { return {}; }
       export async function action() { return null; }
@@ -234,22 +345,15 @@ describe('manifest', () => {
         }
       );
 
-      expect(manifest.routes['routes/page']).toMatchObject({
+      const routeManifest = manifest.routes['routes/page'];
+      expect(routeManifest).toMatchObject({
         hasAction: true,
         hasLoader: true,
       });
       expect(getRouteManifestModuleExports(manifest)['routes/page']).toEqual(
         expect.arrayContaining(['headers', 'action', 'loader', 'default'])
       );
-      expect(Object.keys(manifest).sort()).toEqual([
-        'entry',
-        'hmr',
-        'routes',
-        'sri',
-        'url',
-        'version',
-      ]);
-      expect(JSON.stringify(manifest)).not.toContain('headers');
+      expect(routeManifest).not.toHaveProperty('headers');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

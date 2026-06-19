@@ -113,11 +113,42 @@ describe('route chunk cache', () => {
     expect(uncached).toEqual(cached);
   });
 
-  it('stores only the shared route chunk analysis entry', async () => {
+  it('stores the Yuku route chunk analysis entries for repeated chunk generation', async () => {
     const cache = new Map();
 
     await collectRouteChunkOracle(cache);
 
-    expect(Array.from(cache.keys())).toEqual(['routes/demo.tsx::analysis']);
+    expect(Array.from(cache.keys()).sort()).toEqual([
+      'routes/demo.tsx::analyzeCode',
+      'routes/demo.tsx::getChunkableExportMap',
+      'routes/demo.tsx::getChunkedExport::HydrateFallback',
+      'routes/demo.tsx::getChunkedExport::clientAction',
+      'routes/demo.tsx::getChunkedExport::clientLoader',
+      'routes/demo.tsx::getChunkedExport::clientMiddleware',
+      'routes/demo.tsx::getExportDependencies',
+      'routes/demo.tsx::omitChunkedExports::clientAction,clientLoader,clientMiddleware,HydrateFallback',
+    ]);
+  });
+
+  it('precomputes sibling named chunk entries for repeated chunk generation', async () => {
+    const cache = new Map();
+
+    await getRouteChunkIfEnabled(
+      cache,
+      config,
+      routeId,
+      'clientAction',
+      chunkableCode
+    );
+
+    expect(Array.from(cache.keys()).sort()).toEqual([
+      'routes/demo.tsx::analyzeCode',
+      'routes/demo.tsx::getChunkableExportMap',
+      'routes/demo.tsx::getChunkedExport::HydrateFallback',
+      'routes/demo.tsx::getChunkedExport::clientAction',
+      'routes/demo.tsx::getChunkedExport::clientLoader',
+      'routes/demo.tsx::getChunkedExport::clientMiddleware',
+      'routes/demo.tsx::getExportDependencies',
+    ]);
   });
 });

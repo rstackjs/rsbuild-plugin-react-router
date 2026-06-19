@@ -13,7 +13,7 @@ const routeChunkConfig = {
 };
 
 describe('getBundlerRouteAnalysis', () => {
-  it('reuses transformed code, export names, and chunk info for the same source', async () => {
+  it('reuses source code, export names, and chunk info for the same source', async () => {
     const source = `
       export const clientAction = async () => {};
       export default function Route() { return null; }
@@ -30,6 +30,7 @@ describe('getBundlerRouteAnalysis', () => {
       first.getRouteChunkInfo(undefined, routeChunkConfig)
     );
 
+    expect(first.code).toBe(source);
     expect(first.exportNames).toEqual(['clientAction', 'default']);
     await expect(
       first.getRouteChunkInfo(undefined, routeChunkConfig)

@@ -69,6 +69,20 @@ When `--rspack-trace-output` is provided, the benchmark writes one absolute
 trace file per run under that directory so Rsbuild does not resolve the path
 inside each generated `.rspack-profile-*` directory.
 
+To capture Rspack tracing output for a benchmark, pass `--rspack-profile`:
+
+```sh
+node scripts/bench-builds.mjs --profile=smoke --iterations=1 --warmup=0 --rspack-profile=OVERVIEW
+node scripts/bench-builds.mjs --profile=full --filter=synthetic-1024 --iterations=1 --warmup=0 --rspack-profile=ALL
+```
+
+Trace directories are moved from fixture roots into
+`.benchmark/results/<profile>/rspack-profiles/` and referenced from the JSON
+result. `ALL` can produce large traces; use it for targeted runs.
+When `--rspack-trace-output` is provided, the benchmark writes one absolute
+trace file per run under that directory so Rsbuild does not resolve the path
+inside each generated `.rspack-profile-*` directory.
+
 ## Baseline Shape
 
 The synthetic fixture keeps app behavior simple and scales route count/export

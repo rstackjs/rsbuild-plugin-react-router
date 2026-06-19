@@ -1,9 +1,5 @@
 # Manifest-generation performance benchmark recipe
 
-Task: `t_6008a898`
-Repo: `/home/zack/projects/rsbuild-plugin-react-router`
-Head measured: `c2452de1393264c2b01ef8aa03908077bce025db`
-
 This document defines the reproducible commands and metric checklist for
 measuring manifest-generation performance before and after the route-analysis /
 manifest cache deduplication work.
@@ -13,18 +9,14 @@ manifest cache deduplication work.
 Use the same machine, branch, package manager, and Node version for both halves
 of an A/B comparison.
 
-Measured head environment:
+Record environment details for each run:
 
-- Branch: `perf/bundling-performance`
-- Commit: `c2452de1393264c2b01ef8aa03908077bce025db`
-- Node: `v22.22.3`
-- pnpm: `9.15.3`
-- Platform: `linux 6.8.0-124-generic x64`
-- Rsbuild: `@rsbuild/core@2.0.15`
-- Rspack: `@rspack/core@2.0.8`
-- React Router packages: `7.13.0`
-- Benchmark fixture size used for the baseline below: 256 routes plus the root
-  route, so route-level transforms report 257 calls per compiler environment.
+- Branch and commit
+- Node and pnpm versions
+- Platform
+- Rsbuild and Rspack versions
+- React Router package versions
+- Benchmark fixture size
 
 Fixture export-shape cycle from `scripts/benchmark/fixture.mjs`:
 
@@ -74,8 +66,6 @@ truth. If low-level Rspack stats are needed later, add them through fixture
 Run from the repo root:
 
 ```sh
-cd /home/zack/projects/rsbuild-plugin-react-router
-
 git status --short
 git rev-parse HEAD
 node --version
@@ -164,7 +154,7 @@ The harness command for each fixture build is:
 cd .benchmark/fixtures/synthetic-256-ssr-esm-split
 REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE=1 NODE_ENV=production \
   /usr/bin/time -v \
-  node /home/zack/projects/rsbuild-plugin-react-router/node_modules/@rsbuild/core/bin/rsbuild.js \
+  node node_modules/@rsbuild/core/bin/rsbuild.js \
   build --config rsbuild.config.mjs --log-level info
 ```
 
@@ -229,64 +219,9 @@ transform invocation counts for the same fixture. If `pluginOperations[].count`
 changes, explain why the module graph changed; otherwise compare `totalMs`,
 `maxMs`, and direct counters.
 
-## Head baseline recorded on `c2452de`
+## Baseline expectations
 
-Command used:
-
-```sh
-node scripts/bench-builds.mjs \
-  --profile default \
-  --iterations 5 \
-  --warmup 1 \
-  --clean build \
-  --format both \
-  --out .benchmark/results/manifest-head-baseline
-```
-
-Output files:
-
-- `.benchmark/results/manifest-head-baseline/baseline.json`
-- `.benchmark/results/manifest-head-baseline/baseline.md`
-
-Top-level summary:
-
-| Benchmark                   | Routes | Variant       | Median wall | Mean wall | p95 wall | p95 RSS |
-| --------------------------- | -----: | ------------- | ----------: | --------: | -------: | ------: |
-| synthetic-256-ssr-esm       |    256 | ssr-esm       |       1.56s |     1.58s |    1.67s |  485 MB |
-| synthetic-256-ssr-esm-split |    256 | ssr-esm-split |       2.07s |     2.10s |    2.16s |  704 MB |
-| synthetic-256-spa           |    256 | spa           |       6.53s |     6.56s |    6.62s |  476 MB |
-| synthetic-256-sourcemaps    |    256 | ssr-esm       |       1.62s |     1.63s |    1.69s |  529 MB |
-
-Compiler lifecycle medians from the plugin reports:
-
-| Benchmark                   | web median | node median |
-| --------------------------- | ---------: | ----------: |
-| synthetic-256-ssr-esm       |   1124.6ms |    1308.3ms |
-| synthetic-256-ssr-esm-split |   1591.5ms |    1770.3ms |
-| synthetic-256-spa           |   1082.0ms |    1246.4ms |
-| synthetic-256-sourcemaps    |   1154.4ms |    1348.0ms |
-
-### Operation counts: `synthetic-256-ssr-esm-split`
-
-This is the primary manifest/cache-dedup comparison fixture because it enables
-`future.v8_splitRouteModules`.
-
-| Environment | Operation                  | Total count (5 runs) | Per build | Total time | Max single |
-| ----------- | -------------------------- | -------------------: | --------: | ---------: | ---------: |
-| web         | `route:chunk`              |                 1930 |     386.0 | 409899.2ms |    445.2ms |
-| web         | `route:client-entry`       |                 1285 |     257.0 | 363767.2ms |    445.9ms |
-| web         | `route:module`             |                 1285 |     257.0 |   1059.3ms |      7.8ms |
-| node        | `route:module`             |                 1285 |     257.0 |    453.6ms |      7.3ms |
-| node        | `manifest:transform`       |                    5 |       1.0 |     32.5ms |      7.3ms |
-| node        | `module:client-only-stub`  |                    5 |       1.0 |     21.4ms |      6.9ms |
-| web         | `route:split-exports`      |                 4595 |     919.0 |      0.8ms |      0.1ms |
-| web         | `module:client-only-stub`  |                   15 |       3.0 |      0.5ms |      0.1ms |
-| node        | `module:server-only-guard` |                   10 |       2.0 |      0.0ms |      0.0ms |
-| node        | `route:split-exports`      |                 1390 |     278.0 |      0.0ms |      0.0ms |
-| web         | `manifest:stage`           |                    5 |       1.0 |      0.0ms |      0.0ms |
-| web         | `manifest:transform`       |                    5 |       1.0 |      0.0ms |      0.0ms |
-
-Baseline expectations for the same fixture after cache dedup:
+For the split fixture after cache dedup:
 
 - `route:client-entry`, `route:module`, `route:split-exports`, and
   `route:chunk` invocation counts should remain approximately the same because
@@ -302,22 +237,8 @@ Baseline expectations for the same fixture after cache dedup:
 - Direct `route-chunk:structured-clone` should fall materially if the refactor
   removes per-query AST cloning.
 
-### Control operation counts: `synthetic-256-ssr-esm`
-
-Use this as the non-split control. It should not materially change when the
-split-route cache path changes.
-
-| Environment | Operation                 | Total count (5 runs) | Per build | Total time | Max single |
-| ----------- | ------------------------- | -------------------: | --------: | ---------: | ---------: |
-| web         | `route:client-entry`      |                 1285 |     257.0 | 164444.8ms |    260.4ms |
-| web         | `route:module`            |                 1285 |     257.0 |   1076.2ms |     13.3ms |
-| node        | `route:module`            |                 1285 |     257.0 |    451.0ms |      7.7ms |
-| node        | `manifest:transform`      |                    5 |       1.0 |     28.4ms |      8.2ms |
-| node        | `module:client-only-stub` |                    5 |       1.0 |     21.6ms |      7.9ms |
-| node        | `route:split-exports`     |                 1390 |     278.0 |      3.6ms |      3.6ms |
-| web         | `route:split-exports`     |                 2665 |     533.0 |      0.2ms |      0.1ms |
-| web         | `manifest:stage`          |                    5 |       1.0 |      0.0ms |      0.0ms |
-| web         | `manifest:transform`      |                    5 |       1.0 |      0.0ms |      0.0ms |
+Use `synthetic-256-ssr-esm` as the non-split control. It should not materially
+change when the split-route cache path changes.
 
 ## Comparison procedure
 

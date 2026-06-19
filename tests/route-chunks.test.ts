@@ -35,6 +35,7 @@ const routeId = '/app/routes/demo.tsx';
 const rootRouteId = '/app/root.tsx';
 
 const emptyChunkInfo: RouteChunkInfo = {
+  exportNames: [],
   chunkedExports: [],
   hasRouteChunks: false,
   hasRouteChunkByExportName: {
@@ -83,8 +84,11 @@ const expectOnlyChunkedExport = (
   }
 };
 
-const expectNoRouteChunks = (result: RouteChunkInfo) => {
-  expect(result).toEqual(emptyChunkInfo);
+const expectNoRouteChunks = (
+  result: RouteChunkInfo,
+  exportNames: string[] = []
+) => {
+  expect(result).toEqual({ ...emptyChunkInfo, exportNames });
 };
 
 const expectExports = async (
@@ -143,6 +147,30 @@ describe('route chunks', () => {
       expect(result.chunkedExports).toEqual(routeChunkExportNames);
     });
 
+    it('returns runtime export names from route chunk analysis', async () => {
+      const result = await detectRouteChunksIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        `
+          export type LoaderData = { value: string };
+          export type * from './types';
+          export * from './shared';
+          export * as helpers from './helpers';
+          export const clientAction = async () => {};
+          export async function loader() { return null; }
+          export default function Route() { return null; }
+        `
+      );
+
+      expect(result.exportNames).toEqual([
+        'helpers',
+        'clientAction',
+        'loader',
+        'default',
+      ]);
+    });
+
     it('allows client exports to depend on imports', async () => {
       const code = `
         import { json } from 'react-router';
@@ -164,13 +192,13 @@ describe('route chunks', () => {
 
       const result = await detect(code);
 
-      expectNoRouteChunks(result);
+      expectNoRouteChunks(result, ['clientAction', 'clientLoader']);
     });
 
     it('does not split a client export that shares top-level code with the default export', async () => {
       const result = await detect(codeWithClientActionSharedWithDefault);
 
-      expectNoRouteChunks(result);
+      expectNoRouteChunks(result, ['default', 'clientAction']);
     });
 
     it('splits a single-binding destructured client export', async () => {
@@ -194,7 +222,7 @@ describe('route chunks', () => {
 
       const result = await detect(code);
 
-      expectNoRouteChunks(result);
+      expectNoRouteChunks(result, ['clientAction', 'foo', 'default']);
     });
 
     it('splits an isolated client export while leaving a non-splittable sibling unsplit', async () => {
@@ -262,6 +290,22 @@ describe('route chunks', () => {
       );
 
       await expectExports(chunk, ['default', 'action'], ['clientAction']);
+    });
+
+    it('returns main chunk code without analysis when no route chunk exports exist', async () => {
+      const cache = new Map();
+      const code = `export default function Route() { return null; }`;
+
+      const chunk = await getRouteChunkIfEnabled(
+        cache,
+        config,
+        routeId,
+        'main',
+        code
+      );
+
+      expect(chunk).toBe(code);
+      expect(cache.size).toBe(0);
     });
 
     it('generates an individual client chunk with only that client export', async () => {
@@ -415,7 +459,7 @@ describe('route chunks', () => {
 
       const result = await detect(code);
 
-      expectNoRouteChunks(result);
+      expectNoRouteChunks(result, ['default']);
     });
 
     it('returns null when route chunk generation is disabled', async () => {
