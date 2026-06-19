@@ -41,7 +41,6 @@ import {
   getRouteManifestModuleExports,
   configRoutesToRouteManifest,
   createReactRouterManifestStats,
-  getReactRouterManifestChunkNames,
   type ReactRouterManifestStats,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
@@ -486,10 +485,12 @@ export const pluginReactRouter = (
       ])
     );
 
+    const manifestChunkNames = new Set<string>(['entry.client']);
     const webRouteEntries = Object.values(routes).reduce(
       (acc, route) => {
         const entryName = route.file.slice(0, route.file.lastIndexOf('.'));
         const routeFilePath = resolve(appDirectory, route.file);
+        manifestChunkNames.add(entryName);
         acc[entryName] = {
           import: `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`,
           html: false,
@@ -501,7 +502,9 @@ export const pluginReactRouter = (
             if (!source.includes(exportName)) {
               continue;
             }
-            acc[getRouteChunkEntryName(route.id, exportName)] = {
+            const chunkEntryName = getRouteChunkEntryName(route.id, exportName);
+            manifestChunkNames.add(chunkEntryName);
+            acc[chunkEntryName] = {
               import: getRouteChunkModuleId(routeFilePath, exportName),
               html: false,
             };
@@ -518,10 +521,6 @@ export const pluginReactRouter = (
       rootDirectory: process.cwd(),
     });
     const routesByServerBundleId = getRoutesByServerBundleId(buildManifest);
-    const manifestChunkNames = getReactRouterManifestChunkNames(
-      routes,
-      splitRouteModules
-    );
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
@@ -1340,6 +1339,7 @@ export const pluginReactRouter = (
                     routeChunkOptions,
                     {
                       future,
+                      manifestChunkNames,
                       onManifest: (manifest, sri) => {
                         performanceProfiler.recordSync(
                           'web',

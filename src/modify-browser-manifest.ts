@@ -26,16 +26,19 @@ export function createModifyBrowserManifestPlugin(
   routeChunkOptions?: Parameters<typeof getReactRouterManifestForDev>[5],
   options?: {
     future?: { unstable_subResourceIntegrity?: boolean };
+    manifestChunkNames?: ReadonlySet<string>;
     onManifest?: (
       manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
       sri: Record<string, string> | undefined
     ) => void;
   }
 ) {
-  const manifestChunkNames = getReactRouterManifestChunkNames(
-    routes,
-    routeChunkOptions?.splitRouteModules
-  );
+  const manifestChunkNames =
+    options?.manifestChunkNames ??
+    getReactRouterManifestChunkNames(
+      routes,
+      routeChunkOptions?.splitRouteModules
+    );
 
   return {
     apply(compiler: Rspack.Compiler): void {
