@@ -221,6 +221,9 @@ export async function getReactRouterManifestForDev(
           hasRouteChunkByExportName = chunkInfo;
         }
       } catch (error) {
+        if (isBuild) {
+          throw error;
+        }
         console.error(`Failed to analyze route file ${routeFilePath}:`, error);
       }
 

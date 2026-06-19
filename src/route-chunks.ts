@@ -225,14 +225,14 @@ const getExportDependencies = (
           exportedVariableDeclarators: new Set(),
         };
         const visitedSymbols = new Set<YukuSymbol>();
-        const scannedStatements = new Set<AnyNode>();
+        const scannedNodes = new Set<AnyNode>();
 
-        const scanStatement = (statement: AnyNode) => {
-          if (scannedStatements.has(statement)) {
+        const scanNode = (node: AnyNode) => {
+          if (scannedNodes.has(node)) {
             return;
           }
-          scannedStatements.add(statement);
-          walk(statement as any, {
+          scannedNodes.add(node);
+          walk(node as any, {
             Identifier(node: AnyNode) {
               const reference = module.referenceOf(node as never);
               if (reference?.symbol) {
@@ -265,7 +265,7 @@ const getExportDependencies = (
             ) {
               dependencies.exportedVariableDeclarators.add(declarator);
             }
-            scanStatement(statement);
+            scanNode(declarator ?? statement);
           }
 
           for (const reference of symbol.references as any[]) {
@@ -274,7 +274,11 @@ const getExportDependencies = (
               reference.node
             );
             addTopLevelStatement(module, dependencies, reference.node);
-            scanStatement(statement);
+            const declarator = getVariableDeclaratorForNode(
+              module,
+              reference.node
+            );
+            scanNode(declarator ?? statement);
           }
         };
 
@@ -284,7 +288,7 @@ const getExportDependencies = (
           visitSymbol(localSymbol);
         } else {
           const statement = getTopLevelStatementForNode(module, exportNode);
-          scanStatement(statement);
+          scanNode(statement);
         }
 
         exportDependencies.set(exportName, dependencies);

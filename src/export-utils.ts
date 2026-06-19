@@ -189,7 +189,8 @@ const collectExportNames = (program: AnyNode): string[] => {
         }
       } else if (
         (declaration.type === 'FunctionDeclaration' ||
-          declaration.type === 'ClassDeclaration') &&
+          declaration.type === 'ClassDeclaration' ||
+          declaration.type === 'TSEnumDeclaration') &&
         declaration.id?.name
       ) {
         exportNames.add(declaration.id.name);

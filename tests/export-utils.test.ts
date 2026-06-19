@@ -83,6 +83,17 @@ describe('getBundlerRouteAnalysis', () => {
     );
   });
 
+  it('collects exported TypeScript enum names as runtime exports', async () => {
+    await expect(
+      getExportNamesAndExportAll(
+        `export enum Status { Active = 'active' }`
+      )
+    ).resolves.toEqual({
+      exportNames: ['Status'],
+      exportAllModules: [],
+    });
+  });
+
   it('does not report an erased default interface as a runtime export', async () => {
     const analysis = await getBundlerRouteAnalysis(
       `export default interface RouteType { value: string }`,

@@ -12,9 +12,26 @@ export function validateDestructuredExports(
   id: AnyNode,
   exportsToRemove: string[]
 ): void {
+  if (id.type === 'Identifier') {
+    if (exportsToRemove.includes(id.name)) {
+      throw invalidDestructureError(id.name);
+    }
+    return;
+  }
+
+  if (id.type === 'AssignmentPattern') {
+    validateDestructuredExports(id.left, exportsToRemove);
+    return;
+  }
+
   if (id.type === 'ArrayPattern') {
     for (const element of id.elements ?? []) {
       if (!element) {
+        continue;
+      }
+
+      if (element.type === 'AssignmentPattern') {
+        validateDestructuredExports(element, exportsToRemove);
         continue;
       }
 
@@ -54,6 +71,7 @@ export function validateDestructuredExports(
         }
 
         if (
+          property.value.type === 'AssignmentPattern' ||
           property.value.type === 'ArrayPattern' ||
           property.value.type === 'ObjectPattern'
         ) {
@@ -80,6 +98,14 @@ export function toFunctionExpression(decl: AnyNode): AnyNode {
   return {
     ...decl,
     type: 'FunctionExpression',
+    declare: undefined,
+  };
+}
+
+export function toClassExpression(decl: AnyNode): AnyNode {
+  return {
+    ...decl,
+    type: 'ClassExpression',
     declare: undefined,
   };
 }
@@ -557,6 +583,17 @@ export const removeExports = (
   };
 
   for (const statement of [...program.body]) {
+    if (statement.type === 'ExportAllDeclaration') {
+      const exportedName = statement.exported
+        ? getExportedName({ exported: statement.exported })
+        : null;
+      if (!exportedName || exportsToRemove.includes(exportedName)) {
+        exportsChanged = true;
+        removeFromArray(program.body, statement);
+      }
+      continue;
+    }
+
     if (statement.type === 'ExportNamedDeclaration') {
       if (statement.specifiers?.length) {
         statement.specifiers = statement.specifiers.filter(
@@ -765,16 +802,33 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
   const program = getProgram(ast);
   const usedNames = collectUsedNames(program);
   const hocs: Array<[string, string]> = [];
+  const componentWrapperDeclarations: AnyNode[] = [];
 
-  function getHocUid(hocName: string) {
-    let uid = `_${hocName}`;
+  function getUid(name: string) {
+    let uid = `_${name}`;
     let index = 2;
     while (usedNames.has(uid)) {
-      uid = `_${hocName}${index++}`;
+      uid = `_${name}${index++}`;
     }
     usedNames.add(uid);
+    return uid;
+  }
+
+  function getHocUid(hocName: string) {
+    const uid = getUid(hocName);
     hocs.push([hocName, uid]);
     return identifier(uid);
+  }
+
+  function wrapNamedComponentDeclaration(name: string, declaration: AnyNode) {
+    const uid = getHocUid(`with${name}Props`);
+    const expression =
+      declaration.type === 'FunctionDeclaration'
+        ? toFunctionExpression(declaration)
+        : declaration.type === 'ClassDeclaration'
+          ? toClassExpression(declaration)
+          : declaration;
+    return variableDeclaration(name, callExpression(uid, [expression]));
   }
 
   for (const statement of program.body ?? []) {
@@ -783,8 +837,10 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
       const expr =
         declaration?.type === 'FunctionDeclaration'
           ? toFunctionExpression(declaration)
+          : declaration?.type === 'ClassDeclaration'
+            ? toClassExpression(declaration)
           : declaration;
-      if (expr && expr.type !== 'ClassDeclaration') {
+      if (expr) {
         const uid = getHocUid('withComponentProps');
         statement.declaration = callExpression(uid, [expr]);
       }
@@ -811,18 +867,41 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
     }
 
     if (
-      declaration?.type === 'FunctionDeclaration' &&
+      (declaration?.type === 'FunctionDeclaration' ||
+        declaration?.type === 'ClassDeclaration') &&
       declaration.id?.name &&
       isNamedComponentExport(declaration.id.name)
     ) {
       const name = declaration.id.name;
-      const uid = getHocUid(`with${name}Props`);
-      statement.declaration = variableDeclaration(
-        name,
-        callExpression(uid, [toFunctionExpression(declaration)])
+      statement.declaration = wrapNamedComponentDeclaration(name, declaration);
+      continue;
+    }
+
+    for (const specifier of statement.specifiers ?? []) {
+      if (specifier.type !== 'ExportSpecifier' || specifier.exportKind === 'type') {
+        continue;
+      }
+      const exportedName = getExportedName(specifier);
+      if (!exportedName || !isNamedComponentExport(exportedName)) {
+        continue;
+      }
+      const localName = specifier.local?.name;
+      if (!localName) {
+        continue;
+      }
+      const wrappedLocalName = getUid(exportedName);
+      const uid = getHocUid(`with${exportedName}Props`);
+      componentWrapperDeclarations.push(
+        variableDeclaration(
+          wrappedLocalName,
+          callExpression(uid, [identifier(localName)])
+        )
       );
+      specifier.local = identifier(wrappedLocalName);
     }
   }
+
+  program.body.push(...componentWrapperDeclarations);
 
   if (hocs.length > 0) {
     program.body.unshift(
