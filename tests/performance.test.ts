@@ -105,6 +105,81 @@ describe('React Router performance profiler', () => {
     }
   });
 
+  it('keeps only the five slowest operation entries in descending order', () => {
+    const logs: string[] = [];
+    const originalNow = performance.now;
+    const times = [
+      0, 3, 3, 12, 12, 14, 14, 20, 20, 21, 21, 29, 29, 33,
+    ];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+
+    try {
+      performance.now = () => {
+        const time = times.shift();
+        if (time === undefined) {
+          throw new Error('unexpected timer read');
+        }
+        return time;
+      };
+
+      for (const resource of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) {
+        profiler.recordSync('web', 'route:module', resource, () => resource);
+      }
+      profiler.flush('web');
+
+      const report = parsePerformanceReport(logs[0]);
+      expect(report.operations['route:module'].slowest).toEqual([
+        { durationMs: 9, resource: 'b' },
+        { durationMs: 8, resource: 'f' },
+        { durationMs: 6, resource: 'd' },
+        { durationMs: 4, resource: 'g' },
+        { durationMs: 3, resource: 'a' },
+      ]);
+    } finally {
+      performance.now = originalNow;
+    }
+  });
+
+  it('rounds reported operation timings when flushing', () => {
+    const logs: string[] = [];
+    const originalNow = performance.now;
+    const times = [0, 1.04, 1.04, 1.16];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+
+    try {
+      performance.now = () => {
+        const time = times.shift();
+        if (time === undefined) {
+          throw new Error('unexpected timer read');
+        }
+        return time;
+      };
+
+      profiler.recordSync('web', 'route:module', 'app/routes/a.tsx', () => {});
+      profiler.recordSync('web', 'route:module', 'app/routes/b.tsx', () => {});
+      profiler.flush('web');
+
+      const report = parsePerformanceReport(logs[0]);
+      expect(report.operations['route:module']).toMatchObject({
+        totalMs: 1.2,
+        wallMs: 1.2,
+        maxMs: 1,
+      });
+      expect(report.operations['route:module'].slowest).toEqual([
+        { durationMs: 1, resource: 'app/routes/a.tsx' },
+        { durationMs: 0.1, resource: 'app/routes/b.tsx' },
+      ]);
+    } finally {
+      performance.now = originalNow;
+    }
+  });
+
   it('does not evaluate timers or log output when disabled', async () => {
     const logs: string[] = [];
     const originalNow = performance.now;

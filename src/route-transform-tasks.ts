@@ -10,6 +10,7 @@ import {
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
 import {
+  collectProgramExportNames,
   getBundlerRouteAnalysis,
   getExportNamesAndExportAll,
   getRouteModuleAnalysis,
@@ -67,6 +68,7 @@ export type RouteModuleTransformTask = BaseRouteTransformTask & {
   resource: string;
   environmentName: string;
   ssr: boolean;
+  isBuild: boolean;
   isSpaMode: boolean;
   rootRoutePath: string | null;
 };
@@ -203,10 +205,8 @@ const createClientOnlyStub = async (
       return;
     }
     visitedModules.add(modulePath);
-    const {
-      exports: moduleExportNames,
-      exportAllModules: moduleExportAll,
-    } = await getRouteModuleAnalysis(modulePath);
+    const { exports: moduleExportNames, exportAllModules: moduleExportAll } =
+      await getRouteModuleAnalysis(modulePath);
     for (const name of moduleExportNames) {
       if (name !== 'default') {
         exportNames.add(name);
@@ -259,10 +259,17 @@ const transformRouteModule = async (
 ): Promise<RouteTransformResult> => {
   let code = task.code;
 
+  const defaultExportMatch = code.match(/\n\s{0,}([\w\d_]+)\sas default,?/);
+  if (defaultExportMatch && typeof defaultExportMatch.index === 'number') {
+    code =
+      code.slice(0, defaultExportMatch.index) +
+      code.slice(defaultExportMatch.index + defaultExportMatch[0].length);
+    code += `\nexport default ${defaultExportMatch[1]};`;
+  }
+
+  const ast = parse(code, { sourceType: 'module' });
   if (task.environmentName === 'web' && !task.ssr && task.isSpaMode) {
-    const analysis = await getBundlerRouteAnalysis(task.code, task.resourcePath);
-    code = analysis.code;
-    const resolvedExportNames = analysis.exportNames;
+    const resolvedExportNames = collectProgramExportNames(ast.program);
     const isRootRoute = task.resourcePath === task.rootRoutePath;
     const relativePath = relative(process.cwd(), task.resourcePath);
 
@@ -290,15 +297,6 @@ const transformRouteModule = async (
     }
   }
 
-  const defaultExportMatch = code.match(/\n\s{0,}([\w\d_]+)\sas default,?/);
-  if (defaultExportMatch && typeof defaultExportMatch.index === 'number') {
-    code =
-      code.slice(0, defaultExportMatch.index) +
-      code.slice(defaultExportMatch.index + defaultExportMatch[0].length);
-    code += `\nexport default ${defaultExportMatch[1]};`;
-  }
-
-  const ast = parse(code, { sourceType: 'module' });
   if (task.environmentName === 'web') {
     removeExports(ast, SERVER_ONLY_ROUTE_EXPORTS);
   }
@@ -308,7 +306,7 @@ const transformRouteModule = async (
   }
 
   return generate(ast, {
-    sourceMaps: true,
+    sourceMaps: !task.isBuild,
     filename: task.resource,
     sourceFileName: task.resourcePath,
   });

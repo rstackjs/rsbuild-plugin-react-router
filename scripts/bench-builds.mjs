@@ -511,6 +511,27 @@ const collectRspackProfiles = async ({
   return collected;
 };
 
+const isTraceOutputStream = value => value === 'stdout' || value === 'stderr';
+
+const resolveRspackTraceOutput = async ({
+  traceOutput,
+  benchmarkId,
+  runLabel,
+}) => {
+  if (!traceOutput || isTraceOutputStream(traceOutput)) {
+    return traceOutput;
+  }
+
+  const tracePath = path.resolve(
+    rootDir,
+    traceOutput,
+    benchmarkId,
+    `${runLabel}.log`
+  );
+  await mkdir(path.dirname(tracePath), { recursive: true });
+  return tracePath;
+};
+
 const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   const useTime = await hasGnuTime();
@@ -571,6 +592,14 @@ const main = async () => {
       const beforeRspackProfiles = rspackProfileEnabled
         ? await listRspackProfileDirs(fixtureRoot)
         : [];
+      const runLabel = `${measured ? 'run' : 'warmup'}-${
+        measured ? index - args.warmup + 1 : index + 1
+      }`;
+      const rspackTraceOutput = await resolveRspackTraceOutput({
+        traceOutput: args.rspackTraceOutput,
+        benchmarkId: benchmark.id,
+        runLabel,
+      });
       const commandResult = await runCommand({
         command: process.execPath,
         args: [rsbuildBin, 'build', '--config', 'rsbuild.config.mjs'],
@@ -581,8 +610,8 @@ const main = async () => {
           ...(args.rspackProfile
             ? { RSPACK_PROFILE: args.rspackProfile }
             : {}),
-          ...(args.rspackTraceOutput
-            ? { RSPACK_TRACE_OUTPUT: args.rspackTraceOutput }
+          ...(rspackTraceOutput
+            ? { RSPACK_TRACE_OUTPUT: rspackTraceOutput }
             : {}),
         },
         useTime,
@@ -595,9 +624,7 @@ const main = async () => {
               outputPaths.artifactRoot,
               'rspack-profiles',
               benchmark.id,
-              `${measured ? 'run' : 'warmup'}-${
-                measured ? index - args.warmup + 1 : index + 1
-              }`
+              runLabel
             ),
           })
         : [];
@@ -619,6 +646,10 @@ const main = async () => {
           maxRssKb: timeStats.maxRssKb ?? null,
           pluginReports,
           rspackProfiles,
+          rspackTraceOutput:
+            rspackTraceOutput && !isTraceOutputStream(rspackTraceOutput)
+              ? path.relative(rootDir, rspackTraceOutput)
+              : rspackTraceOutput,
         });
       }
     }

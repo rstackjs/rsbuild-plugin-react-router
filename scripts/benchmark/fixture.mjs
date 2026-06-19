@@ -262,7 +262,9 @@ const createRsbuildConfig = ({
     '    }),',
     '  ],',
     '  output: {',
-    `    sourceMap: ${sourceMap ? 'true' : 'false'},`,
+    `    sourceMap: ${
+      sourceMap ? `{ js: 'cheap-module-source-map', css: false }` : 'false'
+    },`,
     '  },',
     '});',
     '',

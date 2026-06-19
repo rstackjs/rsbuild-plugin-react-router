@@ -264,6 +264,22 @@ describe('route chunks', () => {
       await expectExports(chunk, ['default', 'action'], ['clientAction']);
     });
 
+    it('returns main chunk code without analysis when no route chunk exports exist', async () => {
+      const cache = new Map();
+      const code = `export default function Route() { return null; }`;
+
+      const chunk = await getRouteChunkIfEnabled(
+        cache,
+        config,
+        routeId,
+        'main',
+        code
+      );
+
+      expect(chunk).toBe(code);
+      expect(cache.size).toBe(0);
+    });
+
     it('generates an individual client chunk with only that client export', async () => {
       const code = `
         import { json } from 'react-router';

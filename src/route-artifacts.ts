@@ -2,16 +2,13 @@ import {
   CLIENT_ROUTE_EXPORTS_SET,
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
-import {
-  getBundlerRouteAnalysis,
-  getExportNames,
-  transformToEsm,
-} from './export-utils.js';
+import { getBundlerRouteAnalysis, getExportNames } from './export-utils.js';
 import {
   buildEnforceChunkValidity,
   emptyRouteChunkSnippet,
   getRouteChunkIfEnabled,
   getRouteChunkNameFromModuleId,
+  shouldAnalyzeRouteChunks,
   validateRouteChunks,
   type RouteChunkCache,
   type RouteChunkConfig,
@@ -84,9 +81,11 @@ export const createRouteClientEntryArtifact = async ({
   routeChunkConfig,
 }: RouteClientEntryArtifactOptions): Promise<RouteClientEntryArtifact> => {
   const isServer = environmentName === 'node';
-  const splitRouteModules = routeChunkConfig.splitRouteModules;
-  const shouldAnalyzeRouteChunks = !isServer && isBuild && splitRouteModules;
-  const analysis = shouldAnalyzeRouteChunks
+  const mightHaveRouteChunks =
+    !isServer &&
+    isBuild &&
+    shouldAnalyzeRouteChunks(routeChunkConfig, resourcePath, code);
+  const analysis = mightHaveRouteChunks
     ? await getBundlerRouteAnalysis(code, resourcePath)
     : null;
   const exportNames = analysis?.exportNames ?? (await getExportNames(code));
@@ -131,13 +130,12 @@ export const createRouteChunkArtifact = async ({
     };
   }
 
-  const transformed = await transformToEsm(code, resourcePath);
   const chunk = await getRouteChunkIfEnabled(
     routeChunkCache,
     routeChunkConfig,
     resourcePath,
     chunkName,
-    transformed
+    code
   );
 
   if (splitRouteModules === 'enforce' && chunkName === 'main' && chunk) {

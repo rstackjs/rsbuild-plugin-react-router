@@ -8,7 +8,6 @@ A Rsbuild plugin that provides seamless integration with React Router, supportin
 
 ## Features
 
-
 - 🚀 Zero-config setup with sensible defaults
 - 🔄 Automatic route generation from file system
 - 🖥️ Server-Side Rendering (SSR) support
@@ -58,11 +57,11 @@ export default defineConfig(() => {
         // Optional: Enable custom server mode
         customServer: false,
         // Optional: Specify server output format
-        serverOutput: "commonjs",
+        serverOutput: 'commonjs',
         // Optional: enable experimental support for module federation
-        federation: false
-      }), 
-      pluginReact()
+        federation: false,
+      }),
+      pluginReact(),
     ],
   };
 });
@@ -73,6 +72,7 @@ export default defineConfig(() => {
 The plugin uses a two-part configuration system:
 
 1. **Plugin Options** (in `rsbuild.config.ts`):
+
 ```ts
 pluginReactRouter({
   /**
@@ -87,7 +87,27 @@ pluginReactRouter({
    * Options: "commonjs" | "module"
    * @default "module"
    */
-  serverOutput?: "commonjs" | "module"
+  serverOutput?: "commonjs" | "module",
+
+  /**
+   * Rsbuild dev-only lazy compilation behavior.
+   * @default false
+   */
+  lazyCompilation?: boolean | Rspack.LazyCompilationOptions,
+
+  /**
+   * Emit structured React Router plugin timing logs.
+   * @default false
+   */
+  logPerformance?: boolean,
+
+  /**
+   * Run route transforms in a worker-thread pool.
+   * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
+   * @default true, inline for small route graphs or low-core CPUs; otherwise `min(available CPUs - 2, 8)`, or `6` with split route modules.
+   */
+  parallelTransforms?: boolean | { maxWorkers?: number },
+
   /**
    * Enable experimental support for module federation
    * @default false
@@ -106,6 +126,7 @@ passing the build to React Router's request handler.
 ```
 
 2. **React Router Configuration** (in `react-router.config.*`):
+
 ```ts
 import type { Config } from '@react-router/dev/config';
 
@@ -120,19 +141,19 @@ export default {
    * The file name for the server build output.
    * @default "index.js"
    */
-  serverBuildFile: "index.js",
+  serverBuildFile: 'index.js',
 
   /**
    * The output format for the server build.
    * Options: "esm" | "cjs"
    * @default "esm"
    */
-  serverModuleFormat: "esm",
+  serverModuleFormat: 'esm',
 
   /**
    * Split server bundles by route branch (advanced).
    */
-  serverBundles: async ({ branch }) => branch[0]?.id ?? "main",
+  serverBundles: async ({ branch }) => branch[0]?.id ?? 'main',
 
   /**
    * Hook called after the build completes.
@@ -262,7 +283,7 @@ For large sites, you can tune prerender concurrency:
 export default {
   ssr: false,
   prerender: {
-    paths: ['/','/about'],
+    paths: ['/', '/about'],
     unstable_concurrency: 4,
   },
 } satisfies Config;
@@ -275,7 +296,12 @@ If no configuration is provided, the following defaults will be used:
 ```ts
 // Plugin defaults (rsbuild.config.ts)
 {
-  customServer: false
+  customServer: false,
+  serverOutput: 'module',
+  federation: false,
+  lazyCompilation: false,
+  logPerformance: false,
+  parallelTransforms: true // adaptive worker pool
 }
 
 // Router defaults (react-router.config.ts)
@@ -286,6 +312,14 @@ If no configuration is provided, the following defaults will be used:
   basename: '/'
 }
 ```
+
+`parallelTransforms: true` uses worker threads for large route builds. The default
+worker count is `availableParallelism - 2`, capped at 8 workers, or 6 workers
+when `splitRouteModules` is enabled.
+
+Route transform source maps are generated in development only. If you enable
+Rsbuild source maps for faster local debugging, prefer a cheap JS map:
+`output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
 
 ### Route Configuration
 
@@ -326,6 +360,7 @@ export default [
 ```
 
 The plugin provides several helper functions for defining routes:
+
 - `index()` - Creates an index route
 - `route()` - Creates a regular route with a path
 - `layout()` - Creates a layout route with nested children
@@ -336,6 +371,7 @@ The plugin provides several helper functions for defining routes:
 Route components support the following exports:
 
 #### Client-side Exports
+
 - `default` - The route component
 - `ErrorBoundary` - Error boundary component
 - `HydrateFallback` - Loading component during hydration
@@ -349,6 +385,7 @@ Route components support the following exports:
 - `shouldRevalidate` - Revalidation control
 
 #### Server-side Exports
+
 - `loader` - Server-side data loading
 - `action` - Server-side form actions
 - `middleware` - Server-side middleware
@@ -387,9 +424,9 @@ export default defineConfig(() => {
   return {
     plugins: [
       pluginReactRouter({
-        customServer: true
-      }), 
-      pluginReact()
+        customServer: true,
+      }),
+      pluginReact(),
     ],
   };
 });
@@ -398,6 +435,7 @@ export default defineConfig(() => {
 When using a custom server, you'll need to:
 
 1. Create a server handler (`server/index.ts`):
+
 ```ts
 import { createRequestHandler } from '@react-router/express';
 
@@ -413,6 +451,7 @@ export const app = createRequestHandler({
 ```
 
 2. Set up your server entry point (`server.js`):
+
 ```js
 import { createRsbuild, loadConfig } from '@rsbuild/core';
 import express from 'express';
@@ -451,9 +490,11 @@ async function startServer() {
     devServer.connectWebSocket({ server });
   } else {
     // Production mode
-    app.use(express.static(path.join(__dirname, 'build/client'), {
-      index: false
-    }));
+    app.use(
+      express.static(path.join(__dirname, 'build/client'), {
+        index: false,
+      })
+    );
 
     // Load the server bundle
     const serverBundle = await import('./build/server/static/js/app.js');
@@ -477,6 +518,7 @@ startServer().catch(console.error);
 ```
 
 3. Update your `package.json` scripts:
+
 ```json
 {
   "scripts": {
@@ -488,6 +530,7 @@ startServer().catch(console.error);
 ```
 
 The custom server setup allows you to:
+
 - Add custom middleware
 - Handle API routes
 - Integrate with databases
@@ -500,6 +543,7 @@ The custom server setup allows you to:
 To deploy your React Router app to Cloudflare Workers:
 
 1. **Configure Rsbuild** (`rsbuild.config.ts`):
+
 ```ts
 import { defineConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
@@ -524,17 +568,24 @@ export default defineConfig({
             module: true,
           },
           resolve: {
-            conditionNames: ['workerd', 'worker', 'browser', 'import', 'require'],
+            conditionNames: [
+              'workerd',
+              'worker',
+              'browser',
+              'import',
+              'require',
+            ],
           },
         },
       },
     },
   },
-  plugins: [pluginReactRouter({customServer: true}), pluginReact()],
+  plugins: [pluginReactRouter({ customServer: true }), pluginReact()],
 });
 ```
 
 2. **Configure Wrangler** (`wrangler.toml`):
+
 ```toml
 workers_dev = true
 name = "my-react-router-worker"
@@ -552,6 +603,7 @@ VALUE_FROM_CLOUDFLARE = "Hello from Cloudflare"
 ```
 
 3. **Create Worker Entry** (`server/index.ts`):
+
 ```ts
 import { createRequestHandler } from 'react-router';
 
@@ -588,6 +640,7 @@ export default {
 ```
 
 4. **Update Package Dependencies**:
+
 ```json
 {
   "dependencies": {
@@ -605,6 +658,7 @@ export default {
 ```
 
 5. **Setup Deployment Scripts** (`package.json`):
+
 ```json
 {
   "scripts": {
@@ -630,6 +684,7 @@ export default {
 ### Development Workflow:
 
 1. Local Development:
+
    ```bash
    # Start local development server
    npm run dev
@@ -646,6 +701,7 @@ export default {
 ## Development
 
 The plugin automatically:
+
 - Runs type generation during development and build
 - Sets up development server with live reload
 - Handles route-based code splitting
@@ -667,17 +723,17 @@ CSS endpoint) are not supported 1:1.
 
 The repository includes several examples demonstrating different use cases:
 
-| Example | Description | Port | Command |
-|---------|-------------|------|---------|
-| [default-template](./examples/default-template) | Standard SSR setup with React Router | 3000 | `pnpm dev` |
-| [spa-mode](./examples/spa-mode) | Single Page Application (`ssr: false`) | 3001 | `pnpm dev` |
-| [prerender](./examples/prerender) | Static prerendering for multiple routes | 3002 | `pnpm dev` |
-| [custom-node-server](./examples/custom-node-server) | Custom Express server with SSR | 3003 | `pnpm dev` |
-| [cloudflare](./examples/cloudflare) | Cloudflare Workers deployment | 3004 | `pnpm dev` |
-| [client-only](./examples/client-only) | `.client` modules with SSR hydration | 3010 | `pnpm dev` |
-| [epic-stack](./examples/epic-stack) | Full-featured Epic Stack example | 3005 | `pnpm dev` |
-| [federation/epic-stack](./examples/federation/epic-stack) | Module Federation host | 3006 | `pnpm dev` |
-| [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote | 3007 | `pnpm dev` |
+| Example                                                                 | Description                             | Port | Command    |
+| ----------------------------------------------------------------------- | --------------------------------------- | ---- | ---------- |
+| [default-template](./examples/default-template)                         | Standard SSR setup with React Router    | 3000 | `pnpm dev` |
+| [spa-mode](./examples/spa-mode)                                         | Single Page Application (`ssr: false`)  | 3001 | `pnpm dev` |
+| [prerender](./examples/prerender)                                       | Static prerendering for multiple routes | 3002 | `pnpm dev` |
+| [custom-node-server](./examples/custom-node-server)                     | Custom Express server with SSR          | 3003 | `pnpm dev` |
+| [cloudflare](./examples/cloudflare)                                     | Cloudflare Workers deployment           | 3004 | `pnpm dev` |
+| [client-only](./examples/client-only)                                   | `.client` modules with SSR hydration    | 3010 | `pnpm dev` |
+| [epic-stack](./examples/epic-stack)                                     | Full-featured Epic Stack example        | 3005 | `pnpm dev` |
+| [federation/epic-stack](./examples/federation/epic-stack)               | Module Federation host                  | 3006 | `pnpm dev` |
+| [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote                | 3007 | `pnpm dev` |
 
 Each example has unique ports configured to allow running multiple examples simultaneously.
 

@@ -562,11 +562,76 @@ const removeNewlyDeadTopLevelDeclarations = (
   });
 };
 
+const hasRemovableExport = (
+  program: AnyNode,
+  exportsToRemove: ReadonlySet<string>
+): boolean => {
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ExportAllDeclaration') {
+      const exportedName = statement.exported
+        ? getExportedName({ exported: statement.exported })
+        : null;
+      if (!exportedName || exportsToRemove.has(exportedName)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (statement.type === 'ExportDefaultDeclaration') {
+      if (exportsToRemove.has('default')) {
+        return true;
+      }
+      continue;
+    }
+
+    if (statement.type !== 'ExportNamedDeclaration') {
+      continue;
+    }
+
+    for (const specifier of statement.specifiers ?? []) {
+      if (specifier.type !== 'ExportSpecifier') {
+        continue;
+      }
+      const exportedName = getExportedName(specifier);
+      if (exportedName && exportsToRemove.has(exportedName)) {
+        return true;
+      }
+    }
+
+    const declaration = statement.declaration;
+    if (declaration?.type === 'VariableDeclaration') {
+      for (const declarator of declaration.declarations ?? []) {
+        for (const name of getPatternIdentifierNames(declarator.id)) {
+          if (exportsToRemove.has(name)) {
+            return true;
+          }
+        }
+      }
+      continue;
+    }
+
+    if (
+      (declaration?.type === 'FunctionDeclaration' ||
+        declaration?.type === 'ClassDeclaration') &&
+      declaration.id?.name &&
+      exportsToRemove.has(declaration.id.name)
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
 export const removeExports = (
   ast: ParseResult | AnyNode,
   exportsToRemove: readonly string[]
-): void => {
+): boolean => {
   const program = getProgram(ast);
+  const exportsToRemoveSet = new Set(exportsToRemove);
+  if (!hasRemovableExport(program, exportsToRemoveSet)) {
+    return false;
+  }
+
   const declarationGraph = createTopLevelDeclarationGraph(program);
   const previouslyLive = collectLiveTopLevelDeclarations(
     program,
@@ -591,7 +656,7 @@ export const removeExports = (
       const exportedName = statement.exported
         ? getExportedName({ exported: statement.exported })
         : null;
-      if (!exportedName || exportsToRemove.includes(exportedName)) {
+      if (!exportedName || exportsToRemoveSet.has(exportedName)) {
         exportsChanged = true;
         removeFromArray(program.body, statement);
       }
@@ -606,7 +671,7 @@ export const removeExports = (
               return true;
             }
             const exportedName = getExportedName(specifier);
-            if (exportedName && exportsToRemove.includes(exportedName)) {
+            if (exportedName && exportsToRemoveSet.has(exportedName)) {
               exportsChanged = true;
               if (specifier.local?.name) {
                 removedExportLocalNames.add(specifier.local.name);
@@ -627,7 +692,7 @@ export const removeExports = (
         declaration.declarations = declaration.declarations.filter(
           (declarator: AnyNode) => {
             if (declarator.id.type === 'Identifier') {
-              if (exportsToRemove.includes(declarator.id.name)) {
+              if (exportsToRemoveSet.has(declarator.id.name)) {
                 exportsChanged = true;
                 removedExportLocalNames.add(declarator.id.name);
                 removedExportReferencedNames.add(declarator.id.name);
@@ -650,7 +715,7 @@ export const removeExports = (
         (declaration?.type === 'FunctionDeclaration' ||
           declaration?.type === 'ClassDeclaration') &&
         declaration.id?.name &&
-        exportsToRemove.includes(declaration.id.name)
+        exportsToRemoveSet.has(declaration.id.name)
       ) {
         exportsChanged = true;
         removedExportLocalNames.add(declaration.id.name);
@@ -662,7 +727,7 @@ export const removeExports = (
 
     if (
       statement.type === 'ExportDefaultDeclaration' &&
-      exportsToRemove.includes('default')
+      exportsToRemoveSet.has('default')
     ) {
       exportsChanged = true;
       const declaration = statement.declaration;
@@ -700,6 +765,8 @@ export const removeExports = (
       removedExportReferencedNames
     );
   }
+
+  return exportsChanged;
 };
 
 export const removeUnusedImports = (ast: ParseResult | AnyNode): void => {
@@ -792,26 +859,98 @@ const variableDeclaration = (name: string, init: AnyNode): AnyNode => ({
   ],
 });
 
-const collectUsedNames = (program: AnyNode): Set<string> => {
-  const names = new Set<string>();
-  walk(program as any, {
-    Identifier(node: AnyNode) {
-      names.add(node.name);
-    },
-  });
-  return names;
+const patternIncludesName = (
+  pattern: AnyNode | null | undefined,
+  name: string
+): boolean => {
+  if (!pattern) {
+    return false;
+  }
+  if (pattern.type === 'Identifier') {
+    return pattern.name === name;
+  }
+  if (pattern.type === 'RestElement') {
+    return patternIncludesName(pattern.argument, name);
+  }
+  if (pattern.type === 'AssignmentPattern') {
+    return patternIncludesName(pattern.left, name);
+  }
+  if (pattern.type === 'ArrayPattern') {
+    return (pattern.elements ?? []).some((element: AnyNode | null) =>
+      patternIncludesName(element, name)
+    );
+  }
+  if (pattern.type === 'ObjectPattern') {
+    return (pattern.properties ?? []).some((property: AnyNode) =>
+      property.type === 'RestElement'
+        ? patternIncludesName(property.argument, name)
+        : patternIncludesName(property.value, name)
+    );
+  }
+  return false;
+};
+
+const declarationIncludesName = (
+  declaration: AnyNode,
+  name: string
+): boolean => {
+  if (declaration.type === 'VariableDeclaration') {
+    return (declaration.declarations ?? []).some((declarator: AnyNode) =>
+      patternIncludesName(declarator.id, name)
+    );
+  }
+  if (
+    (declaration.type === 'FunctionDeclaration' ||
+      declaration.type === 'ClassDeclaration') &&
+    declaration.id?.name
+  ) {
+    return declaration.id.name === name;
+  }
+  if (declaration.type === 'ImportDeclaration') {
+    return (declaration.specifiers ?? []).some(
+      (specifier: AnyNode) => specifier.local?.name === name
+    );
+  }
+  return false;
+};
+
+const hasTopLevelBindingName = (program: AnyNode, name: string): boolean => {
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ImportDeclaration') {
+      if (declarationIncludesName(statement, name)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (statement.type === 'ExportDefaultDeclaration') {
+      if (statement.declaration?.id?.name === name) {
+        return true;
+      }
+      continue;
+    }
+
+    const declaration =
+      statement.type === 'ExportNamedDeclaration'
+        ? statement.declaration
+        : statement;
+    if (declaration && declarationIncludesName(declaration, name)) {
+      return true;
+    }
+  }
+  return false;
 };
 
 export const transformRoute = (ast: ParseResult | AnyNode): void => {
   const program = getProgram(ast);
-  const usedNames = collectUsedNames(program);
+  const usedNames = new Set<string>();
   const hocs: Array<[string, string]> = [];
   const componentWrapperDeclarations: AnyNode[] = [];
 
   function getUid(name: string) {
     let uid = `_${name}`;
     let index = 2;
-    while (usedNames.has(uid)) {
+    while (usedNames.has(uid) || hasTopLevelBindingName(program, uid)) {
       uid = `_${name}${index++}`;
     }
     usedNames.add(uid);
@@ -843,7 +982,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
           ? toFunctionExpression(declaration)
           : declaration?.type === 'ClassDeclaration'
             ? toClassExpression(declaration)
-          : declaration;
+            : declaration;
       if (expr) {
         const uid = getHocUid('withComponentProps');
         statement.declaration = callExpression(uid, [expr]);
@@ -882,7 +1021,10 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
     }
 
     for (const specifier of statement.specifiers ?? []) {
-      if (specifier.type !== 'ExportSpecifier' || specifier.exportKind === 'type') {
+      if (
+        specifier.type !== 'ExportSpecifier' ||
+        specifier.exportKind === 'type'
+      ) {
         continue;
       }
       const exportedName = getExportedName(specifier);

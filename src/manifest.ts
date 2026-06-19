@@ -9,6 +9,7 @@ import {
   createEmptyRouteChunkByExportName,
   detectRouteChunksIfEnabled,
   getRouteChunkEntryName,
+  routeChunkExportNames,
   validateRouteChunks,
   type RouteChunkCache,
   type RouteChunkConfig,
@@ -90,6 +91,11 @@ type ReactRouterManifestStatsCompilation = {
   namedChunks: Iterable<[string, ReactRouterManifestStatsChunk]>;
 };
 
+type ReactRouterManifestStatsNamedChunks =
+  ReactRouterManifestStatsCompilation['namedChunks'] & {
+    get?: (chunkName: string) => ReactRouterManifestStatsChunk | undefined;
+  };
+
 const orderChunkFiles = (chunkName: string, files: string[]): string[] => {
   const ownChunkAsset = `${chunkName}.js`;
   const ownFileIndex = files.findIndex(file => file.endsWith(ownChunkAsset));
@@ -105,16 +111,34 @@ const orderChunkFiles = (chunkName: string, files: string[]): string[] => {
 };
 
 export const createReactRouterManifestStats = (
-  compilation: ReactRouterManifestStatsCompilation | undefined
+  compilation: ReactRouterManifestStatsCompilation | undefined,
+  chunkNames?: ReadonlySet<string>
 ): ReactRouterManifestStats | undefined => {
   if (!compilation) {
     return undefined;
   }
 
   const assetsByChunkName: Record<string, string[]> = {};
-  for (const [chunkName, chunk] of compilation.namedChunks) {
-    const files = Array.from(chunk.files ?? []);
-    assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
+  const namedChunks =
+    compilation.namedChunks as ReactRouterManifestStatsNamedChunks;
+
+  if (chunkNames && typeof namedChunks.get === 'function') {
+    for (const chunkName of chunkNames) {
+      const chunk = namedChunks.get(chunkName);
+      if (!chunk) {
+        continue;
+      }
+      const files = Array.from(chunk.files ?? []);
+      assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
+    }
+  } else {
+    for (const [chunkName, chunk] of namedChunks) {
+      if (chunkNames && !chunkNames.has(chunkName)) {
+        continue;
+      }
+      const files = Array.from(chunk.files ?? []);
+      assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
+    }
   }
 
   return { assetsByChunkName };
@@ -173,6 +197,23 @@ const getManifestVersion = (
 const getRouteEntryName = (route: Route): string => {
   const extensionIndex = route.file.lastIndexOf('.');
   return extensionIndex >= 0 ? route.file.slice(0, extensionIndex) : route.file;
+};
+
+export const getReactRouterManifestChunkNames = (
+  routes: Record<string, Route>,
+  splitRouteModules: boolean | 'enforce' = false
+): Set<string> => {
+  const chunkNames = new Set<string>(['entry.client']);
+  for (const route of Object.values(routes)) {
+    chunkNames.add(getRouteEntryName(route));
+    if (!splitRouteModules || route.id === 'root') {
+      continue;
+    }
+    for (const exportName of routeChunkExportNames) {
+      chunkNames.add(getRouteChunkEntryName(route.id, exportName));
+    }
+  }
+  return chunkNames;
 };
 
 export async function getReactRouterManifestForDev(

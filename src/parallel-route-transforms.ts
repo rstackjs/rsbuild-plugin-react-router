@@ -8,14 +8,15 @@ import {
 } from './route-transform-tasks.js';
 import type { PluginOptions } from './types.js';
 
-export type ParallelTransformsConfig = NonNullable<
-  PluginOptions['parallelTransforms']
-> extends infer Config
-  ? Exclude<Config, false>
-  : never;
+export type ParallelTransformsConfig =
+  NonNullable<PluginOptions['parallelTransforms']> extends infer Config
+    ? Exclude<Config, false>
+    : never;
 
 export type RouteTransformExecutorOptions = RouteTransformTaskOptions & {
   parallelTransforms?: PluginOptions['parallelTransforms'];
+  routeCount?: number;
+  splitRouteModules?: boolean;
 };
 
 export type RouteTransformExecutor = {
@@ -58,26 +59,57 @@ class WorkerStartupError extends Error {
   }
 }
 
+const DEFAULT_RESERVED_CORES = 2;
+const DEFAULT_MIN_PARALLEL_ROUTES = 128;
 const DEFAULT_MAX_WORKERS = 8;
+const DEFAULT_SPLIT_ROUTE_MAX_WORKERS = 6;
 
-const getDefaultWorkerCount = (): number => {
-  const cpuCount =
-    typeof availableParallelism === 'function'
-      ? availableParallelism()
-      : cpus().length;
-  return Math.max(1, Math.min(DEFAULT_MAX_WORKERS, cpuCount));
+const getAvailableCpuCount = (): number =>
+  typeof availableParallelism === 'function'
+    ? availableParallelism()
+    : cpus().length;
+
+export const getDefaultWorkerCount = (
+  cpuCount: number = getAvailableCpuCount(),
+  {
+    routeCount,
+    splitRouteModules = false,
+  }: Pick<
+    RouteTransformExecutorOptions,
+    'routeCount' | 'splitRouteModules'
+  > = {}
+): number => {
+  if (
+    typeof routeCount === 'number' &&
+    routeCount < DEFAULT_MIN_PARALLEL_ROUTES
+  ) {
+    return 0;
+  }
+
+  const maxWorkers = splitRouteModules
+    ? DEFAULT_SPLIT_ROUTE_MAX_WORKERS
+    : DEFAULT_MAX_WORKERS;
+  const workerCount = Math.floor(cpuCount) - DEFAULT_RESERVED_CORES;
+  if (workerCount < 2) {
+    return 0;
+  }
+  return Math.min(maxWorkers, workerCount);
 };
 
 const getConfiguredWorkerCount = (
-  parallelTransforms: ParallelTransformsConfig
+  parallelTransforms: ParallelTransformsConfig,
+  options: Pick<
+    RouteTransformExecutorOptions,
+    'routeCount' | 'splitRouteModules'
+  >
 ): number => {
   if (parallelTransforms === true) {
-    return getDefaultWorkerCount();
+    return getDefaultWorkerCount(undefined, options);
   }
 
   const configured = parallelTransforms.maxWorkers;
   if (configured === undefined) {
-    return getDefaultWorkerCount();
+    return getDefaultWorkerCount(undefined, options);
   }
   if (!Number.isFinite(configured) || configured < 1) {
     throw new Error(
@@ -113,11 +145,13 @@ const isWorkerStartupError = (error: unknown): error is WorkerStartupError =>
 class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #closed = false;
   #nextId = 1;
+  #nextRouteModuleWorkerIndex = 0;
   #workers: WorkerState[];
 
   constructor(
     workerCount: number,
-    private readonly options: RouteTransformTaskOptions
+    private readonly options: RouteTransformTaskOptions,
+    private readonly balanceRouteModuleTransforms: boolean
   ) {
     this.#workers = Array.from({ length: workerCount }, () =>
       this.#createWorkerState()
@@ -203,8 +237,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   }
 
   #runInWorker(task: RouteTransformTask): Promise<RouteTransformResult> {
-    const workerIndex =
-      hashString(task.resourcePath) % Math.max(1, this.#workers.length);
+    const workerIndex = this.#getWorkerIndex(task);
     const state = this.#workers[workerIndex];
     if (!state) {
       return executeRouteTransformTask(task, this.options);
@@ -216,11 +249,27 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       state.worker.postMessage({ id, task });
     });
   }
+
+  #getWorkerIndex(task: RouteTransformTask): number {
+    const workerCount = Math.max(1, this.#workers.length);
+    if (
+      this.balanceRouteModuleTransforms &&
+      task.kind === 'routeModule' &&
+      !(task.environmentName === 'web' && !task.ssr && task.isSpaMode)
+    ) {
+      const workerIndex = this.#nextRouteModuleWorkerIndex % workerCount;
+      this.#nextRouteModuleWorkerIndex += 1;
+      return workerIndex;
+    }
+    return hashString(task.resourcePath) % workerCount;
+  }
 }
 
 export const createRouteTransformExecutor = ({
   parallelTransforms,
   routeChunkCache,
+  routeCount,
+  splitRouteModules,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
   const options = { routeChunkCache };
   const effectiveParallelTransforms = parallelTransforms ?? true;
@@ -231,6 +280,20 @@ export const createRouteTransformExecutor = ({
     };
   }
 
-  const workerCount = getConfiguredWorkerCount(effectiveParallelTransforms);
-  return new ParallelRouteTransformExecutor(workerCount, options);
+  const workerCount = getConfiguredWorkerCount(effectiveParallelTransforms, {
+    routeCount,
+    splitRouteModules,
+  });
+  if (workerCount < 1) {
+    return {
+      run: task => executeRouteTransformTask(task, options),
+      close: async () => {},
+    };
+  }
+
+  return new ParallelRouteTransformExecutor(
+    workerCount,
+    options,
+    Boolean(splitRouteModules)
+  );
 };

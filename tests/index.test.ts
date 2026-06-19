@@ -168,6 +168,18 @@ describe('pluginReactRouter', () => {
     expect(webConfig.externalsType).toBe('module');
     expect(webConfig.output.chunkFormat).toBe('module');
     expect(webConfig.output.module).toBe(true);
+
+    const webEntries = config.environments?.web?.source?.entry;
+    expect(webEntries['entry.client']).toEqual(
+      expect.stringMatching(/entry\.client/)
+    );
+    expect(webEntries['virtual/react-router/browser-manifest']).toEqual({
+      import: 'virtual/react-router/browser-manifest',
+      html: false,
+    });
+    expect(webEntries['routes/index']).toMatchObject({
+      html: false,
+    });
   });
 
   it('should configure node environment correctly', async () => {

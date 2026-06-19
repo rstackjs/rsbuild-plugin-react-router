@@ -13,13 +13,41 @@ type OperationTiming = {
 
 type OperationInterval = { startMs: number; endMs: number };
 
-type MutableOperationTiming = Omit<OperationTiming, 'wallMs'> & {
+type MutableOperationTiming = Omit<OperationTiming, 'wallMs' | 'slowest'> & {
+  slowest: Array<{
+    durationMs: number;
+    resource: string;
+  }>;
   intervals: OperationInterval[];
 };
 
 type EnvironmentTimings = Map<string, MutableOperationTiming>;
 
 const MAX_SLOWEST_ENTRIES = 5;
+
+const insertSlowestEntry = (
+  slowest: MutableOperationTiming['slowest'],
+  entry: MutableOperationTiming['slowest'][number]
+) => {
+  if (
+    slowest.length === MAX_SLOWEST_ENTRIES &&
+    entry.durationMs <= slowest[slowest.length - 1].durationMs
+  ) {
+    return;
+  }
+
+  let insertIndex = slowest.length;
+  while (
+    insertIndex > 0 &&
+    entry.durationMs > slowest[insertIndex - 1].durationMs
+  ) {
+    insertIndex -= 1;
+  }
+  slowest.splice(insertIndex, 0, entry);
+  if (slowest.length > MAX_SLOWEST_ENTRIES) {
+    slowest.pop();
+  }
+};
 
 export const roundMs = (value: number): number => Math.round(value * 10) / 10;
 
@@ -112,10 +140,13 @@ export const createReactRouterPerformanceProfiler = ({
     timing: MutableOperationTiming
   ): OperationTiming => ({
     count: timing.count,
-    totalMs: timing.totalMs,
+    totalMs: roundMs(timing.totalMs),
     wallMs: computeWallMs(timing.intervals),
-    maxMs: timing.maxMs,
-    slowest: timing.slowest,
+    maxMs: roundMs(timing.maxMs),
+    slowest: timing.slowest.map(entry => ({
+      durationMs: roundMs(entry.durationMs),
+      resource: entry.resource,
+    })),
   });
 
   const recordDuration = (
@@ -125,17 +156,16 @@ export const createReactRouterPerformanceProfiler = ({
     startMs: number,
     endMs: number
   ) => {
-    const roundedDuration = roundMs(endMs - startMs);
+    const duration = endMs - startMs;
     const timing = getOperationTiming(environment, operation);
     timing.count += 1;
-    timing.totalMs = roundMs(timing.totalMs + roundedDuration);
-    timing.maxMs = Math.max(timing.maxMs, roundedDuration);
+    timing.totalMs += duration;
+    timing.maxMs = Math.max(timing.maxMs, duration);
     timing.intervals.push({ startMs, endMs });
-    timing.slowest.push({ durationMs: roundedDuration, resource });
-    timing.slowest.sort((a, b) => b.durationMs - a.durationMs);
-    if (timing.slowest.length > MAX_SLOWEST_ENTRIES) {
-      timing.slowest.pop();
-    }
+    insertSlowestEntry(timing.slowest, {
+      durationMs: duration,
+      resource,
+    });
   };
 
   return {

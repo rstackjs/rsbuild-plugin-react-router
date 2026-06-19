@@ -46,7 +46,9 @@ describe('benchmark fixture generator', () => {
         rsbuildConfig.indexOf('pluginReactRouter({')
       );
       expect(rsbuildConfig).toContain('logPerformance');
-      expect(rsbuildConfig).toContain('sourceMap: true');
+      expect(rsbuildConfig).toContain(
+        "sourceMap: { js: 'cheap-module-source-map', css: false }"
+      );
       expect(rsbuildConfig).not.toContain('parallelTransforms:');
 
       const reactRouterConfig = readFileSync(

@@ -30,6 +30,9 @@ node scripts/bench-builds.mjs --profile=full --filter=synthetic-1024 --iteration
 Trace directories are moved from fixture roots into
 `.benchmark/results/<profile>/rspack-profiles/` and referenced from the JSON
 result. `ALL` can produce large traces; use it for targeted runs.
+When `--rspack-trace-output` is provided, the benchmark writes one absolute
+trace file per run under that directory so Rsbuild does not resolve the path
+inside each generated `.rspack-profile-*` directory.
 
 ## Baseline Shape
 

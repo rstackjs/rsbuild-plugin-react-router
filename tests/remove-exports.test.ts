@@ -19,6 +19,38 @@ function hasTopLevelAssignment(ast: any, textIncludes: string): boolean {
 }
 
 describe('removeExports', () => {
+  it('returns false when no matching export can be removed', () => {
+    const code = `
+      export const clientLoader = async () => null;
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    const removed = removeExports(ast, ['loader', 'action']);
+
+    expect(removed).toBe(false);
+    expect(generate(ast).code).toContain('clientLoader');
+  });
+
+  it('returns true when a matching export is removed', () => {
+    const code = `
+      export async function loader() {
+        return null;
+      }
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    const removed = removeExports(ast, ['loader']);
+
+    expect(removed).toBe(true);
+    expect(generate(ast).code).not.toContain('loader');
+  });
+
   it('removes top-level property assignment when removed export is referenced by local name', () => {
     const code = `
       const local = () => {};

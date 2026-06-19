@@ -48,6 +48,9 @@ export const routeChunkNames: RouteChunkName[] = [
   ...routeChunkExportNames,
 ];
 
+export const mightContainRouteChunkExportName = (source: string): boolean =>
+  routeChunkExportNames.some(exportName => source.includes(exportName));
+
 const createRouteChunkExportMap = (
   getValue: (exportName: RouteChunkExportName) => boolean
 ): Record<RouteChunkExportName, boolean> =>
@@ -67,6 +70,7 @@ const routeChunkQueryStrings: Record<RouteChunkName, string> = {
   clientMiddleware: `${routeChunkQueryStringPrefix}clientMiddleware`,
   HydrateFallback: `${routeChunkQueryStringPrefix}HydrateFallback`,
 };
+const routeChunkQueryStringValues = Object.values(routeChunkQueryStrings);
 
 const routeChunkEntrySuffix: Record<RouteChunkExportName, string> = {
   clientAction: 'client-action',
@@ -485,8 +489,9 @@ const omitChunkedExports = (
     code,
     () => {
       const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
+      const exportNameSet = new Set(exportNames);
       const isOmitted = (exportName: string) =>
-        exportNames.includes(exportName) &&
+        exportNameSet.has(exportName) &&
         Boolean(chunkableExportMap[exportName as RouteChunkExportName]);
       const isRetained = (exportName: string) => !isOmitted(exportName);
 
@@ -637,9 +642,7 @@ export const getRouteChunkModuleId = (
 ) => `${filePath}${routeChunkQueryStrings[chunkName]}`;
 
 export const isRouteChunkModuleId: (id: string) => boolean = (id: string) =>
-  Object.values(routeChunkQueryStrings).some(queryString =>
-    id.endsWith(queryString)
-  );
+  routeChunkQueryStringValues.some(queryString => id.endsWith(queryString));
 
 const isRouteChunkName = (name: string): name is RouteChunkName =>
   name === 'main' || (routeChunkExportNames as string[]).includes(name);
@@ -647,10 +650,16 @@ const isRouteChunkName = (name: string): name is RouteChunkName =>
 export const getRouteChunkNameFromModuleId = (
   id: string
 ): RouteChunkName | null => {
-  if (!id.includes(routeChunkQueryStringPrefix)) {
+  const queryIndex = id.indexOf(routeChunkQueryStringPrefix);
+  if (queryIndex === -1) {
     return null;
   }
-  const chunkName = id.split(routeChunkQueryStringPrefix)[1].split('&')[0];
+  const chunkNameStart = queryIndex + routeChunkQueryStringPrefix.length;
+  const chunkNameEnd = id.indexOf('&', chunkNameStart);
+  const chunkName = id.slice(
+    chunkNameStart,
+    chunkNameEnd === -1 ? undefined : chunkNameEnd
+  );
   if (!isRouteChunkName(chunkName)) {
     return null;
   }
@@ -665,6 +674,15 @@ const normalizeRelativeFilePath = (file: string, appDirectory: string) => {
 
 const isRootRouteModuleId = (config: RouteChunkConfig, id: string) =>
   normalizeRelativeFilePath(id, config.appDirectory) === config.rootRouteFile;
+
+export const shouldAnalyzeRouteChunks = (
+  config: RouteChunkConfig,
+  id: string,
+  code: string
+): boolean =>
+  Boolean(config.splitRouteModules) &&
+  !isRootRouteModuleId(config, id) &&
+  mightContainRouteChunkExportName(code);
 
 export const createEmptyRouteChunkByExportName = (): Record<
   RouteChunkExportName,
@@ -706,13 +724,7 @@ export const detectRouteChunksIfEnabled: (
     hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
   });
 
-  if (!config.splitRouteModules) {
-    return noRouteChunks();
-  }
-  if (isRootRouteModuleId(config, id)) {
-    return noRouteChunks();
-  }
-  if (!routeChunkExportNames.some(exportName => code.includes(exportName))) {
+  if (!shouldAnalyzeRouteChunks(config, id, code)) {
     return noRouteChunks();
   }
 
@@ -734,6 +746,13 @@ export const getRouteChunkIfEnabled: (
   code: string
 ) => {
   if (!config.splitRouteModules) {
+    return null;
+  }
+  if (chunkName === 'main') {
+    if (!mightContainRouteChunkExportName(code)) {
+      return code;
+    }
+  } else if (!code.includes(chunkName)) {
     return null;
   }
   const cacheKey = normalizeRelativeFilePath(id, config.appDirectory);

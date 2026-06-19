@@ -4,15 +4,17 @@ import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
+import {
+  rspack,
+  type RsbuildEntryDescription,
+  type RsbuildPlugin,
+  type Rspack,
+} from '@rsbuild/core';
 import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
 import { dirname, relative, resolve } from 'pathe';
 
-import {
-  BUILD_CLIENT_ROUTE_QUERY_STRING,
-  PLUGIN_NAME,
-} from './constants.js';
+import { BUILD_CLIENT_ROUTE_QUERY_STRING, PLUGIN_NAME } from './constants.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import {
   generateWithProps,
@@ -39,6 +41,7 @@ import {
   getRouteManifestModuleExports,
   configRoutesToRouteManifest,
   createReactRouterManifestStats,
+  getReactRouterManifestChunkNames,
   type ReactRouterManifestStats,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
@@ -406,6 +409,9 @@ export const pluginReactRouter = (
 
     const isBuild = api.context.action === 'build';
     const splitRouteModules = future?.v8_splitRouteModules ?? false;
+    const isPrerenderEnabled =
+      prerenderConfig !== undefined && prerenderConfig !== false;
+    const isSpaMode = !ssr && !isPrerenderEnabled;
     const routeChunkConfig: RouteChunkConfig = {
       splitRouteModules,
       appDirectory,
@@ -415,6 +421,8 @@ export const pluginReactRouter = (
     const routeTransformExecutor = createRouteTransformExecutor({
       parallelTransforms: pluginOptions.parallelTransforms,
       routeChunkCache,
+      routeCount: Object.keys(routes).length,
+      splitRouteModules: Boolean(splitRouteModules),
     });
     const routeChunkOptions = {
       splitRouteModules,
@@ -484,6 +492,7 @@ export const pluginReactRouter = (
         const routeFilePath = resolve(appDirectory, route.file);
         acc[entryName] = {
           import: `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`,
+          html: false,
         };
 
         if (isBuild && splitRouteModules && route.id !== 'root') {
@@ -494,26 +503,33 @@ export const pluginReactRouter = (
             }
             acc[getRouteChunkEntryName(route.id, exportName)] = {
               import: getRouteChunkModuleId(routeFilePath, exportName),
+              html: false,
             };
           }
         }
 
         return acc;
       },
-      {} as Record<string, { import: string }>
+      {} as Record<string, RsbuildEntryDescription>
     );
-
     const buildManifest = await getBuildManifest({
       reactRouterConfig: resolvedConfigWithRoutes,
       routes,
       rootDirectory: process.cwd(),
     });
     const routesByServerBundleId = getRoutesByServerBundleId(buildManifest);
+    const manifestChunkNames = getReactRouterManifestChunkNames(
+      routes,
+      splitRouteModules
+    );
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
       if (environment.name === 'web') {
-        clientStats = createReactRouterManifestStats(stats?.compilation);
+        clientStats = createReactRouterManifestStats(
+          stats?.compilation,
+          manifestChunkNames
+        );
       }
       if (pluginOptions.federation && ssr) {
         const serverBuildDir = resolve(buildDirectory, 'server');
@@ -540,10 +556,6 @@ export const pluginReactRouter = (
         warn: message => api.logger.warn(message),
       }
     );
-    const isPrerenderEnabled =
-      prerenderConfig !== undefined && prerenderConfig !== false;
-    const isSpaMode = !ssr && !isPrerenderEnabled;
-
     const groupRoutesByParentId = (manifest: Record<string, any>) => {
       const grouped: Record<string, any[]> = {};
       Object.values(manifest).forEach(route => {
@@ -1210,8 +1222,10 @@ export const pluginReactRouter = (
               entry: {
                 // no query needed when federation is disabled
                 'entry.client': finalEntryClientPath,
-                'virtual/react-router/browser-manifest':
-                  'virtual/react-router/browser-manifest',
+                'virtual/react-router/browser-manifest': {
+                  import: 'virtual/react-router/browser-manifest',
+                  html: false,
+                },
                 ...webRouteEntries,
               },
             },
@@ -1486,41 +1500,40 @@ export const pluginReactRouter = (
         )
     );
 
-    api.transform(
-      {
-        test: /\.[cm]?[jt]sx?$/,
-        environments: ['web'],
-      },
-      async args =>
-        performanceProfiler.record(
-          args.environment?.name,
-          'route:split-exports',
-          args.resource,
-          async () => {
-            if (!isBuild || !splitRouteModules) {
-              return { code: args.code, map: null };
-            }
-            if (
-              args.resource.includes(BUILD_CLIENT_ROUTE_QUERY_STRING) ||
-              args.resource.includes('?react-router-route') ||
-              args.resource.includes('route-chunk=')
-            ) {
-              return { code: args.code, map: null };
-            }
-            const route = routeByFilePath.get(args.resourcePath);
-            if (!route) {
-              return { code: args.code, map: null };
-            }
+    if (isBuild && splitRouteModules) {
+      api.transform(
+        {
+          test: /\.[cm]?[jt]sx?$/,
+          environments: ['web'],
+        },
+        async args =>
+          performanceProfiler.record(
+            args.environment?.name,
+            'route:split-exports',
+            args.resource,
+            async () => {
+              if (
+                args.resource.includes(BUILD_CLIENT_ROUTE_QUERY_STRING) ||
+                args.resource.includes('?react-router-route') ||
+                args.resource.includes('route-chunk=')
+              ) {
+                return { code: args.code, map: null };
+              }
+              const route = routeByFilePath.get(args.resourcePath);
+              if (!route) {
+                return { code: args.code, map: null };
+              }
 
-            return routeTransformExecutor.run({
-              kind: 'splitRouteExports',
-              code: args.code,
-              resourcePath: args.resourcePath,
-              routeChunkConfig,
-            });
-          }
-        )
-    );
+              return routeTransformExecutor.run({
+                kind: 'splitRouteExports',
+                code: args.code,
+                resourcePath: args.resourcePath,
+                routeChunkConfig,
+              });
+            }
+          )
+      );
+    }
 
     api.transform(
       {
@@ -1577,6 +1590,7 @@ export const pluginReactRouter = (
               resourcePath: args.resourcePath,
               environmentName: args.environment.name,
               ssr,
+              isBuild,
               isSpaMode,
               rootRoutePath,
             })

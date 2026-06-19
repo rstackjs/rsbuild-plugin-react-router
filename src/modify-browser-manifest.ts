@@ -4,6 +4,7 @@ import { rspack } from '@rsbuild/core';
 import type { Rspack } from '@rsbuild/core';
 import {
   createReactRouterManifestStats,
+  getReactRouterManifestChunkNames,
   getReactRouterManifestForDev,
   getReactRouterManifestPath,
 } from './manifest.js';
@@ -31,12 +32,20 @@ export function createModifyBrowserManifestPlugin(
     ) => void;
   }
 ) {
+  const manifestChunkNames = getReactRouterManifestChunkNames(
+    routes,
+    routeChunkOptions?.splitRouteModules
+  );
+
   return {
     apply(compiler: Rspack.Compiler): void {
       compiler.hooks.emit.tapAsync(
         'ModifyBrowserManifest',
         async (compilation: Rspack.Compilation, callback) => {
-          const stats = createReactRouterManifestStats(compilation);
+          const stats = createReactRouterManifestStats(
+            compilation,
+            manifestChunkNames
+          );
           const manifest = await getReactRouterManifestForDev(
             routes,
             pluginOptions,
