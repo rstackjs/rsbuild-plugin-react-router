@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { strip } from 'yuku-codegen';
 import { langFromPath, parse } from 'yuku-parser';
+import { setBoundedCacheEntry } from './bounded-cache.js';
 import {
   detectRouteChunksIfEnabled,
   type RouteChunkCache,
@@ -60,20 +61,6 @@ const routeModuleAnalysisCache = new Map<
 const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
 
 type AnyNode = Record<string, any>;
-
-const setBoundedCacheEntry = <Key, Value>(
-  cache: Map<Key, Value>,
-  key: Key,
-  value: Value
-) => {
-  if (!cache.has(key) && cache.size >= MAX_EXPORT_UTILS_CACHE_ENTRIES) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
-    }
-  }
-  cache.set(key, value);
-};
 
 const cachePromiseOnReject = <T>(
   promise: Promise<T>,
@@ -261,10 +248,15 @@ const getTransformedModule = async (
     }
   );
 
-  setBoundedCacheEntry(transformCache, resourcePath, {
-    source: code,
-    transformed,
-  });
+  setBoundedCacheEntry(
+    transformCache,
+    resourcePath,
+    {
+      source: code,
+      transformed,
+    },
+    MAX_EXPORT_UTILS_CACHE_ENTRIES
+  );
   return transformed;
 };
 
@@ -334,10 +326,15 @@ export const getBundlerRouteAnalysis = async (
     }
   });
 
-  setBoundedCacheEntry(bundlerRouteAnalysisCache, resourcePath, {
-    source,
-    analysis: trackedAnalysis,
-  });
+  setBoundedCacheEntry(
+    bundlerRouteAnalysisCache,
+    resourcePath,
+    {
+      source,
+      analysis: trackedAnalysis,
+    },
+    MAX_EXPORT_UTILS_CACHE_ENTRIES
+  );
   return trackedAnalysis;
 };
 
@@ -364,7 +361,12 @@ export const getExportNamesAndExportAll = async (
     }
   });
 
-  setBoundedCacheEntry(exportInfoCache, code, trackedExportInfo);
+  setBoundedCacheEntry(
+    exportInfoCache,
+    code,
+    trackedExportInfo,
+    MAX_EXPORT_UTILS_CACHE_ENTRIES
+  );
   return trackedExportInfo;
 };
 
@@ -396,10 +398,15 @@ export const getRouteModuleAnalysis = async (
     }
   });
 
-  setBoundedCacheEntry(routeModuleAnalysisCache, resourcePath, {
-    mtimeMs: stats.mtimeMs,
-    size: stats.size,
-    analysis: trackedAnalysis,
-  });
+  setBoundedCacheEntry(
+    routeModuleAnalysisCache,
+    resourcePath,
+    {
+      mtimeMs: stats.mtimeMs,
+      size: stats.size,
+      analysis: trackedAnalysis,
+    },
+    MAX_EXPORT_UTILS_CACHE_ENTRIES
+  );
   return trackedAnalysis;
 };
