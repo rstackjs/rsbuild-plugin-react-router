@@ -1193,7 +1193,6 @@ export const pluginReactRouter = (
           : { lazyCompilation: pluginOptions.lazyCompilation };
       const shouldCompactFileSizeReport =
         isBuild &&
-        splitRouteModules &&
         routeCount >= 256 &&
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);

@@ -78,6 +78,7 @@ class WorkerStartupError extends Error {
 const DEFAULT_RESERVED_CORES = 2;
 const DEFAULT_MIN_PARALLEL_ROUTES = 128;
 const DEFAULT_MAX_WORKERS = 8;
+const DEFAULT_ROUTE_MAX_WORKERS = 6;
 const DEFAULT_SPLIT_ROUTE_MAX_WORKERS = 2;
 const DEFAULT_LARGE_SPLIT_ROUTE_MIN_ROUTES = 1024;
 const DEFAULT_LARGE_SPLIT_ROUTE_MAX_WORKERS = 4;
@@ -113,7 +114,9 @@ export const getDefaultWorkerCount = (
       ? DEFAULT_LARGE_SPLIT_ROUTE_MAX_WORKERS
       : splitRouteModules
         ? DEFAULT_SPLIT_ROUTE_MAX_WORKERS
-        : DEFAULT_MAX_WORKERS;
+        : typeof routeCount === 'number'
+          ? DEFAULT_ROUTE_MAX_WORKERS
+          : DEFAULT_MAX_WORKERS;
   const workerCount = Math.floor(cpuCount) - DEFAULT_RESERVED_CORES;
   if (workerCount < 2) {
     return 0;
