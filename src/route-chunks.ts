@@ -635,7 +635,11 @@ const precomputeChunkedExports = (
   cache: RouteChunkCache,
   cacheKey: string
 ) => {
+  const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
   for (const exportName of routeChunkExportNames) {
+    if (!chunkableExportMap[exportName]) {
+      continue;
+    }
     if (!hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
       getChunkedExport(code, exportName, cache, cacheKey);
     }
