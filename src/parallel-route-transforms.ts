@@ -1,6 +1,6 @@
-import { availableParallelism, cpus } from 'node:os';
 import { Worker } from 'node:worker_threads';
 import { SERVER_ONLY_ROUTE_EXPORTS } from './constants.js';
+import { getDefaultConcurrency } from './concurrency.js';
 import {
   executeRouteTransformTask,
   type RouteTransformResult,
@@ -75,37 +75,17 @@ class WorkerStartupError extends Error {
   }
 }
 
-const DEFAULT_RESERVED_CORES = 2;
-const DEFAULT_MIN_PARALLEL_ROUTES = 128;
 const DEFAULT_SHARE_ROUTE_MODULE_BUILD_RESULTS_MIN_ROUTES = 1024;
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const MAX_ROUTE_MODULE_RESULT_CACHE_ENTRIES = 2048;
 
-const getAvailableCpuCount = (): number =>
-  typeof availableParallelism === 'function'
-    ? availableParallelism()
-    : cpus().length;
-
 export const getDefaultWorkerCount = (
-  cpuCount: number = getAvailableCpuCount(),
-  { routeCount }: Pick<
+  cpuCount?: number,
+  _options: Pick<
     RouteTransformExecutorOptions,
     'routeCount' | 'splitRouteModules'
   > = {}
-): number => {
-  if (
-    typeof routeCount === 'number' &&
-    routeCount < DEFAULT_MIN_PARALLEL_ROUTES
-  ) {
-    return 0;
-  }
-
-  const workerCount = Math.floor(cpuCount) - DEFAULT_RESERVED_CORES;
-  if (workerCount < 2) {
-    return 0;
-  }
-  return workerCount;
-};
+): number => getDefaultConcurrency(cpuCount);
 
 const getConfiguredWorkerCount = (
   parallelTransforms: ParallelTransformsConfig,
