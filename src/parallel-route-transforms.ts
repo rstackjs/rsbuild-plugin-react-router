@@ -372,7 +372,9 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     const workerCount = Math.max(1, this.#workers.length);
     if (
       this.balanceRouteModuleTransforms &&
-      (task.kind === 'routeClientEntry' || task.kind === 'routeChunk')
+      (task.kind === 'routeClientEntry' ||
+        task.kind === 'routeChunk' ||
+        task.kind === 'splitRouteExports')
     ) {
       const existingWorkerIndex = this.#splitRouteAnalysisWorkers.get(
         task.resourcePath
