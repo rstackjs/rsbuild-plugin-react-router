@@ -1503,7 +1503,10 @@ export const pluginReactRouter = (
     if (isBuild && splitRouteModules) {
       api.transform(
         {
-          test: /\.[cm]?[jt]sx?$/,
+          test: path => routeByFilePath.has(path),
+          resourceQuery: {
+            not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+          },
           environments: ['web'],
         },
         async args =>
@@ -1512,13 +1515,6 @@ export const pluginReactRouter = (
             'route:split-exports',
             args.resource,
             async () => {
-              if (
-                args.resource.includes(BUILD_CLIENT_ROUTE_QUERY_STRING) ||
-                args.resource.includes('?react-router-route') ||
-                args.resource.includes('route-chunk=')
-              ) {
-                return { code: args.code, map: null };
-              }
               const route = routeByFilePath.get(args.resourcePath);
               if (!route) {
                 return { code: args.code, map: null };
