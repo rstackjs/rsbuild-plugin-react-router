@@ -66,6 +66,15 @@ import {
   createRouteChunkArtifact,
   createRouteClientEntryArtifact,
 } from './route-artifacts.js';
+import {
+  createRouteTopologyWatcher,
+  createRouteManifestSnapshot,
+  emitRouteRestartMarkerAsset,
+  ensureDevRestartMarker,
+  getRouteRestartMarkerPath,
+  mergeWatchFiles,
+  type WatchFileConfig,
+} from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
   getBuildManifest,
@@ -198,7 +207,9 @@ export const pluginReactRouter = (
       });
     });
 
-    const jiti = createJiti(process.cwd());
+    const jiti = createJiti(process.cwd(), {
+      moduleCache: false,
+    });
 
     // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
     const configPath = findEntryFile(resolve('react-router.config'));
@@ -326,21 +337,24 @@ export const pluginReactRouter = (
       );
     }
 
-    const routeConfigExport = await jiti.import<RouteConfigEntry[]>(
-      routesPath,
-      {
-        default: true,
+    const loadRouteConfig = async (): Promise<RouteConfigEntry[]> => {
+      const routeConfigExport = await jiti.import<RouteConfigEntry[]>(
+        routesPath,
+        {
+          default: true,
+        }
+      );
+      const routeConfigValue = await routeConfigExport;
+      const validation = validateRouteConfig({
+        routeConfigFile: relative(process.cwd(), routesPath),
+        routeConfig: routeConfigValue,
+      });
+      if (!validation.valid) {
+        throw new Error(validation.message);
       }
-    );
-    const routeConfigValue = await routeConfigExport;
-    const validation = validateRouteConfig({
-      routeConfigFile: relative(process.cwd(), routesPath),
-      routeConfig: routeConfigValue,
-    });
-    if (!validation.valid) {
-      throw new Error(validation.message);
-    }
-    const routeConfig = validation.routeConfig;
+      return validation.routeConfig;
+    };
+    const routeConfig = await loadRouteConfig();
 
     const entryClientPath = findEntryFile(
       resolve(appDirectory, 'entry.client')
@@ -372,6 +386,14 @@ export const pluginReactRouter = (
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
+    const getWatchedRouteTopology = async (): Promise<Set<string>> => {
+      const latestRouteConfig = await loadRouteConfig();
+      const latestRoutes = {
+        root: { path: '', id: 'root', file: rootRouteFile },
+        ...configRoutesToRouteManifest(appDirectory, latestRouteConfig),
+      };
+      return createRouteManifestSnapshot(latestRoutes);
+    };
 
     const routes = {
       root: { path: '', id: 'root', file: rootRouteFile },
@@ -411,6 +433,40 @@ export const pluginReactRouter = (
       isBuild,
       cache: routeChunkCache,
     };
+    const outputClientPath = resolve(buildDirectory, 'client');
+    const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
+    const watchDirectory = resolve(appDirectory);
+    const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
+    const routeWatchFiles: WatchFileConfig[] = [
+      {
+        paths: routesPath,
+        type: 'reload-server',
+      },
+      {
+        paths: routeRestartMarkerPath,
+        type: 'reload-server',
+      },
+    ];
+    let closeRouteTopologyWatcher: (() => void) | undefined;
+
+    api.onBeforeStartDevServer(async () => {
+      await ensureDevRestartMarker(routeRestartMarkerPath);
+      closeRouteTopologyWatcher = await createRouteTopologyWatcher({
+        watchDirectory,
+        getRouteTopology: getWatchedRouteTopology,
+        restartMarkerPath: routeRestartMarkerPath,
+        onError: error => {
+          api.logger.warn(
+            `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
+          );
+        },
+      });
+    });
+
+    api.onCloseDevServer(() => {
+      closeRouteTopologyWatcher?.();
+      closeRouteTopologyWatcher = undefined;
+    });
 
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
@@ -465,9 +521,6 @@ export const pluginReactRouter = (
       rootDirectory: process.cwd(),
     });
     const routesByServerBundleId = getRoutesByServerBundleId(buildManifest);
-
-    const outputClientPath = resolve(buildDirectory, 'client');
-    const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
@@ -1149,6 +1202,7 @@ export const pluginReactRouter = (
         dev: {
           writeToDisk: true,
           ...lazyCompilation,
+          watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
           // Only add SSR middleware if SSR is enabled and not using a custom server
           // In SPA mode (ssr: false), we just serve static files from the client build
           setupMiddlewares:
@@ -1332,6 +1386,19 @@ export const pluginReactRouter = (
         });
       }
     );
+
+    if (isBuild) {
+      api.processAssets(
+        { stage: 'additional', targets: ['web'] },
+        ({ sources, compilation }) => {
+          emitRouteRestartMarkerAsset({
+            restartMarkerPath: routeRestartMarkerPath,
+            sources,
+            compilation,
+          });
+        }
+      );
+    }
 
     api.processAssets(
       { stage: 'additional', targets: ['node'] },
