@@ -52,7 +52,7 @@ describe('parallel route transforms', () => {
     [24, {}, 8],
     [24, { routeCount: 48 }, 0],
     [24, { routeCount: 256 }, 6],
-    [24, { routeCount: 256, splitRouteModules: true }, 2],
+    [24, { routeCount: 256, splitRouteModules: true }, 6],
     [24, { routeCount: 1024 }, 2],
     [24, { routeCount: 1024, splitRouteModules: true }, 2],
   ])('chooses the default worker count', (cpus, options, workers) => {
@@ -64,10 +64,10 @@ describe('parallel route transforms', () => {
     [2, 0],
     [3, 0],
     [4, 2],
-    [8, 2],
-    [10, 2],
-    [24, 2],
-  ])('caps medium split route module builds at two workers', (cpus, workers) => {
+    [8, 6],
+    [10, 6],
+    [24, 6],
+  ])('caps medium split route module builds at six workers', (cpus, workers) => {
     expect(
       getDefaultWorkerCount(cpus, {
         routeCount: 256,
