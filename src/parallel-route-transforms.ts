@@ -16,7 +16,6 @@ export type ParallelTransformsConfig =
 
 export type RouteTransformExecutorOptions = RouteTransformTaskOptions & {
   parallelTransforms?: PluginOptions['parallelTransforms'];
-  routeCount?: number;
   splitRouteModules?: boolean;
 };
 
@@ -75,32 +74,22 @@ class WorkerStartupError extends Error {
   }
 }
 
-const DEFAULT_SHARE_ROUTE_MODULE_BUILD_RESULTS_MIN_ROUTES = 1024;
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const MAX_ROUTE_MODULE_RESULT_CACHE_ENTRIES = 2048;
 
-export const getDefaultWorkerCount = (
-  cpuCount?: number,
-  _options: Pick<
-    RouteTransformExecutorOptions,
-    'routeCount' | 'splitRouteModules'
-  > = {}
-): number => getDefaultConcurrency(cpuCount);
+export const getDefaultWorkerCount = (cpuCount?: number): number =>
+  getDefaultConcurrency(cpuCount);
 
 const getConfiguredWorkerCount = (
-  parallelTransforms: ParallelTransformsConfig,
-  options: Pick<
-    RouteTransformExecutorOptions,
-    'routeCount' | 'splitRouteModules'
-  >
+  parallelTransforms: ParallelTransformsConfig
 ): number => {
   if (parallelTransforms === true) {
-    return getDefaultWorkerCount(undefined, options);
+    return getDefaultWorkerCount();
   }
 
   const configured = parallelTransforms.maxWorkers;
   if (configured === undefined) {
-    return getDefaultWorkerCount(undefined, options);
+    return getDefaultWorkerCount();
   }
   if (!Number.isFinite(configured) || configured < 1) {
     throw new Error(
@@ -369,7 +358,6 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
 export const createRouteTransformExecutor = ({
   parallelTransforms,
   routeChunkCache,
-  routeCount,
   splitRouteModules,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
   const options = { routeChunkCache };
@@ -381,10 +369,7 @@ export const createRouteTransformExecutor = ({
     };
   }
 
-  const workerCount = getConfiguredWorkerCount(effectiveParallelTransforms, {
-    routeCount,
-    splitRouteModules,
-  });
+  const workerCount = getConfiguredWorkerCount(effectiveParallelTransforms);
   if (workerCount < 1) {
     return {
       run: task => executeRouteTransformTask(task, options),
@@ -396,10 +381,6 @@ export const createRouteTransformExecutor = ({
     workerCount,
     options,
     Boolean(splitRouteModules),
-    Boolean(
-      splitRouteModules &&
-      typeof routeCount === 'number' &&
-      routeCount >= DEFAULT_SHARE_ROUTE_MODULE_BUILD_RESULTS_MIN_ROUTES
-    )
+    Boolean(splitRouteModules)
   );
 };

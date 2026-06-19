@@ -43,80 +43,22 @@ const createRouteModuleTask = (
 
 describe('parallel route transforms', () => {
   it.each([
-    [1, {}, 0],
-    [2, {}, 0],
-    [3, {}, 1],
-    [4, {}, 2],
-    [6, {}, 4],
-    [8, {}, 6],
-    [24, {}, 22],
-    [24, { routeCount: 48 }, 22],
-    [24, { routeCount: 256 }, 22],
-    [24, { routeCount: 256, splitRouteModules: true }, 22],
-    [24, { routeCount: 1024 }, 22],
-    [24, { routeCount: 1024, splitRouteModules: true }, 22],
-  ])('chooses the default worker count', (cpus, options, workers) => {
-    expect(getDefaultWorkerCount(cpus, options)).toBe(workers);
-  });
-
-  it.each([
     [1, 0],
     [2, 0],
     [3, 1],
     [4, 2],
+    [6, 4],
     [8, 6],
     [10, 8],
+    [12, 10],
     [24, 22],
-  ])('uses cpu count minus two workers for split route module builds', (cpus, workers) => {
-    expect(
-      getDefaultWorkerCount(cpus, {
-        routeCount: 256,
-        splitRouteModules: true,
-      })
-    ).toBe(workers);
+  ])('defaults to cpu count minus two workers', (cpus, workers) => {
+    expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
 
-  it.each([
-    [3, 1],
-    [4, 2],
-    [6, 4],
-    [10, 8],
-    [24, 22],
-  ])('uses cpu count minus two workers for very large route module builds', (cpus, workers) => {
-    expect(getDefaultWorkerCount(cpus, { routeCount: 1024 })).toBe(workers);
-    expect(
-      getDefaultWorkerCount(cpus, {
-        routeCount: 1024,
-        splitRouteModules: true,
-      })
-    ).toBe(workers);
-  });
-
-  it.each([
-    [1, 0],
-    [2, 0],
-    [3, 1],
-    [4, 2],
-    [6, 4],
-    [10, 8],
-    [24, 22],
-  ])('uses cpu count minus two workers for regular route builds', (cpus, workers) => {
-    expect(getDefaultWorkerCount(cpus, { routeCount: 256 })).toBe(workers);
-  });
-
-  it.each([
-    [1, 0],
-    [2, 0],
-    [3, 1],
-    [24, 22],
-  ])('uses cpu count minus two workers for small route builds', (cpus, workers) => {
-    expect(getDefaultWorkerCount(cpus, { routeCount: 48 })).toBe(workers);
-  });
-
-  it('honors explicit maxWorkers for small route builds', async () => {
+  it('honors explicit maxWorkers', async () => {
     const executor = createRouteTransformExecutor({
       parallelTransforms: { maxWorkers: 2 },
-      routeCount: 48,
     });
 
     try {
@@ -132,7 +74,6 @@ describe('parallel route transforms', () => {
   it('runs route builds inline when parallel transforms are disabled', async () => {
     const executor = createRouteTransformExecutor({
       parallelTransforms: false,
-      routeCount: 48,
     });
 
     try {
@@ -143,20 +84,6 @@ describe('parallel route transforms', () => {
     } finally {
       await executor.close();
     }
-  });
-
-  it.each([
-    [1, 0],
-    [2, 0],
-    [3, 1],
-    [4, 2],
-    [6, 4],
-    [8, 6],
-    [10, 8],
-    [12, 10],
-    [24, 22],
-  ])('defaults to cpu count minus two cores', (cpus, workers) => {
-    expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
 
   it('executes route client entry tasks through the shared task executor', async () => {
@@ -297,7 +224,6 @@ describe('parallel route transforms', () => {
   it('shares build route module results across environments when output is identical', async () => {
     const executor = createRouteTransformExecutor({
       parallelTransforms: { maxWorkers: 2 },
-      routeCount: 1024,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({
@@ -325,7 +251,6 @@ describe('parallel route transforms', () => {
   it('does not share build route module results when web removes server-only exports', async () => {
     const executor = createRouteTransformExecutor({
       parallelTransforms: { maxWorkers: 2 },
-      routeCount: 1024,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({

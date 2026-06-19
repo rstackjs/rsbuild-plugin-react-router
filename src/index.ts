@@ -421,7 +421,6 @@ export const pluginReactRouter = (
     const routeTransformExecutor = createRouteTransformExecutor({
       parallelTransforms: pluginOptions.parallelTransforms,
       routeChunkCache,
-      routeCount,
       splitRouteModules: Boolean(splitRouteModules),
     });
     const routeChunkOptions = {
