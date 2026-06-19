@@ -32,16 +32,20 @@ export type PluginOptions = {
 
   /**
    * Rsbuild dev-only lazy compilation behavior.
+   * @default false
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
 
   /**
    * Emit structured React Router plugin timing logs.
+   * @default false
    */
   logPerformance?: boolean;
 
   /**
    * Run route transforms in a worker-thread pool.
+   * Pass `{ maxWorkers }` to cap the pool size.
+   * @default false
    */
   parallelTransforms?:
     | boolean
