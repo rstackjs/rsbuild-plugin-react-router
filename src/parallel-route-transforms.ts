@@ -163,6 +163,8 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #closed = false;
   #nextId = 1;
   #nextRouteModuleWorkerIndex = 0;
+  #nextSplitRouteAnalysisWorkerIndex = 0;
+  #splitRouteAnalysisWorkers = new Map<string, number>();
   #workers: WorkerState[];
 
   constructor(
@@ -304,6 +306,21 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
 
   #getWorkerIndex(task: RouteTransformTask): number {
     const workerCount = Math.max(1, this.#workers.length);
+    if (
+      this.balanceRouteModuleTransforms &&
+      (task.kind === 'routeClientEntry' || task.kind === 'routeChunk')
+    ) {
+      const existingWorkerIndex = this.#splitRouteAnalysisWorkers.get(
+        task.resourcePath
+      );
+      if (existingWorkerIndex !== undefined) {
+        return existingWorkerIndex % workerCount;
+      }
+      const workerIndex = this.#nextSplitRouteAnalysisWorkerIndex % workerCount;
+      this.#nextSplitRouteAnalysisWorkerIndex += 1;
+      this.#splitRouteAnalysisWorkers.set(task.resourcePath, workerIndex);
+      return workerIndex;
+    }
     if (
       this.balanceRouteModuleTransforms &&
       task.kind === 'routeModule' &&
