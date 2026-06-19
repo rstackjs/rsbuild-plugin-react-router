@@ -289,11 +289,16 @@ export const getBundlerRouteAnalysis = async (
   }
 
   const analysis = (async () => {
-    const transformed = await getTransformedModule(source, resourcePath);
+    const program = parseProgram(source, resourcePath);
+    const sourceInfo: TransformedModule = {
+      code: source,
+      exportNames: collectProgramExportNames(program),
+      exportAllModules: collectExportAllModules(program),
+    };
     const routeChunkInfoCache = new Map<string, Promise<RouteChunkInfo>>();
 
     return {
-      ...transformed,
+      ...sourceInfo,
       getRouteChunkInfo: (
         cache: RouteChunkCache | undefined,
         config: RouteChunkConfig
@@ -306,12 +311,7 @@ export const getBundlerRouteAnalysis = async (
 
         let routeChunkInfo: Promise<RouteChunkInfo>;
         routeChunkInfo = cachePromiseOnReject(
-          detectRouteChunksIfEnabled(
-            cache,
-            config,
-            resourcePath,
-            transformed.code
-          ),
+          detectRouteChunksIfEnabled(cache, config, resourcePath, source),
           () => {
             if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
               routeChunkInfoCache.delete(cacheKey);
