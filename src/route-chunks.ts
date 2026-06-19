@@ -103,6 +103,12 @@ const getOrSetFromCache = <T>(
   return value;
 };
 
+const hasCachedValue = (
+  cache: RouteChunkCache,
+  key: string,
+  version: string
+): boolean => cache.get(key)?.version === version;
+
 type AnalyzedModule = {
   module: Module;
   // Dependency sets use these node identities. Consumers must shallow-copy
@@ -497,6 +503,19 @@ const getChunkedExport = (
   );
 };
 
+const getChunkedExportCacheKey = (
+  cacheKey: string,
+  exportName: RouteChunkExportName
+) => `${cacheKey}::getChunkedExport::${exportName}`;
+
+const hasCachedChunkedExport = (
+  code: string,
+  exportName: RouteChunkExportName,
+  cache: RouteChunkCache,
+  cacheKey: string
+): boolean =>
+  hasCachedValue(cache, getChunkedExportCacheKey(cacheKey, exportName), code);
+
 const omitChunkedExports = (
   code: string,
   exportNames: string[],
@@ -617,7 +636,9 @@ const precomputeChunkedExports = (
   cacheKey: string
 ) => {
   for (const exportName of routeChunkExportNames) {
-    getChunkedExport(code, exportName, cache, cacheKey);
+    if (!hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
+      getChunkedExport(code, exportName, cache, cacheKey);
+    }
   }
 };
 
@@ -669,7 +690,9 @@ export const getRouteChunkCode: (
       cacheKey
     );
   }
-  precomputeChunkedExports(code, analysisCache, cacheKey);
+  if (!hasCachedChunkedExport(code, chunkName, analysisCache, cacheKey)) {
+    precomputeChunkedExports(code, analysisCache, cacheKey);
+  }
   return getChunkedExport(code, chunkName, analysisCache, cacheKey);
 };
 
