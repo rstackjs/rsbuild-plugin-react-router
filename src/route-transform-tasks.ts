@@ -26,7 +26,6 @@ import {
 import {
   detectRouteChunksIfEnabled,
   getRouteChunkModuleId,
-  shouldAnalyzeRouteChunks,
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
@@ -97,16 +96,6 @@ const splitRouteExports = async (
   task: SplitRouteExportsTransformTask,
   options?: RouteTransformTaskOptions
 ): Promise<RouteTransformResult> => {
-  if (
-    !shouldAnalyzeRouteChunks(
-      task.routeChunkConfig,
-      task.resourcePath,
-      task.code
-    )
-  ) {
-    return { code: task.code, map: null };
-  }
-
   const { exportNames, hasRouteChunks, chunkedExports } =
     await detectRouteChunksIfEnabled(
       getRouteChunkCache(options),
