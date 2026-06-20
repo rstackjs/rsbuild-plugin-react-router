@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, watch, type FSWatcher } from 'node:fs';
+import { readFileSync, watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { ProcessAssetsHandler, RsbuildConfig } from '@rsbuild/core';
 import { dirname, resolve } from 'pathe';
@@ -49,10 +49,6 @@ export const getRouteRestartMarkerPath = (outputClientPath: string): string =>
   resolve(outputClientPath, ROUTE_RESTART_MARKER_ASSET);
 
 const readRestartMarkerContent = (restartMarkerPath: string): string => {
-  if (!existsSync(restartMarkerPath)) {
-    return INITIAL_RESTART_MARKER_CONTENT;
-  }
-
   try {
     const content = readFileSync(restartMarkerPath, 'utf8');
     return content || INITIAL_RESTART_MARKER_CONTENT;
