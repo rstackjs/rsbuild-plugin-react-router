@@ -78,7 +78,6 @@ const parseProgram = (code: string, resourcePath?: string) => {
   const result = parse(code, {
     sourceType: 'module',
     lang: resourcePath ? langFromPath(resourcePath) : 'tsx',
-    preserveParens: true,
   });
   const errors = result.diagnostics.filter(
     diagnostic => diagnostic.severity === 'error'

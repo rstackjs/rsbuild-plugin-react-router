@@ -126,7 +126,6 @@ const analyzeCode = (
     const module = analyzer.addFile(cacheKey, code, {
       lang: 'tsx',
       sourceType: 'module',
-      preserveParens: true,
     });
     const errors = module.diagnostics.filter(
       diagnostic => diagnostic.severity === 'error'
