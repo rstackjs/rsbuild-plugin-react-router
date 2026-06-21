@@ -145,10 +145,7 @@ const parseArgs = argv => {
   if (args.rspackProfile !== null && args.rspackProfile.trim() === '') {
     throw new Error('--rspack-profile must not be empty.');
   }
-  if (
-    args.rspackTraceOutput !== null &&
-    args.rspackTraceOutput.trim() === ''
-  ) {
+  if (args.rspackTraceOutput !== null && args.rspackTraceOutput.trim() === '') {
     throw new Error('--rspack-trace-output must not be empty.');
   }
 
@@ -607,9 +604,7 @@ const main = async () => {
         env: {
           NODE_ENV: 'production',
           REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1',
-          ...(args.rspackProfile
-            ? { RSPACK_PROFILE: args.rspackProfile }
-            : {}),
+          ...(args.rspackProfile ? { RSPACK_PROFILE: args.rspackProfile } : {}),
           ...(rspackTraceOutput
             ? { RSPACK_TRACE_OUTPUT: rspackTraceOutput }
             : {}),
