@@ -21,7 +21,7 @@ const { values } = parseArgs({
 
 if (!values.base || !values.head) {
   throw new Error(
-    'Usage: node scripts/report-benchmark-ci.mjs --base <baseline.json> --head <baseline.json> [--out <dir>]'
+    'Usage: node scripts/report-benchmark-ci.mjs --base <base.json> --head <head.json> [--out <dir>]'
   );
 }
 
