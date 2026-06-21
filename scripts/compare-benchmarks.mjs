@@ -9,23 +9,18 @@ const { values } = parseArgs({
     before: { type: 'string' },
     after: { type: 'string' },
     benchmark: { type: 'string', default: 'synthetic-256-ssr-esm-split' },
-    operations: {
-      type: 'string',
-      default: 'route:chunk,route:client-entry,route:split-exports',
-    },
   },
 });
 
 if (!values.before || !values.after) {
   throw new Error(
-    'Usage: node scripts/compare-benchmarks.mjs --before <baseline.json> --after <baseline.json> [--benchmark <id>] [--operations op,op]'
+    'Usage: node scripts/compare-benchmarks.mjs --before <baseline.json> --after <baseline.json> [--benchmark <id>]'
   );
 }
 
 const readJson = async file => JSON.parse(await readFile(file, 'utf8'));
 const before = await readJson(values.before);
 const after = await readJson(values.after);
-const operations = new Set(values.operations.split(',').filter(Boolean));
 
 const findBenchmark = (result, id) => {
   const benchmark = result.benchmarks?.find(item => item.id === id);
@@ -40,19 +35,6 @@ const findBenchmark = (result, id) => {
 const metric = (benchmark, path) =>
   path.split('.').reduce((value, key) => value?.[key], benchmark);
 
-const operationMetric = (benchmark, operation, key) => {
-  const matches =
-    benchmark.pluginOperations?.filter(item => item.operation === operation) ??
-    [];
-  const values = matches
-    .map(item => item[key])
-    .filter(value => typeof value === 'number');
-  if (values.length === 0) {
-    return null;
-  }
-  return values.reduce((sum, value) => sum + value, 0);
-};
-
 const percentDelta = (beforeValue, afterValue) => {
   if (beforeValue == null || afterValue == null || beforeValue === 0) {
     return '-';
@@ -60,7 +42,6 @@ const percentDelta = (beforeValue, afterValue) => {
   return `${(((afterValue - beforeValue) / beforeValue) * 100).toFixed(1)}%`;
 };
 
-const formatNumber = value => (value == null ? '-' : value.toFixed(1));
 const formatMs = value =>
   value == null ? '-' : `${(value / 1000).toFixed(2)}s`;
 const formatKb = value =>
@@ -99,23 +80,6 @@ const rows = [
     format: formatKb,
   },
 ];
-
-for (const operation of operations) {
-  rows.push(
-    {
-      label: `${operation} totalMs`,
-      before: operationMetric(beforeBenchmark, operation, 'totalMs'),
-      after: operationMetric(afterBenchmark, operation, 'totalMs'),
-      format: formatNumber,
-    },
-    {
-      label: `${operation} wallMs`,
-      before: operationMetric(beforeBenchmark, operation, 'wallMs'),
-      after: operationMetric(afterBenchmark, operation, 'wallMs'),
-      format: formatNumber,
-    }
-  );
-}
 
 console.log(`Benchmark comparison: ${values.benchmark}`);
 console.log('');

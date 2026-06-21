@@ -259,7 +259,6 @@ const createRsbuildConfig = ({
     ...(ssr ? [`      serverOutput: 'module',`] : []),
     ...renderParallelTransformsOption(parallelTransforms),
     lazyCompilationOption,
-    `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
     '    }),',
     '  ],',
     '  output: {',

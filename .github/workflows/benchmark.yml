@@ -132,6 +132,7 @@ jobs:
           if-no-files-found: error
 
       - name: Comment benchmark results
+        if: github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
