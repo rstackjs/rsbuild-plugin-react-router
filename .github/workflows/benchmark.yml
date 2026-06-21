@@ -17,6 +17,7 @@ jobs:
   benchmark:
     name: Compare build benchmarks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     env:
       BENCHMARK_PROFILE: default
@@ -164,14 +165,23 @@ jobs:
         run: |
           set -euo pipefail
           history_dir="$GITHUB_WORKSPACE/benchmark-history"
-          git clone --depth 1 --branch "$BENCHMARK_HISTORY_BRANCH" \
-            "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git" "$history_dir" \
-            || {
-              git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git" "$history_dir"
-              cd "$history_dir"
-              git checkout --orphan "$BENCHMARK_HISTORY_BRANCH"
-              git rm -rf .
-            }
+          remote_url="https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+
+          set +e
+          git ls-remote --exit-code --heads "$remote_url" "$BENCHMARK_HISTORY_BRANCH" > /dev/null 2>&1
+          branch_status=$?
+          set -e
+
+          if [ "$branch_status" -eq 0 ]; then
+            git clone --depth 1 --branch "$BENCHMARK_HISTORY_BRANCH" "$remote_url" "$history_dir"
+          elif [ "$branch_status" -eq 2 ]; then
+            git clone --depth 1 "$remote_url" "$history_dir"
+            cd "$history_dir"
+            git checkout --orphan "$BENCHMARK_HISTORY_BRANCH"
+            git rm -rf .
+          else
+            exit "$branch_status"
+          fi
 
           cd "$history_dir"
           git config user.name "github-actions[bot]"
