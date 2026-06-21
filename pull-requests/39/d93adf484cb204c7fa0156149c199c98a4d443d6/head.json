@@ -1,0 +1,3682 @@
+{
+  "repo": "rsbuild-plugin-react-router",
+  "commit": "d93adf484cb204c7fa0156149c199c98a4d443d6",
+  "date": "2026-06-21T01:01:36.917Z",
+  "node": "v22.22.3",
+  "pnpm": "9.15.3",
+  "platform": "linux 6.17.0-1018-azure x64",
+  "profile": "default",
+  "iterations": 5,
+  "warmup": 1,
+  "rspackProfile": null,
+  "rspackTraceOutput": null,
+  "failed": false,
+  "benchmarks": [
+    {
+      "id": "synthetic-256-ssr-esm",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "cwd": ".benchmark/fixtures/synthetic-256-ssr-esm",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 2507.3828009999997,
+          "userMs": 4470,
+          "sysMs": 680,
+          "maxRssKb": 394944,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 2065.8,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 11608.8,
+                  "wallMs": 107.8,
+                  "maxMs": 98.3,
+                  "slowest": [
+                    {
+                      "durationMs": 98.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0211.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 97.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0004.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 96.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0196.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 96.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0103.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 95,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0022.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 16153.5,
+                  "wallMs": 133.4,
+                  "maxMs": 89.1,
+                  "slowest": [
+                    {
+                      "durationMs": 89.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0047.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 88.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0010.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 88.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0030.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 88.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0203.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 88.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0036.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2279.8,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 11.7,
+                  "wallMs": 11.7,
+                  "maxMs": 11.7,
+                  "slowest": [
+                    {
+                      "durationMs": 11.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 11409.5,
+                  "wallMs": 85.5,
+                  "maxMs": 77.1,
+                  "slowest": [
+                    {
+                      "durationMs": 77.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0219.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 76.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0132.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 76.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0161.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 75.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0158.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 75.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0136.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 9.9,
+                  "wallMs": 9.9,
+                  "maxMs": 9.9,
+                  "slowest": [
+                    {
+                      "durationMs": 9.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2383.603771,
+          "userMs": 4270,
+          "sysMs": 640,
+          "maxRssKb": 411696,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1958.2,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 11123.4,
+                  "wallMs": 88,
+                  "maxMs": 79.6,
+                  "slowest": [
+                    {
+                      "durationMs": 79.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0220.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 79.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0161.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 78.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0114.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 78.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0219.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 78,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0127.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15229.4,
+                  "wallMs": 133.9,
+                  "maxMs": 73.6,
+                  "slowest": [
+                    {
+                      "durationMs": 73.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0034.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 73.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0254.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 73.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0153.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 73.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0076.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 73.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0021.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2165.5,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 11.5,
+                  "wallMs": 11.5,
+                  "maxMs": 11.5,
+                  "slowest": [
+                    {
+                      "durationMs": 11.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 10336.2,
+                  "wallMs": 124.3,
+                  "maxMs": 114.8,
+                  "slowest": [
+                    {
+                      "durationMs": 114.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0028.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 107,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0160.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 103.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0251.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 72.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0130.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 71.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0202.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 5.6,
+                  "wallMs": 5.6,
+                  "maxMs": 5.6,
+                  "slowest": [
+                    {
+                      "durationMs": 5.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2335.4316849999996,
+          "userMs": 4190,
+          "sysMs": 630,
+          "maxRssKb": 404504,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1921.5,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 10469.7,
+                  "wallMs": 86,
+                  "maxMs": 76.9,
+                  "slowest": [
+                    {
+                      "durationMs": 76.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0046.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 76.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0020.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 76.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0208.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 76.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0152.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 75.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0059.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15857.3,
+                  "wallMs": 127.5,
+                  "maxMs": 90,
+                  "slowest": [
+                    {
+                      "durationMs": 90,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0085.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 89.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0104.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 89.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0113.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 89.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0128.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 89,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0197.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2121.4,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 11.6,
+                  "wallMs": 11.6,
+                  "maxMs": 11.6,
+                  "slowest": [
+                    {
+                      "durationMs": 11.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 11120.3,
+                  "wallMs": 86.5,
+                  "maxMs": 77.9,
+                  "slowest": [
+                    {
+                      "durationMs": 77.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0079.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0002.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0097.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 76.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0161.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 76.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0253.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 9,
+                  "wallMs": 9,
+                  "maxMs": 9,
+                  "slowest": [
+                    {
+                      "durationMs": 9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2433.4276420000006,
+          "userMs": 4290,
+          "sysMs": 610,
+          "maxRssKb": 397044,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 2025.6,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 9999.9,
+                  "wallMs": 82.8,
+                  "maxMs": 74.7,
+                  "slowest": [
+                    {
+                      "durationMs": 74.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0048.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 73.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0091.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 73.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0156.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 72.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0031.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 72.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0161.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15713.5,
+                  "wallMs": 137.2,
+                  "maxMs": 84.3,
+                  "slowest": [
+                    {
+                      "durationMs": 84.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0179.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0124.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0137.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0247.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0230.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2213.2,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 12.1,
+                  "wallMs": 12.1,
+                  "maxMs": 12.1,
+                  "slowest": [
+                    {
+                      "durationMs": 12.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 10997.4,
+                  "wallMs": 92.6,
+                  "maxMs": 84.7,
+                  "slowest": [
+                    {
+                      "durationMs": 84.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0233.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0051.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0006.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0228.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0217.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 7.1,
+                  "wallMs": 7.1,
+                  "maxMs": 7.1,
+                  "slowest": [
+                    {
+                      "durationMs": 7.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2270.435957999998,
+          "userMs": 4130,
+          "sysMs": 620,
+          "maxRssKb": 399308,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1882.8,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 9355.2,
+                  "wallMs": 74.2,
+                  "maxMs": 65.7,
+                  "slowest": [
+                    {
+                      "durationMs": 65.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0073.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 65.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0134.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 65,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0130.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 64.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0028.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 64.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0037.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 18992.8,
+                  "wallMs": 133.4,
+                  "maxMs": 102.2,
+                  "slowest": [
+                    {
+                      "durationMs": 102.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0151.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 101.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0160.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 101.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0050.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 101.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0188.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 101.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0081.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2053,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 8,
+                  "wallMs": 8,
+                  "maxMs": 8,
+                  "slowest": [
+                    {
+                      "durationMs": 8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 9250.1,
+                  "wallMs": 88,
+                  "maxMs": 75,
+                  "slowest": [
+                    {
+                      "durationMs": 75,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0160.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 74.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0052.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 74.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0197.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 70,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0145.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 69.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/routes/route-0255.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 9.5,
+                  "wallMs": 9.5,
+                  "maxMs": 9.5,
+                  "slowest": [
+                    {
+                      "durationMs": 9.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 2270.435957999998,
+          "median": 2383.603771,
+          "mean": 2386.0563713999995,
+          "p95": 2507.3828009999997,
+          "stdev": 81.11854771179026
+        },
+        "userMs": {
+          "min": 4130,
+          "median": 4270,
+          "mean": 4270,
+          "p95": 4470,
+          "stdev": 115.23888232710347
+        },
+        "sysMs": {
+          "min": 610,
+          "median": 630,
+          "mean": 636,
+          "p95": 680,
+          "stdev": 24.166091947189145
+        },
+        "maxRssKb": {
+          "min": 394944,
+          "median": 399308,
+          "mean": 401499.2,
+          "p95": 411696,
+          "stdev": 6010.3970717416005
+        }
+      },
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 81946.5,
+          "wallMs": 665.4,
+          "maxMs": 102.2,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 53113.5,
+          "wallMs": 476.9,
+          "maxMs": 114.8,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "count": 1285,
+          "totalMs": 52557,
+          "wallMs": 438.8,
+          "maxMs": 98.3,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 54.9,
+          "wallMs": 54.9,
+          "maxMs": 12.1,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "count": 5,
+          "totalMs": 41.1,
+          "wallMs": 41.1,
+          "maxMs": 9.9,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "count": 5,
+          "totalMs": 0.5,
+          "wallMs": 0.5,
+          "maxMs": 0.1,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 0.5,
+          "wallMs": 0.5,
+          "maxMs": 0.1,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-ssr-esm-split",
+      "routeCount": 256,
+      "variant": "ssr-esm-split",
+      "cwd": ".benchmark/fixtures/synthetic-256-ssr-esm-split",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 2827.4734929999977,
+          "userMs": 5210,
+          "sysMs": 680,
+          "maxRssKb": 416540,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 2372.4,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 19625.9,
+                  "wallMs": 262.7,
+                  "maxMs": 134.1,
+                  "slowest": [
+                    {
+                      "durationMs": 134.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0142.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 133,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0179.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 130.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0097.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 129.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0163.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 129.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0004.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:chunk": {
+                  "count": 386,
+                  "totalMs": 28158.8,
+                  "wallMs": 263.5,
+                  "maxMs": 134.7,
+                  "slowest": [
+                    {
+                      "durationMs": 134.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0155.tsx?route-chunk=clientLoader"
+                    },
+                    {
+                      "durationMs": 133.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0131.tsx?route-chunk=clientLoader"
+                    },
+                    {
+                      "durationMs": 132.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0176.tsx?route-chunk=clientMiddleware"
+                    },
+                    {
+                      "durationMs": 131.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0051.tsx?route-chunk=clientAction"
+                    },
+                    {
+                      "durationMs": 131.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0177.tsx?route-chunk=HydrateFallback"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 8852.9,
+                  "wallMs": 131.1,
+                  "maxMs": 63.2,
+                  "slowest": [
+                    {
+                      "durationMs": 63.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0099.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 62.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0016.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 62.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0097.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 62.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0075.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 61.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0179.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2589.9,
+              "operations": {
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 4400.1,
+                  "wallMs": 76.1,
+                  "maxMs": 72.7,
+                  "slowest": [
+                    {
+                      "durationMs": 72.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0001.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 71.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0047.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 70.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0115.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 67.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0077.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 66.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0215.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 7.8,
+                  "wallMs": 7.8,
+                  "maxMs": 7.8,
+                  "slowest": [
+                    {
+                      "durationMs": 7.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 19.8,
+                  "wallMs": 19.8,
+                  "maxMs": 19.8,
+                  "slowest": [
+                    {
+                      "durationMs": 19.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2759.9804600000025,
+          "userMs": 5220,
+          "sysMs": 720,
+          "maxRssKb": 425676,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 2297.3,
+              "operations": {
+                "route:chunk": {
+                  "count": 386,
+                  "totalMs": 32566,
+                  "wallMs": 264,
+                  "maxMs": 162.1,
+                  "slowest": [
+                    {
+                      "durationMs": 162.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0129.tsx?route-chunk=clientLoader"
+                    },
+                    {
+                      "durationMs": 161.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0147.tsx?route-chunk=clientAction"
+                    },
+                    {
+                      "durationMs": 160.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0110.tsx?route-chunk=clientMiddleware"
+                    },
+                    {
+                      "durationMs": 160.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0008.tsx?route-chunk=HydrateFallback"
+                    },
+                    {
+                      "durationMs": 159.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0002.tsx?route-chunk=HydrateFallback"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 22159.2,
+                  "wallMs": 263.5,
+                  "maxMs": 162.2,
+                  "slowest": [
+                    {
+                      "durationMs": 162.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0107.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 161.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0230.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 160.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0008.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 160,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0067.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 159.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0063.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 8899.8,
+                  "wallMs": 127.5,
+                  "maxMs": 68.1,
+                  "slowest": [
+                    {
+                      "durationMs": 68.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0030.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 67.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0252.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 67,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0205.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 66.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0146.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 65.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0251.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2528.9,
+              "operations": {
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 5653.4,
+                  "wallMs": 87.9,
+                  "maxMs": 84.7,
+                  "slowest": [
+                    {
+                      "durationMs": 84.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0148.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0244.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0029.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 82.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0214.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0178.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 12,
+                  "wallMs": 12,
+                  "maxMs": 12,
+                  "slowest": [
+                    {
+                      "durationMs": 12,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 13.3,
+                  "wallMs": 13.3,
+                  "maxMs": 13.3,
+                  "slowest": [
+                    {
+                      "durationMs": 13.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2776.528779,
+          "userMs": 5210,
+          "sysMs": 730,
+          "maxRssKb": 419632,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 2336.6,
+              "operations": {
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 19962.8,
+                  "wallMs": 264.9,
+                  "maxMs": 119.6,
+                  "slowest": [
+                    {
+                      "durationMs": 119.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0074.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 119,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0226.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 119,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0087.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 118.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0233.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 117.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0071.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:chunk": {
+                  "count": 386,
+                  "totalMs": 30325.3,
+                  "wallMs": 264.4,
+                  "maxMs": 121.4,
+                  "slowest": [
+                    {
+                      "durationMs": 121.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0074.tsx?route-chunk=HydrateFallback"
+                    },
+                    {
+                      "durationMs": 121,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0129.tsx?route-chunk=clientMiddleware"
+                    },
+                    {
+                      "durationMs": 120.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0140.tsx?route-chunk=clientAction"
+                    },
+                    {
+                      "durationMs": 120.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0254.tsx?route-chunk=clientLoader"
+                    },
+                    {
+                      "durationMs": 119.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0009.tsx?route-chunk=clientAction"
+                    }
+                  ]
+                },
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 8812.3,
+                  "wallMs": 123.3,
+                  "maxMs": 64.8,
+                  "slowest": [
+                    {
+                      "durationMs": 64.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0084.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 64.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0198.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 63.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0149.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 63.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0166.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 63.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0179.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2551.7,
+              "operations": {
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 5789.8,
+                  "wallMs": 90.3,
+                  "maxMs": 88.3,
+                  "slowest": [
+                    {
+                      "durationMs": 88.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0256.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 85.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0151.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0046.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0124.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0035.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 20,
+                  "wallMs": 20,
+                  "maxMs": 20,
+                  "slowest": [
+                    {
+                      "durationMs": 20,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 3.9,
+                  "wallMs": 3.9,
+                  "maxMs": 3.9,
+                  "slowest": [
+                    {
+                      "durationMs": 3.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2835.9483500000024,
+          "userMs": 5270,
+          "sysMs": 800,
+          "maxRssKb": 408140,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 2386.8,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.2,
+                  "wallMs": 0.2,
+                  "maxMs": 0.2,
+                  "slowest": [
+                    {
+                      "durationMs": 0.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:chunk": {
+                  "count": 386,
+                  "totalMs": 36201.9,
+                  "wallMs": 313.5,
+                  "maxMs": 177.7,
+                  "slowest": [
+                    {
+                      "durationMs": 177.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0209.tsx?route-chunk=clientLoader"
+                    },
+                    {
+                      "durationMs": 177.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0249.tsx?route-chunk=clientMiddleware"
+                    },
+                    {
+                      "durationMs": 176.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0129.tsx?route-chunk=clientMiddleware"
+                    },
+                    {
+                      "durationMs": 173.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0183.tsx?route-chunk=clientLoader"
+                    },
+                    {
+                      "durationMs": 172.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0089.tsx?route-chunk=clientLoader"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 23872.8,
+                  "wallMs": 312.6,
+                  "maxMs": 175.6,
+                  "slowest": [
+                    {
+                      "durationMs": 175.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0047.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 174.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0133.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 174.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0152.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 173.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0219.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 172.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0179.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 11180,
+                  "wallMs": 126.3,
+                  "maxMs": 87,
+                  "slowest": [
+                    {
+                      "durationMs": 87,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0006.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 85.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0178.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0167.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0105.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 80.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0192.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2581.2,
+              "operations": {
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 6608.7,
+                  "wallMs": 122.4,
+                  "maxMs": 118.1,
+                  "slowest": [
+                    {
+                      "durationMs": 118.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0083.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 116.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0250.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 111.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0244.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 110.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0029.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 109.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0059.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 19.9,
+                  "wallMs": 19.9,
+                  "maxMs": 19.9,
+                  "slowest": [
+                    {
+                      "durationMs": 19.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 76.1,
+                  "wallMs": 76.1,
+                  "maxMs": 76.1,
+                  "slowest": [
+                    {
+                      "durationMs": 76.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2799.4867460000023,
+          "userMs": 5160,
+          "sysMs": 760,
+          "maxRssKb": 413240,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 2325.5,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 19831,
+                  "wallMs": 270.7,
+                  "maxMs": 123.6,
+                  "slowest": [
+                    {
+                      "durationMs": 123.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0018.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 122.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0165.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 122.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0249.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 122.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0228.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 121.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0093.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:chunk": {
+                  "count": 386,
+                  "totalMs": 29891.6,
+                  "wallMs": 270.6,
+                  "maxMs": 124.1,
+                  "slowest": [
+                    {
+                      "durationMs": 124.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0089.tsx?route-chunk=clientLoader"
+                    },
+                    {
+                      "durationMs": 123.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0182.tsx?route-chunk=clientMiddleware"
+                    },
+                    {
+                      "durationMs": 123.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0038.tsx?route-chunk=clientAction"
+                    },
+                    {
+                      "durationMs": 123.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0033.tsx?route-chunk=clientMiddleware"
+                    },
+                    {
+                      "durationMs": 123.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0135.tsx?route-chunk=clientMiddleware"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 10080,
+                  "wallMs": 134.4,
+                  "maxMs": 75.6,
+                  "slowest": [
+                    {
+                      "durationMs": 75.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0196.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 75.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0136.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 75.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0054.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 75.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0171.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 75.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0093.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2575.3,
+              "operations": {
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 7545.2,
+                  "wallMs": 103.8,
+                  "maxMs": 101.7,
+                  "slowest": [
+                    {
+                      "durationMs": 101.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0251.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 100.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0016.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 99.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0058.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 99.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0010.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 98.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/routes/route-0187.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 26.9,
+                  "wallMs": 26.9,
+                  "maxMs": 26.9,
+                  "slowest": [
+                    {
+                      "durationMs": 26.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 14.6,
+                  "wallMs": 14.6,
+                  "maxMs": 14.6,
+                  "slowest": [
+                    {
+                      "durationMs": 14.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-ssr-esm-split/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 2759.9804600000025,
+          "median": 2799.4867460000023,
+          "mean": 2799.883565600001,
+          "p95": 2835.9483500000024,
+          "stdev": 28.981836129571995
+        },
+        "userMs": {
+          "min": 5160,
+          "median": 5210,
+          "mean": 5214,
+          "p95": 5270,
+          "stdev": 34.9857113690718
+        },
+        "sysMs": {
+          "min": 680,
+          "median": 730,
+          "mean": 738,
+          "p95": 800,
+          "stdev": 40.19950248448356
+        },
+        "maxRssKb": {
+          "min": 408140,
+          "median": 416540,
+          "mean": 416645.6,
+          "p95": 425676,
+          "stdev": 5906.288228659349
+        }
+      },
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:chunk",
+          "count": 1930,
+          "totalMs": 157143.6,
+          "wallMs": 1376,
+          "maxMs": 177.7,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "count": 1285,
+          "totalMs": 105451.70000000001,
+          "wallMs": 1374.4,
+          "maxMs": 175.6,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 47825,
+          "wallMs": 642.6,
+          "maxMs": 87,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 29997.2,
+          "wallMs": 480.50000000000006,
+          "maxMs": 118.1,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "count": 5,
+          "totalMs": 127.69999999999999,
+          "wallMs": 127.69999999999999,
+          "maxMs": 76.1,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 86.6,
+          "wallMs": 86.6,
+          "maxMs": 26.9,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 0.6,
+          "wallMs": 0.6,
+          "maxMs": 0.2,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "count": 5,
+          "totalMs": 0.5,
+          "wallMs": 0.5,
+          "maxMs": 0.1,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-spa",
+      "routeCount": 256,
+      "variant": "spa",
+      "cwd": ".benchmark/fixtures/synthetic-256-spa",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 2373.905236999999,
+          "userMs": 4050,
+          "sysMs": 590,
+          "maxRssKb": 396272,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1905.1,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 9788.6,
+                  "wallMs": 77.6,
+                  "maxMs": 69.2,
+                  "slowest": [
+                    {
+                      "durationMs": 69.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0091.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 66.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0204.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 66.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0217.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 65.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0101.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 65.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0178.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 14941.9,
+                  "wallMs": 105.7,
+                  "maxMs": 82,
+                  "slowest": [
+                    {
+                      "durationMs": 82,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0124.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0207.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0137.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0256.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0140.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2077.4,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 18,
+                  "wallMs": 18,
+                  "maxMs": 18,
+                  "slowest": [
+                    {
+                      "durationMs": 18,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 14106,
+                  "wallMs": 111.8,
+                  "maxMs": 102,
+                  "slowest": [
+                    {
+                      "durationMs": 102,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0073.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 101.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0253.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 99.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0046.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 98.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0233.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 97.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0040.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 7.2,
+                  "wallMs": 7.2,
+                  "maxMs": 7.2,
+                  "slowest": [
+                    {
+                      "durationMs": 7.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2350.527580999995,
+          "userMs": 4090,
+          "sysMs": 600,
+          "maxRssKb": 410888,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1871.5,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 10241.7,
+                  "wallMs": 83.9,
+                  "maxMs": 74.9,
+                  "slowest": [
+                    {
+                      "durationMs": 74.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0088.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 74.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0194.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 74,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0008.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 73.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0226.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 73,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0101.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 13071.2,
+                  "wallMs": 102.2,
+                  "maxMs": 77.6,
+                  "slowest": [
+                    {
+                      "durationMs": 77.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0227.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0081.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0018.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 76.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0212.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 76.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0207.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2067.4,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 19.9,
+                  "wallMs": 19.9,
+                  "maxMs": 19.9,
+                  "slowest": [
+                    {
+                      "durationMs": 19.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 13616.7,
+                  "wallMs": 140.3,
+                  "maxMs": 126.1,
+                  "slowest": [
+                    {
+                      "durationMs": 126.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0064.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 121,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0254.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 120.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0157.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 86.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0035.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 85.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0192.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 2.1,
+                  "wallMs": 2.1,
+                  "maxMs": 2.1,
+                  "slowest": [
+                    {
+                      "durationMs": 2.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2366.9499080000023,
+          "userMs": 4170,
+          "sysMs": 640,
+          "maxRssKb": 410268,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1883.5,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 10441,
+                  "wallMs": 80.9,
+                  "maxMs": 72.3,
+                  "slowest": [
+                    {
+                      "durationMs": 72.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0125.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 71.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0022.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 71,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0246.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 70.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0046.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 69.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0170.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15352.4,
+                  "wallMs": 112.6,
+                  "maxMs": 94.2,
+                  "slowest": [
+                    {
+                      "durationMs": 94.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0153.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 93.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0045.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 93.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0144.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 93.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0140.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 93.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0117.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2067.9,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 14,
+                  "wallMs": 14,
+                  "maxMs": 14,
+                  "slowest": [
+                    {
+                      "durationMs": 14,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 14362.5,
+                  "wallMs": 125.8,
+                  "maxMs": 119.2,
+                  "slowest": [
+                    {
+                      "durationMs": 119.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0181.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 118.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0200.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 115.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0190.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 113.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0107.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 105.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0147.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 2.6,
+                  "wallMs": 2.6,
+                  "maxMs": 2.6,
+                  "slowest": [
+                    {
+                      "durationMs": 2.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2366.670466000003,
+          "userMs": 4140,
+          "sysMs": 590,
+          "maxRssKb": 403132,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1905.2,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 10886.7,
+                  "wallMs": 85.9,
+                  "maxMs": 76.9,
+                  "slowest": [
+                    {
+                      "durationMs": 76.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0055.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 75.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0161.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 75.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0190.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 75.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0068.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 75.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0046.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 13726.2,
+                  "wallMs": 101.6,
+                  "maxMs": 78.3,
+                  "slowest": [
+                    {
+                      "durationMs": 78.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0104.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 78.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0232.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0065.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0014.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0254.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2081,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 16.1,
+                  "wallMs": 16.1,
+                  "maxMs": 16.1,
+                  "slowest": [
+                    {
+                      "durationMs": 16.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 12676.4,
+                  "wallMs": 125,
+                  "maxMs": 116.9,
+                  "slowest": [
+                    {
+                      "durationMs": 116.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0077.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 110.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0069.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0220.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0200.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0254.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 9,
+                  "wallMs": 9,
+                  "maxMs": 9,
+                  "slowest": [
+                    {
+                      "durationMs": 9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2418.760688000002,
+          "userMs": 4140,
+          "sysMs": 650,
+          "maxRssKb": 397568,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1883,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 10925.1,
+                  "wallMs": 88.9,
+                  "maxMs": 80.3,
+                  "slowest": [
+                    {
+                      "durationMs": 80.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0219.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 79.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0099.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 79.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0189.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 78.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0033.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 77.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0202.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15323.8,
+                  "wallMs": 111.8,
+                  "maxMs": 94.7,
+                  "slowest": [
+                    {
+                      "durationMs": 94.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0126.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 94.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0104.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 94.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0117.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 94.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0128.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 94.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0096.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2095.9,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 25.8,
+                  "wallMs": 25.8,
+                  "maxMs": 25.8,
+                  "slowest": [
+                    {
+                      "durationMs": 25.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15273.2,
+                  "wallMs": 154.8,
+                  "maxMs": 145.6,
+                  "slowest": [
+                    {
+                      "durationMs": 145.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0059.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 145.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0110.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 144.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0196.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 144,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0026.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 140.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/routes/route-0204.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 3.5,
+                  "wallMs": 3.5,
+                  "maxMs": 3.5,
+                  "slowest": [
+                    {
+                      "durationMs": 3.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-spa/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 2350.527580999995,
+          "median": 2366.9499080000023,
+          "mean": 2375.3627760000004,
+          "p95": 2418.760688000002,
+          "stdev": 23.015745470030566
+        },
+        "userMs": {
+          "min": 4050,
+          "median": 4140,
+          "mean": 4118,
+          "p95": 4170,
+          "stdev": 42.61455150532503
+        },
+        "sysMs": {
+          "min": 590,
+          "median": 600,
+          "mean": 614,
+          "p95": 650,
+          "stdev": 25.768197453450252
+        },
+        "maxRssKb": {
+          "min": 396272,
+          "median": 403132,
+          "mean": 403625.6,
+          "p95": 410888,
+          "stdev": 6129.886184914039
+        }
+      },
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 72415.5,
+          "wallMs": 533.9,
+          "maxMs": 94.7,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 70034.8,
+          "wallMs": 657.7,
+          "maxMs": 145.6,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "count": 1285,
+          "totalMs": 52283.1,
+          "wallMs": 417.20000000000005,
+          "maxMs": 80.3,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 93.8,
+          "wallMs": 93.8,
+          "maxMs": 25.8,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "count": 5,
+          "totalMs": 24.4,
+          "wallMs": 24.4,
+          "maxMs": 9,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "count": 5,
+          "totalMs": 0.5,
+          "wallMs": 0.5,
+          "maxMs": 0.1,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 0.5,
+          "wallMs": 0.5,
+          "maxMs": 0.1,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-sourcemaps",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "sourceMap": true,
+      "cwd": ".benchmark/fixtures/synthetic-256-sourcemaps",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 2334.168764000002,
+          "userMs": 4230,
+          "sysMs": 550,
+          "maxRssKb": 431580,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1894.2,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 9528.9,
+                  "wallMs": 80,
+                  "maxMs": 71,
+                  "slowest": [
+                    {
+                      "durationMs": 71,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0228.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 70.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0215.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 69.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0219.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 69.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0206.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 68.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0046.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15933.5,
+                  "wallMs": 122.4,
+                  "maxMs": 82.1,
+                  "slowest": [
+                    {
+                      "durationMs": 82.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0104.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0197.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0122.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 81.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0029.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 80.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0117.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2099.4,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 10.4,
+                  "wallMs": 10.4,
+                  "maxMs": 10.4,
+                  "slowest": [
+                    {
+                      "durationMs": 10.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 11784.4,
+                  "wallMs": 114.4,
+                  "maxMs": 106.6,
+                  "slowest": [
+                    {
+                      "durationMs": 106.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0149.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 106.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0176.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 106.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0125.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 105.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0185.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 105.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0042.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 3.8,
+                  "wallMs": 3.8,
+                  "maxMs": 3.8,
+                  "slowest": [
+                    {
+                      "durationMs": 3.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2329.2714739999938,
+          "userMs": 4140,
+          "sysMs": 560,
+          "maxRssKb": 430912,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1908.2,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 9575.8,
+                  "wallMs": 80.5,
+                  "maxMs": 72.2,
+                  "slowest": [
+                    {
+                      "durationMs": 72.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0253.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 71.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0006.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 70.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0075.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 70.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0099.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 69.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0185.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 16119,
+                  "wallMs": 134.8,
+                  "maxMs": 84.4,
+                  "slowest": [
+                    {
+                      "durationMs": 84.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0052.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 84.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0067.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0092.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0155.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 83.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0160.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2093,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 10.4,
+                  "wallMs": 10.4,
+                  "maxMs": 10.4,
+                  "slowest": [
+                    {
+                      "durationMs": 10.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 10006.6,
+                  "wallMs": 124,
+                  "maxMs": 109.4,
+                  "slowest": [
+                    {
+                      "durationMs": 109.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0239.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 107.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0205.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 105.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0096.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 102.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0040.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 102,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0142.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 6.3,
+                  "wallMs": 6.3,
+                  "maxMs": 6.3,
+                  "slowest": [
+                    {
+                      "durationMs": 6.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2341.2691909999994,
+          "userMs": 4180,
+          "sysMs": 570,
+          "maxRssKb": 411384,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1911.3,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 10263,
+                  "wallMs": 80.1,
+                  "maxMs": 71.6,
+                  "slowest": [
+                    {
+                      "durationMs": 71.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0215.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 71.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0208.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 70.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0165.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 70,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0228.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 69.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0024.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 18485.8,
+                  "wallMs": 135.8,
+                  "maxMs": 81,
+                  "slowest": [
+                    {
+                      "durationMs": 81,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0009.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 80.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0029.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 80.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0208.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 80.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0210.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 80.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0117.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2097.6,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 10.9,
+                  "wallMs": 10.9,
+                  "maxMs": 10.9,
+                  "slowest": [
+                    {
+                      "durationMs": 10.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 12008.2,
+                  "wallMs": 117,
+                  "maxMs": 99.4,
+                  "slowest": [
+                    {
+                      "durationMs": 99.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0159.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 79.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0048.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 79.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0174.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 79.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0145.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 79,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0202.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 4.6,
+                  "wallMs": 4.6,
+                  "maxMs": 4.6,
+                  "slowest": [
+                    {
+                      "durationMs": 4.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2284.1313389999996,
+          "userMs": 4110,
+          "sysMs": 580,
+          "maxRssKb": 413292,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1858,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 9358.8,
+                  "wallMs": 77.9,
+                  "maxMs": 69.4,
+                  "slowest": [
+                    {
+                      "durationMs": 69.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0118.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 68.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0091.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 67.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0165.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 67.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0088.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 66.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0213.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15423.7,
+                  "wallMs": 139.3,
+                  "maxMs": 78.2,
+                  "slowest": [
+                    {
+                      "durationMs": 78.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0092.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0179.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0137.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0115.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 77.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0007.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2051.1,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 7.8,
+                  "wallMs": 7.8,
+                  "maxMs": 7.8,
+                  "slowest": [
+                    {
+                      "durationMs": 7.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 12784.5,
+                  "wallMs": 114.2,
+                  "maxMs": 105.2,
+                  "slowest": [
+                    {
+                      "durationMs": 105.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0240.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 104.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0020.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 104.3,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0097.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 104.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0220.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 103.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0055.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 2.4,
+                  "wallMs": 2.4,
+                  "maxMs": 2.4,
+                  "slowest": [
+                    {
+                      "durationMs": 2.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2312.0844880000004,
+          "userMs": 4120,
+          "sysMs": 560,
+          "maxRssKb": 421148,
+          "pluginReports": [
+            {
+              "environment": "web",
+              "compilerLifecycleMs": 1878.5,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/browser-manifest.js"
+                    }
+                  ]
+                },
+                "route:client-entry": {
+                  "count": 257,
+                  "totalMs": 9781.9,
+                  "wallMs": 78.2,
+                  "maxMs": 67.9,
+                  "slowest": [
+                    {
+                      "durationMs": 67.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0042.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 67.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0134.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 66.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0233.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 66.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0220.tsx?__react-router-build-client-route"
+                    },
+                    {
+                      "durationMs": 66.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0132.tsx?__react-router-build-client-route"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 15562.9,
+                  "wallMs": 131.5,
+                  "maxMs": 90.7,
+                  "slowest": [
+                    {
+                      "durationMs": 90.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0166.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 90.4,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0023.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 90.2,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0135.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 90,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0074.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 89.7,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0034.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "manifest:stage": {
+                  "count": 1,
+                  "totalMs": 0.1,
+                  "wallMs": 0.1,
+                  "maxMs": 0.1,
+                  "slowest": [
+                    {
+                      "durationMs": 0.1,
+                      "resource": "virtual/react-router/browser-manifest"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "environment": "node",
+              "compilerLifecycleMs": 2078.6,
+              "operations": {
+                "manifest:transform": {
+                  "count": 1,
+                  "totalMs": 10.5,
+                  "wallMs": 10.5,
+                  "maxMs": 10.5,
+                  "slowest": [
+                    {
+                      "durationMs": 10.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/node_modules/virtual/react-router/server-manifest.js"
+                    }
+                  ]
+                },
+                "route:module": {
+                  "count": 257,
+                  "totalMs": 12064.9,
+                  "wallMs": 107.2,
+                  "maxMs": 97.8,
+                  "slowest": [
+                    {
+                      "durationMs": 97.8,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0149.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 97.6,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0134.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 97.5,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0194.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 97,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0138.tsx?react-router-route"
+                    },
+                    {
+                      "durationMs": 96.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/routes/route-0110.tsx?react-router-route"
+                    }
+                  ]
+                },
+                "module:client-only-stub": {
+                  "count": 1,
+                  "totalMs": 8.9,
+                  "wallMs": 8.9,
+                  "maxMs": 8.9,
+                  "slowest": [
+                    {
+                      "durationMs": 8.9,
+                      "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/.benchmark/fixtures/synthetic-256-sourcemaps/app/client-data.client.ts"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 2284.1313389999996,
+          "median": 2329.2714739999938,
+          "mean": 2320.185051199999,
+          "p95": 2341.2691909999994,
+          "stdev": 20.435936688279046
+        },
+        "userMs": {
+          "min": 4110,
+          "median": 4140,
+          "mean": 4156,
+          "p95": 4230,
+          "stdev": 44.090815370097204
+        },
+        "sysMs": {
+          "min": 550,
+          "median": 560,
+          "mean": 564,
+          "p95": 580,
+          "stdev": 10.198039027185569
+        },
+        "maxRssKb": {
+          "min": 411384,
+          "median": 421148,
+          "mean": 421663.2,
+          "p95": 431580,
+          "stdev": 8483.956586404718
+        }
+      },
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 81524.9,
+          "wallMs": 663.8000000000001,
+          "maxMs": 90.7,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "count": 1285,
+          "totalMs": 58648.6,
+          "wallMs": 576.8,
+          "maxMs": 109.4,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "count": 1285,
+          "totalMs": 48508.4,
+          "wallMs": 396.7,
+          "maxMs": 72.2,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 50,
+          "wallMs": 50,
+          "maxMs": 10.9,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "count": 5,
+          "totalMs": 26,
+          "wallMs": 26,
+          "maxMs": 8.9,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "count": 5,
+          "totalMs": 0.5,
+          "wallMs": 0.5,
+          "maxMs": 0.1,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "count": 5,
+          "totalMs": 0.5,
+          "wallMs": 0.5,
+          "maxMs": 0.1,
+          "reports": 5
+        }
+      ]
+    }
+  ]
+}
