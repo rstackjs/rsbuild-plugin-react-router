@@ -8,14 +8,108 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from '@rstest/core';
+import { describe, expect, it, rstest } from '@rstest/core';
 import {
   createRouteManifestSnapshot,
+  createRouteTopologyWatcher,
   ensureDevRestartMarker,
   getRouteRestartMarkerPath,
 } from '../src/route-watch';
 
 describe('route watch restart marker', () => {
+  it('allows a topology callback to await watcher shutdown', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    mkdirSync(watchedDirectory, { recursive: true });
+    let topology = new Set(['initial']);
+    let triggerChange!: () => void;
+    let close!: () => Promise<void>;
+    let callbackCompleted = false;
+
+    try {
+      close = await createRouteTopologyWatcher({
+        watchDirectory: watchedDirectory,
+        restartMarkerPath: markerPath,
+        getRouteTopology: async () => topology,
+        onRouteTopologyChange: async () => {
+          await close();
+          callbackCompleted = true;
+        },
+        onError: error => {
+          throw error;
+        },
+        watchDirectoryEntry: (_directory, onChange) => {
+          triggerChange = onChange;
+          return { close: () => {} };
+        },
+      });
+
+      topology = new Set(['changed']);
+      triggerChange();
+
+      await expect.poll(() => callbackCompleted, { timeout: 2000 }).toBe(true);
+    } finally {
+      await close?.();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not recreate watchers or touch the marker after close', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    mkdirSync(watchedDirectory, { recursive: true });
+    await ensureDevRestartMarker(markerPath);
+    const initialMarker = readFileSync(markerPath, 'utf8');
+    let topologyReads = 0;
+    let releaseRescan!: () => void;
+    const rescanReleased = new Promise<void>(resolve => {
+      releaseRescan = resolve;
+    });
+    let markRescanStarted!: () => void;
+    const rescanStarted = new Promise<void>(resolve => {
+      markRescanStarted = resolve;
+    });
+    let triggerChange!: () => void;
+    const closeWatcher = rstest.fn();
+
+    try {
+      const close = await createRouteTopologyWatcher({
+        watchDirectory: watchedDirectory,
+        restartMarkerPath: markerPath,
+        onError: error => {
+          throw error;
+        },
+        getRouteTopology: async () => {
+          topologyReads += 1;
+          if (topologyReads === 1) {
+            return new Set(['initial']);
+          }
+          markRescanStarted();
+          await rescanReleased;
+          return new Set(['changed']);
+        },
+        watchDirectoryEntry: (_directory, onChange) => {
+          triggerChange = onChange;
+          return { close: closeWatcher };
+        },
+      });
+
+      triggerChange();
+      await rescanStarted;
+      const closePromise = close();
+      releaseRescan();
+      await closePromise;
+
+      expect(readFileSync(markerPath, 'utf8')).toBe(initialMarker);
+      expect(closeWatcher).toHaveBeenCalled();
+    } finally {
+      releaseRescan();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('places the restart marker in the client build output', () => {
     expect(getRouteRestartMarkerPath('/project/build/client')).toBe(
       '/project/build/client/.react-router/route-watch'

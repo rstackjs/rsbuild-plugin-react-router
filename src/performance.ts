@@ -180,12 +180,24 @@ export const createReactRouterPerformanceProfiler = ({
         return callback().then(
           result => {
             const end = performance.now();
-            recordDuration(resolvedEnvironment, operation, resource, start, end);
+            recordDuration(
+              resolvedEnvironment,
+              operation,
+              resource,
+              start,
+              end
+            );
             return result;
           },
           error => {
             const end = performance.now();
-            recordDuration(resolvedEnvironment, operation, resource, start, end);
+            recordDuration(
+              resolvedEnvironment,
+              operation,
+              resource,
+              start,
+              end
+            );
             throw error;
           }
         );

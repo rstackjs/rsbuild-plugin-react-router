@@ -5,9 +5,9 @@ export default defineConfig({
   // Maximum time one test can run for
   timeout: 30 * 1000,
   expect: {
-    timeout: 5000
+    timeout: 5000,
   },
-  // Keep this example serial because dev-route-watch mutates routes.ts and
+  // Keep this example serial because dev-route-watch mutates route config and
   // restarts the shared dev server.
   fullyParallel: false,
   workers: 1,

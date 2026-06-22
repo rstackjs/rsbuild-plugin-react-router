@@ -50,15 +50,17 @@ The harness:
 1. builds the plugin package (`pnpm build`) unless `--skip-root-build` is passed;
 2. generates deterministic fixtures under `.benchmark/fixtures/`;
 3. runs `node node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs`;
-4. sets `REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE=1`, enabling structured
-   `[react-router:performance]` plugin logs;
+4. keeps plugin instrumentation disabled for canonical end-to-end A/B runs;
+   pass `--log-performance` for a separate diagnostic run that emits structured
+   `[react-router:performance]` logs;
 5. wraps builds in `/usr/bin/time -v` when available and records user/sys/RSS;
 6. writes `.benchmark/results/<run>/baseline.json` and `baseline.md`.
 
 `rsbuild build --help` in this repo exposes `--log-level`, `--environment`,
 `--mode`, and `--config`, but no dedicated benchmark/stats/profiling CLI flag.
-Use the plugin `logPerformance` reports as the primary plugin-level source of
-truth. If low-level Rspack stats are needed later, add them through fixture
+Use end-to-end wall time, process CPU, and RSS as the primary comparison
+signals. Plugin `logPerformance` reports are diagnostic because their timers
+include queueing and add observer overhead. If low-level Rspack stats are needed later, add them through fixture
 `rsbuild.config.mjs`; do not depend on a non-existent CLI flag.
 
 ## Pre-flight commands

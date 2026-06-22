@@ -2,7 +2,7 @@ import { statSync, type Stats } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
-import { generate, parse } from './babel.js';
+import { generate, parse } from './yuku.js';
 import {
   JS_EXTENSIONS,
   PLUGIN_NAME,
@@ -67,6 +67,7 @@ export type RouteModuleTransformTask = BaseRouteTransformTask & {
   kind: 'routeModule';
   resource: string;
   environmentName: string;
+  sourceMaps: boolean;
   ssr: boolean;
   isBuild: boolean;
   isSpaMode: boolean;
@@ -312,7 +313,9 @@ const transformRouteModule = async (
   }
 
   return generate(ast, {
-    sourceMaps: !task.isBuild,
+    // Rsbuild merges this map with its downstream SWC transform. Only pay the
+    // code-generation cost when this environment actually emits JS maps.
+    sourceMaps: task.sourceMaps,
     filename: task.resource,
     sourceFileName: task.resourcePath,
   });

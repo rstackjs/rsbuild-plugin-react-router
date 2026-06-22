@@ -1,5 +1,4 @@
-import { describe, expect, it, rstest } from '@rstest/core';
-import * as exportUtils from '../src/export-utils';
+import { describe, expect, it } from '@rstest/core';
 import {
   createRouteChunkArtifact,
   createRouteClientEntryArtifact,
@@ -96,72 +95,56 @@ describe('route artifact helpers', () => {
     });
 
     it('excludes split client exports from web build route entries', async () => {
-      const getBundlerRouteAnalysis = rstest.spyOn(
-        exportUtils,
-        'getBundlerRouteAnalysis'
-      );
-
-      try {
-        const result = await createRouteClientEntryArtifact({
-          code: `
+      const result = await createRouteClientEntryArtifact({
+        code: `
             export const clientAction = async () => {};
             export async function clientLoader() { return null; }
             export default function Route() { return null; }
           `,
-          resourcePath,
-          environmentName: 'web',
-          isBuild: true,
-          routeChunkConfig,
-        });
+        resourcePath,
+        environmentName: 'web',
+        isBuild: true,
+        routeChunkConfig,
+      });
 
-        expect(result).toEqual({
-          code: `export { default } from ${JSON.stringify(routeRequest)};`,
-        });
-        expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-      } finally {
-        getBundlerRouteAnalysis.mockRestore();
-      }
+      expect(result).toEqual({
+        code: `export { default } from ${JSON.stringify(routeRequest)};`,
+      });
     });
 
     it('does not run split analysis for root route client entries', async () => {
-      const getBundlerRouteAnalysis = rstest.spyOn(
-        exportUtils,
-        'getBundlerRouteAnalysis'
-      );
       const rootResourcePath = '/app/root.tsx';
-
-      try {
-        const result = await createRouteClientEntryArtifact({
-          code: `
+      const result = await createRouteClientEntryArtifact({
+        code: `
             export async function clientLoader() { return null; }
             export function HydrateFallback() { return null; }
             export default function Root() { return null; }
           `,
-          resourcePath: rootResourcePath,
-          environmentName: 'web',
-          isBuild: true,
-          routeChunkConfig,
-        });
+        resourcePath: rootResourcePath,
+        environmentName: 'web',
+        isBuild: true,
+        routeChunkConfig,
+      });
 
-        expect(result).toEqual({
-          code: `export { HydrateFallback, clientLoader, default } from ${JSON.stringify(
-            `${rootResourcePath}?react-router-route`
-          )};`,
-        });
-        expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-      } finally {
-        getBundlerRouteAnalysis.mockRestore();
-      }
+      expect(result).toEqual({
+        code: `export { HydrateFallback, clientLoader, default } from ${JSON.stringify(
+          `${rootResourcePath}?react-router-route`
+        )};`,
+      });
     });
   });
 
   describe('createRouteChunkArtifact', () => {
     it('returns the disabled split-route empty snippet with a null map', async () => {
       await expect(
-        createRouteChunk(`export const clientLoader = async () => {};`, 'clientLoader', {
-          config: disabledRouteChunkConfig,
-          isBuild: true,
-        })
+        createRouteChunk(
+          `export const clientLoader = async () => {};`,
+          'clientLoader',
+          {
+            config: disabledRouteChunkConfig,
+            isBuild: true,
+          }
+        )
       ).resolves.toEqual({
         code: emptyRouteChunkSnippet('Split route modules disabled'),
         map: null,
@@ -177,25 +160,23 @@ describe('route artifact helpers', () => {
           routeChunkConfig,
           isBuild: true,
         })
-      ).rejects.toThrow(`Invalid route chunk name in "${resourcePath}?route-chunk=invalid"`);
+      ).rejects.toThrow(
+        `Invalid route chunk name in "${resourcePath}?route-chunk=invalid"`
+      );
     });
 
-    it('generates the same route chunk code as the existing transformed ESM path', async () => {
+    it('generates the expected route chunk code from source', async () => {
       const source = `
         export const clientAction = async () => {};
         export default function Route() { return null; }
       `;
       const cache: RouteChunkCache = new Map();
-      const analysis = await exportUtils.getBundlerRouteAnalysis(
-        source,
-        resourcePath
-      );
       const expectedCode = await getRouteChunkIfEnabled(
         cache,
         routeChunkConfig,
         resourcePath,
         'clientAction',
-        analysis.code
+        source
       );
 
       const result = await createRouteChunk(source, 'clientAction', { cache });

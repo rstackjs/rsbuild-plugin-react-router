@@ -1,4 +1,3 @@
-import { getDefaultConcurrency } from './concurrency.js';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
@@ -137,7 +136,7 @@ export const resolvePrerenderPaths = async (
 
 export const getPrerenderConcurrency = (
   prerender: PrerenderConfig,
-  cpuCount?: number
+  _cpuCount?: number
 ): number => {
   if (
     typeof prerender === 'object' &&
@@ -149,7 +148,9 @@ export const getPrerenderConcurrency = (
       return value;
     }
   }
-  return getDefaultConcurrency(cpuCount);
+  // Match React Router's default. Parallel prerendering can fan out loaders and
+  // external requests, so it must remain explicitly opt-in.
+  return 1;
 };
 
 const isValidPrerenderPathsConfig = (

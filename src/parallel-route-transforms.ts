@@ -1,6 +1,5 @@
 import { Worker } from 'node:worker_threads';
 import { setBoundedCacheEntry } from './bounded-cache.js';
-import { SERVER_ONLY_ROUTE_EXPORTS } from './constants.js';
 import { getDefaultConcurrency } from './concurrency.js';
 import {
   executeRouteTransformTask,
@@ -9,6 +8,11 @@ import {
   type RouteTransformTaskOptions,
 } from './route-transform-tasks.js';
 import type { PluginOptions } from './types.js';
+import type {
+  WorkerErrorPayload,
+  WorkerRequest,
+  WorkerResponse,
+} from './parallel-route-transform-protocol.js';
 
 export type ParallelTransformsConfig =
   NonNullable<PluginOptions['parallelTransforms']> extends infer Config
@@ -25,32 +29,6 @@ export type RouteTransformExecutor = {
   close: () => Promise<void>;
 };
 
-type WorkerResponse =
-  | {
-      id: number;
-      ok: true;
-      result: RouteTransformResult;
-    }
-  | {
-      id: number;
-      ok: false;
-      error: WorkerErrorPayload;
-    };
-
-type WorkerRequest = {
-  id: number;
-  task:
-    | RouteTransformTask
-    | (Omit<RouteTransformTask, 'code'> & { code?: string });
-  sourceCacheKey?: string;
-};
-
-type WorkerErrorPayload = {
-  name?: string;
-  message: string;
-  stack?: string;
-};
-
 type PendingTask = {
   resolve: (result: RouteTransformResult) => void;
   reject: (error: Error) => void;
@@ -63,11 +41,6 @@ type WorkerState = {
   startupError?: WorkerStartupError;
 };
 
-type RouteModuleResultCacheEntry = {
-  source: string;
-  result: Promise<RouteTransformResult>;
-};
-
 class WorkerStartupError extends Error {
   constructor(message: string) {
     super(message);
@@ -76,10 +49,15 @@ class WorkerStartupError extends Error {
 }
 
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
-const MAX_ROUTE_MODULE_RESULT_CACHE_ENTRIES = 2048;
+const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
+const DEFAULT_MAX_WORKERS = 8;
+const MAX_CONFIGURED_WORKERS = 32;
 
 export const getDefaultWorkerCount = (cpuCount?: number): number =>
-  getDefaultConcurrency(cpuCount);
+  Math.min(DEFAULT_MAX_WORKERS, getDefaultConcurrency(cpuCount));
+
+export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
+  routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
 
 const getConfiguredWorkerCount = (
   parallelTransforms: ParallelTransformsConfig
@@ -92,12 +70,17 @@ const getConfiguredWorkerCount = (
   if (configured === undefined) {
     return getDefaultWorkerCount();
   }
-  if (!Number.isFinite(configured) || configured < 1) {
+  if (!Number.isInteger(configured) || configured < 1) {
     throw new Error(
-      '[react-router] parallelTransforms.maxWorkers must be at least 1.'
+      '[react-router] parallelTransforms.maxWorkers must be a positive integer.'
     );
   }
-  return Math.floor(configured);
+  if (configured > MAX_CONFIGURED_WORKERS) {
+    throw new Error(
+      `[react-router] parallelTransforms.maxWorkers must not exceed ${MAX_CONFIGURED_WORKERS}.`
+    );
+  }
+  return configured;
 };
 
 const hashString = (value: string): number => {
@@ -123,43 +106,38 @@ const createWorkerUrl = (): URL =>
 const isWorkerStartupError = (error: unknown): error is WorkerStartupError =>
   error instanceof WorkerStartupError;
 
-const canShareRouteModuleBuildResult = (task: RouteTransformTask): boolean =>
-  task.kind === 'routeModule' &&
-  task.isBuild &&
-  task.ssr &&
-  !task.isSpaMode &&
-  !SERVER_ONLY_ROUTE_EXPORTS.some(exportName => task.code.includes(exportName));
-
 class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #closed = false;
+  #closePromise: Promise<void> | undefined;
+  #workersDisabled = false;
   #nextId = 1;
   #nextRouteModuleWorkerIndex = 0;
   #nextSplitRouteAnalysisWorkerIndex = 0;
-  #routeModuleResultCache = new Map<string, RouteModuleResultCacheEntry>();
   #splitRouteAnalysisWorkers = new Map<string, number>();
   #workers: WorkerState[];
 
   constructor(
     workerCount: number,
     private readonly options: RouteTransformTaskOptions,
-    private readonly balanceRouteModuleTransforms: boolean,
-    private readonly shareRouteModuleBuildResults: boolean
+    private readonly balanceRouteModuleTransforms: boolean
   ) {
-    this.#workers = Array.from({ length: workerCount }, () =>
-      this.#createWorkerState()
-    );
+    this.#workers = [];
+    try {
+      for (let index = 0; index < workerCount; index += 1) {
+        this.#workers.push(this.#createWorkerState());
+      }
+    } catch (error) {
+      for (const state of this.#workers) {
+        void state.worker.terminate();
+      }
+      this.#workers = [];
+      throw error;
+    }
   }
 
   async run(task: RouteTransformTask): Promise<RouteTransformResult> {
     if (this.#closed) {
       return executeRouteTransformTask(task, this.options);
-    }
-
-    if (
-      this.shareRouteModuleBuildResults &&
-      canShareRouteModuleBuildResult(task)
-    ) {
-      return this.#runCachedRouteModuleBuildTask(task);
     }
 
     try {
@@ -172,14 +150,14 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     }
   }
 
-  async close(): Promise<void> {
-    if (this.#closed) {
-      return;
+  close(): Promise<void> {
+    if (this.#closePromise) {
+      return this.#closePromise;
     }
     this.#closed = true;
     const workers = this.#workers;
     this.#workers = [];
-    await Promise.all(
+    this.#closePromise = Promise.all(
       workers.map(async state => {
         for (const pending of state.pending.values()) {
           pending.reject(new Error('Route transform worker closed.'));
@@ -187,7 +165,25 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
         state.pending.clear();
         await state.worker.terminate();
       })
-    );
+    ).then(() => undefined);
+    return this.#closePromise;
+  }
+
+  #disableWorkers(error: WorkerStartupError): void {
+    if (this.#workersDisabled || this.#closed) {
+      return;
+    }
+    this.#workersDisabled = true;
+    const workers = this.#workers;
+    this.#workers = [];
+    for (const state of workers) {
+      state.startupError = error;
+      for (const pending of state.pending.values()) {
+        pending.reject(error);
+      }
+      state.pending.clear();
+      void state.worker.terminate();
+    }
   }
 
   #createWorkerState(): WorkerState {
@@ -214,58 +210,20 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     worker.on('error', (error: Error) => {
       const startupError = new WorkerStartupError(error.message);
       startupError.stack = error.stack;
-      state.startupError = startupError;
-      for (const pending of state.pending.values()) {
-        pending.reject(startupError);
-      }
-      state.pending.clear();
+      this.#disableWorkers(startupError);
     });
 
     worker.on('exit', code => {
-      if (this.#closed || code === 0) {
+      if (this.#closed || this.#workersDisabled) {
         return;
       }
       const startupError = new WorkerStartupError(
         `Route transform worker exited with code ${code}.`
       );
-      state.startupError = startupError;
-      for (const pending of state.pending.values()) {
-        pending.reject(startupError);
-      }
-      state.pending.clear();
+      this.#disableWorkers(startupError);
     });
 
     return state;
-  }
-
-  #runCachedRouteModuleBuildTask(
-    task: RouteTransformTask
-  ): Promise<RouteTransformResult> {
-    const cacheKey = task.resourcePath;
-    const cached = this.#routeModuleResultCache.get(cacheKey);
-    if (cached?.source === task.code) {
-      return cached.result;
-    }
-
-    const result = this.#runInWorker(task).catch(error => {
-      if (this.#routeModuleResultCache.get(cacheKey)?.result === result) {
-        this.#routeModuleResultCache.delete(cacheKey);
-      }
-      if (isWorkerStartupError(error)) {
-        return executeRouteTransformTask(task, this.options);
-      }
-      throw error;
-    });
-    setBoundedCacheEntry(
-      this.#routeModuleResultCache,
-      cacheKey,
-      {
-        source: task.code,
-        result,
-      },
-      MAX_ROUTE_MODULE_RESULT_CACHE_ENTRIES
-    );
-    return result;
   }
 
   #runInWorker(task: RouteTransformTask): Promise<RouteTransformResult> {
@@ -287,11 +245,19 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     );
     return new Promise((resolve, reject) => {
       state.pending.set(id, { resolve, reject });
-      state.worker.postMessage({
-        id,
-        task: requestTask,
-        sourceCacheKey,
-      } satisfies WorkerRequest);
+      try {
+        state.worker.postMessage({
+          id,
+          task: requestTask,
+          sourceCacheKey,
+        } satisfies WorkerRequest);
+      } catch (error) {
+        state.pending.delete(id);
+        // The worker may not have received the source update. Force the next
+        // request for this module to send its full source again.
+        state.sourceCache.delete(sourceCacheKey);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 
@@ -353,7 +319,7 @@ export const createRouteTransformExecutor = ({
   splitRouteModules,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
   const options = { routeChunkCache };
-  const effectiveParallelTransforms = parallelTransforms ?? true;
+  const effectiveParallelTransforms = parallelTransforms ?? false;
   if (!effectiveParallelTransforms) {
     return {
       run: task => executeRouteTransformTask(task, options),
@@ -372,7 +338,6 @@ export const createRouteTransformExecutor = ({
   return new ParallelRouteTransformExecutor(
     workerCount,
     options,
-    Boolean(splitRouteModules),
     Boolean(splitRouteModules)
   );
 };

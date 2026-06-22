@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,20 +15,28 @@ const restartMarkerPath = join(
   __dirname,
   '../../build/client/.react-router/route-watch'
 );
-const routesConfigPath = join(appDirectory, 'routes.ts');
+const devRoutesConfigPath = join(appDirectory, 'dev-routes.ts');
 const addedRoutePath = join(appDirectory, 'routes/dev-added-route.tsx');
 const addedRouteUrl = '/dev-added-route';
 const addedRouteText = 'Route added while dev server is running';
 const editedAddedRouteText = 'Route edited without dev server restart';
-const addedRouteConfigEntry = `  route('dev-added-route', 'routes/dev-added-route.tsx'),`;
+const emptyDevRoutesConfig = `import type { RouteConfig } from '@react-router/dev/routes';
+
+// Kept separate so the dev-route-watch E2E covers route-config dependencies,
+// not the direct reload-server watch on app/routes.ts.
+export default [] satisfies RouteConfig;
+`;
+const populatedDevRoutesConfig = `import { route, type RouteConfig } from '@react-router/dev/routes';
+
+export default [
+  route('dev-added-route', 'routes/dev-added-route.tsx'),
+] satisfies RouteConfig;
+`;
 
 const removeAddedRouteConfig = (): boolean => {
-  const routesConfig = readFileSync(routesConfigPath, 'utf8');
-  if (routesConfig.includes(addedRouteConfigEntry)) {
-    writeFileSync(
-      routesConfigPath,
-      routesConfig.replace(`${addedRouteConfigEntry}\n\n`, '')
-    );
+  const routesConfig = readFileSync(devRoutesConfigPath, 'utf8');
+  if (routesConfig !== emptyDevRoutesConfig) {
+    writeFileSync(devRoutesConfigPath, emptyDevRoutesConfig);
     return true;
   }
   return false;
@@ -36,10 +50,20 @@ const removeAddedRouteFile = (): boolean => {
   return false;
 };
 
-const readRestartMarker = (): string | null =>
-  existsSync(restartMarkerPath)
-    ? readFileSync(restartMarkerPath, 'utf8')
-    : null;
+const readRestartMarkerVersion = (): string | null => {
+  try {
+    if (!existsSync(restartMarkerPath)) {
+      return null;
+    }
+    const { mtimeNs } = statSync(restartMarkerPath, { bigint: true });
+    return `${readFileSync(restartMarkerPath, 'utf8')}:${mtimeNs}`;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+};
 
 const expectRestartMarkerStable = async (
   expectedMarker: string | null,
@@ -49,7 +73,7 @@ const expectRestartMarkerStable = async (
   await expect
     .poll(
       () => {
-        const marker = readRestartMarker();
+        const marker = readRestartMarkerVersion();
         if (marker !== expectedMarker) {
           return `changed:${marker ?? 'missing'}`;
         }
@@ -60,11 +84,7 @@ const expectRestartMarkerStable = async (
     .toBe('stable');
 };
 
-const waitForRouteText = async (
-  page: Page,
-  url: string,
-  text: string
-) => {
+const waitForRouteText = async (page: Page, url: string, text: string) => {
   await expect
     .poll(
       async () => {
@@ -86,25 +106,37 @@ const waitForRouteText = async (
     .toBe('ready');
 };
 
+const waitForRouteToBeRemoved = async (page: Page, url: string) => {
+  await expect
+    .poll(
+      async () => {
+        try {
+          const response = await page.request.get(url, { timeout: 2000 });
+          return response.status() === 404 ? 'removed' : response.status();
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+      },
+      { timeout: 60000 }
+    )
+    .toBe('removed');
+};
+
 test.describe('dev route watch', () => {
   test.setTimeout(90000);
 
   test.beforeEach(async ({ page }) => {
     if (removeAddedRouteConfig()) {
-      await waitForRouteText(page, '/', 'Welcome to React Router');
+      await waitForRouteToBeRemoved(page, addedRouteUrl);
     }
-    if (removeAddedRouteFile()) {
-      await waitForRouteText(page, '/', 'Welcome to React Router');
-    }
+    removeAddedRouteFile();
   });
 
   test.afterEach(async ({ page }) => {
     if (removeAddedRouteConfig()) {
-      await waitForRouteText(page, '/', 'Welcome to React Router');
+      await waitForRouteToBeRemoved(page, addedRouteUrl);
     }
-    if (removeAddedRouteFile()) {
-      await waitForRouteText(page, '/', 'Welcome to React Router');
-    }
+    removeAddedRouteFile();
   });
 
   test('serves a route added after the dev server starts without restarting on later edits', async ({
@@ -112,6 +144,7 @@ test.describe('dev route watch', () => {
   }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Welcome to React Router');
+    const restartMarkerBeforeAdd = readRestartMarkerVersion();
 
     writeFileSync(
       addedRoutePath,
@@ -121,22 +154,17 @@ test.describe('dev route watch', () => {
 `
     );
 
-    const routesConfig = readFileSync(routesConfigPath, 'utf8');
-    writeFileSync(
-      routesConfigPath,
-      routesConfig.replace(
-        '  // Docs section with nested routes',
-        `${addedRouteConfigEntry}\n\n  // Docs section with nested routes`
-      )
-    );
+    writeFileSync(devRoutesConfigPath, populatedDevRoutesConfig);
 
     await waitForRouteText(page, addedRouteUrl, addedRouteText);
 
     await page.goto(addedRouteUrl);
     await expect(page.locator('h1')).toHaveText(addedRouteText);
 
-    await expect.poll(readRestartMarker, { timeout: 10000 }).not.toBe(null);
-    const restartMarkerBefore = readRestartMarker();
+    await expect
+      .poll(readRestartMarkerVersion, { timeout: 10000 })
+      .not.toBe(restartMarkerBeforeAdd);
+    const restartMarkerBefore = readRestartMarkerVersion();
     writeFileSync(
       addedRoutePath,
       `export default function DevAddedRoute() {

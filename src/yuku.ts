@@ -5,15 +5,17 @@ import {
   type ParseResult,
 } from 'yuku-parser';
 import type { Rspack } from '@rsbuild/core';
-import { strip } from 'yuku-codegen';
+import { print } from 'yuku-codegen';
 
 export const parse = (
   code: string,
   options: ParseOptions = {}
 ): ParseResult => {
   const result = yukuParse(code, {
+    ...options,
     sourceType: options.sourceType ?? 'module',
     lang: options.lang ?? 'tsx',
+    attachComments: options.attachComments ?? true,
   });
   const errors = result.diagnostics.filter(
     diagnostic => diagnostic.severity === 'error'
@@ -35,8 +37,8 @@ export const generate = (
   } = {}
 ): { code: string; map: Rspack.RawSourceMap | null } => {
   const result = 'program' in ast ? ast : { program: ast, lineStarts: [] };
-  const generated = strip(result.program as Parameters<typeof strip>[0], {
-    comments: 'some',
+  const generated = print(result.program as Parameters<typeof print>[0], {
+    comments: true,
     sourceMaps: options.sourceMaps
       ? {
           lineStarts: result.lineStarts,
@@ -45,6 +47,9 @@ export const generate = (
         }
       : undefined,
   });
+  if (generated.errors.length > 0) {
+    throw new Error(generated.errors.map(error => error.message).join('\n'));
+  }
   const map = generated.map
     ? {
         ...generated.map,
@@ -59,5 +64,4 @@ export const generate = (
   return { code: generated.code, map };
 };
 
-export const t = {};
 export type { ParseResult };

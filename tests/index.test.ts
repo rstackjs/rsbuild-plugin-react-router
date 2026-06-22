@@ -41,6 +41,12 @@ describe('pluginReactRouter', () => {
           type: 'reload-server',
         },
         {
+          paths: expect.stringMatching(
+            /react-router\.config\.[cm]?[jt]sx?$/
+          ),
+          type: 'reload-server',
+        },
+        {
           paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
           type: 'reload-server',
         },
@@ -52,51 +58,6 @@ describe('pluginReactRouter', () => {
         },
       ])
     );
-  });
-
-  it('emits the route restart marker as a web build asset', async () => {
-    const rsbuild = await createStubRsbuild({
-      action: 'build',
-      rsbuildConfig: {},
-    });
-
-    rsbuild.addPlugins([pluginReactRouter()]);
-    await rsbuild.unwrapConfig();
-
-    const processAssetsCall = rsbuild.processAssets.mock.calls.find(
-      ([options]) =>
-        options.stage === 'additional' && options.targets?.includes('web')
-    );
-    expect(processAssetsCall).toBeDefined();
-
-    const handler = processAssetsCall?.[1];
-    const emitAsset = rstest.fn();
-    const updateAsset = rstest.fn();
-    const RawSource = class {
-      constructor(private readonly content: string) {}
-      source() {
-        return this.content;
-      }
-      size() {
-        return this.content.length;
-      }
-    };
-
-    handler({
-      sources: { RawSource },
-      compilation: {
-        getAsset: rstest.fn().mockReturnValue(undefined),
-        emitAsset,
-        updateAsset,
-      },
-    });
-
-    expect(emitAsset).toHaveBeenCalledWith(
-      '.react-router/route-watch',
-      expect.any(RawSource)
-    );
-    expect(emitAsset.mock.calls[0][1].source()).not.toBe('');
-    expect(updateAsset).not.toHaveBeenCalled();
   });
 
   it('should respect server output format', async () => {

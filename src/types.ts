@@ -45,13 +45,22 @@ export type PluginOptions = {
   /**
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
-   * @default true, using `available CPUs - 2` workers.
+   * @default Automatically enabled for 256+ resolved routes. The automatic
+   * pool is capped at 8 workers.
    */
   parallelTransforms?:
     | boolean
     | {
         maxWorkers?: number;
       };
+
+  /**
+   * Called when the route graph changes during development.
+   * Programmatic/custom servers can use this to recreate their Rsbuild server;
+   * the CLI uses its built-in reload-server watcher when this is omitted. This
+   * notification is not awaited, so it may safely close the current server.
+   */
+  onRouteTopologyChange?: () => void | Promise<void>;
 };
 
 export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {

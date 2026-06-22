@@ -5,6 +5,7 @@ import {
   prefix,
   route,
 } from '@react-router/dev/routes';
+import devRoutes from './dev-routes';
 
 export default [
   // Index route for the home page
@@ -18,6 +19,8 @@ export default [
 
   // Client loader/action example
   route('client-features', 'routes/client-features.tsx'),
+
+  ...devRoutes,
 
   // Docs section with nested routes
   ...prefix('docs', [

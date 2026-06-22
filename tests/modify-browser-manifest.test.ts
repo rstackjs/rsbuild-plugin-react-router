@@ -25,6 +25,46 @@ const createAsset = (source: string) => ({
 });
 
 describe('modify browser manifest plugin', () => {
+  it('rejects the promise hook when build route analysis fails', async () => {
+    const { root, appDir } = createTempApp();
+    writeFileSync(join(appDir, 'routes/page.tsx'), 'export const = broken;');
+    const routes = {
+      root: { id: 'root', file: 'root.tsx', path: '' },
+      'routes/page': {
+        id: 'routes/page',
+        parentId: 'root',
+        file: 'routes/page.tsx',
+        path: 'page',
+      },
+    };
+    let emit: ((compilation: unknown) => Promise<void>) | undefined;
+    const compiler = {
+      hooks: {
+        emit: {
+          tapPromise(_name: string, callback: typeof emit) {
+            emit = callback;
+          },
+        },
+      },
+    };
+
+    try {
+      createModifyBrowserManifestPlugin(routes, {}, appDir, '/', {
+        isBuild: true,
+      }).apply(compiler as never);
+
+      expect(emit).toBeDefined();
+      await expect(
+        emit?.({
+          namedChunks: new Map(),
+          assets: {},
+        })
+      ).rejects.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not read ignored chunk files while creating manifest stats', async () => {
     const { root, appDir } = createTempApp();
     const routes = {
@@ -36,13 +76,11 @@ describe('modify browser manifest plugin', () => {
         path: 'page',
       },
     };
-    let emit:
-      | ((compilation: unknown, callback: (error?: Error) => void) => void)
-      | undefined;
+    let emit: ((compilation: unknown) => Promise<void>) | undefined;
     const compiler = {
       hooks: {
         emit: {
-          tapAsync(_name: string, callback: typeof emit) {
+          tapPromise(_name: string, callback: typeof emit) {
             emit = callback;
           },
         },
@@ -61,35 +99,18 @@ describe('modify browser manifest plugin', () => {
         },
       });
 
-      await new Promise<void>((resolve, reject) => {
-        emit?.(
-          {
-            namedChunks: new Map([
-              [
-                'entry.client',
-                { files: new Set(['static/js/entry.client.js']) },
-              ],
-              ['root', { files: new Set(['static/js/root.js']) }],
-              [
-                'routes/page',
-                { files: new Set(['static/js/routes/page.js']) },
-              ],
-              ['vendor', ignoredChunk],
-            ]),
-            assets: {
-              'static/js/virtual/react-router/browser-manifest.js': createAsset(
-                'window.__reactRouterManifest="PLACEHOLDER";'
-              ),
-            },
-          },
-          error => {
-            if (error) {
-              reject(error);
-              return;
-            }
-            resolve();
-          }
-        );
+      await emit?.({
+        namedChunks: new Map([
+          ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+          ['root', { files: new Set(['static/js/root.js']) }],
+          ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
+          ['vendor', ignoredChunk],
+        ]),
+        assets: {
+          'static/js/virtual/react-router/browser-manifest.js': createAsset(
+            'window.__reactRouterManifest="PLACEHOLDER";'
+          ),
+        },
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -107,13 +128,11 @@ describe('modify browser manifest plugin', () => {
         path: 'page',
       },
     };
-    let emit:
-      | ((compilation: unknown, callback: (error?: Error) => void) => void)
-      | undefined;
+    let emit: ((compilation: unknown) => Promise<void>) | undefined;
     const compiler = {
       hooks: {
         emit: {
-          tapAsync(_name: string, callback: typeof emit) {
+          tapPromise(_name: string, callback: typeof emit) {
             emit = callback;
           },
         },
@@ -132,11 +151,7 @@ describe('modify browser manifest plugin', () => {
           isBuild: true,
         },
         {
-          manifestChunkNames: new Set([
-            'entry.client',
-            'root',
-            'routes/page',
-          ]),
+          manifestChunkNames: new Set(['entry.client', 'root', 'routes/page']),
         }
       ).apply(compiler as never);
 
@@ -147,35 +162,18 @@ describe('modify browser manifest plugin', () => {
         },
       });
 
-      await new Promise<void>((resolve, reject) => {
-        emit?.(
-          {
-            namedChunks: new Map([
-              [
-                'entry.client',
-                { files: new Set(['static/js/entry.client.js']) },
-              ],
-              ['root', { files: new Set(['static/js/root.js']) }],
-              [
-                'routes/page',
-                { files: new Set(['static/js/routes/page.js']) },
-              ],
-              ['routes/page-client-loader', theoreticalSplitChunk],
-            ]),
-            assets: {
-              'static/js/virtual/react-router/browser-manifest.js': createAsset(
-                'window.__reactRouterManifest="PLACEHOLDER";'
-              ),
-            },
-          },
-          error => {
-            if (error) {
-              reject(error);
-              return;
-            }
-            resolve();
-          }
-        );
+      await emit?.({
+        namedChunks: new Map([
+          ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+          ['root', { files: new Set(['static/js/root.js']) }],
+          ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
+          ['routes/page-client-loader', theoreticalSplitChunk],
+        ]),
+        assets: {
+          'static/js/virtual/react-router/browser-manifest.js': createAsset(
+            'window.__reactRouterManifest="PLACEHOLDER";'
+          ),
+        },
       });
     } finally {
       rmSync(root, { recursive: true, force: true });

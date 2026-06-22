@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
-import { generate, parse } from '../src/babel';
+import { generate, parse } from '../src/yuku';
 import {
   combineURLs,
   stripFileExtension,
@@ -131,13 +131,35 @@ describe('plugin-utils', () => {
   });
 
   describe('transformRoute', () => {
+    it('preserves bundler directives while transforming routes', () => {
+      const result = transformRouteCode(`
+        export default function Route() {
+          return import(/* webpackChunkName: "route-data" */ './data');
+        }
+      `);
+
+      expect(result).toContain('webpackChunkName');
+    });
+
+    it('preserves named default class bindings', () => {
+      const result = transformRouteCode(`
+        export default class Route {}
+        Route.displayName = 'Route';
+      `);
+
+      expect(result).toMatch(/class Route/);
+      expect(result).toMatch(/export default _withComponentProps\(Route\)/);
+      expect(result).toContain(`Route.displayName = 'Route'`);
+    });
+
     it('wraps default class exports with component props', () => {
       const result = transformRouteCode(`
         export default class Route {}
       `);
 
       expect(result).toContain('withComponentProps');
-      expect(result).toMatch(/export default _withComponentProps\(class Route/);
+      expect(result).toMatch(/class Route/);
+      expect(result).toMatch(/export default _withComponentProps\(Route\)/);
     });
 
     it('wraps named class component exports', () => {
@@ -166,6 +188,30 @@ describe('plugin-utils', () => {
       expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
     });
 
+    it('wraps component exports re-exported from another module', () => {
+      const result = transformRouteCode(`
+        export { Boundary as ErrorBoundary } from './boundary';
+      `);
+
+      expect(result).toMatch(
+        /import \{ Boundary as _ErrorBoundarySource \} from ["']\.\/boundary["']/
+      );
+      expect(result).toMatch(
+        /const _ErrorBoundary = _withErrorBoundaryProps\(_ErrorBoundarySource\)/
+      );
+      expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
+    });
+
+    it('does not turn type-only exports into runtime component wrappers', () => {
+      const result = transformRouteCode(`
+        type Boundary = { message: string };
+        export type { Boundary as ErrorBoundary };
+      `);
+
+      expect(result).not.toContain('withErrorBoundaryProps');
+      expect(result).not.toContain('const _ErrorBoundary');
+    });
+
     it('avoids top-level generated helper name collisions', () => {
       const result = transformRouteCode(`
         const _withComponentProps = 'reserved';
@@ -185,7 +231,8 @@ describe('plugin-utils', () => {
       `);
 
       expect(result).toContain('withComponentProps as _withComponentProps');
-      expect(result).toContain('export default _withComponentProps(function Route');
+      expect(result).toContain('function Route');
+      expect(result).toContain('export default _withComponentProps(Route)');
       expect(result).not.toContain('_withComponentProps2');
     });
 
@@ -200,5 +247,4 @@ describe('plugin-utils', () => {
       expect(result).not.toContain('_withComponentProps2');
     });
   });
-
 });

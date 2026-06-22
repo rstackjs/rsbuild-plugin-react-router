@@ -146,14 +146,10 @@ export const createReactRouterManifestStats = (
 
 export type RouteManifestModuleExports = Record<string, readonly string[]>;
 
-const routeManifestModuleExports = new WeakMap<
-  ReactRouterManifestForDev,
-  RouteManifestModuleExports
->();
-
-export const getRouteManifestModuleExports = (
-  manifest: ReactRouterManifestForDev
-): RouteManifestModuleExports => routeManifestModuleExports.get(manifest) ?? {};
+export type ReactRouterManifestGenerationResult = {
+  manifest: ReactRouterManifestForDev;
+  moduleExportsByRouteId: RouteManifestModuleExports;
+};
 
 const DEFAULT_MANIFEST_DIR = 'static/js';
 
@@ -216,7 +212,7 @@ export const getReactRouterManifestChunkNames = (
   return chunkNames;
 };
 
-export async function getReactRouterManifestForDev(
+export async function generateReactRouterManifestForDev(
   routes: Record<string, Route>,
   //@ts-ignore
   options: PluginOptions,
@@ -224,7 +220,7 @@ export async function getReactRouterManifestForDev(
   context: string,
   assetPrefix = '/',
   routeChunkOptions?: RouteChunkManifestOptions
-): Promise<ReactRouterManifestForDev> {
+): Promise<ReactRouterManifestGenerationResult> {
   const result: Record<string, RouteManifestItem> = {};
   const splitRouteModules = routeChunkOptions?.splitRouteModules ?? false;
   const enforceSplitRouteModules = splitRouteModules === 'enforce';
@@ -395,6 +391,14 @@ export async function getReactRouterManifestForDev(
     routes: result,
   };
 
-  routeManifestModuleExports.set(manifest, routeModuleExportsByRouteId);
-  return manifest;
+  return {
+    manifest,
+    moduleExportsByRouteId: routeModuleExportsByRouteId,
+  };
+}
+
+export async function getReactRouterManifestForDev(
+  ...args: Parameters<typeof generateReactRouterManifestForDev>
+): Promise<ReactRouterManifestForDev> {
+  return (await generateReactRouterManifestForDev(...args)).manifest;
 }

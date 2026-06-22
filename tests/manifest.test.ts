@@ -5,9 +5,9 @@ import { describe, expect, it } from '@rstest/core';
 import {
   createReactRouterManifestStats,
   configRoutesToRouteManifest,
+  generateReactRouterManifestForDev,
   getReactRouterManifestForDev,
   getReactRouterManifestChunkNames,
-  getRouteManifestModuleExports,
 } from '../src/manifest';
 
 const createTempApp = (routeCode: string) => {
@@ -332,25 +332,26 @@ describe('manifest', () => {
       export default function Page() { return null; }
     `);
     try {
-      const manifest = await getReactRouterManifestForDev(
-        routes,
-        {},
-        clientStats,
-        appDir,
-        '/',
-        {
-          isBuild: true,
-          rootRouteFile: 'root.tsx',
-          splitRouteModules: false,
-        }
-      );
+      const { manifest, moduleExportsByRouteId } =
+        await generateReactRouterManifestForDev(
+          routes,
+          {},
+          clientStats,
+          appDir,
+          '/',
+          {
+            isBuild: true,
+            rootRouteFile: 'root.tsx',
+            splitRouteModules: false,
+          }
+        );
 
       const routeManifest = manifest.routes['routes/page'];
       expect(routeManifest).toMatchObject({
         hasAction: true,
         hasLoader: true,
       });
-      expect(getRouteManifestModuleExports(manifest)['routes/page']).toEqual(
+      expect(moduleExportsByRouteId['routes/page']).toEqual(
         expect.arrayContaining(['headers', 'action', 'loader', 'default'])
       );
       expect(routeManifest).not.toHaveProperty('headers');

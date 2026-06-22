@@ -1,38 +1,10 @@
 import { readFile, stat } from 'node:fs/promises';
-import { strip } from 'yuku-codegen';
 import { langFromPath, parse } from 'yuku-parser';
 import { setBoundedCacheEntry } from './bounded-cache.js';
-import {
-  detectRouteChunksIfEnabled,
-  type RouteChunkCache,
-  type RouteChunkConfig,
-  type RouteChunkInfo,
-} from './route-chunks.js';
-
-type TransformCacheEntry = {
-  source: string;
-  transformed: Promise<TransformedModule>;
-};
 
 type ExportInfo = {
   readonly exportNames: readonly string[];
   readonly exportAllModules: readonly string[];
-};
-
-type TransformedModule = ExportInfo & {
-  readonly code: string;
-};
-
-export type BundlerRouteAnalysis = TransformedModule & {
-  getRouteChunkInfo: (
-    cache: RouteChunkCache | undefined,
-    config: RouteChunkConfig
-  ) => Promise<RouteChunkInfo>;
-};
-
-type BundlerRouteAnalysisCacheEntry = {
-  source: string;
-  analysis: Promise<BundlerRouteAnalysis>;
 };
 
 type RouteModuleAnalysis = {
@@ -47,12 +19,7 @@ type RouteModuleAnalysisCacheEntry = {
   analysis: Promise<RouteModuleAnalysis>;
 };
 
-const transformCache = new Map<string, TransformCacheEntry>();
 const exportInfoCache = new Map<string, Promise<ExportInfo>>();
-const bundlerRouteAnalysisCache = new Map<
-  string,
-  BundlerRouteAnalysisCacheEntry
->();
 const routeModuleAnalysisCache = new Map<
   string,
   RouteModuleAnalysisCacheEntry
@@ -70,9 +37,6 @@ const cachePromiseOnReject = <T>(
     invalidate();
     throw error;
   });
-
-const getRouteChunkConfigCacheKey = (config: RouteChunkConfig) =>
-  `${String(config.splitRouteModules ?? false)}\0${config.appDirectory}\0${config.rootRouteFile}`;
 
 const parseProgram = (code: string, resourcePath?: string) => {
   const result = parse(code, {
@@ -217,124 +181,10 @@ const collectExportAllModules = (program: AnyNode): string[] => {
   return modules;
 };
 
-const getTransformedModule = async (
-  code: string,
-  resourcePath: string
-): Promise<TransformedModule> => {
-  const cached = transformCache.get(resourcePath);
-  if (cached?.source === code) {
-    return cached.transformed;
-  }
-
-  let transformed: Promise<TransformedModule>;
-  transformed = cachePromiseOnReject(
-    (async () => {
-      const program = parseProgram(code, resourcePath);
-      const stripped = strip(program, { comments: 'some' });
-      if (stripped.errors.length > 0) {
-        throw new Error(stripped.errors.map(error => error.message).join('\n'));
-      }
-      return {
-        code: stripped.code,
-        exportNames: collectProgramExportNames(program),
-        exportAllModules: collectExportAllModules(program),
-      };
-    })(),
-    () => {
-      if (transformCache.get(resourcePath)?.transformed === transformed) {
-        transformCache.delete(resourcePath);
-      }
-    }
-  );
-
-  setBoundedCacheEntry(
-    transformCache,
-    resourcePath,
-    {
-      source: code,
-      transformed,
-    },
-    MAX_EXPORT_UTILS_CACHE_ENTRIES
-  );
-  return transformed;
-};
-
-export const transformToEsm = async (
-  code: string,
-  resourcePath: string
-): Promise<string> => (await getTransformedModule(code, resourcePath)).code;
-
 export const getExportNames = async (
   code: string
 ): Promise<readonly string[]> => {
   return (await getExportNamesAndExportAll(code)).exportNames;
-};
-
-export const getBundlerRouteAnalysis = async (
-  source: string,
-  resourcePath: string
-): Promise<BundlerRouteAnalysis> => {
-  const cached = bundlerRouteAnalysisCache.get(resourcePath);
-  if (cached?.source === source) {
-    return cached.analysis;
-  }
-
-  const analysis = (async () => {
-    const program = parseProgram(source, resourcePath);
-    const sourceInfo: TransformedModule = {
-      code: source,
-      exportNames: collectProgramExportNames(program),
-      exportAllModules: collectExportAllModules(program),
-    };
-    const routeChunkInfoCache = new Map<string, Promise<RouteChunkInfo>>();
-
-    return {
-      ...sourceInfo,
-      getRouteChunkInfo: (
-        cache: RouteChunkCache | undefined,
-        config: RouteChunkConfig
-      ) => {
-        const cacheKey = getRouteChunkConfigCacheKey(config);
-        const cachedRouteChunkInfo = routeChunkInfoCache.get(cacheKey);
-        if (cachedRouteChunkInfo) {
-          return cachedRouteChunkInfo;
-        }
-
-        let routeChunkInfo: Promise<RouteChunkInfo>;
-        routeChunkInfo = cachePromiseOnReject(
-          detectRouteChunksIfEnabled(cache, config, resourcePath, source),
-          () => {
-            if (routeChunkInfoCache.get(cacheKey) === routeChunkInfo) {
-              routeChunkInfoCache.delete(cacheKey);
-            }
-          }
-        );
-
-        routeChunkInfoCache.set(cacheKey, routeChunkInfo);
-        return routeChunkInfo;
-      },
-    };
-  })();
-
-  let trackedAnalysis: Promise<BundlerRouteAnalysis>;
-  trackedAnalysis = cachePromiseOnReject(analysis, () => {
-    if (
-      bundlerRouteAnalysisCache.get(resourcePath)?.analysis === trackedAnalysis
-    ) {
-      bundlerRouteAnalysisCache.delete(resourcePath);
-    }
-  });
-
-  setBoundedCacheEntry(
-    bundlerRouteAnalysisCache,
-    resourcePath,
-    {
-      source,
-      analysis: trackedAnalysis,
-    },
-    MAX_EXPORT_UTILS_CACHE_ENTRIES
-  );
-  return trackedAnalysis;
 };
 
 export const getExportNamesAndExportAll = async (
@@ -380,11 +230,11 @@ export const getRouteModuleAnalysis = async (
 
   const analysis = (async () => {
     const source = await readFile(resourcePath, 'utf8');
-    const transformed = await getTransformedModule(source, resourcePath);
+    const program = parseProgram(source, resourcePath);
     return {
-      code: transformed.code,
-      exports: transformed.exportNames,
-      exportAllModules: transformed.exportAllModules,
+      code: source,
+      exports: collectProgramExportNames(program),
+      exportAllModules: collectExportAllModules(program),
     };
   })();
 

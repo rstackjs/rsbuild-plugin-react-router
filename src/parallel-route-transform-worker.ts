@@ -2,37 +2,13 @@ import { parentPort } from 'node:worker_threads';
 import { setBoundedCacheEntry } from './bounded-cache.js';
 import {
   executeRouteTransformTask,
-  type RouteTransformResult,
   type RouteTransformTask,
 } from './route-transform-tasks.js';
-
-type CachedRouteTransformTask = Omit<RouteTransformTask, 'code'> & {
-  code?: string;
-};
-
-type WorkerRequest = {
-  id: number;
-  task: RouteTransformTask | CachedRouteTransformTask;
-  sourceCacheKey?: string;
-};
-
-type WorkerErrorPayload = {
-  name?: string;
-  message: string;
-  stack?: string;
-};
-
-type WorkerResponse =
-  | {
-      id: number;
-      ok: true;
-      result: RouteTransformResult;
-    }
-  | {
-      id: number;
-      ok: false;
-      error: WorkerErrorPayload;
-    };
+import type {
+  WorkerErrorPayload,
+  WorkerRequest,
+  WorkerResponse,
+} from './parallel-route-transform-protocol.js';
 
 const serializeError = (error: unknown): WorkerErrorPayload => {
   if (error instanceof Error) {
