@@ -60,6 +60,42 @@ describe('pluginReactRouter', () => {
     );
   });
 
+  it('watches all supported config filenames when the config does not exist yet', async () => {
+    const existsSyncMock = fs.existsSync as unknown as {
+      mockImplementation: (implementation: (path: unknown) => boolean) => void;
+      mockReturnValue: (value: boolean) => void;
+    };
+    existsSyncMock.mockImplementation(
+      path => !String(path).includes('react-router.config')
+    );
+
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+      const configWatch = config.dev.watchFiles.find(
+        (watchFile: { paths: unknown }) => Array.isArray(watchFile.paths)
+      );
+
+      expect(configWatch).toMatchObject({
+        paths: expect.arrayContaining([
+          expect.stringMatching(/react-router\.config\.tsx$/),
+          expect.stringMatching(/react-router\.config\.ts$/),
+          expect.stringMatching(/react-router\.config\.jsx$/),
+          expect.stringMatching(/react-router\.config\.js$/),
+          expect.stringMatching(/react-router\.config\.mjs$/),
+          expect.stringMatching(/react-router\.config\.mts$/),
+        ]),
+        type: 'reload-server',
+      });
+    } finally {
+      existsSyncMock.mockReturnValue(true);
+    }
+  });
+
   it('should respect server output format', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},

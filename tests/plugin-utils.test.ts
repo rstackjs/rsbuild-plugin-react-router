@@ -202,6 +202,19 @@ describe('plugin-utils', () => {
       expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
     });
 
+    it('preserves side-effect import order before wrapped source re-exports', () => {
+      const result = transformRouteCode(`
+        import './setup';
+        export { Boundary as ErrorBoundary } from './boundary';
+      `);
+
+      expect(result.indexOf("import './setup'")).toBeLessThan(
+        result.search(
+          /import\s*\{\s*Boundary as _ErrorBoundarySource\s*\}\s*from ['"]\.\/boundary['"]/
+        )
+      );
+    });
+
     it('does not turn type-only exports into runtime component wrappers', () => {
       const result = transformRouteCode(`
         type Boundary = { message: string };

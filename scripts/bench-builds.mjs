@@ -99,7 +99,10 @@ const parseArgs = argv => {
     if (value === 'false' || value === '0') {
       return false;
     }
-    if (value === 'true' || value === '1' || value === 'auto') {
+    if (value === 'auto') {
+      return undefined;
+    }
+    if (value === 'true' || value === '1') {
       return true;
     }
     const maxWorkers = Number(value);
@@ -323,7 +326,7 @@ const renderMarkdown = result => {
       ? [`- Rspack trace output: ${result.rspackTraceOutput}`]
       : []),
     '',
-    '| Benchmark | Routes | Variant | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports |',
+    '| Benchmark | Routes | Variant | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
     '|---|---:|---|---:|---:|---:|---:|---:|',
   ];
 

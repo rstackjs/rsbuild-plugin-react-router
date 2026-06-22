@@ -9,13 +9,6 @@ type AnyNode = Record<string, any>;
 const getProgram = (ast: ParseResult | AnyNode): AnyNode =>
   (ast as ParseResult).program ?? ast;
 
-const removeFromArray = <T>(array: T[], value: T): void => {
-  const index = array.indexOf(value);
-  if (index >= 0) {
-    array.splice(index, 1);
-  }
-};
-
 const getExportedName = (specifier: AnyNode): string | null => {
   const exported = specifier.exported;
   if (!exported) {
@@ -234,8 +227,6 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
   const usedNames = new Set<string>();
   const hocs: Array<[string, string]> = [];
   const componentWrapperDeclarations: AnyNode[] = [];
-  const sourceReexportImports: AnyNode[] = [];
-  const sourceReexportDeclarations: AnyNode[] = [];
 
   function getUid(name: string) {
     let uid = `_${name}`;
@@ -328,6 +319,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
 
     if (statement.source) {
       const importSpecifiers: Array<{ local: string; imported: string }> = [];
+      const sourceWrapperDeclarations: AnyNode[] = [];
       const wrappedExportSpecifiers: AnyNode[] = [];
       statement.specifiers = (statement.specifiers ?? []).filter(
         (specifier: AnyNode) => {
@@ -353,7 +345,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
             imported: importedName,
             local: sourceLocalName,
           });
-          componentWrapperDeclarations.push(
+          sourceWrapperDeclarations.push(
             variableDeclaration(
               wrappedLocalName,
               callExpression(uid, [identifier(sourceLocalName)])
@@ -366,15 +358,18 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
         }
       );
       if (importSpecifiers.length > 0) {
-        sourceReexportImports.push(
-          importDeclaration(importSpecifiers, String(statement.source.value))
-        );
-        sourceReexportDeclarations.push(
+        const statementIndex = program.body.indexOf(statement);
+        const replacementStatements = [
+          importDeclaration(importSpecifiers, String(statement.source.value)),
+        ];
+        if (statement.specifiers.length > 0) {
+          replacementStatements.push(statement);
+        }
+        replacementStatements.push(...sourceWrapperDeclarations);
+        replacementStatements.push(
           exportNamedDeclaration(wrappedExportSpecifiers)
         );
-        if (statement.specifiers.length === 0) {
-          removeFromArray(program.body, statement);
-        }
+        program.body.splice(statementIndex, 1, ...replacementStatements);
       }
       continue;
     }
@@ -406,11 +401,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
     }
   }
 
-  program.body.unshift(...sourceReexportImports);
-  program.body.push(
-    ...componentWrapperDeclarations,
-    ...sourceReexportDeclarations
-  );
+  program.body.push(...componentWrapperDeclarations);
 
   if (hocs.length > 0) {
     program.body.unshift(
