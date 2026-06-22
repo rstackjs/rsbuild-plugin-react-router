@@ -1,0 +1,78 @@
+{
+  "generatedAt": "2026-06-22T22:27:05.392Z",
+  "pullRequest": "48",
+  "base": {
+    "ref": "main",
+    "sha": "06ae3dbd02b434759bd64b027e26e09601a7afb1",
+    "benchmarkCommit": "06ae3dbd02b434759bd64b027e26e09601a7afb1"
+  },
+  "head": {
+    "ref": "codex/avoid-startup-route-rescan",
+    "sha": "0c380e32625d22c296d28bd9f5d90710e000db06",
+    "benchmarkCommit": "0c380e32625d22c296d28bd9f5d90710e000db06"
+  },
+  "runUrl": "https://github.com/rstackjs/rsbuild-plugin-react-router/actions/runs/27988078360",
+  "profile": "default",
+  "iterations": 5,
+  "warmup": 1,
+  "summary": {
+    "baseWallMs": 19795.68131700001,
+    "headWallMs": 9053.755018000005,
+    "wallDeltaPercent": -54.26398883162016,
+    "wallSpeedup": 2.1864608969034065
+  },
+  "benchmarks": [
+    {
+      "id": "synthetic-256-sourcemaps",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 3426.3816159999988,
+      "headWallMs": 2225.3965860000026,
+      "wallDeltaPercent": -35.05111702653954,
+      "wallSpeedup": 1.5396723611222412,
+      "baseCpuMs": 5960,
+      "headCpuMs": 4490,
+      "baseRssKb": 531396,
+      "headRssKb": 427296
+    },
+    {
+      "id": "synthetic-256-spa",
+      "routeCount": 256,
+      "variant": "spa",
+      "baseWallMs": 8363.683333000008,
+      "headWallMs": 2137.9177640000053,
+      "wallDeltaPercent": -74.43808333148422,
+      "wallSpeedup": 3.9120697127992936,
+      "baseCpuMs": 5910,
+      "headCpuMs": 4240,
+      "baseRssKb": 509664,
+      "headRssKb": 416428
+    },
+    {
+      "id": "synthetic-256-ssr-esm",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 3424.928003000001,
+      "headWallMs": 2149.2138219999997,
+      "wallDeltaPercent": -37.24791236144419,
+      "wallSpeedup": 1.593572481221462,
+      "baseCpuMs": 5900,
+      "headCpuMs": 4330,
+      "baseRssKb": 519864,
+      "headRssKb": 408688
+    },
+    {
+      "id": "synthetic-256-ssr-esm-split",
+      "routeCount": 256,
+      "variant": "ssr-esm-split",
+      "baseWallMs": 4580.688365000002,
+      "headWallMs": 2541.2268459999977,
+      "wallDeltaPercent": -44.52303576429835,
+      "wallSpeedup": 1.8025499660568303,
+      "baseCpuMs": 8080,
+      "headCpuMs": 5360,
+      "baseRssKb": 718224,
+      "headRssKb": 427016
+    }
+  ]
+}
