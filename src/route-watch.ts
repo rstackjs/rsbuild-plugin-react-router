@@ -61,19 +61,20 @@ export const createRouteManifestSnapshot = (
   routes: Record<string, RouteManifestSnapshotEntry>
 ): Set<string> =>
   new Set(
-    Object.entries(routes)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([routeId, route]) =>
-        JSON.stringify([
-          routeId,
-          route.id,
-          route.parentId ?? null,
-          route.path ?? null,
-          route.index ?? null,
-          route.caseSensitive ?? null,
-          route.file,
-        ])
-      )
+    // React Router uses sibling declaration order as a match tiebreaker, so the
+    // snapshot must preserve route-manifest insertion order.
+    Object.entries(routes).map(([routeId, route], order) =>
+      JSON.stringify([
+        order,
+        routeId,
+        route.id,
+        route.parentId ?? null,
+        route.path ?? null,
+        route.index ?? null,
+        route.caseSensitive ?? null,
+        route.file,
+      ])
+    )
   );
 
 export const ensureDevRestartMarker = async (

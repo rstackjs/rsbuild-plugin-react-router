@@ -170,27 +170,39 @@ describe('route watch topology snapshot', () => {
     );
   });
 
-  it('is stable for equivalent route manifests with different object insertion order', () => {
+  it('changes when sibling declaration order changes', () => {
     const first = createRouteManifestSnapshot({
       root: { id: 'root', path: '', file: 'root.tsx' },
-      'routes/demo': {
-        id: 'routes/demo',
+      'routes/a': {
+        id: 'routes/a',
         parentId: 'root',
-        path: 'demo',
-        file: 'routes/demo.tsx',
+        path: ':value',
+        file: 'routes/a.tsx',
+      },
+      'routes/b': {
+        id: 'routes/b',
+        parentId: 'root',
+        path: ':value',
+        file: 'routes/b.tsx',
       },
     });
 
     const second = createRouteManifestSnapshot({
-      'routes/demo': {
-        id: 'routes/demo',
-        parentId: 'root',
-        path: 'demo',
-        file: 'routes/demo.tsx',
-      },
       root: { id: 'root', path: '', file: 'root.tsx' },
+      'routes/b': {
+        id: 'routes/b',
+        parentId: 'root',
+        path: ':value',
+        file: 'routes/b.tsx',
+      },
+      'routes/a': {
+        id: 'routes/a',
+        parentId: 'root',
+        path: ':value',
+        file: 'routes/a.tsx',
+      },
     });
 
-    expect(second).toEqual(first);
+    expect(second).not.toEqual(first);
   });
 });
