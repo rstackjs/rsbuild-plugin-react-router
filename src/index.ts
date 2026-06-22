@@ -75,7 +75,10 @@ import {
   getBuildManifest,
   getRoutesByServerBundleId,
 } from './build-manifest.js';
-import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
+import {
+  isSourceMapEnabled,
+  warnOnClientSourceMaps,
+} from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
 import {
@@ -1643,10 +1646,9 @@ export const pluginReactRouter = (
               resource: args.resource,
               resourcePath: args.resourcePath,
               environmentName: args.environment.name,
-              sourceMaps:
-                args.environment.config.output.sourceMap === true ||
-                (typeof args.environment.config.output.sourceMap === 'object' &&
-                  Boolean(args.environment.config.output.sourceMap.js)),
+              sourceMaps: isSourceMapEnabled(
+                args.environment.config.output.sourceMap
+              ),
               ssr,
               isBuild,
               isSpaMode,

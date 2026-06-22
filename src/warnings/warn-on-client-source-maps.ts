@@ -8,7 +8,7 @@ function isProdBuild(mode?: string): boolean {
   return mode === 'production' || process.env.NODE_ENV === 'production';
 }
 
-function isSourceMapEnabled(value: unknown): boolean {
+export function isSourceMapEnabled(value: unknown): boolean {
   // Rsbuild normalizes `output.sourceMap` into either:
   //  - boolean
   //  - { js?: devtool; css: boolean }

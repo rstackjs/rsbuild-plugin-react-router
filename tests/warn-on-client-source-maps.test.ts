@@ -1,5 +1,8 @@
 import { describe, expect, it, rstest } from '@rstest/core';
-import { warnOnClientSourceMaps } from '../src/warnings/warn-on-client-source-maps';
+import {
+  isSourceMapEnabled,
+  warnOnClientSourceMaps,
+} from '../src/warnings/warn-on-client-source-maps';
 
 describe('warnOnClientSourceMaps', () => {
   it('does not warn in non-production mode', () => {
@@ -55,6 +58,11 @@ describe('warnOnClientSourceMaps', () => {
       warn
     );
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats string output.sourceMap values as enabled', () => {
+    expect(isSourceMapEnabled('source-map')).toBe(true);
+    expect(isSourceMapEnabled('hidden-source-map')).toBe(true);
   });
 
   it('does not warn when source maps are disabled in production', () => {
