@@ -21,7 +21,18 @@ export function configRoutesToRouteManifest(
   routes: RouteConfigEntry[],
   rootId = 'root'
 ): Record<string, Route> {
-  const routeManifest: Record<string, Route> = {};
+  return Object.fromEntries(
+    configRoutesToRouteManifestEntries(appDirectory, routes, rootId)
+  );
+}
+
+export function configRoutesToRouteManifestEntries(
+  appDirectory: string,
+  routes: RouteConfigEntry[],
+  rootId = 'root'
+): Array<[string, Route]> {
+  const routeManifestEntries: Array<[string, Route]> = [];
+  const routeIds = new Set<string>();
 
   function walk(route: RouteConfigEntry, parentId: string) {
     const id = route.id || createRouteId(route.file);
@@ -36,12 +47,13 @@ export function configRoutesToRouteManifest(
       caseSensitive: route.caseSensitive,
     };
 
-    if (Object.prototype.hasOwnProperty.call(routeManifest, id)) {
+    if (routeIds.has(id)) {
       throw new Error(
         `Unable to define routes with duplicate route id: "${id}"`
       );
     }
-    routeManifest[id] = manifestItem;
+    routeIds.add(id);
+    routeManifestEntries.push([id, manifestItem]);
 
     if (route.children) {
       for (const child of route.children) {
@@ -54,7 +66,7 @@ export function configRoutesToRouteManifest(
     walk(route, rootId);
   }
 
-  return routeManifest;
+  return routeManifestEntries;
 }
 
 type RouteChunkManifestOptions = {

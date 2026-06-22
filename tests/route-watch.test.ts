@@ -143,6 +143,101 @@ describe('route watch restart marker', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('reuses discovered topology when initial topology is already current', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    mkdirSync(watchedDirectory, { recursive: true });
+    let topologyReads = 0;
+
+    try {
+      const close = await createRouteTopologyWatcher({
+        watchDirectory: watchedDirectory,
+        restartMarkerPath: markerPath,
+        initialRouteTopology: new Set(['current']),
+        getRouteTopology: async () => {
+          topologyReads += 1;
+          return new Set(['current']);
+        },
+        onError: error => {
+          throw error;
+        },
+        watchDirectoryEntry: () => ({ close: () => {} }),
+      });
+      await close();
+
+      expect(topologyReads).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses discovered topology to notify when initial topology is stale', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    mkdirSync(watchedDirectory, { recursive: true });
+    let topologyReads = 0;
+    const onRouteTopologyChange = rstest.fn();
+
+    try {
+      const close = await createRouteTopologyWatcher({
+        watchDirectory: watchedDirectory,
+        restartMarkerPath: markerPath,
+        initialRouteTopology: new Set(['stale']),
+        getRouteTopology: async () => {
+          topologyReads += 1;
+          return new Set(['current']);
+        },
+        onRouteTopologyChange,
+        onError: error => {
+          throw error;
+        },
+        watchDirectoryEntry: () => ({ close: () => {} }),
+      });
+      await close();
+
+      expect(topologyReads).toBe(1);
+      expect(onRouteTopologyChange).toHaveBeenCalledTimes(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('retains discovered recovery directories when startup topology evaluation fails', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    const helperDirectory = join(watchedDirectory, 'helpers');
+    mkdirSync(helperDirectory, { recursive: true });
+    const watchedDirectories: string[] = [];
+    const onError = rstest.fn();
+
+    try {
+      const close = await createRouteTopologyWatcher({
+        watchDirectory: watchedDirectory,
+        restartMarkerPath: markerPath,
+        initialRouteTopology: new Set(['last-good']),
+        getRouteTopology: async () => {
+          throw new Error('route config failed');
+        },
+        onError,
+        watchDirectoryEntry: directory => {
+          watchedDirectories.push(directory);
+          return { close: () => {} };
+        },
+      });
+      await close();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(watchedDirectories).toEqual(
+        expect.arrayContaining([watchedDirectory, helperDirectory])
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('route watch topology snapshot', () => {
@@ -202,6 +297,54 @@ describe('route watch topology snapshot', () => {
         file: 'routes/a.tsx',
       },
     });
+
+    expect(second).not.toEqual(first);
+  });
+
+  it('preserves ordered entries for numeric-like route IDs', () => {
+    const first = createRouteManifestSnapshot([
+      ['root', { id: 'root', path: '', file: 'root.tsx' }],
+      [
+        '2',
+        {
+          id: '2',
+          parentId: 'root',
+          path: ':value',
+          file: 'routes/two.tsx',
+        },
+      ],
+      [
+        '1',
+        {
+          id: '1',
+          parentId: 'root',
+          path: ':value',
+          file: 'routes/one.tsx',
+        },
+      ],
+    ]);
+
+    const second = createRouteManifestSnapshot([
+      ['root', { id: 'root', path: '', file: 'root.tsx' }],
+      [
+        '1',
+        {
+          id: '1',
+          parentId: 'root',
+          path: ':value',
+          file: 'routes/one.tsx',
+        },
+      ],
+      [
+        '2',
+        {
+          id: '2',
+          parentId: 'root',
+          path: ':value',
+          file: 'routes/two.tsx',
+        },
+      ],
+    ]);
 
     expect(second).not.toEqual(first);
   });

@@ -11,6 +11,9 @@ type RouteManifestSnapshotEntry = Pick<
   Route,
   'caseSensitive' | 'file' | 'id' | 'index' | 'parentId' | 'path'
 >;
+type RouteManifestSnapshotEntries =
+  | Record<string, RouteManifestSnapshotEntry>
+  | Iterable<readonly [string, RouteManifestSnapshotEntry]>;
 
 type WatchFilesConfig = NonNullable<
   NonNullable<RsbuildConfig['dev']>['watchFiles']
@@ -58,23 +61,25 @@ export const getRouteRestartMarkerPath = (outputClientPath: string): string =>
   resolve(outputClientPath, ROUTE_RESTART_MARKER_ASSET);
 
 export const createRouteManifestSnapshot = (
-  routes: Record<string, RouteManifestSnapshotEntry>
+  routes: RouteManifestSnapshotEntries
 ): Set<string> =>
   new Set(
-    // React Router uses sibling declaration order as a match tiebreaker, so the
-    // snapshot must preserve route-manifest insertion order.
-    Object.entries(routes).map(([routeId, route], order) =>
-      JSON.stringify([
-        order,
-        routeId,
-        route.id,
-        route.parentId ?? null,
-        route.path ?? null,
-        route.index ?? null,
-        route.caseSensitive ?? null,
-        route.file,
-      ])
-    )
+    (Symbol.iterator in routes ? Array.from(routes) : Object.entries(routes))
+      // React Router uses sibling declaration order as a match tiebreaker, so
+      // callers that have ordered route config should pass ordered entries
+      // instead of a record with numeric-like keys.
+      .map(([routeId, route], order) =>
+        JSON.stringify([
+          order,
+          routeId,
+          route.id,
+          route.parentId ?? null,
+          route.path ?? null,
+          route.index ?? null,
+          route.caseSensitive ?? null,
+          route.file,
+        ])
+      )
   );
 
 export const ensureDevRestartMarker = async (
@@ -102,13 +107,9 @@ const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
   return true;
 };
 
-const readRouteDirectoryState = async ({
-  watchDirectory,
-  getRouteTopology,
-}: {
-  watchDirectory: string;
-  getRouteTopology: () => Promise<Set<string>>;
-}): Promise<RouteDirectoryState> => {
+const readRouteDirectories = async (
+  watchDirectory: string
+): Promise<Set<string>> => {
   const directories = new Set<string>();
 
   const walkDirectory = async (directory: string): Promise<void> => {
@@ -131,10 +132,7 @@ const readRouteDirectoryState = async ({
   };
 
   await walkDirectory(watchDirectory);
-  return {
-    directories,
-    routeTopology: await getRouteTopology(),
-  };
+  return directories;
 };
 
 export const createRouteTopologyWatcher = async ({
@@ -154,10 +152,23 @@ export const createRouteTopologyWatcher = async ({
   onRouteTopologyChange?: () => void | Promise<void>;
   watchDirectoryEntry?: WatchDirectoryEntry;
 }): Promise<() => Promise<void>> => {
-  const discoveredState = await readRouteDirectoryState({
-    watchDirectory,
-    getRouteTopology,
-  });
+  const discoveredDirectories = await readRouteDirectories(watchDirectory);
+  let discoveredState: RouteDirectoryState;
+  try {
+    discoveredState = {
+      directories: discoveredDirectories,
+      routeTopology: await getRouteTopology(),
+    };
+  } catch (error) {
+    if (!initialRouteTopology) {
+      throw error;
+    }
+    onError(error);
+    discoveredState = {
+      directories: discoveredDirectories,
+      routeTopology: initialRouteTopology,
+    };
+  }
   let state = {
     ...discoveredState,
     routeTopology: initialRouteTopology ?? discoveredState.routeTopology,
@@ -209,39 +220,51 @@ export const createRouteTopologyWatcher = async ({
     watchNewDirectories(nextDirectories);
   };
 
+  const applyNextState = async (nextState: RouteDirectoryState) => {
+    if (closed) {
+      return;
+    }
+    syncDirectoryWatchers(nextState.directories);
+    if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
+      if (onRouteTopologyChange) {
+        // This is a notification boundary, not part of the rescan
+        // transaction. A custom-server callback may close this watcher while
+        // replacing its compiler, so awaiting it here would deadlock close().
+        const notification = onRouteTopologyChange();
+        state = nextState;
+        void Promise.resolve(notification).catch(onError);
+        return;
+      } else {
+        await touchRestartMarker();
+      }
+      if (closed) {
+        return;
+      }
+      state = nextState;
+      return;
+    }
+    state = nextState;
+  };
+
   const runRescan = async (): Promise<void> => {
     if (closed) {
       return;
     }
+    let nextDirectories: Set<string> | undefined;
     try {
-      const nextState = await readRouteDirectoryState({
-        watchDirectory,
-        getRouteTopology,
-      });
+      nextDirectories = await readRouteDirectories(watchDirectory);
+      const nextState = {
+        directories: nextDirectories,
+        routeTopology: await getRouteTopology(),
+      };
       if (closed) {
         return;
       }
-      syncDirectoryWatchers(nextState.directories);
-      if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
-        if (onRouteTopologyChange) {
-          // This is a notification boundary, not part of the rescan
-          // transaction. A custom-server callback may close this watcher while
-          // replacing its compiler, so awaiting it here would deadlock close().
-          const notification = onRouteTopologyChange();
-          state = nextState;
-          void Promise.resolve(notification).catch(onError);
-          return;
-        } else {
-          await touchRestartMarker();
-        }
-        if (closed) {
-          return;
-        }
-        state = nextState;
-        return;
-      }
-      state = nextState;
+      await applyNextState(nextState);
     } catch (error) {
+      if (nextDirectories && !closed) {
+        syncDirectoryWatchers(nextDirectories);
+      }
       onError(error);
     }
   };
@@ -261,9 +284,10 @@ export const createRouteTopologyWatcher = async ({
     }, 100);
   };
 
-  syncDirectoryWatchers(state.directories);
-  if (initialRouteTopology) {
-    await runRescan();
+  try {
+    await applyNextState(discoveredState);
+  } catch (error) {
+    onError(error);
   }
 
   return async () => {
