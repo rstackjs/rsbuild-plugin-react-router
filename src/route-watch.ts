@@ -79,8 +79,8 @@ export const createRouteManifestSnapshot = (
 export const ensureDevRestartMarker = async (
   restartMarkerPath: string
 ): Promise<void> => {
-  // Build emits this marker through processAssets. Dev owns the watched file
-  // directly so ordinary rebuilds do not rewrite it and trigger reload loops.
+  // Dev owns this watched file directly so ordinary rebuilds do not rewrite it
+  // and trigger reload loops.
   await mkdir(dirname(restartMarkerPath), { recursive: true });
   try {
     await access(restartMarkerPath);

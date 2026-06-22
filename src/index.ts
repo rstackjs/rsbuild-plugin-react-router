@@ -15,7 +15,11 @@ import { createJiti } from 'jiti';
 import jsesc from 'jsesc';
 import { dirname, relative, resolve } from 'pathe';
 
-import { BUILD_CLIENT_ROUTE_QUERY_STRING, PLUGIN_NAME } from './constants.js';
+import {
+  BUILD_CLIENT_ROUTE_QUERY_STRING,
+  JS_EXTENSIONS,
+  PLUGIN_NAME,
+} from './constants.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import {
   generateWithProps,
@@ -180,7 +184,7 @@ export const pluginReactRouter = (
       }
       const { execa } = await import('execa');
       // Run typegen in background (non-blocking) for watch mode
-      typegenProcess = execa(
+      const process = execa(
         'npx',
         ['--yes', 'react-router', 'typegen', '--watch'],
         {
@@ -189,10 +193,17 @@ export const pluginReactRouter = (
           cleanup: true,
         }
       );
+      typegenProcess = process;
       // Don't await - let it run in the background
-      typegenProcess.catch(() => {
-        // Silently ignore errors when the process is killed on server shutdown
-      });
+      process
+        .catch(() => {
+          // Silently ignore errors when the process is killed on server shutdown
+        })
+        .finally(() => {
+          if (typegenProcess === process) {
+            typegenProcess = undefined;
+          }
+        });
     });
 
     api.onCloseDevServer(async () => {
@@ -220,6 +231,11 @@ export const pluginReactRouter = (
     // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
+    const configWatchPaths = configExists
+      ? configPath
+      : JS_EXTENSIONS.map(extension =>
+          resolve(`react-router.config${extension}`)
+        );
     let reactRouterUserConfig: Config = {};
     if (!configExists) {
       console.warn(
@@ -458,7 +474,7 @@ export const pluginReactRouter = (
     const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
     const routeWatchFiles: WatchFileConfig[] = [
       {
-        paths: configPath,
+        paths: configWatchPaths,
         type: 'reload-server',
       },
       {

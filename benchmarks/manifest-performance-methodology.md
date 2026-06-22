@@ -165,13 +165,22 @@ because it controls warmup, cleaning, aggregation, and output format.
 
 ## Metric checklist
 
-### Already observable from `baseline.json`
+### Canonical metrics in `baseline.json`
 
 | Metric                      | Source                                                        | Why it matters                                                                                              |
 | --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Build wall time             | `benchmarks[].summary.wallMs`                                 | End-to-end user-visible build time.                                                                         |
 | CPU time                    | `summary.userMs` + `summary.sysMs`                            | Less noisy than wall time when the machine has minor scheduling variance.                                   |
 | Peak RSS                    | `summary.maxRssKb`                                            | Ensures cache dedup does not regress memory.                                                                |
+
+### Diagnostic metrics with `--log-performance`
+
+These fields are empty in canonical A/B runs because plugin instrumentation is
+disabled by default. Use a separate diagnostic run when operation-level
+attribution is needed.
+
+| Metric                      | Source                                                        | Why it matters                                                                                              |
+| --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Compiler lifecycle          | each plugin report's `compilerLifecycleMs`                    | Plugin setup/build lifecycle timing per compiler environment.                                               |
 | Transform invocation counts | `pluginOperations[].count`                                    | Counts route/manifest hook invocations. Counts should usually stay stable after dedup; timings should drop. |
 | Transform cumulative time   | `pluginOperations[].totalMs`                                  | Primary signal for expensive plugin work moving out of duplicate paths.                                     |

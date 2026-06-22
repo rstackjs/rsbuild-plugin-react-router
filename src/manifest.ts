@@ -214,8 +214,7 @@ export const getReactRouterManifestChunkNames = (
 
 export async function generateReactRouterManifestForDev(
   routes: Record<string, Route>,
-  //@ts-ignore
-  options: PluginOptions,
+  _options: PluginOptions,
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix = '/',
