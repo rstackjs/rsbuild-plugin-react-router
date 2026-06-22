@@ -11,9 +11,13 @@ type RouteManifestSnapshotEntry = Pick<
   Route,
   'caseSensitive' | 'file' | 'id' | 'index' | 'parentId' | 'path'
 >;
+type RouteManifestSnapshotEntryPair = readonly [
+  string,
+  RouteManifestSnapshotEntry,
+];
 type RouteManifestSnapshotEntries =
   | Record<string, RouteManifestSnapshotEntry>
-  | Iterable<readonly [string, RouteManifestSnapshotEntry]>;
+  | ReadonlyArray<RouteManifestSnapshotEntryPair>;
 
 type WatchFilesConfig = NonNullable<
   NonNullable<RsbuildConfig['dev']>['watchFiles']
@@ -64,7 +68,7 @@ export const createRouteManifestSnapshot = (
   routes: RouteManifestSnapshotEntries
 ): Set<string> =>
   new Set(
-    (Symbol.iterator in routes ? Array.from(routes) : Object.entries(routes))
+    (Array.isArray(routes) ? routes : Object.entries(routes))
       // React Router uses sibling declaration order as a match tiebreaker, so
       // callers that have ordered route config should pass ordered entries
       // instead of a record with numeric-like keys.

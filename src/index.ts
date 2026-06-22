@@ -414,12 +414,12 @@ export const pluginReactRouter = (
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
     const createRouteTopologySnapshot = (
-      latestRootRouteFile: string,
-      latestRouteConfig: RouteConfigEntry[]
+      routeFile: string,
+      routeConfig: RouteConfigEntry[]
     ) =>
       createRouteManifestSnapshot([
-        ['root', { path: '', id: 'root', file: latestRootRouteFile }],
-        ...configRoutesToRouteManifestEntries(appDirectory, latestRouteConfig),
+        ['root', { path: '', id: 'root', file: routeFile }],
+        ...configRoutesToRouteManifestEntries(appDirectory, routeConfig),
       ]);
     const getWatchedRouteTopology = async (): Promise<Set<string>> => {
       const latestRouteConfig = await loadRouteConfig();
