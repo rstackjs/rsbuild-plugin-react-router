@@ -88,6 +88,7 @@ const parseArgs = argv => {
       'rspack-trace-output': { type: 'string' },
       'fail-fast': { type: 'boolean', default: false },
       'skip-root-build': { type: 'boolean', default: false },
+      'log-performance': { type: 'boolean', default: false },
     },
   });
 
@@ -123,6 +124,7 @@ const parseArgs = argv => {
     rspackTraceOutput: values['rspack-trace-output'] ?? null,
     failFast: values['fail-fast'],
     skipRootBuild: values['skip-root-build'],
+    logPerformance: values['log-performance'],
   };
 
   if (!profiles[args.profile]) {
@@ -155,7 +157,12 @@ const parseArgs = argv => {
 const hasGnuTime = async () => {
   try {
     await access('/usr/bin/time');
-    return true;
+    const probe = await execa(
+      '/usr/bin/time',
+      ['-v', process.execPath, '-e', ''],
+      { reject: false }
+    );
+    return probe.exitCode === 0;
   } catch {
     return false;
   }
@@ -310,6 +317,7 @@ const renderMarkdown = result => {
     `- Iterations: ${result.iterations}`,
     `- Warmup: ${result.warmup}`,
     `- Parallel transforms: ${formatParallelTransforms(result.parallelTransforms)}`,
+    `- Plugin performance logging: ${String(result.logPerformance)}`,
     `- Rspack profile: ${result.rspackProfile ?? 'false'}`,
     ...(result.rspackTraceOutput
       ? [`- Rspack trace output: ${result.rspackTraceOutput}`]
@@ -423,7 +431,7 @@ const writeOutputs = async (result, outputPaths) => {
 
 const formatParallelTransforms = parallelTransforms => {
   if (parallelTransforms === undefined) {
-    return 'default';
+    return 'adaptive';
   }
   if (!parallelTransforms) {
     return 'false';
@@ -536,6 +544,9 @@ const main = async () => {
   const pluginImportPath = pathToFileURL(
     path.join(rootDir, 'dist/index.js')
   ).href;
+  const pluginReactImportPath =
+    process.env.REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT ??
+    '@rsbuild/plugin-react';
   const selectedBenchmarks = profiles[args.profile].filter(benchmark =>
     args.filter ? benchmark.id.includes(args.filter) : true
   );
@@ -565,6 +576,7 @@ const main = async () => {
       variant: benchmark.variant,
       sourceMap: benchmark.sourceMap ?? false,
       pluginImportPath,
+      pluginReactImportPath,
       parallelTransforms: args.parallelTransforms,
     });
 
@@ -603,7 +615,9 @@ const main = async () => {
         cwd: fixtureRoot,
         env: {
           NODE_ENV: 'production',
-          REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1',
+          ...(args.logPerformance
+            ? { REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1' }
+            : {}),
           ...(args.rspackProfile ? { RSPACK_PROFILE: args.rspackProfile } : {}),
           ...(rspackTraceOutput
             ? { RSPACK_TRACE_OUTPUT: rspackTraceOutput }
@@ -674,6 +688,8 @@ const main = async () => {
     profile: args.profile,
     iterations: args.iterations,
     warmup: args.warmup,
+    clean: args.clean,
+    logPerformance: args.logPerformance,
     parallelTransforms: args.parallelTransforms,
     rspackProfile: args.rspackProfile,
     rspackTraceOutput: args.rspackTraceOutput,

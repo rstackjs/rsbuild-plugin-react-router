@@ -1,5 +1,9 @@
 import { describe, expect, it } from '@rstest/core';
-import { getPrerenderConcurrency, getStaticPrerenderPaths, resolvePrerenderPaths } from '../src/prerender';
+import {
+  getPrerenderConcurrency,
+  getStaticPrerenderPaths,
+  resolvePrerenderPaths,
+} from '../src/prerender';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
 const routes: RouteConfigEntry[] = [
@@ -87,8 +91,8 @@ describe('prerender helpers', () => {
     expect(
       getPrerenderConcurrency({ paths: ['/'], unstable_concurrency: 3 })
     ).toBe(3);
-    expect(getPrerenderConcurrency({ paths: ['/'] }, 24)).toBe(22);
+    expect(getPrerenderConcurrency({ paths: ['/'] }, 24)).toBe(1);
     expect(getPrerenderConcurrency({ paths: ['/'] }, 3)).toBe(1);
-    expect(getPrerenderConcurrency({ paths: ['/'] }, 2)).toBe(0);
+    expect(getPrerenderConcurrency({ paths: ['/'] }, 2)).toBe(1);
   });
 });

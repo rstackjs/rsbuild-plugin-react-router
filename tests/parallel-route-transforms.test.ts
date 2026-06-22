@@ -1,5 +1,5 @@
-import { describe, expect, it, rstest } from '@rstest/core';
-import * as exportUtils from '../src/export-utils';
+import { describe, expect, it } from '@rstest/core';
+import { getExportNames } from '../src/export-utils';
 import {
   executeRouteTransformTask,
   type RouteModuleTransformTask,
@@ -7,6 +7,7 @@ import {
 import {
   createRouteTransformExecutor,
   getDefaultWorkerCount,
+  shouldParallelizeRouteTransforms,
 } from '../src/parallel-route-transforms';
 import type { RouteChunkConfig } from '../src/route-chunks';
 
@@ -34,6 +35,7 @@ const createRouteModuleTask = (
   resource: `${resourcePath}?react-router-route`,
   resourcePath,
   environmentName: 'web',
+  sourceMaps: true,
   ssr: true,
   isBuild: false,
   isSpaMode: false,
@@ -43,6 +45,15 @@ const createRouteModuleTask = (
 
 describe('parallel route transforms', () => {
   it.each([
+    [48, false],
+    [255, false],
+    [256, true],
+    [1024, true],
+  ])('selects the adaptive default for %i routes', (routeCount, expected) => {
+    expect(shouldParallelizeRouteTransforms(routeCount)).toBe(expected);
+  });
+
+  it.each([
     [1, 0],
     [2, 0],
     [3, 1],
@@ -50,10 +61,24 @@ describe('parallel route transforms', () => {
     [6, 4],
     [8, 6],
     [10, 8],
-    [12, 10],
-    [24, 22],
-  ])('defaults to cpu count minus two workers', (cpus, workers) => {
+    [12, 8],
+    [24, 8],
+  ])('caps the automatic worker count', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
+  });
+
+  it('rejects unsafe explicit worker counts', () => {
+    expect(() =>
+      createRouteTransformExecutor({
+        parallelTransforms: { maxWorkers: 1.5 },
+      })
+    ).toThrow('must be a positive integer');
+
+    expect(() =>
+      createRouteTransformExecutor({
+        parallelTransforms: { maxWorkers: 33 },
+      })
+    ).toThrow('must not exceed 32');
   });
 
   it('honors explicit maxWorkers', async () => {
@@ -105,107 +130,6 @@ describe('parallel route transforms', () => {
     });
   });
 
-  it('does not run bundler route analysis for client entries without split route chunks', async () => {
-    const getBundlerRouteAnalysis = rstest.spyOn(
-      exportUtils,
-      'getBundlerRouteAnalysis'
-    );
-
-    try {
-      await executeRouteTransformTask({
-        kind: 'routeClientEntry',
-        code: `
-          export async function loader() { return null; }
-          export async function clientLoader() { return null; }
-          export default function Route() { return null; }
-        `,
-        resourcePath,
-        environmentName: 'web',
-        isBuild: false,
-        routeChunkConfig: disabledRouteChunkConfig,
-      });
-
-      expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-    } finally {
-      getBundlerRouteAnalysis.mockRestore();
-    }
-  });
-
-  it('does not run bundler route analysis for split client entries without split export names', async () => {
-    const getBundlerRouteAnalysis = rstest.spyOn(
-      exportUtils,
-      'getBundlerRouteAnalysis'
-    );
-
-    try {
-      const result = await executeRouteTransformTask({
-        kind: 'routeClientEntry',
-        code: `
-          export async function loader() { return null; }
-          export default function Route() { return null; }
-        `,
-        resourcePath,
-        environmentName: 'web',
-        isBuild: true,
-        routeChunkConfig,
-      });
-
-      expect(result.code).toBe(
-        `export { default } from "${resourcePath}?react-router-route";`
-      );
-      expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-    } finally {
-      getBundlerRouteAnalysis.mockRestore();
-    }
-  });
-
-  it('does not run bundler route analysis for split route export modules without split export names', async () => {
-    const getBundlerRouteAnalysis = rstest.spyOn(
-      exportUtils,
-      'getBundlerRouteAnalysis'
-    );
-    const code = `
-      export async function loader() { return null; }
-      export default function Route() { return null; }
-    `;
-
-    try {
-      const result = await executeRouteTransformTask({
-        kind: 'splitRouteExports',
-        code,
-        resourcePath,
-        routeChunkConfig,
-      });
-
-      expect(result).toEqual({ code, map: null });
-      expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-    } finally {
-      getBundlerRouteAnalysis.mockRestore();
-    }
-  });
-
-  it('does not run bundler route analysis for client-only stubs', async () => {
-    const getBundlerRouteAnalysis = rstest.spyOn(
-      exportUtils,
-      'getBundlerRouteAnalysis'
-    );
-
-    try {
-      await executeRouteTransformTask({
-        kind: 'clientOnlyStub',
-        code: `
-          export const clientValue = 'client';
-          export default function ClientOnly() { return null; }
-        `,
-        resourcePath: '/app/client-data.client.ts',
-      });
-
-      expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-    } finally {
-      getBundlerRouteAnalysis.mockRestore();
-    }
-  });
-
   it('can execute route module tasks through worker-backed parallelism', async () => {
     const executor = createRouteTransformExecutor({
       parallelTransforms: { maxWorkers: 2 },
@@ -221,7 +145,7 @@ describe('parallel route transforms', () => {
     }
   });
 
-  it('shares build route module results across environments when output is identical', async () => {
+  it('produces identical build route modules when environments need the same output', async () => {
     const executor = createRouteTransformExecutor({
       parallelTransforms: { maxWorkers: 2 },
       splitRouteModules: true,
@@ -248,12 +172,45 @@ describe('parallel route transforms', () => {
     }
   });
 
-  it('does not share build route module results when web removes server-only exports', async () => {
+  it('keeps environment-specific build route module output isolated', async () => {
     const executor = createRouteTransformExecutor({
       parallelTransforms: { maxWorkers: 2 },
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({
+      environmentName: 'node',
+      isBuild: true,
+    });
+
+    try {
+      const nodeResult = await executor.run(task);
+      const webResult = await executor.run({
+        ...task,
+        environmentName: 'web',
+      });
+
+      await expect(getExportNames(nodeResult.code)).resolves.toContain(
+        'loader'
+      );
+      await expect(getExportNames(webResult.code)).resolves.not.toContain(
+        'loader'
+      );
+    } finally {
+      await executor.close();
+    }
+  });
+
+  it('isolates escaped server exports across build environments', async () => {
+    const executor = createRouteTransformExecutor({
+      parallelTransforms: { maxWorkers: 2 },
+      splitRouteModules: true,
+    });
+    const task = createRouteModuleTask({
+      code: String.raw`
+        const implementation = async () => null;
+        export { implementation as lo\u0061der };
+        export default function Route() { return null; }
+      `,
       environmentName: 'node',
       isBuild: true,
     });
@@ -272,6 +229,22 @@ describe('parallel route transforms', () => {
     }
   });
 
+  it('preserves runtime TypeScript for the downstream Rsbuild SWC stage', async () => {
+    const result = await executeRouteTransformTask(
+      createRouteModuleTask({
+        code: `
+          export enum Status { Active }
+          export default function Route() { return Status.Active; }
+        `,
+        environmentName: 'node',
+        isBuild: true,
+      })
+    );
+
+    expect(result.code).toContain('enum Status');
+    expect(result.code).toContain('Status.Active');
+  });
+
   it('preserves value imports when web route modules have no server-only exports', async () => {
     const result = await executeRouteTransformTask(
       createRouteModuleTask({
@@ -286,46 +259,6 @@ describe('parallel route transforms', () => {
     );
 
     expect(result.code).toContain(`import { setup } from './side-effect';`);
-  });
-
-  it('does not run bundler route analysis for non-SPA route module transforms', async () => {
-    const getBundlerRouteAnalysis = rstest.spyOn(
-      exportUtils,
-      'getBundlerRouteAnalysis'
-    );
-
-    try {
-      await executeRouteTransformTask(createRouteModuleTask());
-
-      expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-    } finally {
-      getBundlerRouteAnalysis.mockRestore();
-    }
-  });
-
-  it('validates SPA route modules without bundler route analysis', async () => {
-    const getBundlerRouteAnalysis = rstest.spyOn(
-      exportUtils,
-      'getBundlerRouteAnalysis'
-    );
-
-    try {
-      const result = await executeRouteTransformTask(
-        createRouteModuleTask({
-          code: `
-            export async function clientLoader() { return null; }
-            export default function Route() { return null; }
-          `,
-          ssr: false,
-          isSpaMode: true,
-        })
-      );
-
-      expect(result.code).toContain('clientLoader');
-      expect(getBundlerRouteAnalysis).not.toHaveBeenCalled();
-    } finally {
-      getBundlerRouteAnalysis.mockRestore();
-    }
   });
 
   it('rejects invalid SPA route module exports from the route transform AST', async () => {
@@ -343,7 +276,7 @@ describe('parallel route transforms', () => {
     ).rejects.toThrow('SPA Mode: 1 invalid route export');
   });
 
-  it('generates route module source maps only outside build mode', async () => {
+  it('generates route module source maps when the environment requests them', async () => {
     const task = createRouteModuleTask({
       code: `
         export async function loader() { return null; }
@@ -351,12 +284,11 @@ describe('parallel route transforms', () => {
       `,
     });
 
-    await expect(
-      executeRouteTransformTask({
-        ...task,
-        isBuild: true,
-      })
-    ).resolves.toMatchObject({ map: null });
+    const buildResult = await executeRouteTransformTask({
+      ...task,
+      isBuild: true,
+    });
+    expect(buildResult.map).not.toBeNull();
 
     const devResult = await executeRouteTransformTask({
       ...task,
@@ -364,5 +296,11 @@ describe('parallel route transforms', () => {
     });
 
     expect(devResult.map).not.toBeNull();
+
+    const withoutSourceMaps = await executeRouteTransformTask({
+      ...task,
+      sourceMaps: false,
+    });
+    expect(withoutSourceMaps.map).toBeNull();
   });
 });

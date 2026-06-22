@@ -1,10 +1,10 @@
-import { readFileSync, watch, type FSWatcher } from 'node:fs';
+import { watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
-import type { ProcessAssetsHandler, RsbuildConfig } from '@rsbuild/core';
+import type { RsbuildConfig } from '@rsbuild/core';
 import { dirname, resolve } from 'pathe';
 import type { Route } from './types.js';
 
-export const ROUTE_RESTART_MARKER_ASSET = '.react-router/route-watch';
+const ROUTE_RESTART_MARKER_ASSET = '.react-router/route-watch';
 const INITIAL_RESTART_MARKER_CONTENT = 'react-router-route-watch';
 
 type RouteManifestSnapshotEntry = Pick<
@@ -24,12 +24,21 @@ type RouteDirectoryState = {
   routeTopology: Set<string>;
 };
 
-type ProcessAssetsContext = Parameters<ProcessAssetsHandler>[0];
-type RouteRestartMarkerAssetOptions = Pick<
-  ProcessAssetsContext,
-  'compilation' | 'sources'
-> & {
-  restartMarkerPath: string;
+type DirectoryWatcher = Pick<FSWatcher, 'close'>;
+type WatchDirectoryEntry = (
+  directory: string,
+  onChange: () => void,
+  onError: (error: unknown) => void
+) => DirectoryWatcher;
+
+const defaultWatchDirectoryEntry: WatchDirectoryEntry = (
+  directory,
+  onChange,
+  onError
+) => {
+  const watcher = watch(directory, onChange);
+  watcher.on('error', onError);
+  return watcher;
 };
 
 export const mergeWatchFiles = (
@@ -47,30 +56,6 @@ export const mergeWatchFiles = (
 
 export const getRouteRestartMarkerPath = (outputClientPath: string): string =>
   resolve(outputClientPath, ROUTE_RESTART_MARKER_ASSET);
-
-const readRestartMarkerContent = (restartMarkerPath: string): string => {
-  try {
-    const content = readFileSync(restartMarkerPath, 'utf8');
-    return content || INITIAL_RESTART_MARKER_CONTENT;
-  } catch {
-    return INITIAL_RESTART_MARKER_CONTENT;
-  }
-};
-
-export const emitRouteRestartMarkerAsset = ({
-  restartMarkerPath,
-  sources,
-  compilation,
-}: RouteRestartMarkerAssetOptions): void => {
-  const source = new sources.RawSource(
-    readRestartMarkerContent(restartMarkerPath)
-  );
-  if (compilation.getAsset(ROUTE_RESTART_MARKER_ASSET)) {
-    compilation.updateAsset(ROUTE_RESTART_MARKER_ASSET, source);
-    return;
-  }
-  compilation.emitAsset(ROUTE_RESTART_MARKER_ASSET, source);
-};
 
 export const createRouteManifestSnapshot = (
   routes: Record<string, RouteManifestSnapshotEntry>
@@ -154,22 +139,32 @@ const readRouteDirectoryState = async ({
 export const createRouteTopologyWatcher = async ({
   watchDirectory,
   getRouteTopology,
+  initialRouteTopology,
   restartMarkerPath,
   onError,
+  onRouteTopologyChange,
+  watchDirectoryEntry: watchDirectoryOverride = defaultWatchDirectoryEntry,
 }: {
   watchDirectory: string;
   getRouteTopology: () => Promise<Set<string>>;
+  initialRouteTopology?: Set<string>;
   restartMarkerPath: string;
   onError: (error: unknown) => void;
-}): Promise<() => void> => {
-  let state = await readRouteDirectoryState({
+  onRouteTopologyChange?: () => void | Promise<void>;
+  watchDirectoryEntry?: WatchDirectoryEntry;
+}): Promise<() => Promise<void>> => {
+  const discoveredState = await readRouteDirectoryState({
     watchDirectory,
     getRouteTopology,
   });
+  let state = {
+    ...discoveredState,
+    routeTopology: initialRouteTopology ?? discoveredState.routeTopology,
+  };
   let closed = false;
   let rescanTimer: ReturnType<typeof setTimeout> | undefined;
   let rescanQueue = Promise.resolve();
-  const directoryWatchers = new Map<string, FSWatcher>();
+  const directoryWatchers = new Map<string, DirectoryWatcher>();
 
   const touchRestartMarker = async (): Promise<void> => {
     await mkdir(dirname(restartMarkerPath), { recursive: true });
@@ -193,10 +188,14 @@ export const createRouteTopologyWatcher = async ({
         continue;
       }
       try {
-        const watcher = watch(directory, () => {
-          scheduleRescan();
+        let watcher: DirectoryWatcher;
+        watcher = watchDirectoryOverride(directory, scheduleRescan, error => {
+          if (directoryWatchers.get(directory) === watcher) {
+            watcher.close();
+            directoryWatchers.delete(directory);
+          }
+          onError(error);
         });
-        watcher.on('error', onError);
         directoryWatchers.set(directory, watcher);
       } catch (error) {
         onError(error);
@@ -218,10 +217,26 @@ export const createRouteTopologyWatcher = async ({
         watchDirectory,
         getRouteTopology,
       });
+      if (closed) {
+        return;
+      }
       syncDirectoryWatchers(nextState.directories);
       if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
+        if (onRouteTopologyChange) {
+          // This is a notification boundary, not part of the rescan
+          // transaction. A custom-server callback may close this watcher while
+          // replacing its compiler, so awaiting it here would deadlock close().
+          const notification = onRouteTopologyChange();
+          state = nextState;
+          void Promise.resolve(notification).catch(onError);
+          return;
+        } else {
+          await touchRestartMarker();
+        }
+        if (closed) {
+          return;
+        }
         state = nextState;
-        await touchRestartMarker();
         return;
       }
       state = nextState;
@@ -246,12 +261,24 @@ export const createRouteTopologyWatcher = async ({
   };
 
   syncDirectoryWatchers(state.directories);
+  if (initialRouteTopology) {
+    await runRescan();
+  }
 
-  return () => {
+  return async () => {
+    if (closed) {
+      await rescanQueue;
+      return;
+    }
     closed = true;
     if (rescanTimer) {
       clearTimeout(rescanTimer);
     }
+    for (const watcher of directoryWatchers.values()) {
+      watcher.close();
+    }
+    directoryWatchers.clear();
+    await rescanQueue;
     for (const watcher of directoryWatchers.values()) {
       watcher.close();
     }

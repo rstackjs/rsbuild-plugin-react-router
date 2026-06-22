@@ -3,7 +3,7 @@ import {
   type Module,
   type Symbol as YukuSymbol,
 } from 'yuku-analyzer';
-import { strip } from 'yuku-codegen';
+import { print } from 'yuku-codegen';
 import { walk } from 'yuku-parser';
 import { normalize, relative, resolve } from 'pathe';
 
@@ -126,6 +126,7 @@ const analyzeCode = (
     const module = analyzer.addFile(cacheKey, code, {
       lang: 'tsx',
       sourceType: 'module',
+      attachComments: true,
     });
     const errors = module.diagnostics.filter(
       diagnostic => diagnostic.severity === 'error'
@@ -405,7 +406,7 @@ const generateCode = (program: AnyNode): string | undefined => {
   if (program.body.length === 0) {
     return undefined;
   }
-  const result = strip(program as any, { comments: 'some' });
+  const result = print(program as any, { comments: true });
   if (result.errors.length > 0) {
     throw new Error(result.errors.map(error => error.message).join('\n'));
   }

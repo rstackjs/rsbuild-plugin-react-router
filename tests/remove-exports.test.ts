@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
-import { generate, parse, traverse } from '../src/babel';
+import { generate, parse, traverse } from '../src/yuku';
 import { removeExports, removeUnusedImports } from '../src/plugin-utils';
 
 function hasTopLevelAssignment(ast: any, textIncludes: string): boolean {
@@ -106,7 +106,7 @@ describe('removeExports', () => {
     expect(hasThemeImport).toBe(false);
   });
 
-  it('removes export-all declarations when removing server-only exports', () => {
+  it('preserves export-all declarations that cannot be filtered safely', () => {
     const code = `
       export * from './data.server';
       export default function Route() {
@@ -118,8 +118,26 @@ describe('removeExports', () => {
     removeExports(ast, ['loader']);
 
     const result = generate(ast).code;
-    expect(result).not.toContain("export * from './data.server'");
+    expect(result).toContain("export * from './data.server'");
     expect(result).toContain('Route');
+  });
+
+  it('keeps lowercase JSX member imports after removing server exports', () => {
+    const code = `
+      import { motion } from 'framer-motion';
+      export async function loader() { return null; }
+      export default function Route() {
+        return <motion.div />;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+    removeExports(ast, ['loader']);
+    removeUnusedImports(ast);
+
+    const result = generate(ast).code;
+    expect(result).toContain("import { motion } from 'framer-motion'");
+    expect(result).toContain('<motion.div');
   });
 
   it('does not treat imported names as local references', () => {
@@ -207,8 +225,7 @@ describe('removeExports', () => {
   it('removes every declaration in a deep dead dependency chain', () => {
     const helperCount = 64;
     const helpers = Array.from({ length: helperCount }, (_, index) => {
-      const value =
-        index === helperCount - 1 ? '1' : `helper${index + 1}()`;
+      const value = index === helperCount - 1 ? '1' : `helper${index + 1}()`;
       return `const helper${index} = () => ${value};`;
     }).join('\n');
     const code = `

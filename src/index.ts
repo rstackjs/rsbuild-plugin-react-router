@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
+import type { ResultPromise } from 'execa';
 import {
   rspack,
   type RsbuildEntryDescription,
@@ -38,10 +39,11 @@ import {
 } from './react-router-config.js';
 import {
   getReactRouterManifestForDev,
-  getRouteManifestModuleExports,
+  generateReactRouterManifestForDev,
   configRoutesToRouteManifest,
   createReactRouterManifestStats,
   type ReactRouterManifestStats,
+  type RouteManifestModuleExports,
 } from './manifest.js';
 import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
 import { createRequestHandler, matchRoutes } from 'react-router';
@@ -52,11 +54,13 @@ import {
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
-import { createRouteTransformExecutor } from './parallel-route-transforms.js';
+import {
+  createRouteTransformExecutor,
+  shouldParallelizeRouteTransforms,
+} from './parallel-route-transforms.js';
 import {
   createRouteTopologyWatcher,
   createRouteManifestSnapshot,
-  emitRouteRestartMarkerAsset,
   ensureDevRestartMarker,
   getRouteRestartMarkerPath,
   mergeWatchFiles,
@@ -167,11 +171,16 @@ export const pluginReactRouter = (
       warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
     });
 
+    let typegenProcess: ResultPromise | undefined;
+
     // Run typegen on build/dev
     api.onBeforeStartDevServer(async () => {
+      if (typegenProcess) {
+        return;
+      }
       const { execa } = await import('execa');
       // Run typegen in background (non-blocking) for watch mode
-      const child = execa(
+      typegenProcess = execa(
         'npx',
         ['--yes', 'react-router', 'typegen', '--watch'],
         {
@@ -181,9 +190,19 @@ export const pluginReactRouter = (
         }
       );
       // Don't await - let it run in the background
-      child.catch(() => {
+      typegenProcess.catch(() => {
         // Silently ignore errors when the process is killed on server shutdown
       });
+    });
+
+    api.onCloseDevServer(async () => {
+      const process = typegenProcess;
+      typegenProcess = undefined;
+      if (!process) {
+        return;
+      }
+      process.kill('SIGTERM');
+      await process.catch(() => undefined);
     });
 
     api.onBeforeBuild(async () => {
@@ -369,14 +388,16 @@ export const pluginReactRouter = (
       ? entryServerPath
       : templateServerPath;
 
-    const rootRoutePath = findEntryFile(resolve(appDirectory, 'root'));
+    const getRootRoutePath = () => findEntryFile(resolve(appDirectory, 'root'));
+    const rootRoutePath = getRootRoutePath();
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
     const getWatchedRouteTopology = async (): Promise<Set<string>> => {
       const latestRouteConfig = await loadRouteConfig();
+      const latestRootRouteFile = relative(appDirectory, getRootRoutePath());
       const latestRoutes = {
-        root: { path: '', id: 'root', file: rootRouteFile },
+        root: { path: '', id: 'root', file: latestRootRouteFile },
         ...configRoutesToRouteManifest(appDirectory, latestRouteConfig),
       };
       return createRouteManifestSnapshot(latestRoutes);
@@ -419,7 +440,9 @@ export const pluginReactRouter = (
     };
     const routeChunkCache: RouteChunkCache = new Map();
     const routeTransformExecutor = createRouteTransformExecutor({
-      parallelTransforms: pluginOptions.parallelTransforms,
+      parallelTransforms:
+        pluginOptions.parallelTransforms ??
+        shouldParallelizeRouteTransforms(routeCount),
       routeChunkCache,
       splitRouteModules: Boolean(splitRouteModules),
     });
@@ -435,6 +458,10 @@ export const pluginReactRouter = (
     const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
     const routeWatchFiles: WatchFileConfig[] = [
       {
+        paths: configPath,
+        type: 'reload-server',
+      },
+      {
         paths: routesPath,
         type: 'reload-server',
       },
@@ -443,14 +470,16 @@ export const pluginReactRouter = (
         type: 'reload-server',
       },
     ];
-    let closeRouteTopologyWatcher: (() => void) | undefined;
+    let closeRouteTopologyWatcher: (() => Promise<void>) | undefined;
 
     api.onBeforeStartDevServer(async () => {
       await ensureDevRestartMarker(routeRestartMarkerPath);
       closeRouteTopologyWatcher = await createRouteTopologyWatcher({
         watchDirectory,
         getRouteTopology: getWatchedRouteTopology,
+        initialRouteTopology: createRouteManifestSnapshot(routes),
         restartMarkerPath: routeRestartMarkerPath,
+        onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
         onError: error => {
           api.logger.warn(
             `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
@@ -459,8 +488,8 @@ export const pluginReactRouter = (
       });
     });
 
-    api.onCloseDevServer(() => {
-      closeRouteTopologyWatcher?.();
+    api.onCloseDevServer(async () => {
+      await closeRouteTopologyWatcher?.();
       closeRouteTopologyWatcher = undefined;
     });
     api.onCloseBuild(async () => {
@@ -474,6 +503,7 @@ export const pluginReactRouter = (
       ReturnType<typeof getReactRouterManifestForDev>
     >;
     let latestBrowserManifest: ReactRouterManifest | null = null;
+    let latestBrowserManifestModuleExports: RouteManifestModuleExports = {};
     let latestServerManifest: ReactRouterManifest | null = null;
     const latestServerManifestsByBundleId: Record<string, ReactRouterManifest> =
       {};
@@ -822,6 +852,7 @@ export const pluginReactRouter = (
 
     const validateSsrFalsePrerenderExports = async (
       manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
+      routeExports: RouteManifestModuleExports,
       prerenderList: string[]
     ) => {
       if (prerenderList.length === 0) {
@@ -844,8 +875,6 @@ export const pluginReactRouter = (
           prerenderedRoutes.add(match.route.id as string)
         );
       }
-
-      const routeExports = getRouteManifestModuleExports(manifest);
 
       const errors: string[] = [];
       for (const [routeId, route] of Object.entries(manifest.routes)) {
@@ -952,17 +981,24 @@ export const pluginReactRouter = (
 
         if (isPrerenderEnabled) {
           if (!ssr) {
-            const manifest =
-              latestBrowserManifest ??
-              (await getReactRouterManifestForDev(
-                routes,
-                pluginOptions,
-                clientStats,
-                appDirectory,
-                assetPrefix,
-                routeChunkOptions
-              ));
-            await validateSsrFalsePrerenderExports(manifest, prerenderPaths);
+            const generated = latestBrowserManifest
+              ? {
+                  manifest: latestBrowserManifest,
+                  moduleExportsByRouteId: latestBrowserManifestModuleExports,
+                }
+              : await generateReactRouterManifestForDev(
+                  routes,
+                  pluginOptions,
+                  clientStats,
+                  appDirectory,
+                  assetPrefix,
+                  routeChunkOptions
+                );
+            await validateSsrFalsePrerenderExports(
+              generated.manifest,
+              generated.moduleExportsByRouteId,
+              prerenderPaths
+            );
           }
 
           const routeTree = createPrerenderRoutes(routes);
@@ -1357,13 +1393,15 @@ export const pluginReactRouter = (
                     {
                       future,
                       manifestChunkNames,
-                      onManifest: (manifest, sri) => {
+                      onManifest: (manifest, sri, moduleExportsByRouteId) => {
                         performanceProfiler.recordSync(
                           'web',
                           'manifest:stage',
                           'virtual/react-router/browser-manifest',
                           () => {
                             latestBrowserManifest = manifest;
+                            latestBrowserManifestModuleExports =
+                              moduleExportsByRouteId;
                             const baseServerManifest = {
                               ...manifest,
                               sri,
@@ -1402,19 +1440,6 @@ export const pluginReactRouter = (
         });
       }
     );
-
-    if (isBuild) {
-      api.processAssets(
-        { stage: 'additional', targets: ['web'] },
-        ({ sources, compilation }) => {
-          emitRouteRestartMarkerAsset({
-            restartMarkerPath: routeRestartMarkerPath,
-            sources,
-            compilation,
-          });
-        }
-      );
-    }
 
     api.processAssets(
       { stage: 'additional', targets: ['node'] },
@@ -1602,6 +1627,10 @@ export const pluginReactRouter = (
               resource: args.resource,
               resourcePath: args.resourcePath,
               environmentName: args.environment.name,
+              sourceMaps:
+                args.environment.config.output.sourceMap === true ||
+                (typeof args.environment.config.output.sourceMap === 'object' &&
+                  Boolean(args.environment.config.output.sourceMap.js)),
               ssr,
               isBuild,
               isSpaMode,

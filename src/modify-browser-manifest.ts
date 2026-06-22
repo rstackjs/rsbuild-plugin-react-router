@@ -4,6 +4,7 @@ import { rspack } from '@rsbuild/core';
 import type { Rspack } from '@rsbuild/core';
 import {
   createReactRouterManifestStats,
+  generateReactRouterManifestForDev,
   getReactRouterManifestChunkNames,
   getReactRouterManifestForDev,
   getReactRouterManifestPath,
@@ -29,7 +30,10 @@ export function createModifyBrowserManifestPlugin(
     manifestChunkNames?: ReadonlySet<string>;
     onManifest?: (
       manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
-      sri: Record<string, string> | undefined
+      sri: Record<string, string> | undefined,
+      moduleExportsByRouteId: Awaited<
+        ReturnType<typeof generateReactRouterManifestForDev>
+      >['moduleExportsByRouteId']
     ) => void;
   }
 ) {
@@ -42,21 +46,22 @@ export function createModifyBrowserManifestPlugin(
 
   return {
     apply(compiler: Rspack.Compiler): void {
-      compiler.hooks.emit.tapAsync(
+      compiler.hooks.emit.tapPromise(
         'ModifyBrowserManifest',
-        async (compilation: Rspack.Compilation, callback) => {
+        async (compilation: Rspack.Compilation) => {
           const stats = createReactRouterManifestStats(
             compilation,
             manifestChunkNames
           );
-          const manifest = await getReactRouterManifestForDev(
-            routes,
-            pluginOptions,
-            stats,
-            appDirectory,
-            assetPrefix,
-            routeChunkOptions
-          );
+          const { manifest, moduleExportsByRouteId } =
+            await generateReactRouterManifestForDev(
+              routes,
+              pluginOptions,
+              stats,
+              appDirectory,
+              assetPrefix,
+              routeChunkOptions
+            );
 
           const virtualManifestPath =
             'static/js/virtual/react-router/browser-manifest.js';
@@ -136,8 +141,7 @@ export function createModifyBrowserManifestPlugin(
             }
           }
 
-          options?.onManifest?.(manifest, sri);
-          callback();
+          options?.onManifest?.(manifest, sri, moduleExportsByRouteId);
         }
       );
     },

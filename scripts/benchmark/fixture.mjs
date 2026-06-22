@@ -237,6 +237,7 @@ const createRsbuildConfig = ({
   variant,
   sourceMap,
   pluginImportPath,
+  pluginReactImportPath,
   parallelTransforms,
 }) => {
   const ssr = variant !== 'spa';
@@ -248,7 +249,7 @@ const createRsbuildConfig = ({
 
   return [
     `import { defineConfig } from '@rsbuild/core';`,
-    `import { pluginReact } from '@rsbuild/plugin-react';`,
+    `import { pluginReact } from '${pluginReactImportPath}';`,
     `import { pluginReactRouter } from '${pluginImportPath}';`,
     '',
     'export default defineConfig({',
@@ -361,6 +362,7 @@ export async function generateSyntheticFixture({
   variant,
   sourceMap = false,
   pluginImportPath = 'rsbuild-plugin-react-router',
+  pluginReactImportPath = '@rsbuild/plugin-react',
   fixture = 'default',
   parallelTransforms,
 }) {
@@ -385,6 +387,7 @@ export async function generateSyntheticFixture({
       variant,
       sourceMap,
       pluginImportPath,
+      pluginReactImportPath,
       parallelTransforms,
     })
   );

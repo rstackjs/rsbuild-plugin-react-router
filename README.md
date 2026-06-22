@@ -104,9 +104,16 @@ pluginReactRouter({
   /**
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
-   * @default true, using `available CPUs - 2` workers.
+   * @default Automatically enabled for 256+ resolved routes. The automatic
+   * pool is capped at 8 workers.
    */
   parallelTransforms?: boolean | { maxWorkers?: number },
+
+  /**
+   * Route-topology notification for programmatic/custom dev servers.
+   * Recreate the Rsbuild server when this fires.
+   */
+  onRouteTopologyChange?: () => void | Promise<void>,
 
   /**
    * Enable experimental support for module federation
@@ -277,8 +284,8 @@ export default {
 } satisfies Config;
 ```
 
-For large sites, prerendering defaults to `availableParallelism - 2` concurrent
-paths. You can tune prerender concurrency:
+Prerendering defaults to one path at a time, matching React Router. You can opt
+into concurrent prerendering for large sites:
 
 ```ts
 export default {
@@ -302,7 +309,7 @@ If no configuration is provided, the following defaults will be used:
   federation: false,
   lazyCompilation: false,
   logPerformance: false,
-  parallelTransforms: true // adaptive worker pool
+  parallelTransforms: undefined // adaptive: workers for 256+ resolved routes
 }
 
 // Router defaults (react-router.config.ts)
@@ -314,9 +321,10 @@ If no configuration is provided, the following defaults will be used:
 }
 ```
 
-`parallelTransforms: true` uses worker threads for route builds. The default
-worker count is `availableParallelism - 2`. Pass `{ maxWorkers }` to override
-that count, or `false` to run route transforms inline.
+Route transforms run inline for fewer than 256 resolved routes and use worker
+threads for larger route graphs. The automatic worker count is capped at 8.
+Pass `true` to force workers, `{ maxWorkers }` (up to 32) to override that
+count, or `false` to force inline transforms.
 
 For builds with 256+ routes, detailed file-size reporting is compacted to totals
 by default to avoid gzipping and printing thousands of assets. Set
@@ -436,6 +444,12 @@ export default defineConfig(() => {
   };
 });
 ```
+
+If the server is created programmatically with `createDevServer()`, pass
+`onRouteTopologyChange` and use it to recreate that server. Rsbuild's
+`reload-server` watcher is owned by the CLI and is not installed by the
+programmatic API. The callback is a notification and is not awaited, so it can
+safely close the current server as part of the replacement.
 
 When using a custom server, you'll need to:
 
