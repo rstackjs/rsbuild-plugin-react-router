@@ -45,6 +45,7 @@ import {
   getReactRouterManifestForDev,
   generateReactRouterManifestForDev,
   configRoutesToRouteManifest,
+  configRoutesToRouteManifestEntries,
   createReactRouterManifestStats,
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
@@ -412,14 +413,21 @@ export const pluginReactRouter = (
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
+    const createRouteTopologySnapshot = (
+      latestRootRouteFile: string,
+      latestRouteConfig: RouteConfigEntry[]
+    ) =>
+      createRouteManifestSnapshot([
+        ['root', { path: '', id: 'root', file: latestRootRouteFile }],
+        ...configRoutesToRouteManifestEntries(appDirectory, latestRouteConfig),
+      ]);
     const getWatchedRouteTopology = async (): Promise<Set<string>> => {
       const latestRouteConfig = await loadRouteConfig();
       const latestRootRouteFile = relative(appDirectory, getRootRoutePath());
-      const latestRoutes = {
-        root: { path: '', id: 'root', file: latestRootRouteFile },
-        ...configRoutesToRouteManifest(appDirectory, latestRouteConfig),
-      };
-      return createRouteManifestSnapshot(latestRoutes);
+      return createRouteTopologySnapshot(
+        latestRootRouteFile,
+        latestRouteConfig
+      );
     };
 
     const routes = {
@@ -475,19 +483,25 @@ export const pluginReactRouter = (
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
     const watchDirectory = resolve(appDirectory);
     const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
+    const routeTopologyWatchFiles: WatchFileConfig[] =
+      pluginOptions.onRouteTopologyChange
+        ? []
+        : [
+            {
+              paths: routesPath,
+              type: 'reload-server',
+            },
+            {
+              paths: routeRestartMarkerPath,
+              type: 'reload-server',
+            },
+          ];
     const routeWatchFiles: WatchFileConfig[] = [
       {
         paths: configWatchPaths,
         type: 'reload-server',
       },
-      {
-        paths: routesPath,
-        type: 'reload-server',
-      },
-      {
-        paths: routeRestartMarkerPath,
-        type: 'reload-server',
-      },
+      ...routeTopologyWatchFiles,
     ];
     let closeRouteTopologyWatcher: (() => Promise<void>) | undefined;
 
@@ -496,7 +510,10 @@ export const pluginReactRouter = (
       closeRouteTopologyWatcher = await createRouteTopologyWatcher({
         watchDirectory,
         getRouteTopology: getWatchedRouteTopology,
-        initialRouteTopology: createRouteManifestSnapshot(routes),
+        initialRouteTopology: createRouteTopologySnapshot(
+          rootRouteFile,
+          routeConfig
+        ),
         restartMarkerPath: routeRestartMarkerPath,
         onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
         onError: error => {

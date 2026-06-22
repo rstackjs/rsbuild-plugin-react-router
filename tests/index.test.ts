@@ -96,6 +96,44 @@ describe('pluginReactRouter', () => {
     }
   });
 
+  it('lets custom route topology callbacks own route restart handling', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([
+      pluginReactRouter({
+        onRouteTopologyChange: () => {},
+      }),
+    ]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.watchFiles).toEqual(
+      expect.arrayContaining([
+        {
+          paths: expect.stringMatching(
+            /react-router\.config\.[cm]?[jt]sx?$/
+          ),
+          type: 'reload-server',
+        },
+      ])
+    );
+    expect(config.dev.watchFiles).not.toEqual(
+      expect.arrayContaining([
+        {
+          paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
+          type: 'reload-server',
+        },
+        {
+          paths: expect.stringMatching(
+            /build\/client\/\.react-router\/route-watch$/
+          ),
+          type: 'reload-server',
+        },
+      ])
+    );
+  });
+
   it('should respect server output format', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},

@@ -18,7 +18,9 @@ counts for stress testing.
 
 All benchmark profiles generate deterministic synthetic React Router apps under
 `.benchmark/fixtures/`, build the current plugin package once, then run Rsbuild
-builds with `pluginReactRouter({ logPerformance: true })`.
+builds with plugin performance instrumentation disabled by default. Pass
+`--log-performance` when you need diagnostic `[react-router:performance]`
+operation reports.
 
 To capture Rspack tracing output for a benchmark, pass `--rspack-profile`:
 
@@ -57,11 +59,12 @@ Each run writes:
 - `.benchmark/results/<profile>/baseline.json`
 - `.benchmark/results/<profile>/baseline.md`
 
-The JSON includes wall time, optional GNU `/usr/bin/time -v` user/sys/RSS data,
-parsed `[react-router:performance]` reports from the plugin, and an aggregated
+The JSON includes wall time and optional GNU `/usr/bin/time -v` user/sys/RSS
+data. Diagnostic runs with `--log-performance` also include parsed
+`[react-router:performance]` reports from the plugin and an aggregated
 `pluginOperations` table per fixture. The markdown report includes the same
-operation breakdown so route transforms and manifest work can be compared
-without opening the raw JSON.
+operation breakdown when instrumentation is enabled so route transforms and
+manifest work can be compared without opening the raw JSON.
 
 ## Hygiene
 

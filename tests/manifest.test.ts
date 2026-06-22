@@ -5,6 +5,7 @@ import { describe, expect, it } from '@rstest/core';
 import {
   createReactRouterManifestStats,
   configRoutesToRouteManifest,
+  configRoutesToRouteManifestEntries,
   generateReactRouterManifestForDev,
   getReactRouterManifestForDev,
   getReactRouterManifestChunkNames,
@@ -170,6 +171,25 @@ describe('manifest', () => {
       expect(result['routes/home'].id).toBe('routes/home');
       expect(result['routes/home'].path).toBe('/');
       expect(result['routes/home'].index).toBe(true);
+    });
+
+    it('preserves declaration order in route manifest entries', () => {
+      const routeConfig = [
+        {
+          id: '2',
+          file: 'routes/two.tsx',
+          path: ':value',
+        },
+        {
+          id: '1',
+          file: 'routes/one.tsx',
+          path: ':value',
+        },
+      ];
+
+      const result = configRoutesToRouteManifestEntries('app', routeConfig);
+
+      expect(result.map(([id]) => id)).toEqual(['2', '1']);
     });
 
     it('should handle nested routes with parentId', () => {
