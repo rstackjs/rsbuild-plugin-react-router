@@ -50,11 +50,9 @@ class WorkerStartupError extends Error {
 
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
-const DEFAULT_MAX_WORKERS = 8;
-const MAX_CONFIGURED_WORKERS = 32;
 
 export const getDefaultWorkerCount = (cpuCount?: number): number =>
-  Math.min(DEFAULT_MAX_WORKERS, getDefaultConcurrency(cpuCount));
+  getDefaultConcurrency(cpuCount);
 
 export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
   routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
@@ -73,11 +71,6 @@ const getConfiguredWorkerCount = (
   if (!Number.isInteger(configured) || configured < 1) {
     throw new Error(
       '[react-router] parallelTransforms.maxWorkers must be a positive integer.'
-    );
-  }
-  if (configured > MAX_CONFIGURED_WORKERS) {
-    throw new Error(
-      `[react-router] parallelTransforms.maxWorkers must not exceed ${MAX_CONFIGURED_WORKERS}.`
     );
   }
   return configured;

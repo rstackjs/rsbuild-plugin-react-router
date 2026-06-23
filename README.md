@@ -105,7 +105,7 @@ pluginReactRouter({
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
    * @default Automatically enabled for 256+ resolved routes. The automatic
-   * pool is capped at 8 workers.
+   * pool uses available CPU cores minus 2.
    */
   parallelTransforms?: boolean | { maxWorkers?: number },
 
@@ -322,8 +322,8 @@ If no configuration is provided, the following defaults will be used:
 ```
 
 Route transforms run inline for fewer than 256 resolved routes and use worker
-threads for larger route graphs. The automatic worker count is capped at 8.
-Pass `true` to force workers, `{ maxWorkers }` (up to 32) to override that
+threads for larger route graphs. The automatic worker count uses available CPU
+cores minus 2. Pass `true` to force workers, `{ maxWorkers }` to override that
 count, or `false` to force inline transforms.
 
 For builds with 256+ routes, detailed file-size reporting is compacted to totals

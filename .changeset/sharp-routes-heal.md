@@ -1,5 +1,5 @@
 ---
-"rsbuild-plugin-react-router": patch
+'rsbuild-plugin-react-router': patch
 ---
 
 Harden route module transforms and development route watching so source maps,
