@@ -33,7 +33,11 @@ export function createModifyBrowserManifestPlugin(
       sri: Record<string, string> | undefined,
       moduleExportsByRouteId: Awaited<
         ReturnType<typeof generateReactRouterManifestForDev>
-      >['moduleExportsByRouteId']
+      >['moduleExportsByRouteId'],
+      context: {
+        compilation: Rspack.Compilation;
+        manifestStats: ReturnType<typeof createReactRouterManifestStats>;
+      }
     ) => void;
   }
 ) {
@@ -141,7 +145,10 @@ export function createModifyBrowserManifestPlugin(
             }
           }
 
-          options?.onManifest?.(manifest, sri, moduleExportsByRouteId);
+          options?.onManifest?.(manifest, sri, moduleExportsByRouteId, {
+            compilation,
+            manifestStats: stats,
+          });
         }
       );
     },

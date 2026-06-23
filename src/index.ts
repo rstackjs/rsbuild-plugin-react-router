@@ -28,6 +28,14 @@ import {
 } from './plugin-utils.js';
 import type { PluginOptions } from './types.js';
 import {
+  ReactRouterDevGenerationCoordinator,
+  registerReactRouterDevServer,
+  unregisterReactRouterDevServer,
+  loadReactRouterServerBuild,
+  type ReactRouterDevManifest,
+  type ReactRouterServerBuild,
+} from './dev-generation-coordinator.js';
+import {
   generateServerBuild,
   normalizeBuildModule,
   resolveBuildExports,
@@ -89,6 +97,8 @@ import {
 import { mapVirtualModules } from './virtual-modules.js';
 
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
+
+export { loadReactRouterServerBuild };
 
 type ModuleFederationPluginLike = {
   name?: string;
@@ -538,6 +548,19 @@ export const pluginReactRouter = (
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
     >;
+    const devGenerationCoordinator = new ReactRouterDevGenerationCoordinator();
+    let currentDevServer: object | undefined;
+    api.onBeforeStartDevServer(({ server }) => {
+      currentDevServer = server as object;
+      registerReactRouterDevServer(currentDevServer, devGenerationCoordinator);
+    });
+    api.onCloseDevServer(() => {
+      if (currentDevServer) {
+        unregisterReactRouterDevServer(currentDevServer);
+        currentDevServer = undefined;
+      }
+      devGenerationCoordinator.close();
+    });
     let latestBrowserManifest: ReactRouterManifest | null = null;
     let latestBrowserManifestModuleExports: RouteManifestModuleExports = {};
     let latestServerManifest: ReactRouterManifest | null = null;
@@ -587,14 +610,125 @@ export const pluginReactRouter = (
       rootDirectory: process.cwd(),
     });
     const routesByServerBundleId = getRoutesByServerBundleId(buildManifest);
+    const serverBuildFileBase = (serverBuildFile || 'index.js').replace(
+      /\.js$/,
+      ''
+    );
+    const serverBuildEntryNames = [
+      'static/js/app',
+      ...Object.entries(routesByServerBundleId)
+        .filter(([, bundleRoutes]) => {
+          return bundleRoutes && Object.keys(bundleRoutes).length > 0;
+        })
+        .map(([bundleId]) => `${bundleId}/${serverBuildFileBase}`),
+    ];
 
     let clientStats: ReactRouterManifestStats | undefined;
-    api.onAfterEnvironmentCompile(({ stats, environment }) => {
+    const statsHasErrors = (stats: Rspack.Stats | undefined): boolean => {
+      return Boolean(
+        stats && typeof stats.hasErrors === 'function'
+          ? stats.hasErrors()
+          : false
+      );
+    };
+    const loadDevServerBuild = async (
+      entryName: string
+    ): Promise<ReactRouterServerBuild | null> => {
+      if (!currentDevServer) {
+        throw new Error(
+          `[${PLUGIN_NAME}] Cannot evaluate React Router server build before the Rsbuild dev server is registered.`
+        );
+      }
+      const devServer = currentDevServer as {
+        environments?: {
+          node?: {
+            loadBundle?: (entryName: string) => Promise<unknown>;
+          };
+        };
+      };
+      const loadBundle = devServer.environments?.node?.loadBundle;
+      if (typeof loadBundle !== 'function') {
+        throw new Error(
+          `[${PLUGIN_NAME}] Rsbuild dev server does not expose node.loadBundle().`
+        );
+      }
+
+      try {
+        const bundle = await loadBundle(entryName);
+        const normalizedBuild = normalizeBuildModule(
+          bundle as Record<string, any>
+        );
+        const build = await resolveBuildExports(normalizedBuild);
+        if (!build || !build.routes) {
+          throw new Error(
+            `[${PLUGIN_NAME}] Server build "${entryName}" is missing React Router routes.`
+          );
+        }
+        return build as ReactRouterServerBuild;
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("Can't find entry")
+        ) {
+          return null;
+        }
+        throw error;
+      }
+    };
+    const stageNodeServerBuilds = async (
+      stats: Rspack.Stats | undefined
+    ): Promise<void> => {
+      const buildsByEntryName: Record<string, ReactRouterServerBuild> = {};
+      for (const entryName of serverBuildEntryNames) {
+        const build = await loadDevServerBuild(entryName);
+        if (build) {
+          buildsByEntryName[entryName] = build;
+        }
+      }
+
+      if (Object.keys(buildsByEntryName).length === 0) {
+        throw new Error(
+          `[${PLUGIN_NAME}] React Router server build not found.`
+        );
+      }
+
+      const nodeStage = devGenerationCoordinator.stageNode({
+        stats,
+        buildsByEntryName,
+      });
+      devGenerationCoordinator.commit(
+        devGenerationCoordinator.getLatestWebStage(),
+        nodeStage
+      );
+    };
+
+    api.onAfterEnvironmentCompile(async ({ stats, environment }) => {
       if (environment.name === 'web') {
         clientStats = createReactRouterManifestStats(
           stats?.compilation,
           manifestChunkNames
         );
+        if (!isBuild && statsHasErrors(stats)) {
+          devGenerationCoordinator.reject(
+            new Error(`[${PLUGIN_NAME}] Web compilation has errors.`)
+          );
+        }
+      }
+      if (!isBuild && environment.name === 'node') {
+        if (statsHasErrors(stats)) {
+          devGenerationCoordinator.reject(
+            new Error(`[${PLUGIN_NAME}] Node compilation has errors.`)
+          );
+        } else {
+          try {
+            await stageNodeServerBuilds(stats);
+          } catch (error) {
+            devGenerationCoordinator.reject(error);
+            api.logger.error(
+              error instanceof Error ? error.message : String(error)
+            );
+          }
+        }
       }
       if (pluginOptions.federation && ssr) {
         const serverBuildDir = resolve(buildDirectory, 'server');
@@ -1232,11 +1366,6 @@ export const pluginReactRouter = (
           : useAsyncNodeChunkLoading
             ? 'async-node'
             : 'require';
-      const serverBuildFileBase = (serverBuildFile || 'index.js').replace(
-        /\.js$/,
-        ''
-      );
-
       const nodeEntries: Record<string, string> = {
         ...(hasServerApp
           ? {
@@ -1429,7 +1558,12 @@ export const pluginReactRouter = (
                     {
                       future,
                       manifestChunkNames,
-                      onManifest: (manifest, sri, moduleExportsByRouteId) => {
+                      onManifest: (
+                        manifest,
+                        sri,
+                        moduleExportsByRouteId,
+                        manifestContext
+                      ) => {
                         performanceProfiler.recordSync(
                           'web',
                           'manifest:stage',
@@ -1443,6 +1577,10 @@ export const pluginReactRouter = (
                               sri,
                             };
                             latestServerManifest = baseServerManifest;
+                            const nextServerManifestsByBundleId: Record<
+                              string,
+                              ReactRouterManifest
+                            > = {};
                             for (const [
                               bundleId,
                               bundleRoutes,
@@ -1458,10 +1596,29 @@ export const pluginReactRouter = (
                                   ([routeId]) => routeIds.has(routeId)
                                 )
                               );
-                              latestServerManifestsByBundleId[bundleId] = {
+                              nextServerManifestsByBundleId[bundleId] = {
                                 ...baseServerManifest,
                                 routes: filteredRoutes,
                               };
+                            }
+                            Object.assign(
+                              latestServerManifestsByBundleId,
+                              nextServerManifestsByBundleId
+                            );
+                            if (!isBuild) {
+                              devGenerationCoordinator.stageWeb({
+                                compilation: manifestContext.compilation,
+                                browserManifest:
+                                  manifest as ReactRouterDevManifest,
+                                serverManifest:
+                                  baseServerManifest as ReactRouterDevManifest,
+                                serverManifestsByBundleId:
+                                  nextServerManifestsByBundleId as Record<
+                                    string,
+                                    ReactRouterDevManifest
+                                  >,
+                                moduleExportsByRouteId,
+                              });
                             }
                           }
                         );
@@ -1513,8 +1670,16 @@ export const pluginReactRouter = (
               /virtual\/react-router\/server-manifest(?:-([^?]+))?/
             );
             const bundleId = bundleMatch?.[1]?.replace(/\.js$/, '');
+            const stagedWeb = !isBuild
+              ? devGenerationCoordinator.getLatestWebStage()
+              : null;
 
             const manifest =
+              (!isBuild && stagedWeb
+                ? bundleId && stagedWeb.serverManifestsByBundleId[bundleId]
+                  ? stagedWeb.serverManifestsByBundleId[bundleId]
+                  : stagedWeb.serverManifest
+                : null) ??
               (isBuild && latestServerManifest
                 ? bundleId && latestServerManifestsByBundleId[bundleId]
                   ? latestServerManifestsByBundleId[bundleId]
