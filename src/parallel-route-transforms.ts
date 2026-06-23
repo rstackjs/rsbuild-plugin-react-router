@@ -38,7 +38,6 @@ type WorkerState = {
   worker: Worker;
   pending: Map<number, PendingTask>;
   sourceCache: Map<string, string>;
-  startupError?: WorkerStartupError;
 };
 
 class WorkerStartupError extends Error {
@@ -170,7 +169,6 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     const workers = this.#workers;
     this.#workers = [];
     for (const state of workers) {
-      state.startupError = error;
       for (const pending of state.pending.values()) {
         pending.reject(error);
       }
@@ -224,9 +222,6 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     const state = this.#workers[workerIndex];
     if (!state) {
       return executeRouteTransformTask(task, this.options);
-    }
-    if (state.startupError) {
-      return Promise.reject(state.startupError);
     }
 
     const id = this.#nextId++;
