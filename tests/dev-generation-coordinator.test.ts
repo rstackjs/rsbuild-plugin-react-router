@@ -31,7 +31,7 @@ const createBuild = (assets: any, loader?: () => unknown) =>
   }) as any;
 
 describe('ReactRouterDevGenerationCoordinator', () => {
-  it('rejects a server build whose embedded manifest does not match the staged web candidate', () => {
+  it('normalizes stale embedded manifests to the staged web candidate', () => {
     const coordinator = new ReactRouterDevGenerationCoordinator();
     const firstManifest = createManifest(false);
     const firstWeb = coordinator.stageWeb({
@@ -54,16 +54,17 @@ describe('ReactRouterDevGenerationCoordinator', () => {
       serverManifestsByBundleId: {},
       moduleExportsByRouteId: {},
     });
+    const staleBuild = createBuild(firstManifest, () => 'data');
     const mismatchedNode = coordinator.stageNode({
       buildsByEntryName: {
-        'static/js/app': createBuild(firstManifest, () => 'data'),
+        'static/js/app': staleBuild,
       },
     });
 
-    expect(() => coordinator.commit(nextWeb, mismatchedNode)).toThrow(
-      'does not match the staged web manifest'
-    );
-    expect(coordinator.getCommitted()).toBe(firstGeneration);
+    const nextGeneration = coordinator.commit(nextWeb, mismatchedNode);
+    expect(nextGeneration).not.toBe(firstGeneration);
+    expect(staleBuild.assets).toBe(nextManifest);
+    expect(coordinator.getCommitted()).toBe(nextGeneration);
   });
 
   it('keeps serving the last committed build after a rejected candidate', async () => {

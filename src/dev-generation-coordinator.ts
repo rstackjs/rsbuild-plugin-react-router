@@ -1,16 +1,18 @@
 import type { Rspack } from '@rsbuild/core';
-import type { ServerBuild } from 'react-router';
+import type {
+  ServerBuild,
+  UNSAFE_AssetsManifest as AssetsManifest,
+} from 'react-router';
 import type { RouteManifestModuleExports } from './manifest.js';
 
-export type ReactRouterDevManifest = {
-  version?: string;
-  routes?: Record<string, unknown>;
+export type ReactRouterDevManifest = AssetsManifest & {
+  routes: Record<string, unknown>;
   [key: string]: unknown;
 };
 
 export type ReactRouterServerBuild = ServerBuild & {
-  assets?: ReactRouterDevManifest;
-  routes?: Record<string, { module?: Record<string, unknown> }>;
+  assets: ReactRouterDevManifest;
+  routes: Record<string, { module?: Record<string, unknown> }>;
 };
 
 export type ReactRouterWebStage = {
@@ -75,6 +77,11 @@ export class ReactRouterDevGenerationCoordinator {
 
   getCommitted(): ReactRouterDevGeneration | null {
     return this.committed;
+  }
+
+  resetStaging(): void {
+    this.latestWebStage = null;
+    this.latestNodeStage = null;
   }
 
   getLastError(): unknown {
@@ -152,12 +159,8 @@ export class ReactRouterDevGenerationCoordinator {
           `[rsbuild-plugin-react-router] Server build "${entryName}" does not expose a React Router assets manifest.`
         );
       }
-      if (!manifestsMatch(expectedManifest, actualManifest)) {
-        throw new Error(
-          `[rsbuild-plugin-react-router] Server build "${entryName}" does not match the staged web manifest.`
-        );
-      }
-      assertBuildMatchesManifest(entryName, build, actualManifest);
+      assertBuildMatchesManifest(entryName, build, expectedManifest);
+      build.assets = expectedManifest;
     }
   }
 }
@@ -175,28 +178,6 @@ const getExpectedManifestForEntry = (
   );
 };
 
-const stableStringify = (value: unknown): string =>
-  JSON.stringify(sortObject(value));
-
-const sortObject = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map(sortObject);
-  }
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, nextValue]) => [key, sortObject(nextValue)])
-  );
-};
-
-const manifestsMatch = (
-  expected: ReactRouterDevManifest,
-  actual: ReactRouterDevManifest
-): boolean => stableStringify(expected) === stableStringify(actual);
-
 const assertBuildMatchesManifest = (
   entryName: string,
   build: ReactRouterServerBuild,
@@ -213,7 +194,9 @@ const assertBuildMatchesManifest = (
     }
     const routeModule = build.routes[routeId]?.module;
     if (!routeModule) {
-      continue;
+      throw new Error(
+        `[rsbuild-plugin-react-router] Server build "${entryName}" route "${routeId}" is missing from the evaluated server build.`
+      );
     }
     const hasLoader = Boolean(
       (manifestRoute as { hasLoader?: unknown }).hasLoader
