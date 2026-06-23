@@ -1,5 +1,5 @@
 ---
-"rsbuild-plugin-react-router": patch
+'rsbuild-plugin-react-router': patch
 ---
 
 Avoid duplicate startup route topology scans and tighten development watcher

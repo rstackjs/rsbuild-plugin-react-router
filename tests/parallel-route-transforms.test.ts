@@ -61,24 +61,18 @@ describe('parallel route transforms', () => {
     [6, 4],
     [8, 6],
     [10, 8],
-    [12, 8],
-    [24, 8],
-  ])('caps the automatic worker count', (cpus, workers) => {
+    [12, 10],
+    [24, 22],
+  ])('defaults worker count to CPU cores minus two', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
 
-  it('rejects unsafe explicit worker counts', () => {
+  it('rejects invalid explicit worker counts', () => {
     expect(() =>
       createRouteTransformExecutor({
         parallelTransforms: { maxWorkers: 1.5 },
       })
     ).toThrow('must be a positive integer');
-
-    expect(() =>
-      createRouteTransformExecutor({
-        parallelTransforms: { maxWorkers: 33 },
-      })
-    ).toThrow('must not exceed 32');
   });
 
   it('honors explicit maxWorkers', async () => {
