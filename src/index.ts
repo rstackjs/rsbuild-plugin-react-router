@@ -551,6 +551,7 @@ export const pluginReactRouter = (
     const devGenerationCoordinator = new ReactRouterDevGenerationCoordinator();
     let currentDevServer: object | undefined;
     api.onBeforeStartDevServer(({ server }) => {
+      devGenerationCoordinator.resetStaging();
       currentDevServer = server as object;
       registerReactRouterDevServer(currentDevServer, devGenerationCoordinator);
     });
@@ -1423,6 +1424,10 @@ export const pluginReactRouter = (
               ? []
               : [
                   (middlewares, server) => {
+                    registerReactRouterDevServer(
+                      server as object,
+                      devGenerationCoordinator
+                    );
                     middlewares.push(createDevServerMiddleware(server));
                   },
                 ],
