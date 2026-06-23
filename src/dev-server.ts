@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { loadReactRouterServerBuild } from './dev-generation-coordinator.js';
 import { normalizeBuildModule, resolveBuildExports } from './server-utils.js';
 
 export type DevServerMiddleware = (
@@ -14,22 +15,7 @@ export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
     next: (err?: any) => void
   ): Promise<void> => {
     try {
-      const tryLoadBundle = async (entryName: string) => {
-        try {
-          return await server.environments.node.loadBundle(entryName);
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message.includes("Can't find entry")
-          ) {
-            return null;
-          }
-          throw error;
-        }
-      };
-
-      const bundle =
-        (await tryLoadBundle('static/js/app')) ?? (await tryLoadBundle('app'));
+      const bundle = await loadReactRouterServerBuild(server);
 
       if (!bundle || !bundle.routes) {
         throw new Error('Server bundle not found or invalid');
