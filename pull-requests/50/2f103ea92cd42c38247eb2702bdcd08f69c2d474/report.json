@@ -1,0 +1,78 @@
+{
+  "generatedAt": "2026-06-24T21:18:48.825Z",
+  "pullRequest": "50",
+  "base": {
+    "ref": "main",
+    "sha": "06ae3dbd02b434759bd64b027e26e09601a7afb1",
+    "benchmarkCommit": "06ae3dbd02b434759bd64b027e26e09601a7afb1"
+  },
+  "head": {
+    "ref": "codex/architecture-refactors",
+    "sha": "2f103ea92cd42c38247eb2702bdcd08f69c2d474",
+    "benchmarkCommit": "2f103ea92cd42c38247eb2702bdcd08f69c2d474"
+  },
+  "runUrl": "https://github.com/rstackjs/rsbuild-plugin-react-router/actions/runs/28130078169",
+  "profile": "default",
+  "iterations": 5,
+  "warmup": 1,
+  "summary": {
+    "baseWallMs": 20108.495944,
+    "headWallMs": 9268.216945,
+    "wallDeltaPercent": -53.90894987466497,
+    "wallSpeedup": 2.169618607692183
+  },
+  "benchmarks": [
+    {
+      "id": "synthetic-256-sourcemaps",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 3558.35734599999,
+      "headWallMs": 2257.000183999997,
+      "wallDeltaPercent": -36.571851432034244,
+      "wallSpeedup": 1.5765870872432304,
+      "baseCpuMs": 6130,
+      "headCpuMs": 4610,
+      "baseRssKb": 534756,
+      "headRssKb": 419248
+    },
+    {
+      "id": "synthetic-256-spa",
+      "routeCount": 256,
+      "variant": "spa",
+      "baseWallMs": 8391.342740000007,
+      "headWallMs": 2218.446272000001,
+      "wallDeltaPercent": -73.56267833722164,
+      "wallSpeedup": 3.7825314256697955,
+      "baseCpuMs": 5970,
+      "headCpuMs": 4400,
+      "baseRssKb": 518088,
+      "headRssKb": 405552
+    },
+    {
+      "id": "synthetic-256-ssr-esm",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 3506.680801999999,
+      "headWallMs": 2185.479789000001,
+      "wallDeltaPercent": -37.67668309720305,
+      "wallSpeedup": 1.6045359099863987,
+      "baseCpuMs": 6100,
+      "headCpuMs": 4480,
+      "baseRssKb": 519252,
+      "headRssKb": 398936
+    },
+    {
+      "id": "synthetic-256-ssr-esm-split",
+      "routeCount": 256,
+      "variant": "ssr-esm-split",
+      "baseWallMs": 4652.115056000002,
+      "headWallMs": 2607.2907000000014,
+      "wallDeltaPercent": -43.95472449381312,
+      "wallSpeedup": 1.7842717177643443,
+      "baseCpuMs": 8280,
+      "headCpuMs": 5590,
+      "baseRssKb": 717312,
+      "headRssKb": 424612
+    }
+  ]
+}
