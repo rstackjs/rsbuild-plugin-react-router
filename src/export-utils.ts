@@ -4,7 +4,9 @@ import { setBoundedCacheEntry } from './bounded-cache.js';
 import {
   getExportedName,
   getIdentifierNamesFromPattern,
+  getProgram,
   type AnyNode,
+  type ProgramNode,
 } from './route-ast.js';
 
 type ExportInfo = {
@@ -41,7 +43,7 @@ const cachePromiseOnReject = <T>(
     throw error;
   });
 
-const parseProgram = (code: string, resourcePath?: string) => {
+const parseProgram = (code: string, resourcePath?: string): ProgramNode => {
   const result = parse(code, {
     sourceType: 'module',
     lang: resourcePath ? langFromPath(resourcePath) : 'tsx',
@@ -52,7 +54,7 @@ const parseProgram = (code: string, resourcePath?: string) => {
   if (errors.length > 0) {
     throw new Error(errors.map(error => error.message).join('\n'));
   }
-  return result.program;
+  return getProgram(result);
 };
 
 const isTypeOnlyExport = (node: AnyNode): boolean =>
@@ -62,7 +64,7 @@ const isTypeOnlyExport = (node: AnyNode): boolean =>
   (node.type === 'ExportDefaultDeclaration' &&
     node.declaration?.type === 'TSInterfaceDeclaration');
 
-export const collectProgramExportNames = (program: AnyNode): string[] => {
+export const collectProgramExportNames = (program: ProgramNode): string[] => {
   const exportNames = new Set<string>();
   for (const statement of program.body ?? []) {
     if (isTypeOnlyExport(statement)) {

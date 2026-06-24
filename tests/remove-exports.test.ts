@@ -196,6 +196,75 @@ describe('removeExports', () => {
     );
   });
 
+  it('rejects nested destructured bindings for removed exports', () => {
+    const code = `
+      const route = { data: { nested: { loader: async () => null } } };
+      export const { data: { nested: { loader } } } = route;
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+
+    expect(() => removeExports(ast, ['loader'])).toThrowError(
+      'Cannot remove destructured export "loader"'
+    );
+  });
+
+  it('rejects rest identifiers for removed exports', () => {
+    const code = `
+      const route = { action: async () => null, loader: async () => null };
+      export const { action, ...loader } = route;
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+
+    expect(() => removeExports(ast, ['loader'])).toThrowError(
+      'Cannot remove destructured export "loader"'
+    );
+  });
+
+  it('checks aliased destructuring by local binding name', () => {
+    const code = `
+      const route = { loader: async () => null };
+      export const { loader: clientLoader } = route;
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+
+    expect(() => removeExports(ast, ['loader'])).not.toThrow();
+    expect(() => removeExports(ast, ['clientLoader'])).toThrowError(
+      'Cannot remove destructured export "clientLoader"'
+    );
+  });
+
+  it('ignores array holes and default initializer references', () => {
+    const code = `
+      const route = [undefined, async () => loader()];
+      export const [, action = loader] = route;
+      function loader() {
+        return null;
+      }
+      export default function Route() {
+        return null;
+      }
+    `;
+
+    const ast = parse(code, { sourceType: 'module' });
+
+    expect(() => removeExports(ast, ['loader'])).not.toThrow();
+    expect(() => removeExports(ast, ['action'])).toThrowError(
+      'Cannot remove destructured export "action"'
+    );
+  });
+
   it('removes every declaration in a deep dead dependency chain', () => {
     const helperCount = 64;
     const helpers = Array.from({ length: helperCount }, (_, index) => {

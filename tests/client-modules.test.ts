@@ -85,10 +85,20 @@ describe('client-only module transforms', () => {
       expect(transformCall).toBeDefined();
 
       const handler = transformCall?.[1];
+      const resolvedPath = join(packageDirectory, 'esm.js');
       const result = await handler({
         environment: { name: 'node' },
         code: await readFile(resourcePath, 'utf8'),
         resourcePath,
+        resolve(
+          context: string,
+          specifier: string,
+          callback: (error: Error | null, resolved?: string) => void
+        ) {
+          expect(context).toBe(join(root, 'app'));
+          expect(specifier).toBe('conditional-client-lib');
+          callback(null, resolvedPath);
+        },
       });
 
       expect(result.code).toContain('export const esmOnly = undefined;');
