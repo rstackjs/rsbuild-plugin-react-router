@@ -91,7 +91,7 @@ pluginReactRouter({
 
   /**
    * Rsbuild dev-only lazy compilation behavior.
-   * @default false
+   * @default undefined
    */
   lazyCompilation?: boolean | Rspack.LazyCompilationOptions,
 
@@ -307,7 +307,7 @@ If no configuration is provided, the following defaults will be used:
   customServer: false,
   serverOutput: 'module',
   federation: false,
-  lazyCompilation: false,
+  lazyCompilation: undefined,
   logPerformance: false,
   parallelTransforms: undefined // adaptive: workers for 256+ resolved routes
 }

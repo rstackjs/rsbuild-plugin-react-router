@@ -34,7 +34,10 @@ describe('resolveReactRouterConfig', () => {
   it('preserves server bundle selection in SSR mode', async () => {
     const serverBundles = async () => 'bundle';
 
-    const result = await resolveReactRouterConfig({ serverBundles });
+    const result = await resolveReactRouterConfig({
+      ssr: true,
+      serverBundles,
+    });
 
     expect(result.resolved.serverBundles).toBe(serverBundles);
   });

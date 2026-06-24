@@ -13,6 +13,16 @@ assert(address && typeof address !== 'string');
 const { port } = address;
 await new Promise(resolve => probe.close(resolve));
 
+const fetchWithTimeout = async url => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2_000);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const child = spawn(process.execPath, ['server.js'], {
   cwd: root,
   env: {
@@ -38,7 +48,7 @@ try {
       throw new Error(`Production server exited early.\n${output}`);
     }
     try {
-      response = await fetch(`http://127.0.0.1:${port}/`);
+      response = await fetchWithTimeout(`http://127.0.0.1:${port}/`);
       if (response.ok) {
         break;
       }

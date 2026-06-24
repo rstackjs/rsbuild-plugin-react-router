@@ -67,7 +67,8 @@ describe('modify browser manifest plugin', () => {
         }
       ).apply(compiler as never);
 
-      await emit?.(compilation);
+      expect(emit).toBeDefined();
+      await emit(compilation);
 
       expect(reportedCompilation).toBe(compilation);
     } finally {
@@ -105,7 +106,7 @@ describe('modify browser manifest plugin', () => {
 
       expect(emit).toBeDefined();
       await expect(
-        emit?.({
+        emit({
           namedChunks: new Map(),
           assets: {},
         })
@@ -149,7 +150,8 @@ describe('modify browser manifest plugin', () => {
         },
       });
 
-      await emit?.({
+      expect(emit).toBeDefined();
+      await emit({
         namedChunks: new Map([
           ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
           ['root', { files: new Set(['static/js/root.js']) }],
@@ -212,7 +214,8 @@ describe('modify browser manifest plugin', () => {
         },
       });
 
-      await emit?.({
+      expect(emit).toBeDefined();
+      await emit({
         namedChunks: new Map([
           ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
           ['root', { files: new Set(['static/js/root.js']) }],

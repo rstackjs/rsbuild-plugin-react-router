@@ -55,9 +55,9 @@ describe('build manifest', () => {
     expect(result).toHaveProperty('serverBundles');
     expect(result).toHaveProperty('routeIdToServerBundleId');
     expect(result?.routes.root.file).toBeDefined();
-    expect(
-      getRoutesByServerBundleId(result, routes).bundle_2['routes/about'].file
-    ).toBe('routes/about.tsx');
+    const bundleRoutes = getRoutesByServerBundleId(result, routes).bundle_2;
+    expect(bundleRoutes.root.file).toBe('root.tsx');
+    expect(bundleRoutes['routes/about'].file).toBe('routes/about.tsx');
   });
 
   it('validates server bundle IDs based on vite environment API flag', async () => {

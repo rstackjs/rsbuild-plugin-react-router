@@ -4,6 +4,10 @@ export const setBoundedCacheEntry = <Key, Value>(
   value: Value,
   maxEntries: number
 ): void => {
+  if (maxEntries <= 0) {
+    cache.clear();
+    return;
+  }
   if (!cache.has(key) && cache.size >= maxEntries) {
     const oldestKey = cache.keys().next().value;
     if (oldestKey !== undefined) {
