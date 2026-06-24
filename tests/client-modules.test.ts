@@ -85,15 +85,75 @@ describe('client-only module transforms', () => {
       expect(transformCall).toBeDefined();
 
       const handler = transformCall?.[1];
+      const resolvedPath = join(packageDirectory, 'esm.js');
       const result = await handler({
         environment: { name: 'node' },
         code: await readFile(resourcePath, 'utf8'),
         resourcePath,
+        resolve(
+          context: string,
+          specifier: string,
+          callback: (error: Error | null, resolved?: string) => void
+        ) {
+          expect(context).toBe(join(root, 'app'));
+          expect(specifier).toBe('conditional-client-lib');
+          callback(null, resolvedPath);
+        },
       });
 
       expect(result.code).toContain('export const esmOnly = undefined;');
       expect(result.code).toContain('export const shared = undefined;');
       expect(result.code).not.toContain('cjsOnly');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses import conditions in the fallback export-all resolver', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rr-client-modules-fallback-'));
+    const packageDirectory = join(
+      root,
+      'node_modules',
+      'fallback-conditional-client-lib'
+    );
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({
+        name: 'fallback-conditional-client-lib',
+        exports: {
+          '.': {
+            import: './esm.js',
+            require: './cjs.cjs',
+          },
+        },
+        type: 'module',
+      })
+    );
+    await writeFile(
+      join(packageDirectory, 'esm.js'),
+      'export const esmOnly = true; export const shared = true;'
+    );
+    await writeFile(
+      join(packageDirectory, 'cjs.cjs'),
+      'exports.cjsOnly = true; exports.shared = true;'
+    );
+    const resourcePath = join(root, 'app', 'example.client.ts');
+    await mkdir(join(root, 'app'), { recursive: true });
+    await writeFile(
+      resourcePath,
+      "export * from 'fallback-conditional-client-lib';"
+    );
+
+    try {
+      const exportNames = await collectClientOnlyStubExportNames(
+        await readFile(resourcePath, 'utf8'),
+        resourcePath
+      );
+
+      expect(exportNames).toContain('esmOnly');
+      expect(exportNames).toContain('shared');
+      expect(exportNames).not.toContain('cjsOnly');
     } finally {
       await rm(root, { recursive: true, force: true });
     }
