@@ -109,6 +109,56 @@ describe('client-only module transforms', () => {
     }
   });
 
+  it('uses import conditions in the fallback export-all resolver', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rr-client-modules-fallback-'));
+    const packageDirectory = join(
+      root,
+      'node_modules',
+      'fallback-conditional-client-lib'
+    );
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({
+        name: 'fallback-conditional-client-lib',
+        exports: {
+          '.': {
+            import: './esm.js',
+            require: './cjs.cjs',
+          },
+        },
+        type: 'module',
+      })
+    );
+    await writeFile(
+      join(packageDirectory, 'esm.js'),
+      'export const esmOnly = true; export const shared = true;'
+    );
+    await writeFile(
+      join(packageDirectory, 'cjs.cjs'),
+      'exports.cjsOnly = true; exports.shared = true;'
+    );
+    const resourcePath = join(root, 'app', 'example.client.ts');
+    await mkdir(join(root, 'app'), { recursive: true });
+    await writeFile(
+      resourcePath,
+      "export * from 'fallback-conditional-client-lib';"
+    );
+
+    try {
+      const exportNames = await collectClientOnlyStubExportNames(
+        await readFile(resourcePath, 'utf8'),
+        resourcePath
+      );
+
+      expect(exportNames).toContain('esmOnly');
+      expect(exportNames).toContain('shared');
+      expect(exportNames).not.toContain('cjsOnly');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not bypass package exports for private export-all subpaths', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rr-client-modules-private-'));
     const packageDirectory = join(root, 'node_modules', 'private-client-lib');

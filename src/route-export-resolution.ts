@@ -1,4 +1,4 @@
-import { statSync, type Stats } from 'node:fs';
+import { readFileSync, statSync, type Stats } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'pathe';
 import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
@@ -9,6 +9,23 @@ import {
 
 const tryStat = (path: string): Stats | null =>
   statSync(path, { throwIfNoEntry: false }) ?? null;
+
+type PackageExportTarget =
+  | string
+  | PackageExportTarget[]
+  | { [condition: string]: PackageExportTarget | undefined }
+  | null;
+
+type PackageJson = {
+  exports?: PackageExportTarget;
+  main?: string;
+  module?: string;
+};
+
+const PACKAGE_IMPORT_CONDITIONS = new Set(['import', 'node']);
+const PACKAGE_RESOLUTION_NOT_APPLICABLE = Symbol(
+  'package resolution not applicable'
+);
 
 const resolveIndexFile = (dirPath: string): string | null => {
   for (const ext of JS_EXTENSIONS) {
@@ -41,6 +58,167 @@ const resolvePathWithExtensions = (basePath: string): string | null => {
   return resolveIndexFile(basePath);
 };
 
+const parsePackageSpecifier = (
+  specifier: string
+): { packageName: string; packageSubpath: string } | null => {
+  if (
+    specifier.startsWith('.') ||
+    specifier.startsWith('/') ||
+    specifier.startsWith('#')
+  ) {
+    return null;
+  }
+
+  const parts = specifier.split('/');
+  const packageName = specifier.startsWith('@')
+    ? parts.slice(0, 2).join('/')
+    : parts[0];
+  const packagePathParts = specifier.startsWith('@')
+    ? parts.slice(2)
+    : parts.slice(1);
+
+  return {
+    packageName,
+    packageSubpath:
+      packagePathParts.length > 0 ? `./${packagePathParts.join('/')}` : '.',
+  };
+};
+
+const findPackageDirectory = (
+  importerPath: string,
+  packageName: string
+): string | null => {
+  let currentDirectory = dirname(importerPath);
+
+  while (true) {
+    const packageDirectory = resolve(
+      currentDirectory,
+      'node_modules',
+      packageName
+    );
+    const packageJsonPath = resolve(packageDirectory, 'package.json');
+    if (tryStat(packageJsonPath)?.isFile()) {
+      return packageDirectory;
+    }
+
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      return null;
+    }
+    currentDirectory = parentDirectory;
+  }
+};
+
+const readPackageJson = (packageDirectory: string): PackageJson | null => {
+  try {
+    return JSON.parse(
+      readFileSync(resolve(packageDirectory, 'package.json'), 'utf8')
+    ) as PackageJson;
+  } catch {
+    return null;
+  }
+};
+
+const resolvePackageExportTarget = (
+  target: PackageExportTarget | undefined
+): string | null => {
+  if (!target) {
+    return null;
+  }
+
+  if (typeof target === 'string') {
+    return target;
+  }
+
+  if (Array.isArray(target)) {
+    for (const nestedTarget of target) {
+      const resolvedTarget = resolvePackageExportTarget(nestedTarget);
+      if (resolvedTarget) {
+        return resolvedTarget;
+      }
+    }
+    return null;
+  }
+
+  for (const [condition, nestedTarget] of Object.entries(target)) {
+    if (condition === 'default' || PACKAGE_IMPORT_CONDITIONS.has(condition)) {
+      const resolvedTarget = resolvePackageExportTarget(nestedTarget);
+      if (resolvedTarget) {
+        return resolvedTarget;
+      }
+    }
+  }
+
+  return null;
+};
+
+const resolvePackageExports = (
+  packageDirectory: string,
+  packageSubpath: string,
+  packageJson: PackageJson
+): string | null => {
+  const exports = packageJson.exports;
+  if (!exports) {
+    const entry = packageJson.module ?? packageJson.main;
+    return entry
+      ? resolvePathWithExtensions(resolve(packageDirectory, entry))
+      : null;
+  }
+
+  const target =
+    typeof exports === 'object' &&
+    !Array.isArray(exports) &&
+    Object.keys(exports).some(key => key.startsWith('.'))
+      ? exports[packageSubpath]
+      : packageSubpath === '.'
+        ? exports
+        : undefined;
+
+  const resolvedTarget = resolvePackageExportTarget(target);
+  if (!resolvedTarget || !resolvedTarget.startsWith('./')) {
+    return null;
+  }
+
+  return resolvePathWithExtensions(resolve(packageDirectory, resolvedTarget));
+};
+
+const resolvePackageImport = (
+  specifier: string,
+  importerPath: string
+): string | null | typeof PACKAGE_RESOLUTION_NOT_APPLICABLE => {
+  const parsedSpecifier = parsePackageSpecifier(specifier);
+  if (!parsedSpecifier) {
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
+  }
+
+  const packageDirectory = findPackageDirectory(
+    importerPath,
+    parsedSpecifier.packageName
+  );
+  if (!packageDirectory) {
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
+  }
+
+  const packageJson = readPackageJson(packageDirectory);
+  if (!packageJson) {
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
+  }
+
+  if (
+    packageJson.exports === undefined &&
+    !packageJson.module &&
+    !packageJson.main
+  ) {
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
+  }
+
+  return resolvePackageExports(
+    packageDirectory,
+    parsedSpecifier.packageSubpath,
+    packageJson
+  );
+};
+
 const resolveExportAllModule = (
   specifier: string,
   importerPath: string
@@ -53,6 +231,11 @@ const resolveExportAllModule = (
     if (resolvedPath) {
       return resolvedPath;
     }
+  }
+
+  const importResolvedPath = resolvePackageImport(specifier, importerPath);
+  if (importResolvedPath !== PACKAGE_RESOLUTION_NOT_APPLICABLE) {
+    return importResolvedPath;
   }
 
   try {
