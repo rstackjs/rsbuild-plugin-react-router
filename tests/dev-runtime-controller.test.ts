@@ -243,16 +243,18 @@ const createHarness = (userSetup?: TestServerSetup) => {
     afterCloseHook?: () => Promise<void> | void
   ): RsbuildDevServer => {
     let closing: Promise<void> | undefined;
-    const record = { count: 0 };
-    const server = {
-      close() {
-        record.count++;
-        closing ??= (async () => {
-          await closeHook?.();
-          await afterCloseHook?.();
-        })();
-        return closing;
-      },
+      const record = { count: 0 };
+      const server = {
+        close() {
+          if (!closing) {
+            record.count++;
+            closing = (async () => {
+              await closeHook?.();
+              await afterCloseHook?.();
+            })();
+          }
+          return closing;
+        },
       environments: { node: { loadBundle } },
       sockWrite: rstest.fn(),
     } as unknown as RsbuildDevServer;

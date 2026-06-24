@@ -45,8 +45,12 @@ async function verifyRegistration(writer, reader) {
   };
   await writer.pluginReactRouter({ customServer: true }).setup(api);
 
-  const start = starts.find(hook => hook.order === 'pre').handler;
-  const close = closes.find(hook => hook.order === 'pre').handler;
+  const startHook = starts.find(hook => hook.order === 'pre');
+  const closeHook = closes.find(hook => hook.order === 'pre');
+  assert(startHook, 'Expected a pre dev-server start hook');
+  assert(closeHook, 'Expected a pre dev-server close hook');
+  const start = startHook.handler;
+  const close = closeHook.handler;
   const server = {
     close: async () => undefined,
     environments: { node: { loadBundle: async () => build } },

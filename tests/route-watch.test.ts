@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, expect, it, rstest } from '@rstest/core';
 import {
   createRouteManifestSnapshot,
@@ -112,7 +112,7 @@ describe('route watch restart marker', () => {
 
   it('places the restart marker in the client build output', () => {
     expect(getRouteRestartMarkerPath('/project/build/client')).toBe(
-      '/project/build/client/.react-router/route-watch'
+      resolve('/project/build/client', '.react-router/route-watch')
     );
   });
 
@@ -200,6 +200,47 @@ describe('route watch restart marker', () => {
 
       expect(topologyReads).toBe(1);
       expect(onRouteTopologyChange).toHaveBeenCalledTimes(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('advances topology before reporting synchronous notification failures', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    mkdirSync(watchedDirectory, { recursive: true });
+    let topology = new Set(['initial']);
+    let triggerChange!: () => void;
+    const onRouteTopologyChange = rstest.fn(() => {
+      throw new Error('topology notification failed');
+    });
+    const onError = rstest.fn();
+
+    try {
+      const close = await createRouteTopologyWatcher({
+        watchDirectory: watchedDirectory,
+        restartMarkerPath: markerPath,
+        getRouteTopology: async () => topology,
+        onRouteTopologyChange,
+        onError,
+        watchDirectoryEntry: (_directory, onChange) => {
+          triggerChange = onChange;
+          return { close: () => {} };
+        },
+      });
+
+      topology = new Set(['changed']);
+      triggerChange();
+      await expect
+        .poll(() => onError.mock.calls.length, { timeout: 2000 })
+        .toBe(1);
+
+      triggerChange();
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(onRouteTopologyChange).toHaveBeenCalledTimes(1);
+      await close();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

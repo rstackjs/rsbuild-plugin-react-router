@@ -476,12 +476,18 @@ const hasRemovableExport = (
   program: AnyNode,
   exportsToRemove: ReadonlySet<string>
 ): boolean => {
+  const removesNamedExports = [...exportsToRemove].some(
+    name => name !== 'default'
+  );
   for (const statement of program.body ?? []) {
     if (statement.type === 'ExportAllDeclaration') {
       const exportedName = statement.exported
         ? getExportedName({ exported: statement.exported })
         : null;
       if (exportedName && exportsToRemove.has(exportedName)) {
+        return true;
+      }
+      if (!exportedName && removesNamedExports) {
         return true;
       }
       continue;
@@ -550,6 +556,7 @@ export const removeExports = (
   let exportsChanged = false;
   const removedExportLocalNames = new Set<string>();
   const removedExportReferencedNames = new Set<string>();
+  const removesNamedExports = exportsToRemove.some(name => name !== 'default');
   const trackRemovedExportReferences = (node: AnyNode | null | undefined) => {
     if (!node) {
       return;
@@ -569,6 +576,11 @@ export const removeExports = (
       if (exportedName && exportsToRemoveSet.has(exportedName)) {
         exportsChanged = true;
         removeFromArray(program.body, statement);
+      }
+      if (!exportedName && removesNamedExports) {
+        throw new Error(
+          'Cannot remove named exports from `export *`; use explicit named re-exports.'
+        );
       }
       continue;
     }

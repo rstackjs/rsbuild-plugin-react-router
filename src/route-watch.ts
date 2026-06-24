@@ -234,9 +234,12 @@ export const createRouteTopologyWatcher = async ({
         // This is a notification boundary, not part of the rescan
         // transaction. A custom-server callback may close this watcher while
         // replacing its compiler, so awaiting it here would deadlock close().
-        const notification = onRouteTopologyChange();
         state = nextState;
-        void Promise.resolve(notification).catch(onError);
+        try {
+          void Promise.resolve(onRouteTopologyChange()).catch(onError);
+        } catch (error) {
+          onError(error);
+        }
         return;
       } else {
         await touchRestartMarker();

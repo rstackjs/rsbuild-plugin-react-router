@@ -107,6 +107,28 @@ const exportNamedDeclaration = (specifiers: AnyNode[]): AnyNode => ({
   exportKind: 'value',
 });
 
+const getComponentExportName = (exportedName: string): string | null => {
+  if (exportedName === 'default') {
+    return 'Component';
+  }
+  return isNamedComponentExport(exportedName) ? exportedName : null;
+};
+
+const getImportInsertionIndex = (program: AnyNode): number => {
+  let index = 0;
+  for (const statement of program.body ?? []) {
+    if (
+      statement.type !== 'ExpressionStatement' ||
+      (statement.directive === undefined &&
+        statement.expression?.type !== 'Literal')
+    ) {
+      break;
+    }
+    index += 1;
+  }
+  return index;
+};
+
 const getModuleExportName = (
   node: AnyNode | null | undefined
 ): string | null => {
@@ -331,16 +353,15 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
           }
           const exportedName = getExportedName(specifier);
           const importedName = getModuleExportName(specifier.local);
-          if (
-            !exportedName ||
-            !importedName ||
-            !isNamedComponentExport(exportedName)
-          ) {
+          const componentExportName = exportedName
+            ? getComponentExportName(exportedName)
+            : null;
+          if (!exportedName || !importedName || !componentExportName) {
             return true;
           }
           const sourceLocalName = getUid(`${exportedName}Source`);
           const wrappedLocalName = getUid(exportedName);
-          const uid = getHocUid(`with${exportedName}Props`);
+          const uid = getHocUid(`with${componentExportName}Props`);
           importSpecifiers.push({
             imported: importedName,
             local: sourceLocalName,
@@ -382,7 +403,10 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
         continue;
       }
       const exportedName = getExportedName(specifier);
-      if (!exportedName || !isNamedComponentExport(exportedName)) {
+      const componentExportName = exportedName
+        ? getComponentExportName(exportedName)
+        : null;
+      if (!exportedName || !componentExportName) {
         continue;
       }
       const localName = specifier.local?.name;
@@ -390,7 +414,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
         continue;
       }
       const wrappedLocalName = getUid(exportedName);
-      const uid = getHocUid(`with${exportedName}Props`);
+      const uid = getHocUid(`with${componentExportName}Props`);
       componentWrapperDeclarations.push(
         variableDeclaration(
           wrappedLocalName,
@@ -404,7 +428,9 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
   program.body.push(...componentWrapperDeclarations);
 
   if (hocs.length > 0) {
-    program.body.unshift(
+    program.body.splice(
+      getImportInsertionIndex(program),
+      0,
       importDeclaration(
         hocs.map(([name, local]) => ({ imported: name, local })),
         'virtual/react-router/with-props'

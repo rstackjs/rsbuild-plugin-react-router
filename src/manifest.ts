@@ -15,6 +15,33 @@ import {
   type RouteChunkConfig,
 } from './route-chunks.js';
 import { getRouteModuleAnalysis } from './export-utils.js';
+import { getDefaultConcurrency } from './concurrency.js';
+
+const ROUTE_ANALYSIS_CONCURRENCY = Math.max(
+  1,
+  Math.min(16, getDefaultConcurrency() || 1)
+);
+
+const mapWithConcurrency = async <Item, Result>(
+  items: readonly Item[],
+  worker: (item: Item, index: number) => Promise<Result>
+): Promise<Result[]> => {
+  const results = new Array<Result>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(ROUTE_ANALYSIS_CONCURRENCY, items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= items.length) {
+          return;
+        }
+        results[index] = await worker(items[index], index);
+      }
+    })
+  );
+  return results;
+};
 
 export function configRoutesToRouteManifest(
   appDirectory: string,
@@ -262,8 +289,9 @@ export async function generateReactRouterManifestForDev(
     return jsAssets[0] ? combineURLs(assetPrefix, jsAssets[0]) : undefined;
   };
 
-  const manifestEntries = await Promise.all(
-    Object.entries(routes).map(async ([key, route]) => {
+  const manifestEntries = await mapWithConcurrency(
+    Object.entries(routes),
+    async ([key, route]) => {
       const routeEntryName = getRouteEntryName(route);
       const assets = getAssetsForChunk(routeEntryName);
       const jsAssets = assets.filter(asset => asset.endsWith('.js'));
@@ -365,7 +393,7 @@ export async function generateReactRouterManifestForDev(
         },
         routeModuleExports,
       ] as const;
-    })
+    }
   );
 
   const routeModuleExportsByRouteId: RouteManifestModuleExports = {};

@@ -20,4 +20,12 @@ describe('bounded cache helpers', () => {
       ['third', 3],
     ]);
   });
+
+  it('clears entries when the maximum size is not positive', () => {
+    const cache = new Map<string, number>([['first', 1]]);
+
+    setBoundedCacheEntry(cache, 'second', 2, 0);
+
+    expect([...cache.entries()]).toEqual([]);
+  });
 });

@@ -1,4 +1,4 @@
-import { statSync, type Stats } from 'node:fs';
+import { readFileSync, statSync, type Stats } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { basename as pathBasename, dirname, relative, resolve } from 'pathe';
@@ -38,6 +38,12 @@ export type RouteTransformResult = {
 type BaseRouteTransformTask = {
   code: string;
   resourcePath: string;
+};
+
+type PackageJson = {
+  exports?: unknown;
+  module?: unknown;
+  main?: unknown;
 };
 
 export type RouteClientEntryTransformTask = BaseRouteTransformTask & {
@@ -169,6 +175,135 @@ const resolvePathWithExtensions = (basePath: string): string | null => {
   return resolveIndexFile(basePath);
 };
 
+const parsePackageSpecifier = (
+  specifier: string
+): { packageName: string; subpath: string } | null => {
+  if (
+    specifier.startsWith('.') ||
+    specifier.startsWith('/') ||
+    specifier.startsWith('node:')
+  ) {
+    return null;
+  }
+  const parts = specifier.split('/');
+  const packageName = specifier.startsWith('@')
+    ? parts.slice(0, 2).join('/')
+    : parts[0];
+  if (!packageName || (specifier.startsWith('@') && parts.length < 2)) {
+    return null;
+  }
+  const rest = parts.slice(packageName.startsWith('@') ? 2 : 1).join('/');
+  return {
+    packageName,
+    subpath: rest ? `./${rest}` : '.',
+  };
+};
+
+const findPackageDirectory = (
+  packageName: string,
+  importerPath: string
+): string | null => {
+  let currentDirectory = dirname(importerPath);
+  while (true) {
+    const candidate = resolve(currentDirectory, 'node_modules', packageName);
+    if (tryStat(candidate)?.isDirectory()) {
+      return candidate;
+    }
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      return null;
+    }
+    currentDirectory = parentDirectory;
+  }
+};
+
+const readPackageJson = (packageDirectory: string): PackageJson | null => {
+  try {
+    return JSON.parse(
+      readFileSync(resolve(packageDirectory, 'package.json'), 'utf8')
+    );
+  } catch {
+    return null;
+  }
+};
+
+const resolvePackageTarget = (
+  packageDirectory: string,
+  target: unknown
+): string | null => {
+  if (typeof target === 'string') {
+    return resolvePathWithExtensions(resolve(packageDirectory, target));
+  }
+  if (Array.isArray(target)) {
+    for (const item of target) {
+      const resolved = resolvePackageTarget(packageDirectory, item);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return null;
+  }
+  if (target && typeof target === 'object') {
+    const conditions = target as Record<string, unknown>;
+    for (const condition of ['import', 'default']) {
+      const resolved = resolvePackageTarget(
+        packageDirectory,
+        conditions[condition]
+      );
+      if (resolved) {
+        return resolved;
+      }
+    }
+  }
+  return null;
+};
+
+const resolvePackageImport = (
+  specifier: string,
+  importerPath: string
+): string | null => {
+  const parsed = parsePackageSpecifier(specifier);
+  if (!parsed) {
+    return null;
+  }
+  const packageDirectory = findPackageDirectory(
+    parsed.packageName,
+    importerPath
+  );
+  if (!packageDirectory) {
+    return null;
+  }
+  const packageJson = readPackageJson(packageDirectory);
+  if (!packageJson) {
+    return null;
+  }
+  const exportsField = packageJson.exports;
+  if (exportsField) {
+    const hasSubpathExports =
+      typeof exportsField === 'object' &&
+      !Array.isArray(exportsField) &&
+      Object.keys(exportsField).some(key => key.startsWith('.'));
+    const target =
+      parsed.subpath === '.' && !hasSubpathExports
+        ? exportsField
+        : hasSubpathExports
+          ? (exportsField as Record<string, unknown>)[parsed.subpath]
+          : undefined;
+    const resolved = resolvePackageTarget(packageDirectory, target);
+    if (resolved) {
+      return resolved;
+    }
+  }
+  if (parsed.subpath !== '.') {
+    return resolvePathWithExtensions(resolve(packageDirectory, parsed.subpath));
+  }
+  return (
+    resolvePackageTarget(packageDirectory, packageJson.module) ??
+    resolvePackageTarget(packageDirectory, packageJson.main) ??
+    resolveIndexFile(packageDirectory)
+  );
+};
+
 const resolveExportAllModule = (
   specifier: string,
   importerPath: string
@@ -181,6 +316,11 @@ const resolveExportAllModule = (
     if (resolvedPath) {
       return resolvedPath;
     }
+  }
+
+  const packageImportPath = resolvePackageImport(specifier, importerPath);
+  if (packageImportPath) {
+    return packageImportPath;
   }
 
   try {

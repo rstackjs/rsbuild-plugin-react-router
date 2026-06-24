@@ -202,6 +202,32 @@ describe('plugin-utils', () => {
       expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
     });
 
+    it('wraps default route component re-exports', () => {
+      const result = transformRouteCode(`
+        export { default } from './Route';
+      `);
+
+      expect(result).toContain('withComponentProps');
+      expect(result).not.toContain('withdefaultProps');
+      expect(result).toContain('export { _default as default }');
+    });
+
+    it('keeps directives before generated HOC imports', () => {
+      const result = transformRouteCode(`
+        "use client";
+        function Route() {
+          return null;
+        }
+        export { Route as default };
+      `);
+
+      expect(result.indexOf("'use client'")).toBeLessThan(
+        result.indexOf('virtual/react-router/with-props')
+      );
+      expect(result).toContain('withComponentProps');
+      expect(result).not.toContain('withdefaultProps');
+    });
+
     it('preserves side-effect import order before wrapped source re-exports', () => {
       const result = transformRouteCode(`
         import './setup';

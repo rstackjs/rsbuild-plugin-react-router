@@ -81,7 +81,7 @@ describe('removeExports', () => {
     expect(generate(ast).code).not.toContain('./theme.server');
   });
 
-  it('preserves export-all declarations that cannot be filtered safely', () => {
+  it('rejects unaliased export-all declarations when removing named exports', () => {
     const code = `
       export * from './data.server';
       export default function Route() {
@@ -90,11 +90,10 @@ describe('removeExports', () => {
     `;
 
     const ast = parse(code, { sourceType: 'module' });
-    removeExports(ast, ['loader']);
 
-    const result = generate(ast).code;
-    expect(result).toContain("export * from './data.server'");
-    expect(result).toContain('Route');
+    expect(() => removeExports(ast, ['loader'])).toThrowError(
+      'Cannot remove named exports from `export *`; use explicit named re-exports.'
+    );
   });
 
   it('keeps lowercase JSX member imports after removing server exports', () => {
