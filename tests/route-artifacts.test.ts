@@ -146,7 +146,7 @@ describe('route artifact helpers', () => {
           }
         )
       ).resolves.toEqual({
-        code: emptyRouteChunkSnippet('Split route modules disabled'),
+        code: emptyRouteChunkSnippet(),
         map: null,
       });
     });
@@ -194,7 +194,7 @@ describe('route artifact helpers', () => {
           isBuild: true,
         })
       ).resolves.toEqual({
-        code: emptyRouteChunkSnippet('No clientLoader chunk'),
+        code: emptyRouteChunkSnippet(),
         map: null,
       });
     });

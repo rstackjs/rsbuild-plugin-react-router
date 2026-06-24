@@ -8,6 +8,36 @@ import { pluginReactRouter } from '../src';
 import { collectClientOnlyStubExportNames } from '../src/route-export-resolution';
 
 describe('client-only module transforms', () => {
+  const createConditionalClientPackage = async (
+    root: string,
+    packageName: string
+  ): Promise<string> => {
+    const packageDirectory = join(root, 'node_modules', packageName);
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({
+        name: packageName,
+        exports: {
+          '.': {
+            import: './esm.js',
+            require: './cjs.cjs',
+          },
+        },
+        type: 'module',
+      })
+    );
+    await writeFile(
+      join(packageDirectory, 'esm.js'),
+      'export const esmOnly = true; export const shared = true;'
+    );
+    await writeFile(
+      join(packageDirectory, 'cjs.cjs'),
+      'exports.cjsOnly = true; exports.shared = true;'
+    );
+    return join(packageDirectory, 'esm.js');
+  };
+
   it('stubs exports for .client modules using export *', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
@@ -40,32 +70,9 @@ describe('client-only module transforms', () => {
 
   it('uses import conditions for bare export-all modules', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rr-client-modules-'));
-    const packageDirectory = join(
+    const resolvedPath = await createConditionalClientPackage(
       root,
-      'node_modules',
       'conditional-client-lib'
-    );
-    await mkdir(packageDirectory, { recursive: true });
-    await writeFile(
-      join(packageDirectory, 'package.json'),
-      JSON.stringify({
-        name: 'conditional-client-lib',
-        exports: {
-          '.': {
-            import: './esm.js',
-            require: './cjs.cjs',
-          },
-        },
-        type: 'module',
-      })
-    );
-    await writeFile(
-      join(packageDirectory, 'esm.js'),
-      'export const esmOnly = true; export const shared = true;'
-    );
-    await writeFile(
-      join(packageDirectory, 'cjs.cjs'),
-      'exports.cjsOnly = true; exports.shared = true;'
     );
     const resourcePath = join(root, 'app', 'example.client.ts');
     await mkdir(join(root, 'app'), { recursive: true });
@@ -85,7 +92,6 @@ describe('client-only module transforms', () => {
       expect(transformCall).toBeDefined();
 
       const handler = transformCall?.[1];
-      const resolvedPath = join(packageDirectory, 'esm.js');
       const result = await handler({
         environment: { name: 'node' },
         code: await readFile(resourcePath, 'utf8'),
@@ -111,32 +117,9 @@ describe('client-only module transforms', () => {
 
   it('uses import conditions in the fallback export-all resolver', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rr-client-modules-fallback-'));
-    const packageDirectory = join(
+    await createConditionalClientPackage(
       root,
-      'node_modules',
       'fallback-conditional-client-lib'
-    );
-    await mkdir(packageDirectory, { recursive: true });
-    await writeFile(
-      join(packageDirectory, 'package.json'),
-      JSON.stringify({
-        name: 'fallback-conditional-client-lib',
-        exports: {
-          '.': {
-            import: './esm.js',
-            require: './cjs.cjs',
-          },
-        },
-        type: 'module',
-      })
-    );
-    await writeFile(
-      join(packageDirectory, 'esm.js'),
-      'export const esmOnly = true; export const shared = true;'
-    );
-    await writeFile(
-      join(packageDirectory, 'cjs.cjs'),
-      'exports.cjsOnly = true; exports.shared = true;'
     );
     const resourcePath = join(root, 'app', 'example.client.ts');
     await mkdir(join(root, 'app'), { recursive: true });

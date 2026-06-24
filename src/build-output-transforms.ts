@@ -176,19 +176,13 @@ export const registerBuildOutputTransforms = ({
           args.environment?.name,
           'route:split-exports',
           args.resource,
-          async () => {
-            const route = routeByFilePath.get(args.resourcePath);
-            if (!route) {
-              return { code: args.code, map: null };
-            }
-
-            return routeTransformExecutor.run({
+          async () =>
+            routeTransformExecutor.run({
               kind: 'splitRouteExports',
               code: args.code,
               resourcePath: args.resourcePath,
               routeChunkConfig,
-            });
-          }
+            })
         )
     );
   }
