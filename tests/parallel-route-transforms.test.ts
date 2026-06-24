@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
+import { mapWithConcurrency } from '../src/concurrency';
 import { getExportNames } from '../src/export-utils';
 import {
   executeRouteTransformTask,
@@ -65,6 +66,21 @@ describe('parallel route transforms', () => {
     [24, 22],
   ])('defaults worker count to CPU cores minus two', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
+  });
+
+  it('maps work with a concurrency cap while preserving result order', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const result = await mapWithConcurrency([3, 1, 2], 2, async value => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise(resolve => setTimeout(resolve, value));
+      active -= 1;
+      return value * 2;
+    });
+
+    expect(result).toEqual([6, 2, 4]);
+    expect(maxActive).toBeLessThanOrEqual(2);
   });
 
   it('rejects invalid explicit worker counts', () => {
