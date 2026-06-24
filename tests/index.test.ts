@@ -293,10 +293,20 @@ describe('pluginReactRouter', () => {
     ]);
     const config = await rsbuild.unwrapConfig();
 
-    expect(config.dev.lazyCompilation).toEqual({
+    expect(config.dev.lazyCompilation).toMatchObject({
       entries: true,
       imports: true,
     });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/root.tsx?__react-router-build-client-route',
+      })
+    ).toBe(false);
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/components/card.tsx',
+      })
+    ).toBe(true);
   });
 
   it('should allow lazy compilation to be enabled with a boolean', async () => {
@@ -307,7 +317,52 @@ describe('pluginReactRouter', () => {
     rsbuild.addPlugins([pluginReactRouter({ lazyCompilation: true })]);
     const config = await rsbuild.unwrapConfig();
 
-    expect(config.dev.lazyCompilation).toBe(true);
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: `${process.cwd()}/app/entry.client.tsx`,
+      })
+    ).toBe(false);
+  });
+
+  it('guards direct Rsbuild lazy compilation config for React Router hydration entries', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: {
+          lazyCompilation: {
+            entries: true,
+            imports: false,
+            test: /app/,
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: false,
+    });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/routes/home.tsx?__react-router-build-client-route',
+      })
+    ).toBe(false);
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/components/card.tsx',
+      })
+    ).toBe(true);
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/vendor/react.tsx',
+      })
+    ).toBe(false);
   });
 
   it('should allow lazy compilation to be disabled', async () => {
