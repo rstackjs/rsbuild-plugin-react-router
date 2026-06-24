@@ -155,7 +155,7 @@ export const getSsrFalsePrerenderExportErrors = ({
         route.parentId && manifestRoutes[route.parentId]
           ? manifestRoutes[route.parentId]
           : null;
-      while (parentRoute && parentRoute.id !== 'root') {
+      while (parentRoute) {
         if (parentRoute.hasLoader && !parentRoute.hasClientLoader) {
           errors.push(
             `Prerender: 1 invalid route export in \`${parentRoute.id}\` when ` +
@@ -164,7 +164,7 @@ export const getSsrFalsePrerenderExportErrors = ({
           );
         }
         parentRoute =
-          parentRoute.parentId && parentRoute.parentId !== 'root'
+          parentRoute.parentId && manifestRoutes[parentRoute.parentId]
             ? manifestRoutes[parentRoute.parentId]
             : null;
       }

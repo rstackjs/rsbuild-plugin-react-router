@@ -65,7 +65,8 @@ const declarationIncludesName = (
   }
   if (
     (declaration.type === 'FunctionDeclaration' ||
-      declaration.type === 'ClassDeclaration') &&
+      declaration.type === 'ClassDeclaration' ||
+      declaration.type === 'TSEnumDeclaration') &&
     declaration.id?.name
   ) {
     return declaration.id.name === name;
@@ -142,6 +143,12 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
     if (statement.type === 'ExportDefaultDeclaration') {
       const declaration = statement.declaration;
       if (!declaration) {
+        continue;
+      }
+      if (
+        declaration.declare === true ||
+        declaration.type === 'TSInterfaceDeclaration'
+      ) {
         continue;
       }
       const uid = getHocUid('withComponentProps');

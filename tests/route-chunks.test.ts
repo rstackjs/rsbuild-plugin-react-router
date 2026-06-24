@@ -270,6 +270,19 @@ describe('route chunks', () => {
         'HydrateFallback',
       ]);
     });
+
+    it('does not split client exports away from top-level side effects', async () => {
+      const code = `
+        import './polyfill';
+        initialize();
+        export const clientAction = async () => {};
+        export default function Route() { return null; }
+      `;
+
+      const result = await detect(code);
+
+      expectNoRouteChunks(result, ['clientAction', 'default']);
+    });
   });
 
   describe('generate route chunk code', () => {
@@ -416,6 +429,14 @@ describe('route chunks', () => {
       expect(moduleId).toBe('/app/routes/r.tsx?route-chunk=clientAction');
       expect(isRouteChunkModuleId(moduleId)).toBe(true);
       expect(getRouteChunkNameFromModuleId(moduleId)).toBe('clientAction');
+      expect(
+        isRouteChunkModuleId('/app/routes/r.tsx?route-chunk=clientAction&foo=1')
+      ).toBe(true);
+      expect(
+        getRouteChunkNameFromModuleId(
+          '/app/routes/r.tsx?route-chunk=clientAction&foo=1'
+        )
+      ).toBe('clientAction');
       expect(getRouteChunkNameFromModuleId('/app/routes/r.tsx?route-chunk=main')).toBe(
         'main'
       );

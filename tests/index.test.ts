@@ -3,6 +3,21 @@ import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
 import { pluginReactRouter } from '../src';
 
+const captureEnv = (keys: string[]) => {
+  const previousValues = new Map(
+    keys.map(key => [key, process.env[key]] as const)
+  );
+  return () => {
+    for (const [key, value] of previousValues) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  };
+};
+
 describe('pluginReactRouter', () => {
   it('should configure basic plugin options', async () => {
     const rsbuild = await createStubRsbuild({
@@ -194,6 +209,10 @@ describe('pluginReactRouter', () => {
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {
+    const restoreEnv = captureEnv([
+      'RR_TEST_SPLIT_ROUTE_MODULES',
+      'RR_TEST_ROUTE_COUNT',
+    ]);
     process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
     process.env.RR_TEST_ROUTE_COUNT = '256';
     const readFileSync = rstest
@@ -215,12 +234,12 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       readFileSync.mockRestore();
-      delete process.env.RR_TEST_SPLIT_ROUTE_MODULES;
-      delete process.env.RR_TEST_ROUTE_COUNT;
+      restoreEnv();
     }
   });
 
   it('reduces file size reporting overhead for medium route builds by default', async () => {
+    const restoreEnv = captureEnv(['RR_TEST_ROUTE_COUNT']);
     process.env.RR_TEST_ROUTE_COUNT = '256';
     const readFileSync = rstest
       .spyOn(fs, 'readFileSync')
@@ -241,11 +260,15 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       readFileSync.mockRestore();
-      delete process.env.RR_TEST_ROUTE_COUNT;
+      restoreEnv();
     }
   });
 
   it('keeps explicit object file size reporting config for large split route builds', async () => {
+    const restoreEnv = captureEnv([
+      'RR_TEST_SPLIT_ROUTE_MODULES',
+      'RR_TEST_ROUTE_COUNT',
+    ]);
     process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
     process.env.RR_TEST_ROUTE_COUNT = '1024';
     const readFileSync = rstest
@@ -273,8 +296,7 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       readFileSync.mockRestore();
-      delete process.env.RR_TEST_SPLIT_ROUTE_MODULES;
-      delete process.env.RR_TEST_ROUTE_COUNT;
+      restoreEnv();
     }
   });
 

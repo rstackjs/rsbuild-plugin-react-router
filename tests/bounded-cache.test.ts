@@ -28,4 +28,18 @@ describe('bounded cache helpers', () => {
 
     expect([...cache.entries()]).toEqual([]);
   });
+
+  it('evicts an undefined oldest key when inserting past the maximum size', () => {
+    const cache = new Map<string | undefined, number>([
+      [undefined, 1],
+      ['second', 2],
+    ]);
+
+    setBoundedCacheEntry(cache, 'third', 3, 2);
+
+    expect([...cache.entries()]).toEqual([
+      ['second', 2],
+      ['third', 3],
+    ]);
+  });
 });

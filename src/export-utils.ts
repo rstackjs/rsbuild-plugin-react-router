@@ -58,6 +58,7 @@ const parseProgram = (code: string, resourcePath?: string) => {
 const isTypeOnlyExport = (node: AnyNode): boolean =>
   node.exportKind === 'type' ||
   node.type === 'TSExportAssignment' ||
+  node.declaration?.declare === true ||
   (node.type === 'ExportDefaultDeclaration' &&
     node.declaration?.type === 'TSInterfaceDeclaration');
 

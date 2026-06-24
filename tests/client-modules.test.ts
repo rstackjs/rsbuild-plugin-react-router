@@ -5,6 +5,7 @@ import { resolve } from 'pathe';
 import { describe, expect, it } from '@rstest/core';
 import { createStubRsbuild } from '@scripts/test-helper';
 import { pluginReactRouter } from '../src';
+import { collectClientOnlyStubExportNames } from '../src/route-export-resolution';
 
 describe('client-only module transforms', () => {
   it('stubs exports for .client modules using export *', async () => {
@@ -93,6 +94,41 @@ describe('client-only module transforms', () => {
       expect(result.code).toContain('export const esmOnly = undefined;');
       expect(result.code).toContain('export const shared = undefined;');
       expect(result.code).not.toContain('cjsOnly');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not bypass package exports for private export-all subpaths', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rr-client-modules-private-'));
+    const packageDirectory = join(root, 'node_modules', 'private-client-lib');
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(
+      join(packageDirectory, 'package.json'),
+      JSON.stringify({
+        name: 'private-client-lib',
+        exports: {
+          '.': './public.js',
+        },
+        type: 'module',
+      })
+    );
+    await writeFile(join(packageDirectory, 'public.js'), 'export const ok = true;');
+    await writeFile(
+      join(packageDirectory, 'private.js'),
+      'export const hidden = true;'
+    );
+    const resourcePath = join(root, 'app', 'example.client.ts');
+    await mkdir(join(root, 'app'), { recursive: true });
+    await writeFile(resourcePath, "export * from 'private-client-lib/private';");
+
+    try {
+      await expect(
+        collectClientOnlyStubExportNames(
+          await readFile(resourcePath, 'utf8'),
+          resourcePath
+        )
+      ).rejects.toThrow('private-client-lib/private');
     } finally {
       await rm(root, { recursive: true, force: true });
     }

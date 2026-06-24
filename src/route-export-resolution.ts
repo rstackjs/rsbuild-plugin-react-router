@@ -14,6 +14,11 @@ type PackageJson = {
   main?: unknown;
 };
 
+type PackageImportResolution =
+  | { status: 'resolved'; path: string }
+  | { status: 'blocked-by-exports' }
+  | { status: 'not-found' };
+
 const tryStat = (path: string): Stats | null =>
   statSync(path, { throwIfNoEntry: false }) ?? null;
 
@@ -134,27 +139,28 @@ const resolvePackageTarget = (
 const resolvePackageImport = (
   specifier: string,
   importerPath: string
-): string | null => {
+): PackageImportResolution => {
   const parsed = parsePackageSpecifier(specifier);
   if (!parsed) {
-    return null;
+    return { status: 'not-found' };
   }
   const packageDirectory = findPackageDirectory(
     parsed.packageName,
     importerPath
   );
   if (!packageDirectory) {
-    return null;
+    return { status: 'not-found' };
   }
   const packageJson = readPackageJson(packageDirectory);
   if (!packageJson) {
-    return null;
+    return { status: 'not-found' };
   }
   const exportsField = packageJson.exports;
-  if (exportsField) {
+  if ('exports' in packageJson) {
     const hasSubpathExports =
       typeof exportsField === 'object' &&
       !Array.isArray(exportsField) &&
+      exportsField !== null &&
       Object.keys(exportsField).some(key => key.startsWith('.'));
     const target =
       parsed.subpath === '.' && !hasSubpathExports
@@ -164,17 +170,25 @@ const resolvePackageImport = (
           : undefined;
     const resolved = resolvePackageTarget(packageDirectory, target);
     if (resolved) {
-      return resolved;
+      return { status: 'resolved', path: resolved };
     }
+    return { status: 'blocked-by-exports' };
   }
   if (parsed.subpath !== '.') {
-    return resolvePathWithExtensions(resolve(packageDirectory, parsed.subpath));
+    const resolved = resolvePathWithExtensions(
+      resolve(packageDirectory, parsed.subpath)
+    );
+    return resolved
+      ? { status: 'resolved', path: resolved }
+      : { status: 'not-found' };
   }
-  return (
+  const resolved =
     resolvePackageTarget(packageDirectory, packageJson.module) ??
     resolvePackageTarget(packageDirectory, packageJson.main) ??
-    resolveIndexFile(packageDirectory)
-  );
+    resolveIndexFile(packageDirectory);
+  return resolved
+    ? { status: 'resolved', path: resolved }
+    : { status: 'not-found' };
 };
 
 const resolveExportAllModule = (
@@ -191,9 +205,12 @@ const resolveExportAllModule = (
     }
   }
 
-  const packageImportPath = resolvePackageImport(specifier, importerPath);
-  if (packageImportPath) {
-    return packageImportPath;
+  const packageImport = resolvePackageImport(specifier, importerPath);
+  if (packageImport.status === 'resolved') {
+    return packageImport.path;
+  }
+  if (packageImport.status === 'blocked-by-exports') {
+    return null;
   }
 
   try {

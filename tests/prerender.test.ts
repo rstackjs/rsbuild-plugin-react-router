@@ -265,4 +265,36 @@ describe('prerender helpers', () => {
       expect.stringContaining('`dashboard` when pre-rendering'),
     ]);
   });
+
+  it('reports root loaders for unprerendered ssr:false descendants', () => {
+    const manifestRoutes = {
+      root: {
+        id: 'root',
+        file: 'root.tsx',
+        path: '',
+        hasLoader: true,
+      },
+      dashboard: {
+        id: 'dashboard',
+        parentId: 'root',
+        file: 'routes/dashboard.tsx',
+        path: 'dashboard',
+      },
+      about: {
+        id: 'about',
+        parentId: 'root',
+        file: 'routes/about.tsx',
+        path: 'about',
+      },
+    };
+
+    expect(
+      getSsrFalsePrerenderExportErrors({
+        routes: manifestRoutes,
+        manifestRoutes,
+        routeExports: {},
+        prerenderPaths: ['/about'],
+      })
+    ).toEqual([expect.stringContaining('`root` when pre-rendering')]);
+  });
 });

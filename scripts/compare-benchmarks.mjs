@@ -25,7 +25,12 @@ if (!values.before || !values.after) {
 const readJson = async file => JSON.parse(await readFile(file, 'utf8'));
 const before = await readJson(values.before);
 const after = await readJson(values.after);
-const operations = new Set(values.operations.split(',').filter(Boolean));
+const operations = new Set(
+  values.operations
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean)
+);
 
 const findBenchmark = (result, id) => {
   const benchmark = result.benchmarks?.find(item => item.id === id);
