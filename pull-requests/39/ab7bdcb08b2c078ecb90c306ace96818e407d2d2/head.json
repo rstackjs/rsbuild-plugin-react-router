@@ -1,0 +1,379 @@
+{
+  "repo": "rsbuild-plugin-react-router",
+  "commit": "ab7bdcb08b2c078ecb90c306ace96818e407d2d2",
+  "date": "2026-06-24T21:58:41.637Z",
+  "node": "v22.23.0",
+  "pnpm": "9.15.3",
+  "platform": "linux 6.17.0-1018-azure x64",
+  "profile": "default",
+  "iterations": 5,
+  "warmup": 1,
+  "clean": "build",
+  "logPerformance": false,
+  "rspackProfile": null,
+  "rspackTraceOutput": null,
+  "failed": false,
+  "benchmarks": [
+    {
+      "id": "synthetic-256-ssr-esm",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "cwd": ".benchmark/fixtures/synthetic-256-ssr-esm",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 1931.4315669999996,
+          "userMs": 3590,
+          "sysMs": 420,
+          "maxRssKb": 393288,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1917.5300000000007,
+          "userMs": 3610,
+          "sysMs": 420,
+          "maxRssKb": 397104,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1978.3357489999999,
+          "userMs": 3570,
+          "sysMs": 430,
+          "maxRssKb": 391120,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1956.3344689999994,
+          "userMs": 3640,
+          "sysMs": 420,
+          "maxRssKb": 390696,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1941.1218360000003,
+          "userMs": 3590,
+          "sysMs": 440,
+          "maxRssKb": 400452,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 1917.5300000000007,
+          "median": 1941.1218360000003,
+          "mean": 1944.9507242,
+          "p95": 1978.3357489999999,
+          "stdev": 20.945040646735293
+        },
+        "userMs": {
+          "min": 3570,
+          "median": 3590,
+          "mean": 3600,
+          "p95": 3640,
+          "stdev": 23.664319132398465
+        },
+        "sysMs": {
+          "min": 420,
+          "median": 420,
+          "mean": 426,
+          "p95": 440,
+          "stdev": 8
+        },
+        "maxRssKb": {
+          "min": 390696,
+          "median": 393288,
+          "mean": 394532,
+          "p95": 400452,
+          "stdev": 3730.033780007897
+        }
+      },
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-256-ssr-esm-split",
+      "routeCount": 256,
+      "variant": "ssr-esm-split",
+      "cwd": ".benchmark/fixtures/synthetic-256-ssr-esm-split",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 2354.7695710000007,
+          "userMs": 4470,
+          "sysMs": 550,
+          "maxRssKb": 424176,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2356.4358589999974,
+          "userMs": 4430,
+          "sysMs": 560,
+          "maxRssKb": 429168,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2349.245113000001,
+          "userMs": 4510,
+          "sysMs": 510,
+          "maxRssKb": 418640,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2282.7772719999994,
+          "userMs": 4400,
+          "sysMs": 540,
+          "maxRssKb": 422364,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2361.8458710000014,
+          "userMs": 4530,
+          "sysMs": 490,
+          "maxRssKb": 421264,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 2282.7772719999994,
+          "median": 2354.7695710000007,
+          "mean": 2341.0147372,
+          "p95": 2361.8458710000014,
+          "stdev": 29.394843168692304
+        },
+        "userMs": {
+          "min": 4400,
+          "median": 4470,
+          "mean": 4468,
+          "p95": 4530,
+          "stdev": 48.33218389437829
+        },
+        "sysMs": {
+          "min": 490,
+          "median": 540,
+          "mean": 530,
+          "p95": 560,
+          "stdev": 26.076809620810597
+        },
+        "maxRssKb": {
+          "min": 418640,
+          "median": 422364,
+          "mean": 423122.4,
+          "p95": 429168,
+          "stdev": 3515.1126070155988
+        }
+      },
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-256-spa",
+      "routeCount": 256,
+      "variant": "spa",
+      "cwd": ".benchmark/fixtures/synthetic-256-spa",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 1952.528419000002,
+          "userMs": 3490,
+          "sysMs": 440,
+          "maxRssKb": 408060,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1927.5817220000026,
+          "userMs": 3450,
+          "sysMs": 460,
+          "maxRssKb": 395000,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1958.641893,
+          "userMs": 3530,
+          "sysMs": 430,
+          "maxRssKb": 392800,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1953.2117669999934,
+          "userMs": 3500,
+          "sysMs": 430,
+          "maxRssKb": 390372,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1953.4185209999996,
+          "userMs": 3570,
+          "sysMs": 420,
+          "maxRssKb": 397700,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 1927.5817220000026,
+          "median": 1953.2117669999934,
+          "mean": 1949.0764643999996,
+          "p95": 1958.641893,
+          "stdev": 10.967146837856507
+        },
+        "userMs": {
+          "min": 3450,
+          "median": 3500,
+          "mean": 3508,
+          "p95": 3570,
+          "stdev": 40.19950248448356
+        },
+        "sysMs": {
+          "min": 420,
+          "median": 430,
+          "mean": 436,
+          "p95": 460,
+          "stdev": 13.564659966250536
+        },
+        "maxRssKb": {
+          "min": 390372,
+          "median": 395000,
+          "mean": 396786.4,
+          "p95": 408060,
+          "stdev": 6134.425143401784
+        }
+      },
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-256-sourcemaps",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "sourceMap": true,
+      "cwd": ".benchmark/fixtures/synthetic-256-sourcemaps",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 2036.9664479999992,
+          "userMs": 3720,
+          "sysMs": 430,
+          "maxRssKb": 409288,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1960.5647600000011,
+          "userMs": 3700,
+          "sysMs": 420,
+          "maxRssKb": 417484,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2024.8884619999953,
+          "userMs": 3790,
+          "sysMs": 420,
+          "maxRssKb": 420208,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2024.021858,
+          "userMs": 3790,
+          "sysMs": 400,
+          "maxRssKb": 409088,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2035.6206740000052,
+          "userMs": 3830,
+          "sysMs": 440,
+          "maxRssKb": 408316,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 1960.5647600000011,
+          "median": 2024.8884619999953,
+          "mean": 2016.4124404000002,
+          "p95": 2036.9664479999992,
+          "stdev": 28.42580887464205
+        },
+        "userMs": {
+          "min": 3700,
+          "median": 3790,
+          "mean": 3766,
+          "p95": 3830,
+          "stdev": 48.41487374764082
+        },
+        "sysMs": {
+          "min": 400,
+          "median": 420,
+          "mean": 422,
+          "p95": 440,
+          "stdev": 13.2664991614216
+        },
+        "maxRssKb": {
+          "min": 408316,
+          "median": 409288,
+          "mean": 412876.8,
+          "p95": 420208,
+          "stdev": 4960.003483869745
+        }
+      },
+      "pluginOperations": []
+    }
+  ]
+}
