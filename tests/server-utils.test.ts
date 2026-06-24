@@ -49,6 +49,17 @@ describe('resolveReactRouterServerBuild', () => {
     ).resolves.toMatchObject({ assets: { version: 'commonjs' } });
   });
 
+  it('prefers module.exports when a CommonJS namespace default is not a server build', async () => {
+    const build = createBuild('module-exports');
+
+    await expect(
+      resolveReactRouterServerBuild({
+        default: { routes: {} },
+        'module.exports': build,
+      })
+    ).resolves.toMatchObject({ assets: { version: 'module-exports' } });
+  });
+
   it('resolves recognized asynchronous build exports', async () => {
     const build = createBuild('async');
 

@@ -1,75 +1,33 @@
-import type {
-  RsbuildConfig,
-  RsbuildPluginAPI,
-  RsbuildDevServer,
-  Rspack,
-} from '@rsbuild/core';
+import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
+import {
+  createCompilationIdentityTracker,
+  hasPendingCompilation,
+  isLatestStartedCompilation,
+  type DevCompilerPair,
+} from './dev-runtime-compilation.js';
 import {
   createReactRouterDevRuntime,
   loadReactRouterServerBuild,
   registerReactRouterDevRuntime,
   unregisterReactRouterDevRuntime,
-  type ReactRouterDevRuntime,
 } from './dev-generation.js';
 import {
   getEnvironmentStats,
   snapshotDevChangedFiles,
-  type DevCompilationIdentity,
-  type DevGraphChanges,
-  type DevGraphIdentity,
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
-
-type DevCompilerPair = {
-  web: Rspack.Compiler;
-  node: Rspack.Compiler;
-  settledCompilations: WeakSet<Rspack.Compilation>;
-  pendingAttempt?: PendingDevCompilation;
-  latestCompletedWebIdentity?: DevCompilationIdentity;
-  latestWebStart?: CompilationStart;
-  latestNodeStart?: CompilationStart;
-};
-
-type PendingDevCompilation = {
-  stats: Rspack.Stats | Rspack.MultiStats;
-  changes: DevGraphChanges;
-  identity: DevGraphIdentity;
-  webCompilation: Rspack.Compilation;
-  nodeCompilation: Rspack.Compilation;
-};
-
-type CompilationStart =
-  | { status: 'pending' }
-  | { status: 'started'; identity: DevCompilationIdentity };
-
-type RuntimeBinding = {
-  id: number;
-  server: RsbuildDevServer;
-  runtime: ReactRouterDevRuntime;
-  compilers?: DevCompilerPair;
-};
-
-type CloseOutcome = { ok: true } | { ok: false; cause: unknown };
-
-type CloseObservation = {
-  binding?: RuntimeBinding;
-  promise?: Promise<void>;
-  outcome?: CloseOutcome;
-};
+import {
+  createDevRuntimeSessionManager,
+  type RuntimeBinding,
+} from './dev-runtime-session.js';
 
 type ServerSetup = Exclude<
   NonNullable<NonNullable<RsbuildConfig['server']>['setup']>,
   unknown[]
 >;
-
-type ControllerState =
-  | { status: 'idle' }
-  | { status: 'active'; binding: RuntimeBinding }
-  | { status: 'closing'; binding: RuntimeBinding }
-  | { status: 'terminal'; error: Error };
 
 export type ReactRouterDevRuntimeController = {
   captureWeb: (
@@ -91,16 +49,6 @@ const escapeHtml = (value: string): string =>
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
 
-const isLatestStartedCompilation = (
-  identity: DevCompilationIdentity | undefined,
-  start: CompilationStart | undefined
-): boolean =>
-  !identity || (start?.status === 'started' && start.identity === identity);
-
-const hasPendingCompilation = (pair: DevCompilerPair): boolean =>
-  pair.latestWebStart?.status === 'pending' ||
-  pair.latestNodeStart?.status === 'pending';
-
 export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
@@ -120,42 +68,6 @@ export const createReactRouterDevRuntimeController = ({
     };
   }
 
-  let state: ControllerState = { status: 'idle' };
-  let nextSessionId = 1;
-  const identityByCompilation = new WeakMap<
-    Rspack.Compilation,
-    DevCompilationIdentity
-  >();
-  const webIdentityByNodeCompilation = new WeakMap<
-    Rspack.Compilation,
-    DevCompilationIdentity
-  >();
-  const closeObservationByServer = new WeakMap<
-    RsbuildDevServer,
-    CloseObservation
-  >();
-
-  const getCompilationIdentity = (
-    compilation: Rspack.Compilation
-  ): DevCompilationIdentity => {
-    const existing = identityByCompilation.get(compilation);
-    if (existing) {
-      return existing;
-    }
-    const identity = Symbol();
-    // Keep compact lineage tokens in committed state without retaining entire
-    // Rspack compilation graphs across failed rebuilds.
-    identityByCompilation.set(compilation, identity);
-    return identity;
-  };
-
-  const getActiveBinding = (): RuntimeBinding | undefined =>
-    state.status === 'active' ? state.binding : undefined;
-
-  const isCurrentBinding = (binding: RuntimeBinding): boolean =>
-    (state.status === 'active' || state.status === 'closing') &&
-    state.binding === binding;
-
   const closeBinding = (binding: RuntimeBinding, error?: Error): void => {
     const pair = binding.compilers;
     if (pair) {
@@ -169,80 +81,9 @@ export const createReactRouterDevRuntimeController = ({
     unregisterReactRouterDevRuntime(binding.server, binding.runtime);
   };
 
-  const completeClose = (binding: RuntimeBinding): void => {
-    if (!isCurrentBinding(binding)) {
-      return;
-    }
-    if (state.status === 'active') {
-      closeBinding(binding);
-    }
-    state = { status: 'idle' };
-  };
-
-  const failClose = (binding: RuntimeBinding, cause: unknown): void => {
-    if (!isCurrentBinding(binding)) {
-      return;
-    }
-    const error = new Error(
-      `[${PLUGIN_NAME}] The previous development server failed to close. Restart the process before retrying because Rsbuild may not have finished tearing down its compiler and watchers.`,
-      { cause }
-    );
-    closeBinding(binding, error);
-    state = { status: 'terminal', error };
-  };
-
-  const applyCloseOutcome = (
-    observation: CloseObservation,
-    outcome: CloseOutcome
-  ): void => {
-    observation.outcome = outcome;
-    const { binding } = observation;
-    if (!binding) {
-      return;
-    }
-    if (outcome.ok) {
-      completeClose(binding);
-    } else {
-      failClose(binding, outcome.cause);
-    }
-    observation.binding = undefined;
-  };
-
-  const observeClose = (server: RsbuildDevServer): CloseObservation => {
-    const existing = closeObservationByServer.get(server);
-    if (existing) {
-      return existing;
-    }
-    const observation: CloseObservation = {};
-    const close = server.close.bind(server);
-    server.close = () => {
-      if (observation.promise) {
-        return observation.promise;
-      }
-      let closePromise: Promise<void>;
-      try {
-        closePromise = close();
-      } catch (cause) {
-        closePromise = Promise.reject(cause);
-      }
-      observation.promise = closePromise;
-      void closePromise.then(
-        () => applyCloseOutcome(observation, { ok: true }),
-        cause => applyCloseOutcome(observation, { ok: false, cause })
-      );
-      return closePromise;
-    };
-    closeObservationByServer.set(server, observation);
-    return observation;
-  };
-
-  const bindCloseObservation = (binding: RuntimeBinding): void => {
-    const observation = observeClose(binding.server);
-    observation.binding = binding;
-    if (observation.outcome) {
-      applyCloseOutcome(observation, observation.outcome);
-    }
-  };
+  const sessions = createDevRuntimeSessionManager(closeBinding);
+  const compilationIdentities = createCompilationIdentityTracker();
+  const { getCompilationIdentity } = compilationIdentities;
 
   const flushSettledAttempt = (
     binding: RuntimeBinding,
@@ -251,7 +92,7 @@ export const createReactRouterDevRuntimeController = ({
     const pending = pair.pendingAttempt;
     if (
       !pending ||
-      getActiveBinding()?.id !== binding.id ||
+      sessions.getActiveBinding()?.id !== binding.id ||
       !pair.settledCompilations.has(pending.webCompilation) ||
       !pair.settledCompilations.has(pending.nodeCompilation)
     ) {
@@ -267,7 +108,7 @@ export const createReactRouterDevRuntimeController = ({
     void binding.runtime
       .finishAttempt(pending.stats, pending.changes, pending.identity)
       .catch(cause => {
-        if (getActiveBinding()?.id === binding.id) {
+        if (sessions.getActiveBinding()?.id === binding.id) {
           binding.runtime.failAttempt(
             cause instanceof Error ? cause : new Error(String(cause))
           );
@@ -278,13 +119,12 @@ export const createReactRouterDevRuntimeController = ({
   const rejectUnsupportedCompiler = (reason: string): void => {
     const message = `[${PLUGIN_NAME}] Could not coordinate React Router development output because ${reason}.`;
     api.logger.warn(message);
-    const binding = getActiveBinding();
+    const binding = sessions.getActiveBinding();
     if (!binding) {
       return;
     }
     const error = new Error(message);
-    closeBinding(binding, error);
-    state = { status: 'terminal', error };
+    sessions.terminate(binding, error);
   };
 
   // Rsbuild runs server.setup before onBeforeStartDevServer. Prepending the
@@ -300,7 +140,7 @@ export const createReactRouterDevRuntimeController = ({
         : [];
       const observeServer: ServerSetup = context => {
         if (context.action === 'dev') {
-          observeClose(context.server);
+          sessions.observeClose(context.server);
         }
       };
       return {
@@ -316,24 +156,12 @@ export const createReactRouterDevRuntimeController = ({
   api.onBeforeStartDevServer({
     order: 'pre',
     async handler({ server }) {
-      if (state.status === 'terminal') {
-        throw state.error;
-      }
-      if (state.status === 'active') {
-        throw new Error(
-          `[${PLUGIN_NAME}] A development server is already active. Await its close() before calling createDevServer() again. If startup failed before returning the server, restart the process before retrying.`
-        );
-      }
-      if (state.status === 'closing') {
-        throw new Error(
-          `[${PLUGIN_NAME}] The previous development server is still closing. Await its close() before calling createDevServer() again.`
-        );
-      }
+      sessions.assertCanStart();
       const runtime = createReactRouterDevRuntime({
         server,
         buildPlan,
         onEvaluationError(error) {
-          if (getActiveBinding()?.runtime !== runtime) {
+          if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
           }
           api.logger.error(error.message);
@@ -344,29 +172,28 @@ export const createReactRouterDevRuntimeController = ({
         },
         onWarning: message => api.logger.warn(message),
       });
-      const binding = { id: nextSessionId++, server, runtime };
-      state = { status: 'active', binding };
+      const binding = sessions.createBinding(server, runtime);
       registerReactRouterDevRuntime(server, runtime);
-      bindCloseObservation(binding);
+      sessions.bindCloseObservation(binding);
     },
   });
 
   api.onCloseDevServer({
     order: 'pre',
     handler() {
-      if (state.status !== 'active') {
+      const binding = sessions.getActiveBinding();
+      if (!binding) {
         return;
       }
-      const binding = state.binding;
       closeBinding(binding);
-      state = { status: 'closing', binding };
+      sessions.markClosing(binding);
     },
   });
 
   api.onBeforeDevCompile({
     order: 'pre',
     handler() {
-      const binding = getActiveBinding();
+      const binding = sessions.getActiveBinding();
       const pair = binding?.compilers;
       if (!binding || !pair || hasPendingCompilation(pair)) {
         return;
@@ -387,7 +214,7 @@ export const createReactRouterDevRuntimeController = ({
       rejectUnsupportedCompiler('the web or node compiler was missing');
       return;
     }
-    const binding = getActiveBinding();
+    const binding = sessions.getActiveBinding();
     if (!binding) {
       return;
     }
@@ -400,7 +227,7 @@ export const createReactRouterDevRuntimeController = ({
     const sessionId = binding.id;
     const runtime = binding.runtime;
     const failCurrentAttempt = (side: 'web' | 'node', error: Error): void => {
-      if (getActiveBinding()?.id === sessionId) {
+      if (sessions.getActiveBinding()?.id === sessionId) {
         if (side === 'web') {
           pair.latestWebStart = undefined;
         } else {
@@ -414,7 +241,7 @@ export const createReactRouterDevRuntimeController = ({
       side: 'latestWebStart' | 'latestNodeStart'
     ): void => {
       if (
-        getActiveBinding()?.id === sessionId &&
+        sessions.getActiveBinding()?.id === sessionId &&
         pair[side]?.status !== 'pending'
       ) {
         const attemptAlreadyPending = hasPendingCompilation(pair);
@@ -436,7 +263,7 @@ export const createReactRouterDevRuntimeController = ({
     web.hooks.done.tap(
       { name: `${PLUGIN_NAME}:dev-web-complete`, stage: -1000 },
       stats => {
-        if (getActiveBinding()?.id !== sessionId) {
+        if (sessions.getActiveBinding()?.id !== sessionId) {
           return;
         }
         pair.latestCompletedWebIdentity = getCompilationIdentity(
@@ -447,7 +274,7 @@ export const createReactRouterDevRuntimeController = ({
     web.hooks.thisCompilation.tap(
       `${PLUGIN_NAME}:dev-web-compilation`,
       compilation => {
-        if (getActiveBinding()?.id === sessionId) {
+        if (sessions.getActiveBinding()?.id === sessionId) {
           pair.latestWebStart = {
             status: 'started',
             identity: getCompilationIdentity(compilation),
@@ -458,7 +285,7 @@ export const createReactRouterDevRuntimeController = ({
     node.hooks.thisCompilation.tap(
       `${PLUGIN_NAME}:dev-node-web-compilation`,
       compilation => {
-        if (getActiveBinding()?.id !== sessionId) {
+        if (sessions.getActiveBinding()?.id !== sessionId) {
           return;
         }
         pair.latestNodeStart = {
@@ -466,7 +293,7 @@ export const createReactRouterDevRuntimeController = ({
           identity: getCompilationIdentity(compilation),
         };
         if (pair.latestCompletedWebIdentity) {
-          webIdentityByNodeCompilation.set(
+          compilationIdentities.setWebIdentityForNodeCompilation(
             compilation,
             pair.latestCompletedWebIdentity
           );
@@ -474,7 +301,7 @@ export const createReactRouterDevRuntimeController = ({
       }
     );
     const settleCompilation = (stats: Rspack.Stats): void => {
-      if (getActiveBinding()?.id !== sessionId) {
+      if (sessions.getActiveBinding()?.id !== sessionId) {
         return;
       }
       pair.settledCompilations.add(stats.compilation);
@@ -497,7 +324,7 @@ export const createReactRouterDevRuntimeController = ({
   });
 
   api.onAfterDevCompile(async ({ stats }) => {
-    const binding = getActiveBinding();
+    const binding = sessions.getActiveBinding();
     const pair = binding?.compilers;
     if (!binding || !pair) {
       return;
@@ -530,7 +357,9 @@ export const createReactRouterDevRuntimeController = ({
       web: webIdentity,
       node: nodeIdentity,
       nodeWeb: nodeStats
-        ? webIdentityByNodeCompilation.get(nodeStats.compilation)
+        ? compilationIdentities.getWebIdentityForNodeCompilation(
+            nodeStats.compilation
+          )
         : undefined,
     };
     if (!webStats || !nodeStats) {
@@ -549,17 +378,18 @@ export const createReactRouterDevRuntimeController = ({
 
   return {
     captureWeb(compilation, manifestsByEntryName): void {
-      const binding = getActiveBinding();
+      const binding = sessions.getActiveBinding();
       if (binding?.compilers?.web === compilation.compiler) {
         binding.runtime.captureWeb(compilation, manifestsByEntryName);
       }
     },
 
     createBuildLoader(entryName?: string): () => Promise<ServerBuild> {
-      const server = getActiveBinding()?.server;
+      const server = sessions.getActiveBinding()?.server;
       if (server) {
         return () => loadReactRouterServerBuild(server, entryName);
       }
+      const state = sessions.getState();
       if (state.status === 'terminal') {
         const { error } = state;
         return () => Promise.reject(error);

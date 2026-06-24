@@ -13,7 +13,17 @@ declare module 'react-router' {
 }
 
 export default defineConfig(() => {
+  const lazyCompilation =
+    process.env.RR_LAZY_COMPILATION === 'entries'
+      ? { entries: true }
+      : undefined;
+
   return {
-    plugins: [pluginReactRouter(), pluginReact(), pluginLess(), pluginSass()],
+    plugins: [
+      pluginReactRouter({ lazyCompilation }),
+      pluginReact(),
+      pluginLess(),
+      pluginSass(),
+    ],
   };
 });

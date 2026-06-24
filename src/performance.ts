@@ -71,7 +71,7 @@ export type ReactRouterPerformanceProfiler = {
     callback: () => T
   ): T;
   flush(
-    environment: string,
+    environment: string | undefined,
     details?: Pick<ReactRouterPerformanceReport, 'compilerLifecycleMs'>
   ): void;
 };
@@ -171,7 +171,11 @@ export const createReactRouterPerformanceProfiler = ({
   return {
     record(environment, operation, resource, callback) {
       if (!enabled) {
-        return callback();
+        try {
+          return Promise.resolve(callback());
+        } catch (error) {
+          return Promise.reject(error);
+        }
       }
 
       const resolvedEnvironment = environment ?? 'unknown';
@@ -226,7 +230,8 @@ export const createReactRouterPerformanceProfiler = ({
         return;
       }
 
-      const timings = timingsByEnvironment.get(environment);
+      const resolvedEnvironment = environment ?? 'unknown';
+      const timings = timingsByEnvironment.get(resolvedEnvironment);
       if (!timings || timings.size === 0) {
         return;
       }
@@ -238,12 +243,12 @@ export const createReactRouterPerformanceProfiler = ({
         ])
       );
       const report: ReactRouterPerformanceReport = {
-        environment,
+        environment: resolvedEnvironment,
         ...details,
         operations,
       };
       log(`[react-router:performance] ${JSON.stringify(report)}`);
-      timingsByEnvironment.delete(environment);
+      timingsByEnvironment.delete(resolvedEnvironment);
     },
   };
 };

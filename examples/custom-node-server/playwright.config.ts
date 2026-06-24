@@ -44,7 +44,8 @@ export default defineConfig({
   webServer: {
     command: 'corepack pnpm run dev',
     url: 'http://localhost:3003',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer:
+      !process.env.CI && process.env.RR_E2E_REUSE_EXISTING_SERVER !== 'false',
     timeout: 120000,
   },
 });

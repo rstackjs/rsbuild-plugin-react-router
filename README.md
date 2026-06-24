@@ -91,6 +91,9 @@ pluginReactRouter({
 
   /**
    * Rsbuild dev-only lazy compilation behavior.
+   * The plugin guards React Router hydration-critical modules so
+   * `lazyCompilation: { entries: true }` remains enabled without replacing
+   * manifest route modules with lazy entry proxies.
    * @default undefined
    */
   lazyCompilation?: boolean | Rspack.LazyCompilationOptions,
@@ -307,7 +310,7 @@ If no configuration is provided, the following defaults will be used:
   customServer: false,
   serverOutput: 'module',
   federation: false,
-  lazyCompilation: undefined,
+  lazyCompilation: undefined, // Rsbuild's dev defaults still apply
   logPerformance: false,
   parallelTransforms: undefined // adaptive: workers for 256+ resolved routes
 }

@@ -239,4 +239,38 @@ describe('React Router performance profiler', () => {
       performance.now = originalNow;
     }
   });
+
+  it('returns a rejected promise for synchronous record failures when disabled', async () => {
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: false,
+      log: () => {},
+    });
+
+    await expect(
+      profiler.record('web', 'route:module', 'app/routes/a.tsx', () => {
+        throw new Error('sync failure');
+      })
+    ).rejects.toThrow('sync failure');
+  });
+
+  it('flushes timings recorded before an environment is known', async () => {
+    const logs: string[] = [];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+
+    await profiler.record(
+      undefined,
+      'route:module',
+      'app/routes/a.tsx',
+      async () => 'route-module'
+    );
+    profiler.flush(undefined);
+
+    expect(logs).toHaveLength(1);
+    const report = parsePerformanceReport(logs[0]);
+    expect(report.environment).toBe('unknown');
+    expect(report.operations['route:module'].count).toBe(1);
+  });
 });

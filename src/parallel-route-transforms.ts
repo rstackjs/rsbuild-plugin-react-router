@@ -131,6 +131,9 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     if (this.#closed) {
       return executeRouteTransformTask(task, this.options);
     }
+    if (task.kind === 'clientOnlyStub' && task.resolveExportAllModule) {
+      return executeRouteTransformTask(task, this.options);
+    }
 
     try {
       return await this.#runInWorker(task);
