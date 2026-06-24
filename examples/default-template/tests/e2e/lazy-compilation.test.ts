@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('lazy compilation', () => {
-  test('hydrates the initial route when route entries are lazy-enabled', async ({
+  test('hydrates with entries:true while manifest route modules stay synchronous', async ({
     page,
   }) => {
     const errors: string[] = [];
@@ -31,6 +31,20 @@ test.describe('lazy compilation', () => {
     });
     expect(initialRouteModules.root).toContain('default');
     expect(initialRouteModules['routes/home']).toContain('default');
+
+    const manifestRouteModules = await page.evaluate(() => {
+      const manifest = (window as any).__reactRouterManifest;
+      return Object.fromEntries(
+        Object.entries(manifest.routes).map(([routeId, route]) => [
+          routeId,
+          (route as { module: string }).module,
+        ])
+      );
+    });
+    const rootRouteAsset = await page.request.get(manifestRouteModules.root);
+    expect(await rootRouteAsset.text()).not.toContain(
+      'lazy-compilation-proxy'
+    );
 
     const documentRequests: string[] = [];
     page.on('request', (request) => {

@@ -93,7 +93,7 @@ pluginReactRouter({
    * Rsbuild dev-only lazy compilation behavior.
    * The plugin guards React Router hydration-critical modules so
    * `lazyCompilation: { entries: true }` remains enabled without replacing
-   * initial route modules with lazy entry proxies.
+   * manifest route modules with lazy entry proxies.
    * @default undefined
    */
   lazyCompilation?: boolean | Rspack.LazyCompilationOptions,
