@@ -1,6 +1,6 @@
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import jsesc from 'jsesc';
-import { dirname, relative } from 'pathe';
+import { relative } from 'pathe';
 import { PLUGIN_NAME } from './constants.js';
 import {
   getReactRouterManifestForDev,
@@ -8,6 +8,7 @@ import {
 } from './manifest.js';
 import type { RouteTransformExecutor } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
+import { createBundlerRouteExportResolver } from './route-export-resolution.js';
 import type { RouteChunkConfig } from './route-chunks.js';
 import type { PluginOptions, Route } from './types.js';
 import { isSourceMapEnabled } from './warnings/warn-on-client-source-maps.js';
@@ -228,18 +229,7 @@ export const registerBuildOutputTransforms = ({
             resourcePath: args.resourcePath,
             resolveExportAllModule:
               typeof args.resolve === 'function'
-                ? (specifier: string, importerPath: string) =>
-                    new Promise<string | null>(resolveResolvedPath => {
-                      args.resolve?.(
-                        dirname(importerPath),
-                        specifier,
-                        (error, resolved) => {
-                          resolveResolvedPath(
-                            error || !resolved ? null : resolved
-                          );
-                        }
-                      );
-                    })
+                ? createBundlerRouteExportResolver(args.resolve)
                 : undefined,
           });
         }
