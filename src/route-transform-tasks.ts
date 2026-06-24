@@ -10,7 +10,10 @@ import {
   removeUnusedImports,
   transformRoute,
 } from './plugin-utils.js';
-import { collectClientOnlyStubExportNames } from './route-export-resolution.js';
+import {
+  collectClientOnlyStubExportNames,
+  type RouteExportResolver,
+} from './route-export-resolution.js';
 import {
   createRouteChunkArtifact,
   createRouteClientEntryArtifact,
@@ -53,6 +56,7 @@ export type SplitRouteExportsTransformTask = BaseRouteTransformTask & {
 
 export type ClientOnlyStubTransformTask = BaseRouteTransformTask & {
   kind: 'clientOnlyStub';
+  resolveExportAllModule?: RouteExportResolver;
 };
 
 export type RouteModuleTransformTask = BaseRouteTransformTask & {
@@ -130,7 +134,8 @@ const createClientOnlyStub = async (
 ): Promise<RouteTransformResult> => {
   const exportNames = await collectClientOnlyStubExportNames(
     task.code,
-    task.resourcePath
+    task.resourcePath,
+    task.resolveExportAllModule
   );
 
   return {

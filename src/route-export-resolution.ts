@@ -204,9 +204,15 @@ const resolveExportAllModule = (
   }
 };
 
+export type RouteExportResolver = (
+  specifier: string,
+  importerPath: string
+) => Promise<string | null> | string | null;
+
 export const collectClientOnlyStubExportNames = async (
   code: string,
-  resourcePath: string
+  resourcePath: string,
+  resolveModule: RouteExportResolver = resolveExportAllModule
 ): Promise<Set<string>> => {
   const { exportNames: directExportNames, exportAllModules } =
     await getExportNamesAndExportAll(code);
@@ -229,7 +235,7 @@ export const collectClientOnlyStubExportNames = async (
       }
     }
     for (const nestedSpecifier of moduleExportAll) {
-      const nestedPath = resolveExportAllModule(nestedSpecifier, modulePath);
+      const nestedPath = await resolveModule(nestedSpecifier, modulePath);
       if (!nestedPath) {
         unresolvedExportAll.add(nestedSpecifier);
         continue;
@@ -239,7 +245,7 @@ export const collectClientOnlyStubExportNames = async (
   };
 
   for (const specifier of exportAllModules) {
-    const resolvedPath = resolveExportAllModule(specifier, resourcePath);
+    const resolvedPath = await resolveModule(specifier, resourcePath);
     if (!resolvedPath) {
       unresolvedExportAll.add(specifier);
       continue;

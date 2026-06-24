@@ -55,7 +55,7 @@ import {
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
 } from './manifest.js';
-import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
+import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
 import { createRequestHandler, matchRoutes } from 'react-router';
 import {
   getRouteChunkEntryName,
@@ -553,6 +553,55 @@ export const pluginReactRouter = (
     let latestServerManifest: ReactRouterManifest | null = null;
     const latestServerManifestsByBundleId: Record<string, ReactRouterManifest> =
       {};
+
+    const stageLatestManifests = (
+      manifest: ReactRouterManifest,
+      sri: Record<string, string> | undefined,
+      moduleExportsByRouteId: RouteManifestModuleExports,
+      compilation: Rspack.Compilation
+    ) => {
+      performanceProfiler.recordSync(
+        'web',
+        'manifest:stage',
+        'virtual/react-router/browser-manifest',
+        () => {
+          latestBrowserManifest = manifest;
+          latestBrowserManifestModuleExports = moduleExportsByRouteId;
+          const baseServerManifest = {
+            ...manifest,
+            sri,
+          };
+          latestServerManifest = baseServerManifest;
+          const manifestsByEntryName: Record<string, ReactRouterManifest> = {
+            [devServerBuildEntryName]: baseServerManifest,
+          };
+
+          for (const { bundleId, entryName } of serverBundleEntries) {
+            const bundleRoutes = routesByServerBundleId[bundleId];
+            if (!bundleRoutes) {
+              continue;
+            }
+
+            const routeIds = new Set(Object.keys(bundleRoutes));
+            const filteredRoutes = Object.fromEntries(
+              Object.entries(manifest.routes).filter(([routeId]) =>
+                routeIds.has(routeId)
+              )
+            );
+            const bundleManifest = {
+              ...baseServerManifest,
+              routes: filteredRoutes,
+            };
+            latestServerManifestsByBundleId[bundleId] = bundleManifest;
+            manifestsByEntryName[entryName] = bundleManifest;
+          }
+
+          if (!isBuild) {
+            devRuntime.captureWeb(compilation, manifestsByEntryName);
+          }
+        }
+      );
+    };
 
     const routeByFilePath = new Map(
       Object.values(routes).map(route => [
@@ -1331,81 +1380,30 @@ export const pluginReactRouter = (
                 }
               }
 
-              if (name === 'web' && rspackConfig.plugins) {
-                rspackConfig.plugins.push(
-                  createModifyBrowserManifestPlugin(
-                    routes,
-                    pluginOptions,
-                    appDirectory,
-                    assetPrefix,
-                    routeChunkOptions,
-                    {
-                      future,
-                      manifestChunkNames,
-                      onManifest: (
-                        manifest,
-                        sri,
-                        moduleExportsByRouteId,
-                        manifestContext
-                      ) => {
-                        performanceProfiler.recordSync(
-                          'web',
-                          'manifest:stage',
-                          'virtual/react-router/browser-manifest',
-                          () => {
-                            latestBrowserManifest = manifest;
-                            latestBrowserManifestModuleExports =
-                              moduleExportsByRouteId;
-                            const baseServerManifest = {
-                              ...manifest,
-                              sri,
-                            };
-                            latestServerManifest = baseServerManifest;
-                            const manifestsByEntryName = {
-                              [devServerBuildEntryName]: baseServerManifest,
-                            } as Record<string, ReactRouterManifest>;
-                            for (const {
-                              bundleId,
-                              entryName,
-                            } of serverBundleEntries) {
-                              const bundleRoutes =
-                                routesByServerBundleId[bundleId];
-                              if (!bundleRoutes) {
-                                continue;
-                              }
-                              const routeIds = new Set(
-                                Object.keys(bundleRoutes)
-                              );
-                              const filteredRoutes = Object.fromEntries(
-                                Object.entries(manifest.routes).filter(
-                                  ([routeId]) => routeIds.has(routeId)
-                                )
-                              );
-                              const bundleManifest = {
-                                ...baseServerManifest,
-                                routes: filteredRoutes,
-                              };
-                              latestServerManifestsByBundleId[bundleId] =
-                                bundleManifest;
-                              manifestsByEntryName[entryName] = bundleManifest;
-                            }
-                            if (!isBuild) {
-                              devRuntime.captureWeb(
-                                manifestContext.compilation,
-                                manifestsByEntryName
-                              );
-                            }
-                          }
-                        );
-                      },
-                    }
-                  )
-                );
-              }
               return rspackConfig;
             },
           },
         });
+      }
+    );
+
+    registerModifyBrowserManifestAssets(
+      api,
+      routes,
+      pluginOptions,
+      appDirectory,
+      () => assetPrefix,
+      routeChunkOptions,
+      {
+        future,
+        manifestChunkNames,
+        onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
+          stageLatestManifests(
+            manifest,
+            sri,
+            moduleExportsByRouteId,
+            context.compilation
+          ),
       }
     );
 
@@ -1568,12 +1566,28 @@ export const pluginReactRouter = (
           args.environment?.name,
           'module:client-only-stub',
           args.resource,
-          async () =>
-            routeTransformExecutor.run({
+          async () => {
+            const resolveExportAllModule =
+              typeof args.resolve === 'function'
+                ? (specifier: string, importerPath: string) =>
+                    new Promise<string | null>(resolveModule => {
+                      args.resolve(
+                        dirname(importerPath),
+                        specifier,
+                        (error, path) => {
+                          resolveModule(error || !path ? null : path);
+                        }
+                      );
+                    })
+                : undefined;
+
+            return routeTransformExecutor.run({
               kind: 'clientOnlyStub',
               code: args.code,
               resourcePath: args.resourcePath,
-            })
+              resolveExportAllModule,
+            });
+          }
         )
     );
 
