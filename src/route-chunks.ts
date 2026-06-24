@@ -59,7 +59,7 @@ const createRouteChunkExportMap = (
     routeChunkExportNames.map(exportName => [exportName, getValue(exportName)])
   ) as Record<RouteChunkExportName, boolean>;
 
-export const emptyRouteChunkSnippet = (_reason: string): string => 'export {};';
+export const emptyRouteChunkSnippet = (): string => 'export {};';
 
 const routeChunkQueryStringPrefix = '?route-chunk=';
 

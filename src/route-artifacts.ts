@@ -116,7 +116,7 @@ export const createRouteChunkArtifact = async ({
   const splitRouteModules = routeChunkConfig.splitRouteModules;
   if (!isBuild || !splitRouteModules) {
     return {
-      code: emptyRouteChunkSnippet('Split route modules disabled'),
+      code: emptyRouteChunkSnippet(),
       map: null,
     };
   }
@@ -127,7 +127,7 @@ export const createRouteChunkArtifact = async ({
   }
   if (chunkName !== 'main' && !code.includes(chunkName)) {
     return {
-      code: emptyRouteChunkSnippet(`No ${chunkName} chunk`),
+      code: emptyRouteChunkSnippet(),
       map: null,
     };
   }
@@ -150,7 +150,7 @@ export const createRouteChunkArtifact = async ({
   }
 
   return {
-    code: chunk ?? emptyRouteChunkSnippet(`No ${chunkName} chunk`),
+    code: chunk ?? emptyRouteChunkSnippet(),
     map: null,
   };
 };
