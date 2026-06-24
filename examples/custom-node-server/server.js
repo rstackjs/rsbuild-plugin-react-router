@@ -1,4 +1,9 @@
 import { createRsbuild, loadConfig } from '@rsbuild/core';
+import { createRequestHandler } from '@react-router/express';
+import {
+  loadReactRouterServerBuild,
+  resolveReactRouterServerBuild,
+} from 'rsbuild-plugin-react-router';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,71 +15,49 @@ const app = express();
 const isDev = process.env.NODE_ENV !== 'production';
 
 async function startServer() {
+  /** @type {import('@rsbuild/core').RsbuildDevServer | undefined} */
+  let devServer;
+  /** @type {import('react-router').ServerBuild | (() => Promise<import('react-router').ServerBuild>)} */
+  let build;
+
   if (isDev) {
     const config = await loadConfig();
     const rsbuild = await createRsbuild({
       rsbuildConfig: config.content,
     });
-    const devServer = await rsbuild.createDevServer();
-    app.use(devServer.middlewares);
-
-    app.use(async (req, res, next) => {
-      try {
-        const tryLoadBundle = async (entryName) => {
-          try {
-            return await devServer.environments.node.loadBundle(entryName);
-          } catch (error) {
-            if (error instanceof Error && error.message.includes("Can't find entry")) {
-              return null;
-            }
-            throw error;
-          }
-        };
-        const bundle = /** @type {import("./server/index.js")} */ (
-          (await tryLoadBundle('static/js/app')) ?? (await tryLoadBundle('app'))
-        );
-        await bundle.app(req, res, next);
-      } catch (e) {
-        next(e);
-      }
-    });
-
-    const port = Number.parseInt(process.env.PORT || '3000', 10);
-    const server = app.listen(port, () => {
-      console.log(`Development server is running on http://localhost:${port}`);
-      devServer.afterListen();
-    });
-    devServer.connectWebSocket({ server });
+    const currentDevServer = await rsbuild.createDevServer();
+    devServer = currentDevServer;
+    app.use(currentDevServer.middlewares);
+    build = () => loadReactRouterServerBuild(currentDevServer);
   } else {
-    // Production mode
-
-    app.use(express.static(path.join(__dirname, 'build/client'), {
-      index: false
-    }));
-
-    // Load the server bundle
-    const serverBundle = await import('./build/server/static/js/app.js');
-    const serverApp = serverBundle.app ?? serverBundle.default?.app;
-    if (typeof serverApp !== 'function') {
-      throw new Error(
-        'Invalid server bundle: expected an exported `app(req, res, next)` handler.'
-      );
-    }
-
-    // Mount the server app after static file handling
-    app.use(async (req, res, next) => {
-      try {
-        await serverApp(req, res, next);
-      } catch (e) {
-        next(e);
-      }
-    });
-
-    const port = Number.parseInt(process.env.PORT || '3000', 10);
-    app.listen(port, () => {
-      console.log(`Production server is running on http://localhost:${port}`);
-    });
+    app.use(
+      express.static(path.join(__dirname, 'build/client'), {
+        index: false,
+      })
+    );
+    const productionBuildPath = './build/server/static/js/app.js';
+    build = await resolveReactRouterServerBuild(import(productionBuildPath));
   }
+
+  app.use(
+    createRequestHandler({
+      build,
+      mode: isDev ? 'development' : 'production',
+      getLoadContext() {
+        return {
+          VALUE_FROM_EXPRESS: 'Hello from Express',
+        };
+      },
+    })
+  );
+
+  const port = Number.parseInt(process.env.PORT || '3000', 10);
+  const server = app.listen(port, () => {
+    const mode = isDev ? 'Development' : 'Production';
+    console.log(`${mode} server is running on http://localhost:${port}`);
+    devServer?.afterListen();
+  });
+  devServer?.connectWebSocket({ server });
 }
 
 startServer().catch(console.error);

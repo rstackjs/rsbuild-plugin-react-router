@@ -1,4 +1,5 @@
 import { resolve } from 'pathe';
+import type { ServerBuild } from 'react-router';
 import type { Route } from './types.js';
 
 /**
@@ -105,30 +106,28 @@ const RESOLVABLE_BUILD_EXPORTS = new Set([
   'ssr',
 ]);
 
-const isPromiseLike = (value: unknown): value is Promise<unknown> =>
-  typeof (value as Promise<unknown>)?.then === 'function';
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-export const normalizeBuildModule = <T extends Record<string, any>>(
-  build: T
-): T => {
-  if (!build || typeof build !== 'object') {
-    return build;
-  }
-  if (
-    'default' in build &&
-    Object.keys(build).length === 1 &&
-    typeof build.default === 'object' &&
-    build.default
-  ) {
-    return build.default as T;
-  }
-  return build;
-};
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return isRecord(value) && typeof value.then === 'function';
+}
 
-export const resolveBuildExports = async <T extends Record<string, any>>(
-  build: T
-): Promise<T> => {
-  const resolved: Record<string, any> = { ...build };
+function isRouteDiscovery(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value.mode === 'initial' ||
+      (value.mode === 'lazy' &&
+        (value.manifestPath === undefined ||
+          typeof value.manifestPath === 'string')))
+  );
+}
+
+async function resolveBuildExports(
+  build: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const resolved = { ...build };
   for (const key of Object.keys(build)) {
     if (!RESOLVABLE_BUILD_EXPORTS.has(key)) {
       continue;
@@ -143,7 +142,64 @@ export const resolveBuildExports = async <T extends Record<string, any>>(
       resolved[key] = await value;
     }
   }
-  return resolved as T;
-};
+  return resolved;
+}
+
+function isServerBuild(value: unknown): value is ServerBuild {
+  return Boolean(
+    isRecord(value) &&
+    isRecord(value.entry) &&
+    isRecord(value.entry.module) &&
+    typeof value.entry.module.default === 'function' &&
+    isRecord(value.routes) &&
+    isRecord(value.assets) &&
+    typeof value.assetsBuildDirectory === 'string' &&
+    (value.basename === undefined || typeof value.basename === 'string') &&
+    isRecord(value.future) &&
+    typeof value.isSpaMode === 'boolean' &&
+    Array.isArray(value.prerender) &&
+    typeof value.publicPath === 'string' &&
+    isRouteDiscovery(value.routeDiscovery) &&
+    typeof value.ssr === 'boolean'
+  );
+}
+
+async function resolveServerBuildCandidate(
+  candidate: unknown
+): Promise<ServerBuild | undefined> {
+  if (!isRecord(candidate)) {
+    return undefined;
+  }
+  const resolved = await resolveBuildExports(candidate);
+  return isServerBuild(resolved) ? resolved : undefined;
+}
+
+export async function resolveServerBuildModule(
+  buildModule: unknown,
+  source: string
+): Promise<ServerBuild> {
+  const moduleValue = await buildModule;
+  const direct = await resolveServerBuildCandidate(moduleValue);
+  if (direct) {
+    return direct;
+  }
+  if (isRecord(moduleValue) && 'default' in moduleValue) {
+    const fromDefault = await resolveServerBuildCandidate(
+      await moduleValue.default
+    );
+    if (fromDefault) {
+      return fromDefault;
+    }
+  }
+  throw new Error(
+    `[rsbuild-plugin-react-router] ${source} did not contain a valid React Router ServerBuild.`
+  );
+}
+
+export function resolveReactRouterServerBuild(
+  buildModule: unknown
+): Promise<ServerBuild> {
+  return resolveServerBuildModule(buildModule, 'Imported module');
+}
 
 export { generateServerBuild };

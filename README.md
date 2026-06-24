@@ -449,30 +449,25 @@ If the server is created programmatically with `createDevServer()`, pass
 `onRouteTopologyChange` and use it to recreate that server. Rsbuild's
 `reload-server` watcher is owned by the CLI and is not installed by the
 programmatic API. The callback is a notification and is not awaited, so it can
-safely close the current server as part of the replacement.
+safely start a serialized replacement task. Always `await` the active server's
+`close()` before calling `createDevServer()` again; the plugin rejects overlapping
+or out-of-order replacement instead of closing one server from inside another
+server's startup hooks. If startup fails before returning a server, or if
+`close()` rejects, restart the process before retrying unless you can externally
+prove and force complete teardown; a fresh Rsbuild instance alone is not
+sufficient. Do not launch concurrent `createDevServer()` calls.
 
-When using a custom server, you'll need to:
-
-1. Create a server handler (`server/index.ts`):
-
-```ts
-import { createRequestHandler } from '@react-router/express';
-
-export const app = createRequestHandler({
-  build: () => import('virtual/react-router/server-build'),
-  getLoadContext() {
-    // Add custom context available to your loaders/actions
-    return {
-      // ... your custom context
-    };
-  },
-});
-```
-
-2. Set up your server entry point (`server.js`):
+Create one server entry point (`server.js`) and let it own the React Router
+request handler in both development and production. Only the build provider
+changes between modes:
 
 ```js
 import { createRsbuild, loadConfig } from '@rsbuild/core';
+import { createRequestHandler } from '@react-router/express';
+import {
+  loadReactRouterServerBuild,
+  resolveReactRouterServerBuild,
+} from 'rsbuild-plugin-react-router';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -484,64 +479,83 @@ const app = express();
 const isDev = process.env.NODE_ENV !== 'production';
 
 async function startServer() {
+  let devServer;
+  let build;
+
   if (isDev) {
     const config = await loadConfig();
     const rsbuild = await createRsbuild({
       rsbuildConfig: config.content,
     });
-    const devServer = await rsbuild.createDevServer();
-    app.use(devServer.middlewares);
-
-    app.use(async (req, res, next) => {
-      try {
-        const bundle = await devServer.environments.node.loadBundle('app');
-        await bundle.app(req, res, next);
-      } catch (e) {
-        next(e);
-      }
-    });
-
-    const port = Number.parseInt(process.env.PORT || '3000', 10);
-    const server = app.listen(port, () => {
-      console.log(`Development server is running on http://localhost:${port}`);
-      devServer.afterListen();
-    });
-    devServer.connectWebSocket({ server });
+    const currentDevServer = await rsbuild.createDevServer();
+    devServer = currentDevServer;
+    app.use(currentDevServer.middlewares);
+    build = () => loadReactRouterServerBuild(currentDevServer);
   } else {
-    // Production mode
     app.use(
       express.static(path.join(__dirname, 'build/client'), {
         index: false,
       })
     );
-
-    // Load the server bundle
-    const serverBundle = await import('./build/server/static/js/app.js');
-    // Mount the server app after static file handling
-    app.use(async (req, res, next) => {
-      try {
-        await serverBundle.default.app(req, res, next);
-      } catch (e) {
-        next(e);
-      }
-    });
-
-    const port = Number.parseInt(process.env.PORT || '3000', 10);
-    app.listen(port, () => {
-      console.log(`Production server is running on http://localhost:${port}`);
-    });
+    build = await resolveReactRouterServerBuild(
+      import('./build/server/static/js/app.js')
+    );
   }
+
+  app.use(
+    createRequestHandler({
+      build,
+      mode: isDev ? 'development' : 'production',
+      getLoadContext() {
+        return {
+          // Add custom loader/action context here.
+        };
+      },
+    })
+  );
+
+  const port = Number.parseInt(process.env.PORT || '3000', 10);
+  const server = app.listen(port, () => {
+    const mode = isDev ? 'Development' : 'Production';
+    console.log(`${mode} server is running on http://localhost:${port}`);
+    devServer?.afterListen();
+  });
+  devServer?.connectWebSocket({ server });
 }
 
 startServer().catch(console.error);
 ```
 
-3. Update your `package.json` scripts:
+`loadReactRouterServerBuild` waits for a complete React Router development
+generation. During rebuilds it returns the last successfully evaluated server
+build, whose embedded manifest is paired with the selected web compilation.
+A failed or incomplete candidate does not replace that last-good pair. The
+built-in development middleware uses the same path. Calling
+`devServer.environments.node.loadBundle()` directly bypasses this guarantee.
+
+When `serverBundles` is configured, pass its exact Rsbuild entry name as the
+optional second argument (for example, `bundle-a/index`). The default build
+and every configured bundle are
+evaluated and published as one generation; one failing bundle keeps the whole
+previous generation active.
+
+`resolveReactRouterServerBuild` accepts an imported production server module,
+normalizes ESM and CommonJS namespace shapes, resolves supported asynchronous
+build exports, and validates the result before it reaches React Router.
+
+This guarantee covers the eagerly evaluated server entry object and its
+embedded manifest. It does not snapshot deferred server chunks, make emitted
+client assets immutable, or delay Rsbuild's WebSocket success notification.
+Same-path server or client chunks can change before the matching framework
+generation commits. Closing that publication gap requires a supported Rsbuild
+graph-settled hook plus immutable or staged outputs.
+
+Then update your `package.json` scripts:
 
 ```json
 {
   "scripts": {
-    "dev": "node server.js",
+    "dev": "NODE_ENV=development NODE_OPTIONS=\"--experimental-vm-modules\" node server.js",
     "build": "rsbuild build",
     "start": "NODE_ENV=production node server.js"
   }

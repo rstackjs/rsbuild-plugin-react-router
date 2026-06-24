@@ -147,7 +147,8 @@ export const getBuildManifest = async ({
 };
 
 export const getRoutesByServerBundleId = (
-  buildManifest: BuildManifest | undefined
+  buildManifest: BuildManifest | undefined,
+  sourceRoutes: Record<string, Route>
 ): Record<string, Record<string, Route>> => {
   if (!buildManifest || !('routeIdToServerBundleId' in buildManifest)) {
     return {};
@@ -158,7 +159,7 @@ export const getRoutesByServerBundleId = (
     buildManifest.routeIdToServerBundleId
   )) {
     routesByServerBundleId[serverBundleId] ??= {};
-    const branch = getRouteBranch(buildManifest.routes, routeId);
+    const branch = getRouteBranch(sourceRoutes, routeId);
     for (const route of branch) {
       routesByServerBundleId[serverBundleId][route.id] = route;
     }

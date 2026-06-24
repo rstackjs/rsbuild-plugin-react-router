@@ -30,4 +30,22 @@ describe('resolveReactRouterConfig', () => {
     });
     expect(buildEndCalls).toBe(2);
   });
+
+  it('preserves server bundle selection in SSR mode', async () => {
+    const serverBundles = async () => 'bundle';
+
+    const result = await resolveReactRouterConfig({ serverBundles });
+
+    expect(result.resolved.serverBundles).toBe(serverBundles);
+  });
+
+  it('distinguishes an explicit server module format from its default', async () => {
+    const defaultResult = await resolveReactRouterConfig({});
+    const configuredResult = await resolveReactRouterConfig({
+      serverModuleFormat: 'cjs',
+    });
+
+    expect(defaultResult.hasConfiguredServerModuleFormat).toBe(false);
+    expect(configuredResult.hasConfiguredServerModuleFormat).toBe(true);
+  });
 });
