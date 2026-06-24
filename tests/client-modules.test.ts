@@ -97,4 +97,53 @@ describe('client-only module transforms', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('uses the Rsbuild transform resolver for export-all modules', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rr-client-modules-resolve-'));
+    const appDirectory = join(root, 'app');
+    const resourcePath = join(appDirectory, 'example.client.ts');
+    const resolvedPath = join(root, 'generated', 'client-exports.ts');
+    await mkdir(appDirectory, { recursive: true });
+    await mkdir(join(root, 'generated'), { recursive: true });
+    await writeFile(resourcePath, "export * from '@client/exports';");
+    await writeFile(
+      resolvedPath,
+      'export const fromResolver = true; export const alsoResolver = true;'
+    );
+
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      const plugin = pluginReactRouter();
+      await plugin.setup(rsbuild as any);
+
+      const transformCall = (rsbuild.transform as any).mock.calls.find(
+        (call: any[]) => call[0].test?.toString().includes('\\.client')
+      );
+      expect(transformCall).toBeDefined();
+
+      const handler = transformCall?.[1];
+      const result = await handler({
+        environment: { name: 'node' },
+        code: await readFile(resourcePath, 'utf8'),
+        resourcePath,
+        resolve(
+          context: string,
+          specifier: string,
+          callback: (error: Error | null, resolved?: string) => void
+        ) {
+          expect(context).toBe(appDirectory);
+          expect(specifier).toBe('@client/exports');
+          callback(null, resolvedPath);
+        },
+      });
+
+      expect(result.code).toContain('export const fromResolver = undefined;');
+      expect(result.code).toContain('export const alsoResolver = undefined;');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
