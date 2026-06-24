@@ -1,6 +1,8 @@
 import { Link, NavLink, Outlet, useLoaderData } from 'react-router';
 import type { Route } from './+types/layout';
 
+type LoaderData = Route.ComponentProps['loaderData'];
+
 export function handle() {
   return {
     breadcrumb: () => 'Projects',
@@ -20,7 +22,7 @@ export function loader() {
 }
 
 export default function ProjectsLayout() {
-  const { projects } = useLoaderData<Route.LoaderData>();
+  const { projects } = useLoaderData<LoaderData>();
 
   return (
     <div className="page-container">

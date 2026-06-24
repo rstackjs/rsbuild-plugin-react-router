@@ -1,6 +1,8 @@
 import { Link, useLoaderData } from 'react-router';
 import type { Route } from './+types/index';
 
+type LoaderData = Route.ComponentProps['loaderData'];
+
 export function handle() {
   return {
     breadcrumb: () => 'All Projects',
@@ -73,7 +75,7 @@ function StatCard({
 }
 
 export default function ProjectsIndex() {
-  const { stats, recentActivity } = useLoaderData<Route.LoaderData>();
+  const { stats, recentActivity } = useLoaderData<LoaderData>();
 
   return (
     <div className="space-y-8">

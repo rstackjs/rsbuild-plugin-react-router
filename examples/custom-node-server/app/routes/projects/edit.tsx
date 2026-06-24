@@ -1,9 +1,11 @@
 import { Form, Link, useLoaderData, useNavigation } from 'react-router';
 import type { Route } from './+types/edit';
 
+type LoaderData = Route.ComponentProps['loaderData'];
+
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => `Edit ${data.project.name}`,
+    breadcrumb: (data: LoaderData) => `Edit ${data.project.name}`,
   };
 }
 
@@ -31,7 +33,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function EditProject() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<LoaderData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
 

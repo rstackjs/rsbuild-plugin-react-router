@@ -19,6 +19,34 @@ describe('pluginReactRouter', () => {
     expect(config.dev.lazyCompilation).toBeUndefined();
   });
 
+  it('adds the committed custom-server build entry only in development', async () => {
+    const devRsbuild = await createStubRsbuild({ rsbuildConfig: {} });
+    devRsbuild.addPlugins([pluginReactRouter({ customServer: true })]);
+    const devConfig = await devRsbuild.unwrapConfig();
+
+    expect(
+      devConfig.environments.node.source.entry[
+        'static/js/react-router-server-build'
+      ]
+    ).toBe('virtual/react-router/server-build');
+
+    const buildRsbuild = await createStubRsbuild({
+      action: 'build',
+      rsbuildConfig: {},
+    });
+    buildRsbuild.addPlugins([pluginReactRouter({ customServer: true })]);
+    const buildConfig = await buildRsbuild.unwrapConfig();
+
+    expect(
+      buildConfig.environments.node.source.entry[
+        'static/js/react-router-server-build'
+      ]
+    ).toBeUndefined();
+    expect(buildRsbuild.onBeforeDevCompile).not.toHaveBeenCalled();
+    expect(buildRsbuild.onAfterDevCompile).not.toHaveBeenCalled();
+    expect(buildRsbuild.onAfterCreateCompiler).not.toHaveBeenCalled();
+  });
+
   it('should restart the dev server when route entries are added', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {

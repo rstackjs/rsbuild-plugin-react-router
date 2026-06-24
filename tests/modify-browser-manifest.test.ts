@@ -25,6 +25,56 @@ const createAsset = (source: string) => ({
 });
 
 describe('modify browser manifest plugin', () => {
+  it('reports the exact compilation that produced the manifest', async () => {
+    const { root, appDir } = createTempApp();
+    const routes = {
+      root: { id: 'root', file: 'root.tsx', path: '' },
+    };
+    let emit: ((compilation: unknown) => Promise<void>) | undefined;
+    let reportedCompilation: unknown;
+    const compiler = {
+      hooks: {
+        emit: {
+          tapPromise(_name: string, callback: typeof emit) {
+            emit = callback;
+          },
+        },
+      },
+    };
+    const compilation = {
+      namedChunks: new Map([
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+        ['root', { files: new Set(['static/js/root.js']) }],
+      ]),
+      assets: {
+        'static/js/virtual/react-router/browser-manifest.js': createAsset(
+          'window.__reactRouterManifest="PLACEHOLDER";'
+        ),
+      },
+    };
+
+    try {
+      createModifyBrowserManifestPlugin(
+        routes,
+        {},
+        appDir,
+        '/',
+        undefined,
+        {
+          onManifest(_manifest, _sri, _exports, context) {
+            reportedCompilation = context.compilation;
+          },
+        }
+      ).apply(compiler as never);
+
+      await emit?.(compilation);
+
+      expect(reportedCompilation).toBe(compilation);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects the promise hook when build route analysis fails', async () => {
     const { root, appDir } = createTempApp();
     writeFileSync(join(appDir, 'routes/page.tsx'), 'export const = broken;');
