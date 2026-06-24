@@ -24,6 +24,7 @@ import {
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
+import { getProgram } from './route-ast.js';
 
 export type RouteTransformResult = {
   code: string;
@@ -165,7 +166,7 @@ const transformRouteModule = async (
 
   const ast = parse(code, { sourceType: 'module' });
   if (task.environmentName === 'web' && !task.ssr && task.isSpaMode) {
-    const resolvedExportNames = collectProgramExportNames(ast.program);
+    const resolvedExportNames = collectProgramExportNames(getProgram(ast));
     const isRootRoute = task.resourcePath === task.rootRoutePath;
     const relativePath = relative(process.cwd(), task.resourcePath);
 

@@ -5,93 +5,86 @@ import {
   getProgram,
   removeFromArray,
   type AnyNode,
+  type ProgramNode,
 } from './route-ast.js';
 
 export function validateDestructuredExports(
   id: AnyNode,
   exportsToRemove: readonly string[]
 ): void {
-  if (id.type === 'Identifier') {
-    if (exportsToRemove.includes(id.name)) {
-      throw invalidDestructureError(id.name);
-    }
-    return;
-  }
-
-  if (id.type === 'AssignmentPattern') {
-    validateDestructuredExports(id.left, exportsToRemove);
-    return;
-  }
-
-  if (id.type === 'ArrayPattern') {
-    for (const element of id.elements ?? []) {
-      if (!element) {
-        continue;
-      }
-
-      if (element.type === 'AssignmentPattern') {
-        validateDestructuredExports(element, exportsToRemove);
-        continue;
-      }
-
-      if (
-        element.type === 'Identifier' &&
-        exportsToRemove.includes(element.name)
-      ) {
-        throw invalidDestructureError(element.name);
-      }
-
-      if (
-        element.type === 'RestElement' &&
-        element.argument.type === 'Identifier' &&
-        exportsToRemove.includes(element.argument.name)
-      ) {
-        throw invalidDestructureError(element.argument.name);
-      }
-
-      if (element.type === 'ArrayPattern' || element.type === 'ObjectPattern') {
-        validateDestructuredExports(element, exportsToRemove);
-      }
-    }
-  }
-
-  if (id.type === 'ObjectPattern') {
-    for (const property of id.properties ?? []) {
-      if (!property) {
-        continue;
-      }
-
-      if (property.type === 'Property') {
-        if (
-          property.value.type === 'Identifier' &&
-          exportsToRemove.includes(property.value.name)
-        ) {
-          throw invalidDestructureError(property.value.name);
-        }
-
-        if (
-          property.value.type === 'AssignmentPattern' ||
-          property.value.type === 'ArrayPattern' ||
-          property.value.type === 'ObjectPattern'
-        ) {
-          validateDestructuredExports(property.value, exportsToRemove);
-        }
-      }
-
-      if (
-        property.type === 'RestElement' &&
-        property.argument.type === 'Identifier' &&
-        exportsToRemove.includes(property.argument.name)
-      ) {
-        throw invalidDestructureError(property.argument.name);
-      }
-    }
-  }
+  validateBindingTarget(id, new Set(exportsToRemove));
 }
 
 export function invalidDestructureError(name: string): Error {
   return new Error(`Cannot remove destructured export "${name}"`);
 }
+
+const assertAllowedBindingName = (
+  name: string,
+  exportsToRemove: ReadonlySet<string>
+): void => {
+  if (exportsToRemove.has(name)) {
+    throw invalidDestructureError(name);
+  }
+};
+
+const validateRestElement = (
+  element: AnyNode,
+  exportsToRemove: ReadonlySet<string>
+): void => {
+  if (element.argument?.type === 'Identifier' && element.argument.name) {
+    assertAllowedBindingName(element.argument.name, exportsToRemove);
+  }
+};
+
+const validateObjectProperty = (
+  property: AnyNode,
+  exportsToRemove: ReadonlySet<string>
+): void => {
+  if (property.type === 'RestElement') {
+    validateRestElement(property, exportsToRemove);
+    return;
+  }
+  if (property.type === 'Property') {
+    validateBindingTarget(
+      property.value as AnyNode | null | undefined,
+      exportsToRemove
+    );
+  }
+};
+
+const validateBindingTarget = (
+  node: AnyNode | null | undefined,
+  exportsToRemove: ReadonlySet<string>
+): void => {
+  if (!node) {
+    return;
+  }
+
+  switch (node.type) {
+    case 'Identifier':
+      if (node.name) {
+        assertAllowedBindingName(node.name, exportsToRemove);
+      }
+      return;
+    case 'AssignmentPattern':
+      validateBindingTarget(node.left, exportsToRemove);
+      return;
+    case 'ArrayPattern':
+      for (const element of node.elements ?? []) {
+        if (element?.type === 'RestElement') {
+          validateRestElement(element, exportsToRemove);
+        } else {
+          validateBindingTarget(element, exportsToRemove);
+        }
+      }
+      return;
+    case 'ObjectPattern':
+      for (const property of node.properties ?? []) {
+        validateObjectProperty(property, exportsToRemove);
+      }
+  }
+};
 
 const getDeclaredNames = (node: AnyNode): Set<string> => {
   const names = new Set<string>();
@@ -128,7 +121,9 @@ const isIdentifierDeclaration = (node: AnyNode, parent: AnyNode | null) => {
     return true;
   }
   if (parent.type === 'VariableDeclarator') {
-    return getPatternIdentifierNames(parent.id).has(node.name);
+    return Boolean(
+      node.name && getPatternIdentifierNames(parent.id).has(node.name)
+    );
   }
   if (
     (parent.type === 'ImportSpecifier' ||
@@ -142,11 +137,12 @@ const isIdentifierDeclaration = (node: AnyNode, parent: AnyNode | null) => {
     (parent.type === 'FunctionDeclaration' ||
       parent.type === 'FunctionExpression' ||
       parent.type === 'ArrowFunctionExpression') &&
-    (parent.params ?? []).some((param: AnyNode) =>
-      getPatternIdentifierNames(param).has(node.name)
-    )
+    node.name
   ) {
-    return true;
+    const name = node.name;
+    return (parent.params ?? []).some((param: AnyNode) =>
+      getPatternIdentifierNames(param).has(name)
+    );
   }
   return false;
 };
@@ -204,43 +200,49 @@ const isUppercaseName = (name: string): boolean => /^[A-Z]/.test(name);
 
 const collectReferencedNames = (node: AnyNode): Set<string> => {
   const referenced = new Set<string>();
-  walk(node as any, {
-    Identifier(node: AnyNode, ctx: any) {
-      const parent = ctx.parent as AnyNode | null;
-      if (!isNonReferenceIdentifier(node, parent)) {
-        referenced.add(node.name);
+  walk(node as never, {
+    Identifier(node, ctx) {
+      const current = node as unknown as AnyNode;
+      const parent = (ctx as { parent?: unknown }).parent as AnyNode | null;
+      if (!isNonReferenceIdentifier(current, parent) && current.name) {
+        referenced.add(current.name);
       }
     },
-    JSXIdentifier(node: AnyNode, ctx: any) {
-      const parent = ctx.parent as AnyNode | null;
+    JSXIdentifier(node, ctx) {
+      const current = node as unknown as AnyNode;
+      const parent = (ctx as { parent?: unknown }).parent as AnyNode | null;
       if (!parent) {
         return;
       }
-      if (parent.type === 'JSXMemberExpression' && parent.object === node) {
-        referenced.add(node.name);
+      if (parent.type === 'JSXMemberExpression' && parent.object === current) {
+        if (current.name) {
+          referenced.add(current.name);
+        }
         return;
       }
-      if (!isUppercaseName(node.name)) {
+      if (!current.name || !isUppercaseName(current.name)) {
         return;
       }
       if (
         (parent.type === 'JSXOpeningElement' ||
           parent.type === 'JSXClosingElement') &&
-        parent.name === node
+        parent.name === current
       ) {
-        referenced.add(node.name);
+        referenced.add(current.name);
         return;
       }
     },
-    ExportSpecifier(node: AnyNode, ctx: any) {
-      const declaration = ctx.parent as AnyNode | null;
+    ExportSpecifier(node, ctx) {
+      const current = node as unknown as AnyNode;
+      const declaration = (ctx as { parent?: unknown })
+        .parent as AnyNode | null;
       if (
         !declaration?.source &&
         declaration?.exportKind !== 'type' &&
-        node.local?.name &&
-        node.exportKind !== 'type'
+        current.local?.name &&
+        current.exportKind !== 'type'
       ) {
-        referenced.add(node.local.name);
+        referenced.add(current.local.name);
       }
     },
   });
@@ -257,7 +259,7 @@ type TopLevelDeclarationGraph = {
 };
 
 const createTopLevelDeclarationGraph = (
-  program: AnyNode
+  program: ProgramNode
 ): TopLevelDeclarationGraph => {
   const declarationsByNode = new Map<AnyNode, TopLevelDeclaration>();
   const declarationsByName = new Map<string, Set<TopLevelDeclaration>>();
@@ -280,7 +282,7 @@ const createTopLevelDeclarationGraph = (
 
   for (const statement of [...(program.body ?? [])]) {
     if (statement.type === 'VariableDeclaration') {
-      for (const declarator of statement.declarations) {
+      for (const declarator of statement.declarations ?? []) {
         registerDeclaration(
           declarator,
           declarator,
@@ -301,7 +303,7 @@ const createTopLevelDeclarationGraph = (
 };
 
 const collectLiveTopLevelDeclarations = (
-  program: AnyNode,
+  program: ProgramNode,
   graph: TopLevelDeclarationGraph
 ): Set<TopLevelDeclaration> => {
   const pendingNames: string[] = [];
@@ -384,7 +386,7 @@ const declarationReferencesName = (
 };
 
 const removeNewlyDeadTopLevelDeclarations = (
-  program: AnyNode,
+  program: ProgramNode,
   graph: TopLevelDeclarationGraph,
   previouslyLive: ReadonlySet<TopLevelDeclaration>,
   removedExportReferencedNames: ReadonlySet<string>
@@ -409,7 +411,7 @@ const removeNewlyDeadTopLevelDeclarations = (
 
   program.body = program.body.filter((statement: AnyNode) => {
     if (statement.type === 'VariableDeclaration') {
-      statement.declarations = statement.declarations.filter(
+      statement.declarations = (statement.declarations ?? []).filter(
         (declarator: AnyNode) => !isRemovableDeadDeclaration(declarator)
       );
       return statement.declarations.length > 0;
@@ -419,7 +421,7 @@ const removeNewlyDeadTopLevelDeclarations = (
 };
 
 const hasRemovableExport = (
-  program: AnyNode,
+  program: ProgramNode,
   exportsToRemove: ReadonlySet<string>
 ): boolean => {
   const removesNamedExports = [...exportsToRemove].some(
@@ -557,20 +559,23 @@ export const removeExports = (
 
       const declaration = statement.declaration;
       if (declaration?.type === 'VariableDeclaration') {
-        declaration.declarations = declaration.declarations.filter(
+        declaration.declarations = (declaration.declarations ?? []).filter(
           (declarator: AnyNode) => {
-            if (declarator.id.type === 'Identifier') {
-              if (exportsToRemoveSet.has(declarator.id.name)) {
+            const id = declarator.id;
+            if (id?.type === 'Identifier') {
+              if (id.name && exportsToRemoveSet.has(id.name)) {
                 exportsChanged = true;
-                removedExportLocalNames.add(declarator.id.name);
-                removedExportReferencedNames.add(declarator.id.name);
+                removedExportLocalNames.add(id.name);
+                removedExportReferencedNames.add(id.name);
                 trackRemovedExportReferences(declarator);
                 return false;
               }
               return true;
             }
 
-            validateDestructuredExports(declarator.id, exportsToRemove);
+            if (id) {
+              validateDestructuredExports(id, exportsToRemove);
+            }
             return true;
           }
         );
@@ -599,7 +604,7 @@ export const removeExports = (
     ) {
       exportsChanged = true;
       const declaration = statement.declaration;
-      if (declaration?.type === 'Identifier') {
+      if (declaration?.type === 'Identifier' && declaration.name) {
         removedExportLocalNames.add(declaration.name);
         removedExportReferencedNames.add(declaration.name);
       } else if (declaration?.id?.name) {
@@ -619,6 +624,7 @@ export const removeExports = (
     if (
       left?.type === 'MemberExpression' &&
       left.object?.type === 'Identifier' &&
+      left.object.name &&
       removedExportLocalNames.has(left.object.name)
     ) {
       removeFromArray(program.body, statement);

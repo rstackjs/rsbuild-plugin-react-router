@@ -2,8 +2,12 @@ import type { ParseResult } from 'yuku-parser';
 
 export type AnyNode = Record<string, any>;
 
-export const getProgram = (ast: ParseResult | AnyNode): AnyNode =>
-  (ast as ParseResult).program ?? ast;
+export type ProgramNode = AnyNode & {
+  body: AnyNode[];
+};
+
+export const getProgram = (ast: ParseResult | AnyNode): ProgramNode =>
+  ((ast as ParseResult).program ?? ast) as ProgramNode;
 
 export const getPatternIdentifierNames = (
   pattern: AnyNode | null | undefined,

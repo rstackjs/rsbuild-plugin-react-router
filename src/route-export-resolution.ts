@@ -1,6 +1,5 @@
 import { readFileSync, statSync, type Stats } from 'node:fs';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 import { dirname, relative, resolve } from 'pathe';
 import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
 import {
@@ -8,19 +7,25 @@ import {
   getRouteModuleAnalysis,
 } from './export-utils.js';
 
-type PackageJson = {
-  exports?: unknown;
-  module?: unknown;
-  main?: unknown;
-};
-
-type PackageImportResolution =
-  | { status: 'resolved'; path: string }
-  | { status: 'blocked-by-exports' }
-  | { status: 'not-found' };
-
 const tryStat = (path: string): Stats | null =>
   statSync(path, { throwIfNoEntry: false }) ?? null;
+
+type PackageExportTarget =
+  | string
+  | PackageExportTarget[]
+  | { [condition: string]: PackageExportTarget | undefined }
+  | null;
+
+type PackageJson = {
+  exports?: PackageExportTarget;
+  main?: string;
+  module?: string;
+};
+
+const PACKAGE_IMPORT_CONDITIONS = new Set(['import', 'node']);
+const PACKAGE_RESOLUTION_NOT_APPLICABLE = Symbol(
+  'package resolution not applicable'
+);
 
 const resolveIndexFile = (dirPath: string): string | null => {
   for (const ext of JS_EXTENSIONS) {
@@ -55,38 +60,47 @@ const resolvePathWithExtensions = (basePath: string): string | null => {
 
 const parsePackageSpecifier = (
   specifier: string
-): { packageName: string; subpath: string } | null => {
+): { packageName: string; packageSubpath: string } | null => {
   if (
     specifier.startsWith('.') ||
     specifier.startsWith('/') ||
-    specifier.startsWith('node:')
+    specifier.startsWith('#')
   ) {
     return null;
   }
+
   const parts = specifier.split('/');
   const packageName = specifier.startsWith('@')
     ? parts.slice(0, 2).join('/')
     : parts[0];
-  if (!packageName || (specifier.startsWith('@') && parts.length < 2)) {
-    return null;
-  }
-  const rest = parts.slice(packageName.startsWith('@') ? 2 : 1).join('/');
+  const packagePathParts = specifier.startsWith('@')
+    ? parts.slice(2)
+    : parts.slice(1);
+
   return {
     packageName,
-    subpath: rest ? `./${rest}` : '.',
+    packageSubpath:
+      packagePathParts.length > 0 ? `./${packagePathParts.join('/')}` : '.',
   };
 };
 
 const findPackageDirectory = (
-  packageName: string,
-  importerPath: string
+  importerPath: string,
+  packageName: string
 ): string | null => {
   let currentDirectory = dirname(importerPath);
+
   while (true) {
-    const candidate = resolve(currentDirectory, 'node_modules', packageName);
-    if (tryStat(candidate)?.isDirectory()) {
-      return candidate;
+    const packageDirectory = resolve(
+      currentDirectory,
+      'node_modules',
+      packageName
+    );
+    const packageJsonPath = resolve(packageDirectory, 'package.json');
+    if (tryStat(packageJsonPath)?.isFile()) {
+      return packageDirectory;
     }
+
     const parentDirectory = dirname(currentDirectory);
     if (parentDirectory === currentDirectory) {
       return null;
@@ -99,96 +113,110 @@ const readPackageJson = (packageDirectory: string): PackageJson | null => {
   try {
     return JSON.parse(
       readFileSync(resolve(packageDirectory, 'package.json'), 'utf8')
-    );
+    ) as PackageJson;
   } catch {
     return null;
   }
 };
 
-const resolvePackageTarget = (
-  packageDirectory: string,
-  target: unknown
+const resolvePackageExportTarget = (
+  target: PackageExportTarget | undefined
 ): string | null => {
-  if (typeof target === 'string') {
-    return resolvePathWithExtensions(resolve(packageDirectory, target));
+  if (!target) {
+    return null;
   }
+
+  if (typeof target === 'string') {
+    return target;
+  }
+
   if (Array.isArray(target)) {
-    for (const item of target) {
-      const resolved = resolvePackageTarget(packageDirectory, item);
-      if (resolved) {
-        return resolved;
+    for (const nestedTarget of target) {
+      const resolvedTarget = resolvePackageExportTarget(nestedTarget);
+      if (resolvedTarget) {
+        return resolvedTarget;
       }
     }
     return null;
   }
-  if (target && typeof target === 'object') {
-    const conditions = target as Record<string, unknown>;
-    for (const condition of ['import', 'default']) {
-      const resolved = resolvePackageTarget(
-        packageDirectory,
-        conditions[condition]
-      );
-      if (resolved) {
-        return resolved;
+
+  for (const [condition, nestedTarget] of Object.entries(target)) {
+    if (condition === 'default' || PACKAGE_IMPORT_CONDITIONS.has(condition)) {
+      const resolvedTarget = resolvePackageExportTarget(nestedTarget);
+      if (resolvedTarget) {
+        return resolvedTarget;
       }
     }
   }
+
   return null;
+};
+
+const resolvePackageExports = (
+  packageDirectory: string,
+  packageSubpath: string,
+  packageJson: PackageJson
+): string | null => {
+  const exports = packageJson.exports;
+  if (!exports) {
+    const entry = packageJson.module ?? packageJson.main;
+    return entry
+      ? resolvePathWithExtensions(resolve(packageDirectory, entry))
+      : null;
+  }
+
+  const target =
+    typeof exports === 'object' &&
+    !Array.isArray(exports) &&
+    Object.keys(exports).some(key => key.startsWith('.'))
+      ? exports[packageSubpath]
+      : packageSubpath === '.'
+        ? exports
+        : undefined;
+
+  const resolvedTarget = resolvePackageExportTarget(target);
+  if (!resolvedTarget || !resolvedTarget.startsWith('./')) {
+    return null;
+  }
+
+  return resolvePathWithExtensions(resolve(packageDirectory, resolvedTarget));
 };
 
 const resolvePackageImport = (
   specifier: string,
   importerPath: string
-): PackageImportResolution => {
-  const parsed = parsePackageSpecifier(specifier);
-  if (!parsed) {
-    return { status: 'not-found' };
+): string | null | typeof PACKAGE_RESOLUTION_NOT_APPLICABLE => {
+  const parsedSpecifier = parsePackageSpecifier(specifier);
+  if (!parsedSpecifier) {
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
   }
+
   const packageDirectory = findPackageDirectory(
-    parsed.packageName,
-    importerPath
+    importerPath,
+    parsedSpecifier.packageName
   );
   if (!packageDirectory) {
-    return { status: 'not-found' };
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
   }
+
   const packageJson = readPackageJson(packageDirectory);
   if (!packageJson) {
-    return { status: 'not-found' };
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
   }
-  const exportsField = packageJson.exports;
-  if ('exports' in packageJson) {
-    const hasSubpathExports =
-      typeof exportsField === 'object' &&
-      !Array.isArray(exportsField) &&
-      exportsField !== null &&
-      Object.keys(exportsField).some(key => key.startsWith('.'));
-    const target =
-      parsed.subpath === '.' && !hasSubpathExports
-        ? exportsField
-        : hasSubpathExports
-          ? (exportsField as Record<string, unknown>)[parsed.subpath]
-          : undefined;
-    const resolved = resolvePackageTarget(packageDirectory, target);
-    if (resolved) {
-      return { status: 'resolved', path: resolved };
-    }
-    return { status: 'blocked-by-exports' };
+
+  if (
+    packageJson.exports === undefined &&
+    !packageJson.module &&
+    !packageJson.main
+  ) {
+    return PACKAGE_RESOLUTION_NOT_APPLICABLE;
   }
-  if (parsed.subpath !== '.') {
-    const resolved = resolvePathWithExtensions(
-      resolve(packageDirectory, parsed.subpath)
-    );
-    return resolved
-      ? { status: 'resolved', path: resolved }
-      : { status: 'not-found' };
-  }
-  const resolved =
-    resolvePackageTarget(packageDirectory, packageJson.module) ??
-    resolvePackageTarget(packageDirectory, packageJson.main) ??
-    resolveIndexFile(packageDirectory);
-  return resolved
-    ? { status: 'resolved', path: resolved }
-    : { status: 'not-found' };
+
+  return resolvePackageExports(
+    packageDirectory,
+    parsedSpecifier.packageSubpath,
+    packageJson
+  );
 };
 
 const resolveExportAllModule = (
@@ -205,17 +233,13 @@ const resolveExportAllModule = (
     }
   }
 
-  const packageImport = resolvePackageImport(specifier, importerPath);
-  if (packageImport.status === 'resolved') {
-    return packageImport.path;
-  }
-  if (packageImport.status === 'blocked-by-exports') {
-    return null;
+  const importResolvedPath = resolvePackageImport(specifier, importerPath);
+  if (importResolvedPath !== PACKAGE_RESOLUTION_NOT_APPLICABLE) {
+    return importResolvedPath;
   }
 
   try {
-    const resolver = createRequire(pathToFileURL(importerPath).href);
-    return resolver.resolve(specifier);
+    return createRequire(importerPath).resolve(specifier);
   } catch {
     return null;
   }
@@ -225,6 +249,26 @@ export type RouteExportResolver = (
   specifier: string,
   importerPath: string
 ) => Promise<string | null> | string | null;
+
+export type RouteModuleResolveCallback = (
+  error: Error | null,
+  resolved?: string | false
+) => void;
+
+export type RouteModuleResolver = (
+  context: string,
+  specifier: string,
+  callback: RouteModuleResolveCallback
+) => void;
+
+export const createBundlerRouteExportResolver =
+  (resolveModule: RouteModuleResolver): RouteExportResolver =>
+  (specifier, importerPath) =>
+    new Promise<string | null>(resolveResolvedPath => {
+      resolveModule(dirname(importerPath), specifier, (error, resolved) => {
+        resolveResolvedPath(error || !resolved ? null : resolved);
+      });
+    });
 
 export const collectClientOnlyStubExportNames = async (
   code: string,
