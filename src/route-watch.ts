@@ -260,6 +260,9 @@ export const createRouteTopologyWatcher = async ({
     let nextDirectories: Set<string> | undefined;
     try {
       nextDirectories = await readRouteDirectories(watchDirectory);
+      if (closed) {
+        return;
+      }
       const nextState = {
         directories: nextDirectories,
         routeTopology: await getRouteTopology(),

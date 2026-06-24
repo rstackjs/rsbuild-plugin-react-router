@@ -3,25 +3,18 @@ import {
   NAMED_COMPONENT_EXPORTS_SET,
 } from './constants.js';
 import type { ParseResult } from 'yuku-parser';
-
-type AnyNode = Record<string, any>;
-
-const getProgram = (ast: ParseResult | AnyNode): AnyNode =>
-  (ast as ParseResult).program ?? ast;
-
-const getExportedName = (specifier: AnyNode): string | null => {
-  const exported = specifier.exported;
-  if (!exported) {
-    return null;
-  }
-  if (exported.type === 'Identifier') {
-    return exported.name;
-  }
-  if (exported.type === 'Literal') {
-    return String(exported.value);
-  }
-  return null;
-};
+import {
+  callExpression,
+  exportNamedDeclaration,
+  exportSpecifier,
+  getExportedName,
+  getProgram,
+  identifier,
+  importDeclaration,
+  patternIncludesName,
+  variableDeclaration,
+  type AnyNode,
+} from './route-ast.js';
 
 export function toFunctionExpression(decl: AnyNode): AnyNode {
   return {
@@ -38,74 +31,6 @@ export function toClassExpression(decl: AnyNode): AnyNode {
     declare: undefined,
   };
 }
-
-const identifier = (name: string): AnyNode => ({
-  type: 'Identifier',
-  start: 0,
-  end: 0,
-  name,
-  decorators: [],
-  optional: false,
-  typeAnnotation: null,
-});
-
-const literal = (value: string): AnyNode => ({
-  type: 'Literal',
-  start: 0,
-  end: 0,
-  value,
-  raw: JSON.stringify(value),
-});
-
-const callExpression = (callee: AnyNode, args: AnyNode[]): AnyNode => ({
-  type: 'CallExpression',
-  start: 0,
-  end: 0,
-  callee,
-  arguments: args,
-  optional: false,
-});
-
-const importDeclaration = (
-  specifiers: Array<{ local: string; imported: string }>,
-  source: string
-): AnyNode => ({
-  type: 'ImportDeclaration',
-  start: 0,
-  end: 0,
-  specifiers: specifiers.map(specifier => ({
-    type: 'ImportSpecifier',
-    start: 0,
-    end: 0,
-    imported: identifier(specifier.imported),
-    local: identifier(specifier.local),
-    importKind: 'value',
-  })),
-  source: literal(source),
-  attributes: [],
-  phase: null,
-  importKind: 'value',
-});
-
-const exportSpecifier = (local: string, exported: string): AnyNode => ({
-  type: 'ExportSpecifier',
-  start: 0,
-  end: 0,
-  local: identifier(local),
-  exported: identifier(exported),
-  exportKind: 'value',
-});
-
-const exportNamedDeclaration = (specifiers: AnyNode[]): AnyNode => ({
-  type: 'ExportNamedDeclaration',
-  start: 0,
-  end: 0,
-  declaration: null,
-  specifiers,
-  source: null,
-  attributes: [],
-  exportKind: 'value',
-});
 
 const getComponentExportName = (exportedName: string): string | null => {
   if (exportedName === 'default') {
@@ -129,70 +54,6 @@ const getImportInsertionIndex = (program: AnyNode): number => {
   return index;
 };
 
-const getModuleExportName = (
-  node: AnyNode | null | undefined
-): string | null => {
-  if (!node) {
-    return null;
-  }
-  if (node.type === 'Identifier') {
-    return node.name;
-  }
-  if (node.type === 'Literal') {
-    return String(node.value);
-  }
-  return null;
-};
-
-const variableDeclaration = (name: string, init: AnyNode): AnyNode => ({
-  type: 'VariableDeclaration',
-  start: 0,
-  end: 0,
-  kind: 'const',
-  declare: false,
-  declarations: [
-    {
-      type: 'VariableDeclarator',
-      start: 0,
-      end: 0,
-      id: identifier(name),
-      init,
-      definite: false,
-    },
-  ],
-});
-
-const patternIncludesName = (
-  pattern: AnyNode | null | undefined,
-  name: string
-): boolean => {
-  if (!pattern) {
-    return false;
-  }
-  if (pattern.type === 'Identifier') {
-    return pattern.name === name;
-  }
-  if (pattern.type === 'RestElement') {
-    return patternIncludesName(pattern.argument, name);
-  }
-  if (pattern.type === 'AssignmentPattern') {
-    return patternIncludesName(pattern.left, name);
-  }
-  if (pattern.type === 'ArrayPattern') {
-    return (pattern.elements ?? []).some((element: AnyNode | null) =>
-      patternIncludesName(element, name)
-    );
-  }
-  if (pattern.type === 'ObjectPattern') {
-    return (pattern.properties ?? []).some((property: AnyNode) =>
-      property.type === 'RestElement'
-        ? patternIncludesName(property.argument, name)
-        : patternIncludesName(property.value, name)
-    );
-  }
-  return false;
-};
-
 const declarationIncludesName = (
   declaration: AnyNode,
   name: string
@@ -204,7 +65,8 @@ const declarationIncludesName = (
   }
   if (
     (declaration.type === 'FunctionDeclaration' ||
-      declaration.type === 'ClassDeclaration') &&
+      declaration.type === 'ClassDeclaration' ||
+      declaration.type === 'TSEnumDeclaration') &&
     declaration.id?.name
   ) {
     return declaration.id.name === name;
@@ -283,6 +145,12 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
       if (!declaration) {
         continue;
       }
+      if (
+        declaration.declare === true ||
+        declaration.type === 'TSInterfaceDeclaration'
+      ) {
+        continue;
+      }
       const uid = getHocUid('withComponentProps');
       if (
         (declaration.type === 'FunctionDeclaration' ||
@@ -352,7 +220,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
             return true;
           }
           const exportedName = getExportedName(specifier);
-          const importedName = getModuleExportName(specifier.local);
+          const importedName = getExportedName(specifier.local);
           const componentExportName = exportedName
             ? getComponentExportName(exportedName)
             : null;

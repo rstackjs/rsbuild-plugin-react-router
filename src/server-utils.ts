@@ -191,6 +191,14 @@ export async function resolveServerBuildModule(
       return fromDefault;
     }
   }
+  if (isRecord(moduleValue) && 'module.exports' in moduleValue) {
+    const fromModuleExports = await resolveServerBuildCandidate(
+      await moduleValue['module.exports']
+    );
+    if (fromModuleExports) {
+      return fromModuleExports;
+    }
+  }
   throw new Error(
     `[rsbuild-plugin-react-router] ${source} did not contain a valid React Router ServerBuild.`
   );

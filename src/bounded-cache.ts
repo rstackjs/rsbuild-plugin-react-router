@@ -9,9 +9,9 @@ export const setBoundedCacheEntry = <Key, Value>(
     return;
   }
   if (!cache.has(key) && cache.size >= maxEntries) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
+    const oldestEntry = cache.keys().next();
+    if (!oldestEntry.done) {
+      cache.delete(oldestEntry.value);
     }
   }
   cache.set(key, value);

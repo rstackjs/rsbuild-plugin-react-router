@@ -3,6 +3,21 @@ import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
 import { pluginReactRouter } from '../src';
 
+const captureEnv = (keys: string[]) => {
+  const previousValues = new Map(
+    keys.map(key => [key, process.env[key]] as const)
+  );
+  return () => {
+    for (const [key, value] of previousValues) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  };
+};
+
 describe('pluginReactRouter', () => {
   it('should configure basic plugin options', async () => {
     const rsbuild = await createStubRsbuild({
@@ -194,6 +209,10 @@ describe('pluginReactRouter', () => {
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {
+    const restoreEnv = captureEnv([
+      'RR_TEST_SPLIT_ROUTE_MODULES',
+      'RR_TEST_ROUTE_COUNT',
+    ]);
     process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
     process.env.RR_TEST_ROUTE_COUNT = '256';
     const readFileSync = rstest
@@ -215,12 +234,12 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       readFileSync.mockRestore();
-      delete process.env.RR_TEST_SPLIT_ROUTE_MODULES;
-      delete process.env.RR_TEST_ROUTE_COUNT;
+      restoreEnv();
     }
   });
 
   it('reduces file size reporting overhead for medium route builds by default', async () => {
+    const restoreEnv = captureEnv(['RR_TEST_ROUTE_COUNT']);
     process.env.RR_TEST_ROUTE_COUNT = '256';
     const readFileSync = rstest
       .spyOn(fs, 'readFileSync')
@@ -241,11 +260,15 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       readFileSync.mockRestore();
-      delete process.env.RR_TEST_ROUTE_COUNT;
+      restoreEnv();
     }
   });
 
   it('keeps explicit object file size reporting config for large split route builds', async () => {
+    const restoreEnv = captureEnv([
+      'RR_TEST_SPLIT_ROUTE_MODULES',
+      'RR_TEST_ROUTE_COUNT',
+    ]);
     process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
     process.env.RR_TEST_ROUTE_COUNT = '1024';
     const readFileSync = rstest
@@ -273,8 +296,7 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       readFileSync.mockRestore();
-      delete process.env.RR_TEST_SPLIT_ROUTE_MODULES;
-      delete process.env.RR_TEST_ROUTE_COUNT;
+      restoreEnv();
     }
   });
 
@@ -293,10 +315,20 @@ describe('pluginReactRouter', () => {
     ]);
     const config = await rsbuild.unwrapConfig();
 
-    expect(config.dev.lazyCompilation).toEqual({
+    expect(config.dev.lazyCompilation).toMatchObject({
       entries: true,
       imports: true,
     });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/root.tsx?__react-router-build-client-route',
+      })
+    ).toBe(false);
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/components/card.tsx',
+      })
+    ).toBe(true);
   });
 
   it('should allow lazy compilation to be enabled with a boolean', async () => {
@@ -307,7 +339,52 @@ describe('pluginReactRouter', () => {
     rsbuild.addPlugins([pluginReactRouter({ lazyCompilation: true })]);
     const config = await rsbuild.unwrapConfig();
 
-    expect(config.dev.lazyCompilation).toBe(true);
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: `${process.cwd()}/app/entry.client.tsx`,
+      })
+    ).toBe(false);
+  });
+
+  it('guards direct Rsbuild lazy compilation config for React Router hydration entries', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: {
+          lazyCompilation: {
+            entries: true,
+            imports: false,
+            test: /app/,
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: false,
+    });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/routes/home.tsx?__react-router-build-client-route',
+      })
+    ).toBe(false);
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/app/components/card.tsx',
+      })
+    ).toBe(true);
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: '/project/vendor/react.tsx',
+      })
+    ).toBe(false);
   });
 
   it('should allow lazy compilation to be disabled', async () => {

@@ -251,6 +251,17 @@ describe('plugin-utils', () => {
       expect(result).not.toContain('const _ErrorBoundary');
     });
 
+    it('does not wrap erased default interface exports', () => {
+      const result = transformRouteCode(`
+        export default interface Route {
+          value: string;
+        }
+      `);
+
+      expect(result).not.toContain('withComponentProps');
+      expect(result).toContain('export default interface Route');
+    });
+
     it('avoids top-level generated helper name collisions', () => {
       const result = transformRouteCode(`
         const _withComponentProps = 'reserved';
@@ -284,6 +295,18 @@ describe('plugin-utils', () => {
       expect(result).toContain('withComponentProps as _withComponentProps');
       expect(result).toContain('export default _withComponentProps');
       expect(result).not.toContain('_withComponentProps2');
+    });
+
+    it('avoids top-level generated helper name collisions with enums', () => {
+      const result = transformRouteCode(`
+        enum _withComponentProps {
+          reserved = 'reserved'
+        }
+        export default function Route() { return null; }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps2');
+      expect(result).toContain('export default _withComponentProps2(Route)');
     });
   });
 });

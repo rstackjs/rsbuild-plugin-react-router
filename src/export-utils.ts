@@ -1,6 +1,11 @@
 import { readFile, stat } from 'node:fs/promises';
 import { langFromPath, parse } from 'yuku-parser';
 import { setBoundedCacheEntry } from './bounded-cache.js';
+import {
+  getExportedName,
+  getIdentifierNamesFromPattern,
+  type AnyNode,
+} from './route-ast.js';
 
 type ExportInfo = {
   readonly exportNames: readonly string[];
@@ -27,8 +32,6 @@ const routeModuleAnalysisCache = new Map<
 
 const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
 
-type AnyNode = Record<string, any>;
-
 const cachePromiseOnReject = <T>(
   promise: Promise<T>,
   invalidate: () => void
@@ -52,57 +55,10 @@ const parseProgram = (code: string, resourcePath?: string) => {
   return result.program;
 };
 
-const getIdentifierNamesFromPattern = (
-  pattern: AnyNode | null | undefined,
-  names: string[] = []
-): string[] => {
-  if (!pattern) {
-    return names;
-  }
-  if (pattern.type === 'Identifier') {
-    names.push(pattern.name);
-    return names;
-  }
-  if (pattern.type === 'RestElement') {
-    return getIdentifierNamesFromPattern(pattern.argument, names);
-  }
-  if (pattern.type === 'AssignmentPattern') {
-    return getIdentifierNamesFromPattern(pattern.left, names);
-  }
-  if (pattern.type === 'ArrayPattern') {
-    for (const element of pattern.elements ?? []) {
-      getIdentifierNamesFromPattern(element, names);
-    }
-    return names;
-  }
-  if (pattern.type === 'ObjectPattern') {
-    for (const property of pattern.properties ?? []) {
-      if (property.type === 'RestElement') {
-        getIdentifierNamesFromPattern(property.argument, names);
-      } else {
-        getIdentifierNamesFromPattern(property.value, names);
-      }
-    }
-  }
-  return names;
-};
-
-const getExportedName = (node: AnyNode): string | null => {
-  if (!node) {
-    return null;
-  }
-  if (node.type === 'Identifier') {
-    return node.name;
-  }
-  if (node.type === 'Literal' || node.type === 'StringLiteral') {
-    return String(node.value);
-  }
-  return null;
-};
-
 const isTypeOnlyExport = (node: AnyNode): boolean =>
   node.exportKind === 'type' ||
   node.type === 'TSExportAssignment' ||
+  node.declaration?.declare === true ||
   (node.type === 'ExportDefaultDeclaration' &&
     node.declaration?.type === 'TSInterfaceDeclaration');
 

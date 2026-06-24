@@ -170,8 +170,9 @@ const createHarness = (userSetup?: TestServerSetup) => {
     ) => {
       const handler =
         typeof callback === 'function' ? callback : callback.handler;
-      const config = handler({ server: { setup: serverSetups } });
-      const setup = config?.server?.setup;
+      const nextConfig: TestConfig = { server: { setup: serverSetups } };
+      const config = handler(nextConfig) ?? nextConfig;
+      const setup = config.server?.setup;
       serverSetups = setup
         ? Array.isArray(setup)
           ? setup
@@ -338,7 +339,7 @@ describe('React Router development runtime controller', () => {
   it('rejects readiness when Rsbuild does not create both compilers', async () => {
     const { callbacks, controller, server } = createHarness();
     const compiler = createCompiler('web');
-    callbacks.start({ server });
+    await callbacks.start({ server });
 
     callbacks.created({ compiler: compiler.compiler });
 
@@ -351,7 +352,7 @@ describe('React Router development runtime controller', () => {
     const { callbacks, controller, server } = createHarness();
     const web = createCompiler('web');
     const node = createCompiler('node');
-    callbacks.start({ server });
+    await callbacks.start({ server });
     callbacks.created({
       compiler: { compilers: [web.compiler, node.compiler] },
     });
@@ -370,7 +371,7 @@ describe('React Router development runtime controller', () => {
     const { callbacks, controller, loadBundle, server } = createHarness();
     const web = createCompiler('web');
     const node = createCompiler('node');
-    callbacks.start({ server });
+    await callbacks.start({ server });
     callbacks.created({
       compiler: { compilers: [web.compiler, node.compiler] },
     });
@@ -593,7 +594,7 @@ describe('React Router development runtime controller', () => {
     const { callbacks, controller, createServer, server } = createHarness();
     const oldWeb = createCompiler('web');
     const oldNode = createCompiler('node');
-    callbacks.start({ server });
+    await callbacks.start({ server });
     callbacks.created({
       compiler: { compilers: [oldWeb.compiler, oldNode.compiler] },
     });
@@ -619,7 +620,7 @@ describe('React Router development runtime controller', () => {
 
   it('disposes the current session through the supported close hook', async () => {
     const { callbacks, controller, server } = createHarness();
-    callbacks.start({ server });
+    await callbacks.start({ server });
     const loadBuild = controller.createBuildLoader();
 
     await callbacks.close();
@@ -634,7 +635,7 @@ describe('React Router development runtime controller', () => {
     const { callbacks, controller, createServer, server } = createHarness();
     const oldWeb = createCompiler('web');
     const oldNode = createCompiler('node');
-    callbacks.start({ server });
+    await callbacks.start({ server });
     callbacks.created({
       compiler: { compilers: [oldWeb.compiler, oldNode.compiler] },
     });
@@ -668,7 +669,7 @@ describe('React Router development runtime controller', () => {
     const { callbacks, controller, createServer, server } = createHarness();
     const oldWeb = createCompiler('web');
     const oldNode = createCompiler('node');
-    callbacks.start({ server });
+    await callbacks.start({ server });
     callbacks.created({
       compiler: { compilers: [oldWeb.compiler, oldNode.compiler] },
     });
@@ -834,7 +835,7 @@ describe('React Router development runtime controller', () => {
     const node = createCompiler('node');
     let build = createBuild('base');
     loadBundle.mockImplementation(() => build);
-    callbacks.start({ server });
+    await callbacks.start({ server });
     callbacks.created({
       compiler: { compilers: [web.compiler, node.compiler] },
     });

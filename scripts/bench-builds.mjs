@@ -269,6 +269,17 @@ const summarizePluginOperations = runs => {
       for (const [operation, metrics] of Object.entries(
         report.operations ?? {}
       )) {
+        if (!metrics || typeof metrics !== 'object') {
+          continue;
+        }
+
+        const count = typeof metrics.count === 'number' ? metrics.count : 0;
+        const totalMs =
+          typeof metrics.totalMs === 'number' ? metrics.totalMs : 0;
+        const wallMs =
+          typeof metrics.wallMs === 'number' ? metrics.wallMs : null;
+        const maxMs = typeof metrics.maxMs === 'number' ? metrics.maxMs : 0;
+
         const key = `${report.environment}:${operation}`;
         const current = operations.get(key) ?? {
           environment: report.environment,
@@ -279,12 +290,12 @@ const summarizePluginOperations = runs => {
           maxMs: 0,
           reports: 0,
         };
-        current.count += metrics.count ?? 0;
-        current.totalMs += metrics.totalMs ?? 0;
-        if (typeof metrics.wallMs === 'number') {
-          current.wallMs = (current.wallMs ?? 0) + metrics.wallMs;
+        current.count += count;
+        current.totalMs += totalMs;
+        if (wallMs !== null) {
+          current.wallMs = (current.wallMs ?? 0) + wallMs;
         }
-        current.maxMs = Math.max(current.maxMs, metrics.maxMs ?? 0);
+        current.maxMs = Math.max(current.maxMs, maxMs);
         current.reports += 1;
         operations.set(key, current);
       }

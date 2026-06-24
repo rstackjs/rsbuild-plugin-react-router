@@ -10,7 +10,7 @@
     "start": "NODE_ENV=production PORT=3003 node server.js",
     "build": "rsbuild build",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "test:e2e": "playwright test && corepack pnpm run test:production",
+    "test:e2e": "RR_E2E_REUSE_EXISTING_SERVER=false playwright test && corepack pnpm run test:production",
     "test:production": "corepack pnpm run test:production:module && corepack pnpm run test:production:commonjs",
     "test:production:module": "RR_SERVER_OUTPUT=module corepack pnpm run build && node scripts/smoke-production.mjs",
     "test:production:commonjs": "RR_SERVER_OUTPUT=commonjs corepack pnpm run build && node scripts/smoke-production.mjs"

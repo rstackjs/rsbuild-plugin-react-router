@@ -1,9 +1,11 @@
 import { walk, type ParseResult } from 'yuku-parser';
-
-type AnyNode = Record<string, any>;
-
-const getProgram = (ast: ParseResult | AnyNode): AnyNode =>
-  (ast as ParseResult).program ?? ast;
+import {
+  getExportedName,
+  getPatternIdentifierNames,
+  getProgram,
+  removeFromArray,
+  type AnyNode,
+} from './route-ast.js';
 
 export function validateDestructuredExports(
   id: AnyNode,
@@ -90,48 +92,6 @@ export function validateDestructuredExports(
 export function invalidDestructureError(name: string): Error {
   return new Error(`Cannot remove destructured export "${name}"`);
 }
-
-const removeFromArray = <T>(array: T[], value: T): void => {
-  const index = array.indexOf(value);
-  if (index >= 0) {
-    array.splice(index, 1);
-  }
-};
-
-const getPatternIdentifierNames = (
-  pattern: AnyNode | null | undefined,
-  names = new Set<string>()
-): Set<string> => {
-  if (!pattern) {
-    return names;
-  }
-  if (pattern.type === 'Identifier') {
-    names.add(pattern.name);
-    return names;
-  }
-  if (pattern.type === 'RestElement') {
-    return getPatternIdentifierNames(pattern.argument, names);
-  }
-  if (pattern.type === 'AssignmentPattern') {
-    return getPatternIdentifierNames(pattern.left, names);
-  }
-  if (pattern.type === 'ArrayPattern') {
-    for (const element of pattern.elements ?? []) {
-      getPatternIdentifierNames(element, names);
-    }
-    return names;
-  }
-  if (pattern.type === 'ObjectPattern') {
-    for (const property of pattern.properties ?? []) {
-      if (property.type === 'RestElement') {
-        getPatternIdentifierNames(property.argument, names);
-      } else {
-        getPatternIdentifierNames(property.value, names);
-      }
-    }
-  }
-  return names;
-};
 
 const getDeclaredNames = (node: AnyNode): Set<string> => {
   const names = new Set<string>();
@@ -285,20 +245,6 @@ const collectReferencedNames = (node: AnyNode): Set<string> => {
     },
   });
   return referenced;
-};
-
-const getExportedName = (specifier: AnyNode): string | null => {
-  const exported = specifier.exported;
-  if (!exported) {
-    return null;
-  }
-  if (exported.type === 'Identifier') {
-    return exported.name;
-  }
-  if (exported.type === 'Literal') {
-    return String(exported.value);
-  }
-  return null;
 };
 
 type TopLevelDeclaration = {

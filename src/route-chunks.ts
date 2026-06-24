@@ -70,7 +70,6 @@ const routeChunkQueryStrings: Record<RouteChunkName, string> = {
   clientMiddleware: `${routeChunkQueryStringPrefix}clientMiddleware`,
   HydrateFallback: `${routeChunkQueryStringPrefix}HydrateFallback`,
 };
-const routeChunkQueryStringValues = Object.values(routeChunkQueryStrings);
 
 const routeChunkEntrySuffix: Record<RouteChunkExportName, string> = {
   clientAction: 'client-action',
@@ -209,6 +208,12 @@ const getExportDependencies = (
       const exportDependencies = new Map<string, ExportDependencies>();
       const topLevelStatementCache = new Map<AnyNode, AnyNode>();
       const variableDeclaratorCache = new Map<AnyNode, AnyNode | null>();
+      const sharedTopLevelSideEffects = (module.ast as AnyNode).body.filter(
+        (statement: AnyNode) =>
+          (statement.type === 'ImportDeclaration' &&
+            statement.specifiers.length === 0) ||
+          statement.type === 'ExpressionStatement'
+      );
 
       const getCachedTopLevelStatementForNode = (node: AnyNode): AnyNode => {
         const cached = topLevelStatementCache.get(node);
@@ -319,6 +324,11 @@ const getExportDependencies = (
         } else {
           const statement = getCachedTopLevelStatementForNode(exportNode);
           scanNode(statement);
+        }
+
+        for (const statement of sharedTopLevelSideEffects) {
+          dependencies.topLevelStatements.add(statement);
+          dependencies.topLevelNonModuleStatements.add(statement);
         }
 
         exportDependencies.set(exportName, dependencies);
@@ -706,7 +716,7 @@ export const getRouteChunkModuleId = (
 ) => `${filePath}${routeChunkQueryStrings[chunkName]}`;
 
 export const isRouteChunkModuleId: (id: string) => boolean = (id: string) =>
-  routeChunkQueryStringValues.some(queryString => id.endsWith(queryString));
+  getRouteChunkNameFromModuleId(id) !== null;
 
 const isRouteChunkName = (name: string): name is RouteChunkName =>
   name === 'main' || (routeChunkExportNames as string[]).includes(name);
