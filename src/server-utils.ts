@@ -179,24 +179,21 @@ export async function resolveServerBuildModule(
   source: string
 ): Promise<ServerBuild> {
   const moduleValue = await buildModule;
-  const direct = await resolveServerBuildCandidate(moduleValue);
-  if (direct) {
-    return direct;
-  }
-  if (isRecord(moduleValue) && 'default' in moduleValue) {
-    const fromDefault = await resolveServerBuildCandidate(
-      await moduleValue.default
-    );
-    if (fromDefault) {
-      return fromDefault;
+  const candidates = [() => moduleValue];
+  if (isRecord(moduleValue)) {
+    if ('default' in moduleValue) {
+      candidates.push(() => moduleValue.default);
+    }
+    if ('module.exports' in moduleValue) {
+      candidates.push(() => moduleValue['module.exports']);
     }
   }
-  if (isRecord(moduleValue) && 'module.exports' in moduleValue) {
-    const fromModuleExports = await resolveServerBuildCandidate(
-      await moduleValue['module.exports']
-    );
-    if (fromModuleExports) {
-      return fromModuleExports;
+
+  for (const getCandidate of candidates) {
+    const candidate = await getCandidate();
+    const serverBuild = await resolveServerBuildCandidate(candidate);
+    if (serverBuild) {
+      return serverBuild;
     }
   }
   throw new Error(

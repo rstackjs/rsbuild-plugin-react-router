@@ -18,7 +18,7 @@ const { values } = parseArgs({
 
 if (!values.before || !values.after) {
   throw new Error(
-    'Usage: node scripts/compare-benchmarks.mjs --before <baseline.json> --after <baseline.json> [--benchmark <id>] [--operations op,op]'
+    'Usage: node scripts/compare-benchmarks.mjs --before <baseline.json> --after <comparison.json> [--benchmark <id>] [--operations op,op]'
   );
 }
 
