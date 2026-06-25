@@ -52,7 +52,7 @@ export const buildRouteClientEntryCode = ({
   chunkedExports: readonly string[];
   isServer: boolean;
   resourcePath: string;
-}): { code: string; reexports: string[] } => {
+}): string => {
   const chunkedExportSet =
     chunkedExports.length > 0 ? new Set<string>(chunkedExports) : undefined;
   const reexports = exportNames
@@ -67,10 +67,7 @@ export const buildRouteClientEntryCode = ({
     })
     .sort();
   const target = `${resourcePath}?react-router-route`;
-  return {
-    code: `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`,
-    reexports,
-  };
+  return `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`;
 };
 
 export const createRouteClientEntryArtifact = async ({
@@ -103,7 +100,7 @@ export const createRouteClientEntryArtifact = async ({
       chunkedExports,
       isServer,
       resourcePath,
-    }).code,
+    }),
   };
 };
 
