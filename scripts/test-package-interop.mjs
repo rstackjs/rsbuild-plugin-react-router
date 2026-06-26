@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 const require = createRequire(import.meta.url);
+const execFileAsync = promisify(execFile);
 const esm = await import('../dist/index.js');
 const commonjs = require('../dist/index.cjs');
+const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const build = {
   entry: { module: { default: () => new Response() } },
   routes: {},
@@ -66,6 +70,29 @@ async function verifyRegistration(writer, reader) {
     /not registered/
   );
 }
+
+async function verifyPackIncludesOriginalSource() {
+  const { stdout } = await execFileAsync(
+    'npm',
+    ['pack', '--dry-run', '--json'],
+    {
+      cwd: packageRoot,
+    }
+  );
+  const [pack] = JSON.parse(stdout);
+  const files = new Set(pack.files.map(file => file.path));
+
+  assert(
+    files.has('src/index.ts'),
+    'Expected npm package to include src/index.ts'
+  );
+  assert(
+    files.has('src/templates/entry.client.tsx'),
+    'Expected npm package to include source templates'
+  );
+}
+
+await verifyPackIncludesOriginalSource();
 
 process.chdir(
   fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
