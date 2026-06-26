@@ -9,6 +9,7 @@ import type {
 } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
 import type { ServerBuild } from 'react-router';
+import type { ReactRouterDevManifest } from '../src/dev-generation';
 import { createReactRouterDevRuntimeController } from '../src/dev-runtime-controller';
 
 type FailedCallback = (error: Error) => void;
@@ -20,10 +21,18 @@ const afterDoneByCompiler = new WeakMap<
 
 type TestServerBuild = ServerBuild & { marker: string };
 
-const createBuild = (marker: string): TestServerBuild =>
+const createBuild = (
+  marker: string,
+  routeIds = ['routes/about', 'routes/home']
+): TestServerBuild =>
   ({
     entry: { module: { default: () => new Response() } },
-    routes: {},
+    routes: Object.fromEntries(
+      routeIds.map(routeId => [
+        routeId,
+        { module: { default: () => null } },
+      ])
+    ),
     assets: { routes: {}, version: marker },
     assetsBuildDirectory: '/app/build/client',
     basename: '/',
@@ -36,12 +45,37 @@ const createBuild = (marker: string): TestServerBuild =>
     ssr: true,
   }) as unknown as TestServerBuild;
 
-const createManifest = (version: string) => ({
+const createRouteManifest = (
+  id: string,
+  css: string[]
+): ReactRouterDevManifest['routes'][string] => ({
+  id,
+  module: `/${id}.js`,
+  hasAction: false,
+  hasLoader: false,
+  hasClientAction: false,
+  hasClientLoader: false,
+  hasClientMiddleware: false,
+  hasDefaultExport: true,
+  hasErrorBoundary: false,
+  imports: [],
+  css,
+});
+
+const createManifest = (
+  version: string,
+  css: { entry?: string[]; routes?: Record<string, string[]> } = {}
+) => ({
   'static/js/app': {
     version,
     url: '/manifest',
-    entry: { module: '/entry.js', imports: [], css: [] },
-    routes: {},
+    entry: { module: '/entry.js', imports: [], css: css.entry ?? [] },
+    routes: Object.fromEntries(
+      Object.entries(css.routes ?? {}).map(([id, routeCss]) => [
+        id,
+        createRouteManifest(id, routeCss),
+      ])
+    ),
   },
 });
 
@@ -427,6 +461,108 @@ describe('React Router development runtime controller', () => {
       assets: { version: 'web-next' },
     });
     expect(loadBundle).toHaveBeenCalledOnce();
+  });
+
+  it('hard reloads when a safe web-only compile removes CSS assets', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('base'));
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(
+      baseWeb,
+      createManifest('web-base', {
+        entry: ['/assets/entry.css'],
+        routes: { 'routes/about': ['/assets/about.css'] },
+      })
+    );
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+    expect(server.sockWrite).not.toHaveBeenCalled();
+
+    web.setChanges(['/app/routes/about.tsx']);
+    callbacks.before();
+    const nextWeb = web.compile();
+    controller.captureWeb(
+      nextWeb,
+      createManifest('web-next', {
+        entry: ['/assets/entry.css'],
+      })
+    );
+    web.complete(nextWeb);
+    await callbacks.after({ stats: createGraphStats(nextWeb, baseNode) });
+
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'base',
+      assets: { version: 'web-next' },
+    });
+    expect(server.sockWrite).toHaveBeenCalledWith('full-reload', {
+      path: '*',
+    });
+  });
+
+  it('hard reloads when CSS ownership is restored after a removal', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('base'));
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(
+      baseWeb,
+      createManifest('web-base', {
+        routes: { 'routes/about': ['/assets/about.css'] },
+      })
+    );
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    web.setChanges(['/app/routes/about.tsx']);
+    callbacks.before();
+    const removedCssWeb = web.compile();
+    controller.captureWeb(
+      removedCssWeb,
+      createManifest('without-css', {
+        routes: { 'routes/about': [] },
+      })
+    );
+    web.complete(removedCssWeb);
+    await callbacks.after({ stats: createGraphStats(removedCssWeb, baseNode) });
+
+    web.setChanges(['/app/routes/about.tsx']);
+    callbacks.before();
+    const readdedCssWeb = web.compile();
+    controller.captureWeb(
+      readdedCssWeb,
+      createManifest('readded-css', {
+        routes: { 'routes/about': ['/assets/about.css'] },
+      })
+    );
+    web.complete(readdedCssWeb);
+    await callbacks.after({ stats: createGraphStats(readdedCssWeb, baseNode) });
+
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'base',
+      assets: { version: 'readded-css' },
+    });
+    expect(server.sockWrite).toHaveBeenCalledTimes(2);
+    expect(server.sockWrite).toHaveBeenNthCalledWith(1, 'full-reload', {
+      path: '*',
+    });
+    expect(server.sockWrite).toHaveBeenNthCalledWith(2, 'full-reload', {
+      path: '*',
+    });
   });
 
   it('publishes a safe node-only compile after the aggregate pre-hook', async () => {
