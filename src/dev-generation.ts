@@ -494,9 +494,11 @@ export const createReactRouterDevRuntime = ({
         if (cssAssetsRemoved) {
           reloadAfterCssRemoval = !cssAssetsAdded;
           notifyCssAssetOwnershipChanged();
-        } else if (webChanged && reloadAfterCssRemoval) {
+        } else if (cssAssetsAdded) {
+          if (reloadAfterCssRemoval) {
+            notifyCssAssetOwnershipChanged();
+          }
           reloadAfterCssRemoval = false;
-          notifyCssAssetOwnershipChanged();
         }
       } catch (cause) {
         rejectAttempt(

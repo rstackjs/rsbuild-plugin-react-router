@@ -406,6 +406,19 @@ describe('React Router development runtime', () => {
       cssOnlyChange,
       graphIdentity(removedCssWeb, node)
     );
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
+
+    const contentOnlyWeb = createCompilation('web');
+    runtime.beginAttempt();
+    captureWeb(runtime, contentOnlyWeb, 'without-css-content-edit', {
+      routes: { 'routes/about': [] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(contentOnlyWeb, node),
+      cssOnlyChange,
+      graphIdentity(contentOnlyWeb, node)
+    );
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
 
     const readdedCssWeb = createCompilation('web');
     runtime.beginAttempt();
