@@ -244,12 +244,7 @@ const renderParallelTransformsOption = parallelTransforms => {
   if (parallelTransforms === false) {
     return [`      parallelTransforms: false,`];
   }
-  if (parallelTransforms === true) {
-    return [`      parallelTransforms: true,`];
-  }
-  return [
-    `      parallelTransforms: { maxWorkers: ${parallelTransforms.maxWorkers} },`,
-  ];
+  return [`      parallelTransforms: ${parallelTransforms},`];
 };
 
 const createRsbuildConfig = ({

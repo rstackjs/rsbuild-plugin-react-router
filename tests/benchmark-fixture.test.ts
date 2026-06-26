@@ -96,14 +96,12 @@ describe('benchmark fixture generator', () => {
         root,
         routeCount: 1,
         variant: 'ssr-esm',
-        parallelTransforms: { maxWorkers: 3 },
+        parallelTransforms: 3,
       });
 
       const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
-      expect(result.parallelTransforms).toEqual({ maxWorkers: 3 });
-      expect(rsbuildConfig).toContain(
-        'parallelTransforms: { maxWorkers: 3 },'
-      );
+      expect(result.parallelTransforms).toBe(3);
+      expect(rsbuildConfig).toContain('parallelTransforms: 3,');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

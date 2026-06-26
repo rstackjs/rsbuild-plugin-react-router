@@ -125,16 +125,13 @@ const parseArgs = argv => {
     if (value === 'auto') {
       return undefined;
     }
-    if (value === 'true' || value === '1') {
-      return true;
-    }
-    const maxWorkers = Number(value);
-    if (!Number.isInteger(maxWorkers) || maxWorkers < 1) {
+    const workerCount = Number(value);
+    if (!Number.isInteger(workerCount) || workerCount < 1) {
       throw new Error(
-        '--parallel-transforms must be true, false, auto, or a positive integer.'
+        '--parallel-transforms must be false, auto, or a positive integer.'
       );
     }
-    return { maxWorkers };
+    return workerCount;
   };
 
   const args = {
@@ -834,10 +831,7 @@ const formatParallelTransforms = parallelTransforms => {
   if (!parallelTransforms) {
     return 'false';
   }
-  if (parallelTransforms === true) {
-    return 'true';
-  }
-  return `maxWorkers=${parallelTransforms.maxWorkers}`;
+  return `workers=${parallelTransforms}`;
 };
 
 const git = async args => {

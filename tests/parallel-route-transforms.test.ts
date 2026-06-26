@@ -8,7 +8,6 @@ import {
 import {
   createRouteTransformExecutor,
   getDefaultWorkerCount,
-  shouldParallelizeRouteTransforms,
 } from '../src/parallel-route-transforms';
 import type { RouteChunkConfig } from '../src/route-chunks';
 
@@ -46,17 +45,8 @@ const createRouteModuleTask = (
 
 describe('parallel route transforms', () => {
   it.each([
-    [48, false],
-    [255, false],
-    [256, true],
-    [1024, true],
-  ])('selects the adaptive default for %i routes', (routeCount, expected) => {
-    expect(shouldParallelizeRouteTransforms(routeCount)).toBe(expected);
-  });
-
-  it.each([
-    [1, 0],
-    [2, 0],
+    [1, 1],
+    [2, 1],
     [3, 1],
     [4, 2],
     [6, 4],
@@ -64,7 +54,7 @@ describe('parallel route transforms', () => {
     [10, 8],
     [12, 10],
     [24, 22],
-  ])('defaults worker count to CPU cores minus two', (cpus, workers) => {
+  ])('defaults worker count to CPU cores minus two with at least one worker', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
 
@@ -86,14 +76,14 @@ describe('parallel route transforms', () => {
   it('rejects invalid explicit worker counts', () => {
     expect(() =>
       createRouteTransformExecutor({
-        parallelTransforms: { maxWorkers: 1.5 },
+        parallelTransforms: 1.5,
       })
-    ).toThrow('must be a positive integer');
+    ).toThrow('must be false or a positive integer');
   });
 
-  it('honors explicit maxWorkers', async () => {
+  it('honors an explicit worker count', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelTransforms: 2,
     });
 
     try {
@@ -142,7 +132,7 @@ describe('parallel route transforms', () => {
 
   it('can execute route module tasks through worker-backed parallelism', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelTransforms: 2,
     });
 
     try {
@@ -157,7 +147,7 @@ describe('parallel route transforms', () => {
 
   it('produces identical build route modules when environments need the same output', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelTransforms: 2,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({
@@ -184,7 +174,7 @@ describe('parallel route transforms', () => {
 
   it('keeps environment-specific build route module output isolated', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelTransforms: 2,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({
@@ -212,7 +202,7 @@ describe('parallel route transforms', () => {
 
   it('isolates escaped server exports across build environments', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelTransforms: 2,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({

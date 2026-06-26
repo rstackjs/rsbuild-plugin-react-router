@@ -48,31 +48,19 @@ class WorkerStartupError extends Error {
 }
 
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
-const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
 
 export const getDefaultWorkerCount = (cpuCount?: number): number =>
-  getDefaultConcurrency(cpuCount);
-
-export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
-  routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
+  Math.max(1, getDefaultConcurrency(cpuCount));
 
 const getConfiguredWorkerCount = (
   parallelTransforms: ParallelTransformsConfig
 ): number => {
-  if (parallelTransforms === true) {
-    return getDefaultWorkerCount();
-  }
-
-  const configured = parallelTransforms.maxWorkers;
-  if (configured === undefined) {
-    return getDefaultWorkerCount();
-  }
-  if (!Number.isInteger(configured) || configured < 1) {
+  if (!Number.isInteger(parallelTransforms) || parallelTransforms < 1) {
     throw new Error(
-      '[react-router] parallelTransforms.maxWorkers must be a positive integer.'
+      '[react-router] parallelTransforms must be false or a positive integer.'
     );
   }
-  return configured;
+  return parallelTransforms;
 };
 
 const hashString = (value: string): number => {
@@ -310,15 +298,17 @@ export const createRouteTransformExecutor = ({
   splitRouteModules,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
   const options = { routeChunkCache };
-  const effectiveParallelTransforms = parallelTransforms ?? false;
-  if (!effectiveParallelTransforms) {
+  if (parallelTransforms === false) {
     return {
       run: task => executeRouteTransformTask(task, options),
       close: async () => {},
     };
   }
 
-  const workerCount = getConfiguredWorkerCount(effectiveParallelTransforms);
+  const workerCount =
+    parallelTransforms === undefined
+      ? getDefaultWorkerCount()
+      : getConfiguredWorkerCount(parallelTransforms);
   if (workerCount < 1) {
     return {
       run: task => executeRouteTransformTask(task, options),
