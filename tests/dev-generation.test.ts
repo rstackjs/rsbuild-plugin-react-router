@@ -67,7 +67,8 @@ const createBuild = (
 
 const createRouteManifest = (
   id: string,
-  css: string[]
+  css: string[],
+  imports: string[] = []
 ): ReactRouterDevManifest['routes'][string] => ({
   id,
   module: `/${id}.js`,
@@ -78,7 +79,7 @@ const createRouteManifest = (
   hasClientMiddleware: false,
   hasDefaultExport: true,
   hasErrorBoundary: false,
-  imports: [],
+  imports,
   css,
 });
 
@@ -87,6 +88,7 @@ const createDevManifest = (
   css: {
     entry?: string[];
     routes?: Record<string, string[]>;
+    routeImports?: Record<string, string[]>;
   } = {}
 ): ReactRouterDevManifest => ({
   version,
@@ -95,7 +97,7 @@ const createDevManifest = (
   routes: Object.fromEntries(
     Object.entries(css.routes ?? {}).map(([id, routeCss]) => [
       id,
-      createRouteManifest(id, routeCss),
+      createRouteManifest(id, routeCss, css.routeImports?.[id]),
     ])
   ),
 });
@@ -484,6 +486,63 @@ describe('React Router development runtime', () => {
     runtime.beginAttempt();
     captureWeb(runtime, readdedCssWeb, 'readded-css', {
       routes: { 'routes/about': ['/assets/about.css'] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(readdedCssWeb, staleNode),
+      cssOnlyChange,
+      graphIdentity(readdedCssWeb, staleNode, removedCssWeb)
+    );
+
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledTimes(2);
+    expect(loadBundle).toHaveBeenCalledOnce();
+    expect(warnings).toEqual([]);
+    await expect(runtime.load()).resolves.toMatchObject({
+      assets: { version: 'readded-css' },
+    });
+  });
+
+  it('publishes re-added css when route imports change with css ownership', async () => {
+    const onCssAssetOwnershipChanged = rstest.fn();
+    const { loadBundle, runtime, warnings } = createHarness(
+      () => createBuild('build'),
+      { onCssAssetOwnershipChanged }
+    );
+    const node = createCompilation('node');
+    const cssOnlyChange: DevGraphChanges = {
+      web: { known: true, files: new Set(['/app/routes/about.tsx']) },
+      node: { known: true, files: new Set(['/app/routes/about.tsx']) },
+    };
+
+    const firstWeb = createCompilation('web');
+    runtime.beginAttempt();
+    captureWeb(runtime, firstWeb, 'with-css', {
+      routes: { 'routes/about': ['/assets/about.css'] },
+      routeImports: { 'routes/about': ['/assets/about.css'] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(firstWeb, node),
+      noKnownChanges,
+      graphIdentity(firstWeb, node)
+    );
+
+    const removedCssWeb = createCompilation('web');
+    runtime.beginAttempt();
+    captureWeb(runtime, removedCssWeb, 'without-css', {
+      routes: { 'routes/about': [] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(removedCssWeb, node),
+      cssOnlyChange,
+      graphIdentity(removedCssWeb, node, firstWeb)
+    );
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
+
+    const readdedCssWeb = createCompilation('web');
+    const staleNode = createCompilation('node');
+    runtime.beginAttempt();
+    captureWeb(runtime, readdedCssWeb, 'readded-css', {
+      routes: { 'routes/about': ['/assets/about.css'] },
+      routeImports: { 'routes/about': ['/assets/about.css'] },
     });
     await runtime.finishAttempt(
       createGraphStats(readdedCssWeb, staleNode),
