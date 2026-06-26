@@ -74,7 +74,107 @@ type CreateReactRouterDevRuntimeOptions = {
   server: RsbuildDevServer;
   buildPlan: ReactRouterDevBuildPlan;
   onEvaluationError: (error: Error) => void;
+  onCssAssetOwnershipChanged?: () => void;
   onWarning?: (message: string) => void;
+};
+
+const collectManifestCssAssetOwnership = (
+  manifest: ReactRouterDevManifestSet[string]
+): Set<string> => {
+  const ownership = new Set<string>();
+  for (const asset of manifest.entry?.css ?? []) {
+    ownership.add(`entry\0${asset}`);
+  }
+  for (const [routeId, route] of Object.entries(manifest.routes ?? {})) {
+    for (const asset of route.css ?? []) {
+      ownership.add(`route\0${routeId}\0${asset}`);
+    }
+  }
+  return ownership;
+};
+
+const hasRemovedCssAssetOwnership = (
+  previous: ReactRouterDevManifestSet,
+  next: ReactRouterDevManifestSet
+): boolean => {
+  for (const [entryName, previousManifest] of Object.entries(previous)) {
+    const previousOwnership = collectManifestCssAssetOwnership(previousManifest);
+    if (previousOwnership.size === 0) {
+      continue;
+    }
+    const nextManifest = next[entryName];
+    if (!nextManifest) {
+      return true;
+    }
+    const nextOwnership = collectManifestCssAssetOwnership(nextManifest);
+    for (const owner of previousOwnership) {
+      if (!nextOwnership.has(owner)) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+const hasAddedCssAssetOwnership = (
+  previous: ReactRouterDevManifestSet,
+  next: ReactRouterDevManifestSet
+): boolean => hasRemovedCssAssetOwnership(next, previous);
+
+const normalizeManifestForCssOwnershipCheck = (
+  manifest: ReactRouterDevManifestSet[string]
+) => ({
+  entry: {
+    imports: manifest.entry?.imports ?? [],
+    module: manifest.entry?.module,
+  },
+  routes: Object.fromEntries(
+    Object.entries(manifest.routes ?? {})
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([routeId, route]) => [
+        routeId,
+        {
+          caseSensitive: route.caseSensitive,
+          clientActionModule: route.clientActionModule,
+          clientLoaderModule: route.clientLoaderModule,
+          clientMiddlewareModule: route.clientMiddlewareModule,
+          errorBoundary: route.hasErrorBoundary,
+          hasAction: route.hasAction,
+          hasClientAction: route.hasClientAction,
+          hasClientLoader: route.hasClientLoader,
+          hasClientMiddleware: route.hasClientMiddleware,
+          hasDefaultExport: route.hasDefaultExport,
+          hasLoader: route.hasLoader,
+          hydrateFallbackModule: route.hydrateFallbackModule,
+          id: route.id,
+          imports: route.imports,
+          index: route.index,
+          module: route.module,
+          parentId: route.parentId,
+          path: route.path,
+        },
+      ])
+  ),
+});
+
+const hasOnlyCssAssetOwnershipChanges = (
+  previous: ReactRouterDevManifestSet,
+  next: ReactRouterDevManifestSet
+): boolean => {
+  const previousEntryNames = Object.keys(previous).sort();
+  const nextEntryNames = Object.keys(next).sort();
+  if (previousEntryNames.join('\0') !== nextEntryNames.join('\0')) {
+    return false;
+  }
+  return previousEntryNames.every(entryName => {
+    const previousManifest = normalizeManifestForCssOwnershipCheck(
+      previous[entryName]
+    );
+    const nextManifest = normalizeManifestForCssOwnershipCheck(
+      next[entryName]
+    );
+    return JSON.stringify(previousManifest) === JSON.stringify(nextManifest);
+  });
 };
 
 const createDeferred = <T>(): Deferred<T> => {
@@ -94,9 +194,11 @@ export const createReactRouterDevRuntime = ({
   server,
   buildPlan,
   onEvaluationError,
+  onCssAssetOwnershipChanged = () => undefined,
   onWarning = () => undefined,
 }: CreateReactRouterDevRuntimeOptions): ReactRouterDevRuntime => {
   let nextAttemptId = 1;
+  let reloadAfterCssRemoval = false;
   let state: RuntimeState = {
     kind: 'starting',
     attemptId: 0,
@@ -106,6 +208,17 @@ export const createReactRouterDevRuntime = ({
     Rspack.Compilation,
     ReactRouterDevManifestSet
   >();
+
+  const notifyCssAssetOwnershipChanged = (): void => {
+    try {
+      onCssAssetOwnershipChanged();
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      onWarning(
+        `[rsbuild-plugin-react-router] Failed to notify the browser after CSS asset ownership changed: ${reason}`
+      );
+    }
+  };
 
   const uniqueEntryNames = new Set(buildPlan.entryNames);
   if (
@@ -161,9 +274,12 @@ export const createReactRouterDevRuntime = ({
     }
   };
 
-  const commit = (attemptId: number, committed: CommittedGeneration): void => {
+  const commit = (
+    attemptId: number,
+    committed: CommittedGeneration
+  ): boolean => {
     if (!isCurrentAttempt(attemptId)) {
-      return;
+      return false;
     }
     if (state.kind === 'starting') {
       const { readiness } = state;
@@ -172,6 +288,7 @@ export const createReactRouterDevRuntime = ({
     } else if (state.kind === 'ready') {
       state = { kind: 'ready', committed, pendingAttemptId: null };
     }
+    return true;
   };
 
   const discardUnsafeOneSidedResult = (
@@ -283,17 +400,6 @@ export const createReactRouterDevRuntime = ({
         return;
       }
 
-      if (nodeChanged && identity.nodeWeb !== webIdentity) {
-        const message =
-          '[rsbuild-plugin-react-router] Discarded web and node results from different compiler cycles and kept the last-good build.';
-        if (!previous) {
-          return;
-        }
-        onWarning(message);
-        rejectAttempt(attemptId, new Error(message), false);
-        return;
-      }
-
       const manifestsByEntryName = webChanged
         ? manifestsByCompilation.get(webCompilation)
         : previous?.web.manifestsByEntryName;
@@ -307,16 +413,55 @@ export const createReactRouterDevRuntime = ({
         );
         return;
       }
+      const cssAssetsRemoved =
+        !!previous &&
+        webChanged &&
+        hasRemovedCssAssetOwnership(
+          previous.web.manifestsByEntryName,
+          manifestsByEntryName
+        );
+      const cssAssetsAdded =
+        !!previous &&
+        webChanged &&
+        hasAddedCssAssetOwnership(
+          previous.web.manifestsByEntryName,
+          manifestsByEntryName
+        );
+      const cssOnlyWebManifestChange =
+        (cssAssetsRemoved || cssAssetsAdded) &&
+        hasOnlyCssAssetOwnershipChanges(
+          previous.web.manifestsByEntryName,
+          manifestsByEntryName
+        );
+      const reusePreviousNodeBuild = !!previous && cssOnlyWebManifestChange;
+
+      if (
+        nodeChanged &&
+        identity.nodeWeb !== webIdentity &&
+        !reusePreviousNodeBuild
+      ) {
+        const message =
+          '[rsbuild-plugin-react-router] Discarded web and node results from different compiler cycles and kept the last-good build.';
+        if (!previous) {
+          return;
+        }
+        onWarning(message);
+        rejectAttempt(attemptId, new Error(message), false);
+        return;
+      }
+
+      const shouldEvaluateNode = nodeChanged && !reusePreviousNodeBuild;
       if (
         previous &&
-        webChanged !== nodeChanged &&
+        webChanged !== shouldEvaluateNode &&
+        !cssOnlyWebManifestChange &&
         discardUnsafeOneSidedResult(attemptId, previous, webChanged, changes)
       ) {
         return;
       }
 
       try {
-        const buildsByEntryName = nodeChanged
+        const buildsByEntryName = shouldEvaluateNode
           ? await evaluateServerBuilds(server, buildPlan.entryNames)
           : previous!.buildsByEntryName;
         if (!isCurrentAttempt(attemptId)) {
@@ -328,19 +473,31 @@ export const createReactRouterDevRuntime = ({
               dependencies: snapshotDependencies(webCompilation),
             }
           : previous!.web;
-        commit(attemptId, {
+        const committed = commit(attemptId, {
           buildsByEntryName: pinServerBuildsToManifests(
             buildsByEntryName,
             buildPlan.entryNames,
             web.manifestsByEntryName
           ),
           webIdentity,
-          nodeIdentity,
+          nodeIdentity: shouldEvaluateNode
+            ? nodeIdentity
+            : previous!.nodeIdentity,
           web,
-          nodeDependencies: nodeChanged
+          nodeDependencies: shouldEvaluateNode
             ? snapshotDependencies(nodeCompilation)
             : previous!.nodeDependencies,
         });
+        if (!committed) {
+          return;
+        }
+        if (cssAssetsRemoved) {
+          reloadAfterCssRemoval = !cssAssetsAdded;
+          notifyCssAssetOwnershipChanged();
+        } else if (webChanged && reloadAfterCssRemoval) {
+          reloadAfterCssRemoval = false;
+          notifyCssAssetOwnershipChanged();
+        }
       } catch (cause) {
         rejectAttempt(
           attemptId,
