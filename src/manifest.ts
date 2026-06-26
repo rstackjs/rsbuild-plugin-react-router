@@ -99,20 +99,34 @@ export type ReactRouterManifestForDev = {
 
 export type ReactRouterManifestStats = {
   assetsByChunkName?: Record<string, string[]>;
+  entrypointFilesByName?: Record<string, string[]>;
 };
 
 type ReactRouterManifestStatsChunk = {
   files?: Iterable<string>;
 };
 
+type ReactRouterManifestStatsEntrypoint = {
+  getFiles?: () => Iterable<string>;
+};
+
 type ReactRouterManifestStatsCompilation = {
   namedChunks: Iterable<[string, ReactRouterManifestStatsChunk]>;
+  entrypoints?: Iterable<[string, ReactRouterManifestStatsEntrypoint]>;
 };
 
 type ReactRouterManifestStatsNamedChunks =
   ReactRouterManifestStatsCompilation['namedChunks'] & {
     get?: (chunkName: string) => ReactRouterManifestStatsChunk | undefined;
   };
+
+type ReactRouterManifestStatsEntrypoints = NonNullable<
+  ReactRouterManifestStatsCompilation['entrypoints']
+> & {
+  get?: (
+    entrypointName: string
+  ) => ReactRouterManifestStatsEntrypoint | undefined;
+};
 
 const orderChunkFiles = (chunkName: string, files: string[]): string[] => {
   const ownChunkAsset = `${chunkName}.js`;
@@ -137,8 +151,12 @@ export const createReactRouterManifestStats = (
   }
 
   const assetsByChunkName: Record<string, string[]> = {};
+  const entrypointFilesByName: Record<string, string[]> = {};
   const namedChunks =
     compilation.namedChunks as ReactRouterManifestStatsNamedChunks;
+  const entrypoints = compilation.entrypoints as
+    | ReactRouterManifestStatsEntrypoints
+    | undefined;
 
   if (chunkNames && typeof namedChunks.get === 'function') {
     for (const chunkName of chunkNames) {
@@ -159,7 +177,32 @@ export const createReactRouterManifestStats = (
     }
   }
 
-  return { assetsByChunkName };
+  if (entrypoints) {
+    if (chunkNames && typeof entrypoints.get === 'function') {
+      for (const entrypointName of chunkNames) {
+        const entrypoint = entrypoints.get(entrypointName);
+        if (!entrypoint) {
+          continue;
+        }
+        entrypointFilesByName[entrypointName] = Array.from(
+          entrypoint.getFiles?.() ?? []
+        );
+      }
+    } else {
+      for (const [entrypointName, entrypoint] of entrypoints) {
+        if (chunkNames && !chunkNames.has(entrypointName)) {
+          continue;
+        }
+        entrypointFilesByName[entrypointName] = Array.from(
+          entrypoint.getFiles?.() ?? []
+        );
+      }
+    }
+  }
+
+  return Object.keys(entrypointFilesByName).length > 0
+    ? { assetsByChunkName, entrypointFilesByName }
+    : { assetsByChunkName };
 };
 
 export type RouteManifestModuleExports = Record<string, readonly string[]>;
@@ -256,10 +299,24 @@ export async function generateReactRouterManifestForDev(
     if (!assets) {
       return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`];
     }
-    if (!assets.some(asset => asset.endsWith('.js'))) {
-      return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`, ...assets];
+    const entrypointCssAssets =
+      clientStats?.entrypointFilesByName?.[chunkName]?.filter(asset =>
+        asset.endsWith('.css')
+      ) ?? [];
+    const cssAssets = [
+      ...assets.filter(asset => asset.endsWith('.css')),
+      ...entrypointCssAssets,
+    ].filter((asset, index, all) => all.indexOf(asset) === index);
+    const nonCssAssets = assets.filter(asset => !asset.endsWith('.css'));
+
+    if (!nonCssAssets.some(asset => asset.endsWith('.js'))) {
+      return [
+        `${DEFAULT_MANIFEST_DIR}/${chunkName}.js`,
+        ...nonCssAssets,
+        ...cssAssets,
+      ];
     }
-    return assets;
+    return [...nonCssAssets, ...cssAssets];
   };
 
   const getModulePathForChunk = (chunkName: string): string | undefined => {

@@ -92,9 +92,11 @@ const createProcessAssetsHarness = () => {
 
 const createCompilation = (
   namedChunks: Array<[string, unknown]>,
-  assets: Record<string, Asset> = {}
+  assets: Record<string, Asset> = {},
+  entrypoints: Array<[string, unknown]> = []
 ) => ({
   namedChunks: new Map(namedChunks),
+  entrypoints: new Map(entrypoints),
   assets,
   getAsset(name: string) {
     const asset = assets[name];
@@ -355,6 +357,64 @@ describe('modify browser manifest plugin', () => {
           ['routes/page-client-loader', theoreticalSplitChunk],
         ]),
       });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('adds transitive entrypoint CSS without adding transitive JavaScript preloads', async () => {
+    const { root, appDir } = createTempApp();
+    const harness = createProcessAssetsHarness();
+    const assets = createBrowserManifestAssets();
+    let manifest: unknown;
+
+    try {
+      registerModifyBrowserManifestAssets(
+        harness.api as never,
+        { root: rootRoute },
+        {},
+        appDir,
+        '/',
+        { isBuild: true },
+        {
+          onManifest(nextManifest) {
+            manifest = nextManifest;
+          },
+        }
+      );
+
+      await harness.run({
+        assets,
+        compilation: createCompilation(
+          [
+            ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+            ['vendor', { files: new Set(['static/js/vendor.js']) }],
+          ],
+          assets,
+          [
+            [
+              'entry.client',
+              {
+                getFiles: () => [
+                  'static/js/entry.client.js',
+                  'static/js/vendor.js',
+                  'static/css/reset.css',
+                  'static/css/route.css',
+                ],
+              },
+            ],
+          ]
+        ),
+      });
+
+      expect(manifest).toMatchObject({
+        entry: {
+          imports: ['/static/js/entry.client.js'],
+          css: ['/static/css/reset.css', '/static/css/route.css'],
+        },
+      });
+      expect((manifest as { entry: { imports: string[] } }).entry.imports).not
+        .toContain('/static/js/vendor.js');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

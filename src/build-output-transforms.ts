@@ -1,4 +1,4 @@
-import type { RsbuildPluginAPI } from '@rsbuild/core';
+import type { RsbuildPluginAPI, TransformHandler } from '@rsbuild/core';
 import jsesc from 'jsesc';
 import { relative } from 'pathe';
 import { PLUGIN_NAME } from './constants.js';
@@ -62,6 +62,28 @@ export const registerBuildOutputTransforms = ({
   isSpaMode,
   rootRoutePath,
 }: RegisterBuildOutputTransformsOptions): void => {
+  const transformRouteModule = async (args: Parameters<TransformHandler>[0]) =>
+    performanceProfiler.record(
+      args.environment?.name,
+      'route:module',
+      args.resource,
+      async () =>
+        routeTransformExecutor.run({
+          kind: 'routeModule',
+          code: args.code,
+          resource: args.resource,
+          resourcePath: args.resourcePath,
+          environmentName: args.environment.name,
+          sourceMaps: isSourceMapEnabled(
+            args.environment.config.output.sourceMap
+          ),
+          ssr,
+          isBuild,
+          isSpaMode,
+          rootRoutePath,
+        })
+    );
+
   api.processAssets(
     { stage: 'additional', targets: ['node'] },
     ({ sources, compilation }) => {
@@ -233,27 +255,19 @@ export const registerBuildOutputTransforms = ({
   api.transform(
     {
       resourceQuery: /\?react-router-route/,
+      order: 'post',
     },
-    async args =>
-      performanceProfiler.record(
-        args.environment?.name,
-        'route:module',
-        args.resource,
-        async () =>
-          routeTransformExecutor.run({
-            kind: 'routeModule',
-            code: args.code,
-            resource: args.resource,
-            resourcePath: args.resourcePath,
-            environmentName: args.environment.name,
-            sourceMaps: isSourceMapEnabled(
-              args.environment.config.output.sourceMap
-            ),
-            ssr,
-            isBuild,
-            isSpaMode,
-            rootRoutePath,
-          })
-      )
+    transformRouteModule
+  );
+
+  api.transform(
+    {
+      test: path => routeByFilePath.has(path),
+      resourceQuery: {
+        not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+      },
+      order: 'post',
+    },
+    transformRouteModule
   );
 };
