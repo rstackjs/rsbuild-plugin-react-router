@@ -64,7 +64,7 @@ export type ReactRouterDevRuntime = {
     stats: Rspack.Stats | Rspack.MultiStats,
     changes: DevGraphChanges,
     identity: DevGraphIdentity
-  ) => Promise<void>;
+  ) => Promise<'committed' | 'ignored' | 'retry-node'>;
   failAttempt: (error: Error) => void;
   load: (entryName?: string) => Promise<ServerBuild>;
   close: (error?: Error) => void;
@@ -431,10 +431,10 @@ export const createReactRouterDevRuntime = ({
       }
     },
 
-    async finishAttempt(stats, changes, identity): Promise<void> {
+    async finishAttempt(stats, changes, identity) {
       const attemptId = getCurrentAttemptId();
       if (attemptId === null) {
-        return;
+        return 'ignored';
       }
       const webStats = getEnvironmentStats(stats, 'web');
       const nodeStats = getEnvironmentStats(stats, 'node');
@@ -446,13 +446,13 @@ export const createReactRouterDevRuntime = ({
           ),
           true
         );
-        return;
+        return 'ignored';
       }
       if (
         webStats.compilation.needAdditionalPass ||
         nodeStats.compilation.needAdditionalPass
       ) {
-        return;
+        return 'ignored';
       }
       if (webStats.hasErrors() || nodeStats.hasErrors()) {
         rejectAttempt(
@@ -462,7 +462,7 @@ export const createReactRouterDevRuntime = ({
           ),
           false
         );
-        return;
+        return 'ignored';
       }
 
       const webCompilation = webStats.compilation;
@@ -477,14 +477,14 @@ export const createReactRouterDevRuntime = ({
           ),
           true
         );
-        return;
+        return 'ignored';
       }
       const previous = state.kind === 'ready' ? state.committed : undefined;
       const webChanged = !previous || previous.webIdentity !== webIdentity;
       const nodeChanged = !previous || previous.nodeIdentity !== nodeIdentity;
 
       if (!webChanged && !nodeChanged) {
-        return;
+        return 'ignored';
       }
 
       const manifestsByEntryName = webChanged
@@ -498,7 +498,7 @@ export const createReactRouterDevRuntime = ({
           ),
           true
         );
-        return;
+        return 'ignored';
       }
       const cssAssetsRemoved =
         !!previous &&
@@ -528,20 +528,25 @@ export const createReactRouterDevRuntime = ({
           manifestsByEntryName
         );
       const reusePreviousNodeBuild = !!previous && cssOnlyWebManifestChange;
+      const sameCompileAttempt =
+        !!identity.webAttempt &&
+        !!identity.nodeAttempt &&
+        identity.webAttempt === identity.nodeAttempt;
 
       if (
         nodeChanged &&
         identity.nodeWeb !== webIdentity &&
+        !sameCompileAttempt &&
         !reusePreviousNodeBuild
       ) {
         const message =
           '[rsbuild-plugin-react-router] Discarded web and node results from different compiler cycles and kept the last-good build.';
         if (!previous) {
-          return;
+          return 'retry-node';
         }
         onWarning(message);
         rejectAttempt(attemptId, new Error(message), false);
-        return;
+        return 'retry-node';
       }
 
       const shouldEvaluateNode = nodeChanged && !reusePreviousNodeBuild;
@@ -551,7 +556,7 @@ export const createReactRouterDevRuntime = ({
         !cssOnlyWebManifestChange &&
         discardUnsafeOneSidedResult(attemptId, previous, webChanged, changes)
       ) {
-        return;
+        return 'ignored';
       }
 
       try {
@@ -559,7 +564,7 @@ export const createReactRouterDevRuntime = ({
           ? await evaluateServerBuilds(server, buildPlan.entryNames)
           : previous!.buildsByEntryName;
         if (!isCurrentAttempt(attemptId)) {
-          return;
+          return 'ignored';
         }
         const web = webChanged
           ? {
@@ -583,7 +588,7 @@ export const createReactRouterDevRuntime = ({
             : previous!.nodeDependencies,
         });
         if (!committed) {
-          return;
+          return 'ignored';
         }
         if (cssAssetsRemoved) {
           reloadAfterCssRemoval = !cssAssetsAdded;
@@ -597,12 +602,14 @@ export const createReactRouterDevRuntime = ({
         if (routeManifestMetadataChanged) {
           notifyRouteManifestChanged();
         }
+        return 'committed';
       } catch (cause) {
         rejectAttempt(
           attemptId,
           cause instanceof Error ? cause : new Error(String(cause)),
           true
         );
+        return 'ignored';
       }
     },
 

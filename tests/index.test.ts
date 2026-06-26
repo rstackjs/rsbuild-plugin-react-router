@@ -538,6 +538,31 @@ describe('pluginReactRouter', () => {
     expect(nodeConfig.experiments.outputModule).toBe(true);
   });
 
+  it('should run development web and node compilers without a hard dependency edge', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    const nodeConfig = config.environments?.node?.tools?.rspack;
+    expect(nodeConfig.dependencies).toBeUndefined();
+  });
+
+  it('should keep the node compiler dependent on web during production builds', async () => {
+    const rsbuild = await createStubRsbuild({
+      action: 'build',
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    const nodeConfig = config.environments?.node?.tools?.rspack;
+    expect(nodeConfig.dependencies).toEqual(['web']);
+  });
+
   it('should use async-node target for federation builds', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {

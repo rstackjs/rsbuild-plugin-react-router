@@ -108,6 +108,7 @@ export const createReactRouterDevRuntimeController = ({
     const pair = binding.compilers;
     if (pair) {
       pair.pendingAttempt = undefined;
+      pair.currentAttemptIdentity = undefined;
       pair.latestCompletedWebIdentity = undefined;
       pair.latestWebStart = undefined;
       pair.latestNodeStart = undefined;
@@ -120,6 +121,26 @@ export const createReactRouterDevRuntimeController = ({
   const sessions = createDevRuntimeSessionManager(closeBinding);
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
+
+  const finishRuntimeAttempt = async (
+    binding: RuntimeBinding,
+    pair: DevCompilerPair,
+    stats: Rspack.Stats | Rspack.MultiStats,
+    changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
+    identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
+  ): Promise<void> => {
+    const result = await binding.runtime.finishAttempt(
+      stats,
+      changes,
+      identity
+    );
+    if (
+      result === 'retry-node' &&
+      sessions.getActiveBinding()?.id === binding.id
+    ) {
+      pair.node.watching?.invalidate();
+    }
+  };
 
   const flushSettledAttempt = (
     binding: RuntimeBinding,
@@ -143,6 +164,14 @@ export const createReactRouterDevRuntimeController = ({
     }
     void binding.runtime
       .finishAttempt(pending.stats, pending.changes, pending.identity)
+      .then(result => {
+        if (
+          result === 'retry-node' &&
+          sessions.getActiveBinding()?.id === binding.id
+        ) {
+          pair.node.watching?.invalidate();
+        }
+      })
       .catch(cause => {
         if (sessions.getActiveBinding()?.id === binding.id) {
           binding.runtime.failAttempt(
@@ -248,6 +277,7 @@ export const createReactRouterDevRuntimeController = ({
         return;
       }
       pair.pendingAttempt = undefined;
+      pair.currentAttemptIdentity = Symbol();
       binding.runtime.beginAttempt();
     },
   });
@@ -299,6 +329,7 @@ export const createReactRouterDevRuntimeController = ({
         pair[side] = { status: 'pending' };
         pair.pendingAttempt = undefined;
         if (!attemptAlreadyPending) {
+          pair.currentAttemptIdentity = Symbol();
           runtime.beginAttempt();
         }
         if (side === 'latestWebStart' && reloadAfterCssAssetOwnershipRemoval) {
@@ -328,6 +359,12 @@ export const createReactRouterDevRuntimeController = ({
       `${PLUGIN_NAME}:dev-web-compilation`,
       compilation => {
         if (sessions.getActiveBinding()?.id === sessionId) {
+          if (pair.currentAttemptIdentity) {
+            compilationIdentities.setAttemptIdentityForCompilation(
+              compilation,
+              pair.currentAttemptIdentity
+            );
+          }
           pair.latestWebStart = {
             status: 'started',
             identity: getCompilationIdentity(compilation),
@@ -349,6 +386,12 @@ export const createReactRouterDevRuntimeController = ({
           status: 'started',
           identity: getCompilationIdentity(compilation),
         };
+        if (pair.currentAttemptIdentity) {
+          compilationIdentities.setAttemptIdentityForCompilation(
+            compilation,
+            pair.currentAttemptIdentity
+          );
+        }
         if (pair.latestCompletedWebIdentity) {
           compilationIdentities.setWebIdentityForNodeCompilation(
             compilation,
@@ -418,9 +461,19 @@ export const createReactRouterDevRuntimeController = ({
             nodeStats.compilation
           )
         : undefined,
+      webAttempt: webStats
+        ? compilationIdentities.getAttemptIdentityForCompilation(
+            webStats.compilation
+          )
+        : undefined,
+      nodeAttempt: nodeStats
+        ? compilationIdentities.getAttemptIdentityForCompilation(
+            nodeStats.compilation
+          )
+        : undefined,
     };
     if (!webStats || !nodeStats) {
-      await binding.runtime.finishAttempt(stats, changes, identity);
+      await finishRuntimeAttempt(binding, pair, stats, changes, identity);
       return;
     }
     pair.pendingAttempt = {

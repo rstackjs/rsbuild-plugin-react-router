@@ -1,5 +1,6 @@
 import type { Rspack } from '@rsbuild/core';
 import type {
+  DevCompileAttemptIdentity,
   DevCompilationIdentity,
   DevGraphChanges,
   DevGraphIdentity,
@@ -10,6 +11,7 @@ export type DevCompilerPair = {
   node: Rspack.Compiler;
   settledCompilations: WeakSet<Rspack.Compilation>;
   pendingAttempt?: PendingDevCompilation;
+  currentAttemptIdentity?: DevCompileAttemptIdentity;
   latestCompletedWebIdentity?: DevCompilationIdentity;
   latestWebStart?: CompilationStart;
   latestNodeStart?: CompilationStart;
@@ -44,6 +46,13 @@ export type CompilationIdentityTracker = {
   getWebIdentityForNodeCompilation(
     compilation: Rspack.Compilation
   ): DevCompilationIdentity | undefined;
+  getAttemptIdentityForCompilation(
+    compilation: Rspack.Compilation
+  ): DevCompileAttemptIdentity | undefined;
+  setAttemptIdentityForCompilation(
+    compilation: Rspack.Compilation,
+    identity: DevCompileAttemptIdentity
+  ): void;
   setWebIdentityForNodeCompilation(
     compilation: Rspack.Compilation,
     identity: DevCompilationIdentity
@@ -59,6 +68,10 @@ export const createCompilationIdentityTracker =
     const webIdentityByNodeCompilation = new WeakMap<
       Rspack.Compilation,
       DevCompilationIdentity
+    >();
+    const attemptIdentityByCompilation = new WeakMap<
+      Rspack.Compilation,
+      DevCompileAttemptIdentity
     >();
 
     return {
@@ -80,6 +93,19 @@ export const createCompilationIdentityTracker =
         compilation: Rspack.Compilation
       ): DevCompilationIdentity | undefined {
         return webIdentityByNodeCompilation.get(compilation);
+      },
+
+      getAttemptIdentityForCompilation(
+        compilation: Rspack.Compilation
+      ): DevCompileAttemptIdentity | undefined {
+        return attemptIdentityByCompilation.get(compilation);
+      },
+
+      setAttemptIdentityForCompilation(
+        compilation: Rspack.Compilation,
+        identity: DevCompileAttemptIdentity
+      ): void {
+        attemptIdentityByCompilation.set(compilation, identity);
       },
 
       setWebIdentityForNodeCompilation(

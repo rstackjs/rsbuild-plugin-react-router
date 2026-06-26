@@ -34,11 +34,14 @@ export type DevGraphChanges = {
 };
 
 export type DevCompilationIdentity = symbol;
+export type DevCompileAttemptIdentity = symbol;
 
 export type DevGraphIdentity = {
   web: DevCompilationIdentity | undefined;
   node: DevCompilationIdentity | undefined;
   nodeWeb: DevCompilationIdentity | undefined;
+  webAttempt: DevCompileAttemptIdentity | undefined;
+  nodeAttempt: DevCompileAttemptIdentity | undefined;
 };
 
 export type WebArtifact = {

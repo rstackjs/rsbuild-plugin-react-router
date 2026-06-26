@@ -919,7 +919,7 @@ export const pluginReactRouter = (
                   ],
                 },
                 externals: nodeExternals,
-                dependencies: ['web'],
+                ...(isBuild ? { dependencies: ['web'] } : {}),
                 externalsType: resolvedServerOutput,
                 output: {
                   chunkFormat: resolvedServerOutput,

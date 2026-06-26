@@ -573,6 +573,71 @@ describe('React Router development runtime controller', () => {
     expect(loadBundle).toHaveBeenCalledTimes(2);
   });
 
+  it('publishes an initial same-attempt compile when node starts before web completes', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('parallel'));
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const waiting = controller.createBuildLoader()();
+
+    const nodeCompilation = node.compile();
+    const webCompilation = web.compile();
+    controller.captureWeb(webCompilation, createManifest('parallel'));
+    web.complete(webCompilation);
+    await callbacks.after({
+      stats: createGraphStats(webCompilation, nodeCompilation),
+    });
+
+    const published = await Promise.race([
+      waiting,
+      new Promise(resolve => setTimeout(() => resolve('pending'), 0)),
+    ]);
+    expect(published).toMatchObject({
+      marker: 'parallel',
+      assets: { version: 'parallel' },
+    });
+    expect(loadBundle).toHaveBeenCalledOnce();
+  });
+
+  it('publishes a same-attempt rebuild when node starts before web completes', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    const loadBuild = controller.createBuildLoader();
+
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifest('base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    build = createBuild('node-b');
+    callbacks.before();
+    const nodeB = node.compile();
+    const webB = web.compile();
+    controller.captureWeb(webB, createManifest('web-b'));
+    web.complete(webB);
+    await callbacks.after({ stats: createGraphStats(webB, nodeB) });
+
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(loadBuild()).resolves.toMatchObject({
+      marker: 'node-b',
+      assets: { version: 'web-b' },
+    });
+  });
+
   it('waits for late done hooks before snapshotting dependencies', async () => {
     const routePath = '/app/routes.ts';
     const { callbacks, controller, loadBundle, server, warn } = createHarness();
