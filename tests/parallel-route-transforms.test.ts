@@ -53,6 +53,7 @@ type FakeWorkerHandler = (value: any) => void;
 class FakeRouteTransformWorker {
   readonly messages: WorkerRequest[] = [];
   readonly handlers = new Map<string, FakeWorkerHandler[]>();
+  failNextPostMessage = false;
   terminateCalls = 0;
 
   on(event: string, handler: FakeWorkerHandler): this {
@@ -61,6 +62,10 @@ class FakeRouteTransformWorker {
   }
 
   postMessage(message: WorkerRequest): void {
+    if (this.failNextPostMessage) {
+      this.failNextPostMessage = false;
+      throw new Error('postMessage failed');
+    }
     this.messages.push(message);
   }
 
@@ -171,6 +176,67 @@ describe('parallel route transforms', () => {
 
     await executor.close();
     expect(worker.terminateCalls).toBe(1);
+  });
+
+  it('rejects in-flight worker tasks on idempotent close and runs inline afterward', async () => {
+    const worker = new FakeRouteTransformWorker();
+    const executor = createRouteTransformExecutorForTesting(
+      {
+        parallelTransforms: 1,
+      },
+      () => worker
+    );
+
+    const pending = executor.run(createRouteModuleTask());
+    expect(worker.messages).toHaveLength(1);
+
+    const firstClose = executor.close();
+    const secondClose = executor.close();
+
+    await expect(pending).rejects.toThrow('Route transform worker closed.');
+    await expect(Promise.all([firstClose, secondClose])).resolves.toEqual([
+      undefined,
+      undefined,
+    ]);
+    expect(worker.terminateCalls).toBe(1);
+
+    const inlineResult = await executor.run(createRouteModuleTask());
+    expect(inlineResult.code).toContain('export default _withComponentProps');
+    expect(worker.messages).toHaveLength(1);
+  });
+
+  it('sends full source again after a cached worker request fails to post', async () => {
+    const worker = new FakeRouteTransformWorker();
+    const executor = createRouteTransformExecutorForTesting(
+      {
+        parallelTransforms: 1,
+      },
+      () => worker
+    );
+    const task = createRouteModuleTask();
+
+    const firstRun = executor.run(task);
+    expect(worker.messages[0]?.task.code).toBe(task.code);
+    worker.emit('message', {
+      id: worker.messages[0]!.id,
+      ok: true,
+      result: { code: 'first' },
+    } satisfies WorkerResponse);
+    await expect(firstRun).resolves.toEqual({ code: 'first' });
+
+    worker.failNextPostMessage = true;
+    await expect(executor.run(task)).rejects.toThrow('postMessage failed');
+
+    const thirdRun = executor.run(task);
+    expect(worker.messages[1]?.task.code).toBe(task.code);
+    worker.emit('message', {
+      id: worker.messages[1]!.id,
+      ok: true,
+      result: { code: 'third' },
+    } satisfies WorkerResponse);
+    await expect(thirdRun).resolves.toEqual({ code: 'third' });
+
+    await executor.close();
   });
 
   it('executes route client entry tasks through the shared task executor', async () => {
