@@ -1,8 +1,14 @@
 import { isAbsolute, relative } from 'node:path';
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
+import { Effect } from 'effect';
 import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
-import { resolveServerBuildModule } from './server-utils.js';
+import {
+  normalizeEffectError,
+  runPluginEffect,
+  tryPluginPromise,
+} from './effect-runtime.js';
+import { resolveServerBuildModuleEffect } from './server-utils.js';
 
 export type ReactRouterDevManifest = ReactRouterManifestForDev;
 
@@ -118,29 +124,50 @@ export const getEnvironmentStats = (
   });
 };
 
-const evaluateServerBuild = async (
+const startServerBuildEvaluationEffect = (
   server: RsbuildDevServer,
   entryName: string
-): Promise<ServerBuild> => {
-  const loaded = await server.environments.node.loadBundle(entryName);
-  return resolveServerBuildModule(
-    loaded,
-    `Server entry ${JSON.stringify(entryName)}`
+): Effect.Effect<ServerBuild, Error, never> => {
+  let loaded: PromiseLike<unknown> | unknown;
+  try {
+    loaded = server.environments.node.loadBundle(entryName);
+  } catch (cause) {
+    return Effect.fail(normalizeEffectError(cause));
+  }
+
+  return tryPluginPromise(() => loaded).pipe(
+    Effect.flatMap(buildModule =>
+      resolveServerBuildModuleEffect(
+        buildModule,
+        `Server entry ${JSON.stringify(entryName)}`
+      )
+    )
   );
 };
 
-export const evaluateServerBuilds = async (
+export const evaluateServerBuildsEffect = (
   server: RsbuildDevServer,
   entryNames: readonly string[]
-): Promise<ReactRouterServerBuilds> => {
-  const evaluated = await Promise.all(
-    entryNames.map(async entryName => [
-      entryName,
-      await evaluateServerBuild(server, entryName),
-    ])
+): Effect.Effect<ReactRouterServerBuilds, Error, never> =>
+  Effect.forEach(
+    entryNames.map(entryName =>
+      startServerBuildEvaluationEffect(server, entryName).pipe(
+        Effect.map(build => [entryName, build] as const)
+      )
+    ),
+    evaluation => evaluation,
+    { concurrency: 'unbounded' }
+  ).pipe(
+    Effect.map(
+      evaluated => Object.fromEntries(evaluated) as Record<string, ServerBuild>
+    )
   );
-  return Object.fromEntries(evaluated) as Record<string, ServerBuild>;
-};
+
+export const evaluateServerBuilds = (
+  server: RsbuildDevServer,
+  entryNames: readonly string[]
+): Promise<ReactRouterServerBuilds> =>
+  runPluginEffect(evaluateServerBuildsEffect(server, entryNames));
 
 const assertBuildMatchesManifest = (
   entryName: string,

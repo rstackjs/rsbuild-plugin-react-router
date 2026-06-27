@@ -2,7 +2,7 @@ import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import { Deferred as EffectDeferred, Effect } from 'effect';
 import type { ServerBuild } from 'react-router';
 import {
-  evaluateServerBuilds,
+  evaluateServerBuildsEffect,
   getEnvironmentStats,
   isSafeOneSidedChange,
   pinServerBuildsToManifests,
@@ -549,7 +549,9 @@ export const createReactRouterDevRuntime = ({
 
       try {
         const buildsByEntryName = shouldEvaluateNode
-          ? await evaluateServerBuilds(server, buildPlan.entryNames)
+          ? await runPluginEffect(
+              evaluateServerBuildsEffect(server, buildPlan.entryNames)
+            )
           : previous!.buildsByEntryName;
         if (!isCurrentAttempt(attemptId)) {
           return 'ignored';

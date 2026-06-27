@@ -1,12 +1,14 @@
 import type { RsbuildDevServer } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { loadReactRouterServerBuild } from '../src';
+import { evaluateServerBuildsEffect } from '../src/dev-runtime-artifacts';
 import {
   createReactRouterDevRuntime,
   type DevGraphChanges,
   registerReactRouterDevRuntime,
   unregisterReactRouterDevRuntime,
 } from '../src/dev-generation';
+import { runPluginEffect } from '../src/effect-runtime';
 import {
   captureWeb,
   createDevRuntimeHarness as createHarness,
@@ -20,6 +22,24 @@ import {
 } from './dev-runtime-fixtures';
 
 describe('React Router development runtime', () => {
+  it('evaluates server builds through the Effect path', async () => {
+    const defaultBuild = createBuild('default');
+    const nestedBuild = createBuild('nested');
+    const loadBundle = rstest.fn((entryName: string) =>
+      entryName === 'nested/entry' ? Promise.resolve(nestedBuild) : defaultBuild
+    );
+    const server = {
+      environments: { node: { loadBundle } },
+    } as unknown as RsbuildDevServer;
+
+    const builds = await runPluginEffect(
+      evaluateServerBuildsEffect(server, ['nested/entry', 'static/js/app'])
+    );
+
+    expect(builds['nested/entry']).toMatchObject({ marker: 'nested' });
+    expect(builds['static/js/app']).toMatchObject({ marker: 'default' });
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+  });
   it('publishes css-only removals when the route file overlaps node dependencies', async () => {
     const routePath = '/app/routes/about.tsx';
     const onCssAssetOwnershipChanged = rstest.fn();
