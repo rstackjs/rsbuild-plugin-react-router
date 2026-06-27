@@ -1,7 +1,7 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
-import { pluginReactRouter } from '../src';
+import { pluginReactRouter, shouldParallelizeEnvironmentBuilds } from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
@@ -548,6 +548,14 @@ describe('pluginReactRouter', () => {
 
     const nodeConfig = config.environments?.node?.tools?.rspack;
     expect(nodeConfig.dependencies).toBeUndefined();
+  });
+
+  it.each([
+    [{ isBuild: false, spareCoreCount: 1 }, true],
+    [{ isBuild: false, spareCoreCount: 0 }, false],
+    [{ isBuild: true, spareCoreCount: 8 }, false],
+  ])('should resolve parallel environment build mode', (options, expected) => {
+    expect(shouldParallelizeEnvironmentBuilds(options)).toBe(expected);
   });
 
   it('should keep the node compiler dependent on web during production builds', async () => {

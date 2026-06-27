@@ -1,6 +1,9 @@
 import { Worker } from 'node:worker_threads';
 import { setBoundedCacheEntry } from './bounded-cache.js';
-import { getDefaultConcurrency } from './concurrency.js';
+import {
+  getAvailableCpuCount,
+  getDefaultConcurrency,
+} from './concurrency.js';
 import {
   executeRouteTransformTask,
   type RouteTransformResult,
@@ -58,10 +61,22 @@ class WorkerStartupError extends Error {
 }
 
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
-const DEFAULT_WORKER_COUNT_LIMIT = 2;
+const DEFAULT_WORKER_COUNT_LIMIT = 4;
+const SMALL_MACHINE_WORKER_COUNT_LIMIT = 1;
+const SMALL_MACHINE_CPU_COUNT = 4;
 
-export const getDefaultWorkerCount = (cpuCount?: number): number =>
-  Math.min(getDefaultConcurrency(cpuCount), DEFAULT_WORKER_COUNT_LIMIT);
+export const getDefaultWorkerCount = (cpuCount?: number): number => {
+  const resolvedCpuCount = cpuCount ?? getAvailableCpuCount();
+  const workerCount = getDefaultConcurrency(resolvedCpuCount);
+  if (workerCount < 1) {
+    return 0;
+  }
+  const workerLimit =
+    resolvedCpuCount <= SMALL_MACHINE_CPU_COUNT
+      ? SMALL_MACHINE_WORKER_COUNT_LIMIT
+      : DEFAULT_WORKER_COUNT_LIMIT;
+  return Math.min(workerCount, workerLimit);
+};
 
 const getConfiguredWorkerCount = (
   parallelTransforms: ParallelTransformsConfig

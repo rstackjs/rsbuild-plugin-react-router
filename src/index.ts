@@ -11,6 +11,7 @@ import {
 import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
+import { getDefaultConcurrency } from './concurrency.js';
 import {
   BUILD_CLIENT_ROUTE_QUERY_STRING,
   JS_EXTENSIONS,
@@ -86,6 +87,14 @@ import {
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
+
+export const shouldParallelizeEnvironmentBuilds = ({
+  isBuild,
+  spareCoreCount = getDefaultConcurrency(),
+}: {
+  isBuild: boolean;
+  spareCoreCount?: number;
+}): boolean => !isBuild && spareCoreCount > 0;
 
 type ModuleFederationPluginLike = {
   name?: string;
@@ -423,6 +432,8 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
+    const shouldDependOnWebCompiler =
+      !shouldParallelizeEnvironmentBuilds({ isBuild });
     const isPrerenderEnabled =
       prerenderConfig !== undefined && prerenderConfig !== false;
     const isSpaMode = !ssr && !isPrerenderEnabled;
@@ -914,7 +925,7 @@ export const pluginReactRouter = (
                   ],
                 },
                 externals: nodeExternals,
-                ...(isBuild ? { dependencies: ['web'] } : {}),
+                ...(shouldDependOnWebCompiler ? { dependencies: ['web'] } : {}),
                 externalsType: resolvedServerOutput,
                 output: {
                   chunkFormat: resolvedServerOutput,
