@@ -1,6 +1,10 @@
 import { describe, expect, it, rstest } from '@rstest/core';
 import type { ResultPromise } from 'execa';
-import { createReactRouterTypegenRunner } from '../src/typegen';
+import {
+  createReactRouterTypegenRunner,
+  registerReactRouterTypegen,
+  type ReactRouterTypegenRunner,
+} from '../src/typegen';
 
 const createProcess = () => {
   let rejectProcess!: (error: Error) => void;
@@ -63,5 +67,31 @@ describe('React Router typegen runner', () => {
       ['--yes', 'react-router', 'typegen'],
       { stdio: 'inherit' }
     );
+  });
+
+  it('starts dev watch after the first dev compile without blocking startup', () => {
+    let afterDevCompile!: () => void;
+    const runner: ReactRouterTypegenRunner = {
+      startWatch: rstest.fn().mockResolvedValue(undefined),
+      closeWatch: rstest.fn().mockResolvedValue(undefined),
+      runBuild: rstest.fn().mockResolvedValue(undefined),
+    };
+    const api = {
+      logger: { warn: rstest.fn() },
+      onAfterDevCompile: rstest.fn(callback => {
+        afterDevCompile = callback;
+      }),
+      onBeforeStartDevServer: rstest.fn(),
+      onCloseDevServer: rstest.fn(),
+      onBeforeBuild: rstest.fn(),
+    };
+
+    registerReactRouterTypegen(api as never, runner);
+
+    expect(api.onBeforeStartDevServer).not.toHaveBeenCalled();
+    const result = afterDevCompile();
+    expect(result).toBeUndefined();
+    afterDevCompile();
+    expect(runner.startWatch).toHaveBeenCalledTimes(1);
   });
 });

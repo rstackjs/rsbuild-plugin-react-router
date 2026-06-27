@@ -118,10 +118,23 @@ export const createReactRouterTypegenRunner = (
   };
 };
 
-export const registerReactRouterTypegen = (api: RsbuildPluginAPI): void => {
-  const runner = createReactRouterTypegenRunner();
+export const registerReactRouterTypegen = (
+  api: RsbuildPluginAPI,
+  runner: ReactRouterTypegenRunner = createReactRouterTypegenRunner()
+): void => {
+  let devWatchStarted = false;
 
-  api.onBeforeStartDevServer(() => runner.startWatch());
+  api.onAfterDevCompile(() => {
+    if (devWatchStarted) {
+      return;
+    }
+    devWatchStarted = true;
+    void runner.startWatch().catch(error => {
+      api.logger.warn(
+        `[react-router] Failed to start React Router typegen watch: ${error}`
+      );
+    });
+  });
 
   api.onCloseDevServer(() => runner.closeWatch());
 
