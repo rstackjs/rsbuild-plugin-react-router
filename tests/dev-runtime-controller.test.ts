@@ -47,7 +47,8 @@ const createBuild = (
 
 const createRouteManifest = (
   id: string,
-  css: string[]
+  css: string[],
+  overrides: Partial<ReactRouterDevManifest['routes'][string]> = {}
 ): ReactRouterDevManifest['routes'][string] => ({
   id,
   module: `/${id}.js`,
@@ -60,6 +61,7 @@ const createRouteManifest = (
   hasErrorBoundary: false,
   imports: [],
   css,
+  ...overrides,
 });
 
 const createManifest = (
@@ -561,6 +563,53 @@ describe('React Router development runtime controller', () => {
       path: '*',
     });
     expect(server.sockWrite).toHaveBeenNthCalledWith(2, 'full-reload', {
+      path: '*',
+    });
+  });
+
+  it('hard reloads when route export metadata changes', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('base'));
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, {
+      'static/js/app': {
+        ...createManifest('web-base')['static/js/app'],
+        routes: {
+          'routes/about': createRouteManifest('routes/about', [], {
+            hasClientLoader: false,
+          }),
+        },
+      },
+    });
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    callbacks.before();
+    const nextWeb = web.compile();
+    controller.captureWeb(nextWeb, {
+      'static/js/app': {
+        ...createManifest('web-next')['static/js/app'],
+        routes: {
+          'routes/about': createRouteManifest('routes/about', [], {
+            hasClientLoader: true,
+            clientLoaderModule: '/routes/about.clientLoader.js',
+          }),
+        },
+      },
+    });
+    web.complete(nextWeb);
+    const nextNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(nextWeb, nextNode) });
+
+    expect(server.sockWrite).toHaveBeenCalledWith('full-reload', {
       path: '*',
     });
   });

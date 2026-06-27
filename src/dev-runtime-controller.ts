@@ -176,6 +176,12 @@ export const createReactRouterDevRuntimeController = ({
           }
           server.sockWrite('full-reload', { path: '*' });
         },
+        onRouteManifestChanged() {
+          if (sessions.getActiveBinding()?.runtime !== runtime) {
+            return;
+          }
+          server.sockWrite('full-reload', { path: '*' });
+        },
         onWarning: message => api.logger.warn(message),
       });
       const binding = sessions.createBinding(server, runtime);

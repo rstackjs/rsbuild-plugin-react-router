@@ -75,6 +75,7 @@ type CreateReactRouterDevRuntimeOptions = {
   buildPlan: ReactRouterDevBuildPlan;
   onEvaluationError: (error: Error) => void;
   onCssAssetOwnershipChanged?: () => void;
+  onRouteManifestChanged?: () => void;
   onWarning?: (message: string) => void;
 };
 
@@ -194,6 +195,53 @@ const hasOnlyCssAssetOwnershipChanges = (
   });
 };
 
+const normalizeManifestForRouteMetadataCheck = (
+  manifest: ReactRouterDevManifestSet[string]
+) =>
+  Object.fromEntries(
+    Object.entries(manifest.routes ?? {})
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([routeId, route]) => [
+        routeId,
+        {
+          caseSensitive: route.caseSensitive,
+          clientActionModule: route.clientActionModule,
+          clientLoaderModule: route.clientLoaderModule,
+          clientMiddlewareModule: route.clientMiddlewareModule,
+          errorBoundary: route.hasErrorBoundary,
+          hasAction: route.hasAction,
+          hasClientAction: route.hasClientAction,
+          hasClientLoader: route.hasClientLoader,
+          hasClientMiddleware: route.hasClientMiddleware,
+          hasDefaultExport: route.hasDefaultExport,
+          hasLoader: route.hasLoader,
+          hydrateFallbackModule: route.hydrateFallbackModule,
+          id: route.id,
+          index: route.index,
+          parentId: route.parentId,
+          path: route.path,
+        },
+      ])
+  );
+
+const hasRouteManifestMetadataChanges = (
+  previous: ReactRouterDevManifestSet,
+  next: ReactRouterDevManifestSet
+): boolean => {
+  const previousEntryNames = Object.keys(previous).sort();
+  const nextEntryNames = Object.keys(next).sort();
+  if (previousEntryNames.join('\0') !== nextEntryNames.join('\0')) {
+    return true;
+  }
+  return previousEntryNames.some(entryName => {
+    const previousRoutes = normalizeManifestForRouteMetadataCheck(
+      previous[entryName]
+    );
+    const nextRoutes = normalizeManifestForRouteMetadataCheck(next[entryName]);
+    return JSON.stringify(previousRoutes) !== JSON.stringify(nextRoutes);
+  });
+};
+
 const createDeferred = <T>(): Deferred<T> => {
   let resolve!: (value: T) => void;
   let reject!: (error: Error) => void;
@@ -212,6 +260,7 @@ export const createReactRouterDevRuntime = ({
   buildPlan,
   onEvaluationError,
   onCssAssetOwnershipChanged = () => undefined,
+  onRouteManifestChanged = () => undefined,
   onWarning = () => undefined,
 }: CreateReactRouterDevRuntimeOptions): ReactRouterDevRuntime => {
   let nextAttemptId = 1;
@@ -233,6 +282,17 @@ export const createReactRouterDevRuntime = ({
       const reason = cause instanceof Error ? cause.message : String(cause);
       onWarning(
         `[rsbuild-plugin-react-router] Failed to notify the browser after CSS asset ownership changed: ${reason}`
+      );
+    }
+  };
+
+  const notifyRouteManifestChanged = (): void => {
+    try {
+      onRouteManifestChanged();
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      onWarning(
+        `[rsbuild-plugin-react-router] Failed to notify the browser after route manifest metadata changed: ${reason}`
       );
     }
   };
@@ -450,6 +510,13 @@ export const createReactRouterDevRuntime = ({
           previous.web.manifestsByEntryName,
           manifestsByEntryName
         );
+      const routeManifestMetadataChanged =
+        !!previous &&
+        webChanged &&
+        hasRouteManifestMetadataChanges(
+          previous.web.manifestsByEntryName,
+          manifestsByEntryName
+        );
       const reusePreviousNodeBuild = !!previous && cssOnlyWebManifestChange;
 
       if (
@@ -516,6 +583,9 @@ export const createReactRouterDevRuntime = ({
             notifyCssAssetOwnershipChanged();
           }
           reloadAfterCssRemoval = false;
+        }
+        if (routeManifestMetadataChanged) {
+          notifyRouteManifestChanged();
         }
       } catch (cause) {
         rejectAttempt(
