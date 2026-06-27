@@ -1,4 +1,6 @@
 import { availableParallelism, cpus } from 'node:os';
+import { Effect } from 'effect';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
 const DEFAULT_RESERVED_CORES = 2;
 
@@ -16,19 +18,13 @@ export const mapWithConcurrency = async <Item, Result>(
   concurrency: number,
   worker: (item: Item, index: number) => Promise<Result>
 ): Promise<Result[]> => {
-  const results = new Array<Result>(items.length);
-  let nextIndex = 0;
   const workerCount = Math.max(1, Math.min(concurrency, items.length));
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (true) {
-        const index = nextIndex++;
-        if (index >= items.length) {
-          return;
-        }
-        results[index] = await worker(items[index], index);
-      }
-    })
+
+  return runPluginEffect(
+    Effect.forEach(
+      items.map((item, index) => ({ item, index })),
+      ({ item, index }) => tryPluginPromise(() => worker(item, index)),
+      { concurrency: workerCount }
+    )
   );
-  return results;
 };
