@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,6 +7,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const appDirectory = join(__dirname, '../../app');
 const aboutRoutePath = join(appDirectory, 'routes/about.tsx');
 const aboutCssPath = join(appDirectory, 'routes/about.css');
+const dynamicCssComponentPath = join(
+  appDirectory,
+  'routes/dynamic-css-widget.tsx'
+);
 const originalAboutRoute = readFileSync(aboutRoutePath, 'utf8');
 const originalAboutCss = readFileSync(aboutCssPath, 'utf8');
 const aboutRouteWithCssImport = `import './about.css';
@@ -30,6 +34,44 @@ const aboutCssProbe = `.css-hmr-probe {
   color: rgb(255, 0, 0);
 }
 `;
+const dynamicCssWidget = `import './about.css';
+
+export function DynamicCssWidget() {
+  return (
+    <div data-testid="dynamic-css-widget" className="css-hmr-probe">
+      Dynamic CSS widget
+    </div>
+  );
+}
+`;
+const aboutRouteWithDynamicCssImport = `import { useState } from 'react';
+import './about.css';
+
+export default function About() {
+  const [showWidget, setShowWidget] = useState(false);
+  const [Widget, setWidget] = useState<null | (() => JSX.Element)>(null);
+
+  return (
+    <main>
+      <h1>About Dynamic CSS Probe</h1>
+      <div data-testid="css-hmr-probe" className="css-hmr-probe">
+        Route CSS probe
+      </div>
+      <button
+        type="button"
+        onClick={async () => {
+          const mod = await import('./dynamic-css-widget');
+          setWidget(() => mod.DynamicCssWidget);
+          setShowWidget(true);
+        }}
+      >
+        Load dynamic CSS widget
+      </button>
+      {showWidget && Widget ? <Widget /> : null}
+    </main>
+  );
+}
+`;
 
 const writeFileIfChanged = (path: string, contents: string) => {
   if (readFileSync(path, 'utf8') !== contents) {
@@ -40,6 +82,9 @@ const writeFileIfChanged = (path: string, contents: string) => {
 const restoreAboutRoute = () => {
   writeFileIfChanged(aboutRoutePath, originalAboutRoute);
   writeFileIfChanged(aboutCssPath, originalAboutCss);
+  if (existsSync(dynamicCssComponentPath)) {
+    rmSync(dynamicCssComponentPath);
+  }
 };
 
 const readProbeColor = async (page: Page) => {
@@ -242,5 +287,42 @@ test.describe('lazy compilation', () => {
         { timeout: 60000 }
       )
       .toBe('loaded');
+  });
+
+  test('keeps route CSS applied when the same CSS is dynamically imported', async ({
+    page,
+  }) => {
+    writeFileSync(aboutRoutePath, aboutRouteWithDynamicCssImport);
+    writeFileSync(dynamicCssComponentPath, dynamicCssWidget);
+    writeFileSync(aboutCssPath, aboutCssProbe);
+
+    const documentRequests: string[] = [];
+    page.on('request', request => {
+      if (
+        request.isNavigationRequest() &&
+        request.frame() === page.mainFrame()
+      ) {
+        documentRequests.push(request.url());
+      }
+    });
+
+    await page.goto('/about');
+    await expect(
+      page.getByRole('heading', { name: 'About Dynamic CSS Probe' })
+    ).toBeVisible();
+    await expect
+      .poll(() => readProbeColor(page), { timeout: 60000 })
+      .toBe('rgb(255, 0, 0)');
+
+    const documentRequestsBeforeClick = documentRequests.length;
+    await page
+      .getByRole('button', { name: 'Load dynamic CSS widget' })
+      .click();
+
+    await expect(page.getByTestId('dynamic-css-widget')).toBeVisible();
+    await expect
+      .poll(() => readProbeColor(page), { timeout: 60000 })
+      .toBe('rgb(255, 0, 0)');
+    expect(documentRequests.length).toBe(documentRequestsBeforeClick);
   });
 });
