@@ -64,7 +64,7 @@ import {
 } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
-  getBuildManifest,
+  getBuildManifestEffect,
   getRoutesByServerBundleId,
 } from './build-manifest.js';
 import {
@@ -83,6 +83,7 @@ import { createReactRouterDevRuntimeController } from './dev-runtime-controller.
 import {
   createDelayedPluginTask,
   DEV_BACKGROUND_STARTUP_DELAY_MS,
+  runPluginEffect,
   tryPluginPromise,
 } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
@@ -660,11 +661,13 @@ export const pluginReactRouter = (
       },
       {} as Record<string, RsbuildEntryDescription>
     );
-    const buildManifest = await getBuildManifest({
-      reactRouterConfig: resolvedConfigWithRoutes,
-      routes,
-      rootDirectory: process.cwd(),
-    });
+    const buildManifest = await runPluginEffect(
+      getBuildManifestEffect({
+        reactRouterConfig: resolvedConfigWithRoutes,
+        routes,
+        rootDirectory: process.cwd(),
+      })
+    );
     const routesByServerBundleId = getRoutesByServerBundleId(
       buildManifest,
       routes
