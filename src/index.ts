@@ -80,7 +80,11 @@ import {
 } from './performance.js';
 import { mapVirtualModules } from './virtual-modules.js';
 import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import {
+  createDelayedPluginTask,
+  DEV_BACKGROUND_STARTUP_DELAY_MS,
+  tryPluginPromise,
+} from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import {
   clearConfigImportCache,
@@ -486,7 +490,6 @@ export const pluginReactRouter = (
       ...routeTopologyWatchFiles,
     ];
     let closeRouteTopologyWatcher: (() => Promise<void>) | undefined;
-    let routeTopologyWatcherStartup: Promise<void> | undefined;
     let routeTopologyWatcherClosed = false;
 
     const reportRouteTopologyWatcherError = (error: unknown): void => {
@@ -495,16 +498,9 @@ export const pluginReactRouter = (
       );
     };
 
-    const startRouteTopologyWatcher = (): void => {
-      if (
-        routeTopologyWatcherClosed ||
-        routeTopologyWatcherStartup ||
-        closeRouteTopologyWatcher
-      ) {
-        return;
-      }
-
-      routeTopologyWatcherStartup = runPluginEffect(
+    const routeTopologyWatcherTask = createDelayedPluginTask({
+      delayMs: DEV_BACKGROUND_STARTUP_DELAY_MS,
+      run: () =>
         Effect.gen(function* () {
           yield* tryPluginPromise(() =>
             ensureDevRestartMarker(routeRestartMarkerPath)
@@ -527,12 +523,15 @@ export const pluginReactRouter = (
             return;
           }
           closeRouteTopologyWatcher = closeWatcher;
-        })
-      )
-        .catch(reportRouteTopologyWatcherError)
-        .finally(() => {
-          routeTopologyWatcherStartup = undefined;
-        });
+        }),
+      onError: reportRouteTopologyWatcherError,
+    });
+
+    const scheduleRouteTopologyWatcher = (): void => {
+      if (routeTopologyWatcherClosed || closeRouteTopologyWatcher) {
+        return;
+      }
+      routeTopologyWatcherTask.schedule();
     };
 
     if (!isBuild) {
@@ -541,13 +540,13 @@ export const pluginReactRouter = (
       });
 
       api.onAfterDevCompile(() => {
-        startRouteTopologyWatcher();
+        scheduleRouteTopologyWatcher();
       });
     }
 
     api.onCloseDevServer(async () => {
       routeTopologyWatcherClosed = true;
-      await routeTopologyWatcherStartup;
+      await routeTopologyWatcherTask.cancel();
       await closeRouteTopologyWatcher?.();
       closeRouteTopologyWatcher = undefined;
     });

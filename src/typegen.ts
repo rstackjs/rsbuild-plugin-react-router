@@ -2,6 +2,8 @@ import type { RsbuildPluginAPI } from '@rsbuild/core';
 import type { ResultPromise } from 'execa';
 import { Effect } from 'effect';
 import {
+  createDelayedPluginTask,
+  DEV_BACKGROUND_STARTUP_DELAY_MS,
   runPluginEffect,
   tryPluginPromise,
   tryPluginSync,
@@ -120,25 +122,34 @@ export const createReactRouterTypegenRunner = (
 
 export const registerReactRouterTypegen = (
   api: RsbuildPluginAPI,
-  runner: ReactRouterTypegenRunner = createReactRouterTypegenRunner()
+  runner: ReactRouterTypegenRunner = createReactRouterTypegenRunner(),
+  devWatchDelayMs: number = DEV_BACKGROUND_STARTUP_DELAY_MS
 ): void => {
-  let devWatchStarted = false;
+  let devWatchScheduled = false;
+  const devWatchTask = createDelayedPluginTask({
+    delayMs: devWatchDelayMs,
+    run: () => tryPluginPromise(() => runner.startWatch()).pipe(Effect.asVoid),
+    onError(error) {
+      api.logger.warn(
+        `[react-router] Failed to start React Router typegen watch: ${error}`
+      );
+    },
+  });
 
   if (api.context.action !== 'build') {
     api.onAfterDevCompile(() => {
-      if (devWatchStarted) {
+      if (devWatchScheduled) {
         return;
       }
-      devWatchStarted = true;
-      void runner.startWatch().catch(error => {
-        api.logger.warn(
-          `[react-router] Failed to start React Router typegen watch: ${error}`
-        );
-      });
+      devWatchScheduled = true;
+      devWatchTask.schedule();
     });
   }
 
-  api.onCloseDevServer(() => runner.closeWatch());
+  api.onCloseDevServer(async () => {
+    await devWatchTask.cancel();
+    await runner.closeWatch();
+  });
 
   api.onBeforeBuild(() => runner.runBuild());
 };

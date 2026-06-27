@@ -69,10 +69,11 @@ describe('React Router typegen runner', () => {
     );
   });
 
-  it('starts dev watch after the first dev compile without blocking startup', () => {
+  it('starts dev watch after the first dev compile without blocking startup', async () => {
     let afterDevCompile!: () => void;
+    const startWatch = rstest.fn().mockResolvedValue(undefined);
     const runner: ReactRouterTypegenRunner = {
-      startWatch: rstest.fn().mockResolvedValue(undefined),
+      startWatch,
       closeWatch: rstest.fn().mockResolvedValue(undefined),
       runBuild: rstest.fn().mockResolvedValue(undefined),
     };
@@ -87,13 +88,47 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, runner);
+    registerReactRouterTypegen(api as never, runner, 0);
 
     expect(api.onBeforeStartDevServer).not.toHaveBeenCalled();
     const result = afterDevCompile();
     expect(result).toBeUndefined();
     afterDevCompile();
-    expect(runner.startWatch).toHaveBeenCalledTimes(1);
+    expect(startWatch).not.toHaveBeenCalled();
+    await expect.poll(() => startWatch.mock.calls.length).toBe(1);
+  });
+
+  it('cancels delayed dev watch startup on close', async () => {
+    let afterDevCompile!: () => void;
+    let closeDevServer!: () => Promise<void>;
+    const startWatch = rstest.fn().mockResolvedValue(undefined);
+    const closeWatch = rstest.fn().mockResolvedValue(undefined);
+    const runner: ReactRouterTypegenRunner = {
+      startWatch,
+      closeWatch,
+      runBuild: rstest.fn().mockResolvedValue(undefined),
+    };
+    const api = {
+      context: { action: 'dev' },
+      logger: { warn: rstest.fn() },
+      onAfterDevCompile: rstest.fn(callback => {
+        afterDevCompile = callback;
+      }),
+      onBeforeStartDevServer: rstest.fn(),
+      onCloseDevServer: rstest.fn(callback => {
+        closeDevServer = callback;
+      }),
+      onBeforeBuild: rstest.fn(),
+    };
+
+    registerReactRouterTypegen(api as never, runner, 1000);
+
+    afterDevCompile();
+    await closeDevServer();
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(startWatch).not.toHaveBeenCalled();
+    expect(closeWatch).toHaveBeenCalledTimes(1);
   });
 
   it('does not register the dev watch hook during production builds', () => {
