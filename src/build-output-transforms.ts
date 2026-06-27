@@ -141,6 +141,12 @@ export const registerBuildOutputTransforms = ({
       )
   );
 
+  // Rspack loader rules support native worker parallelism via
+  // `use: [{ loader, options, parallel: { maxWorkers } }]`. We tested moving
+  // these pure route transforms to that shape, but the large dev benchmark was
+  // slower overall: server-ready improved slightly while lazy route requests
+  // regressed. Keep the custom executor until loader workers can share the
+  // route transform cache and avoid the lazy-route penalty.
   api.transform(
     {
       resourceQuery: /__react-router-build-client-route/,
