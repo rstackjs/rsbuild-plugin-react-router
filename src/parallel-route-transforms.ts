@@ -34,8 +34,18 @@ type PendingTask = {
   reject: (error: Error) => void;
 };
 
+type RouteTransformWorker = {
+  on(event: 'message', handler: (response: WorkerResponse) => void): unknown;
+  on(event: 'error', handler: (error: Error) => void): unknown;
+  on(event: 'exit', handler: (code: number) => void): unknown;
+  postMessage(message: WorkerRequest): void;
+  terminate(): Promise<number> | number;
+};
+
+type RouteTransformWorkerFactory = () => RouteTransformWorker;
+
 type WorkerState = {
-  worker: Worker;
+  worker: RouteTransformWorker;
   pending: Map<number, PendingTask>;
   sourceCache: Map<string, string>;
 };
@@ -83,6 +93,9 @@ const deserializeWorkerError = (error: WorkerErrorPayload): Error => {
 const createWorkerUrl = (): URL =>
   new URL('./parallel-route-transform-worker.js', import.meta.url);
 
+const createDefaultWorker = (): RouteTransformWorker =>
+  new Worker(createWorkerUrl());
+
 const isWorkerStartupError = (error: unknown): error is WorkerStartupError =>
   error instanceof WorkerStartupError;
 
@@ -94,26 +107,14 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #nextRouteModuleWorkerIndex = 0;
   #nextSplitRouteAnalysisWorkerIndex = 0;
   #splitRouteAnalysisWorkers = new Map<string, number>();
-  #workers: WorkerState[];
+  #workers: WorkerState[] | undefined;
 
   constructor(
-    workerCount: number,
+    private readonly workerCount: number,
     private readonly options: RouteTransformTaskOptions,
-    private readonly balanceRouteModuleTransforms: boolean
-  ) {
-    this.#workers = [];
-    try {
-      for (let index = 0; index < workerCount; index += 1) {
-        this.#workers.push(this.#createWorkerState());
-      }
-    } catch (error) {
-      for (const state of this.#workers) {
-        void state.worker.terminate();
-      }
-      this.#workers = [];
-      throw error;
-    }
-  }
+    private readonly balanceRouteModuleTransforms: boolean,
+    private readonly createWorker: RouteTransformWorkerFactory
+  ) {}
 
   async run(task: RouteTransformTask): Promise<RouteTransformResult> {
     if (this.#closed) {
@@ -138,7 +139,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       return this.#closePromise;
     }
     this.#closed = true;
-    const workers = this.#workers;
+    const workers = this.#workers ?? [];
     this.#workers = [];
     this.#closePromise = Promise.all(
       workers.map(async state => {
@@ -157,7 +158,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       return;
     }
     this.#workersDisabled = true;
-    const workers = this.#workers;
+    const workers = this.#workers ?? [];
     this.#workers = [];
     for (const state of workers) {
       for (const pending of state.pending.values()) {
@@ -169,7 +170,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   }
 
   #createWorkerState(): WorkerState {
-    const worker = new Worker(createWorkerUrl());
+    const worker = this.createWorker();
     const state: WorkerState = {
       worker,
       pending: new Map(),
@@ -208,9 +209,33 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     return state;
   }
 
+  #getWorkers(): WorkerState[] {
+    if (this.#closed || this.#workersDisabled) {
+      return [];
+    }
+    if (this.#workers) {
+      return this.#workers;
+    }
+    const workers: WorkerState[] = [];
+    try {
+      for (let index = 0; index < this.workerCount; index += 1) {
+        workers.push(this.#createWorkerState());
+      }
+    } catch (error) {
+      for (const state of workers) {
+        void state.worker.terminate();
+      }
+      this.#workers = [];
+      throw error;
+    }
+    this.#workers = workers;
+    return workers;
+  }
+
   #runInWorker(task: RouteTransformTask): Promise<RouteTransformResult> {
-    const workerIndex = this.#getWorkerIndex(task);
-    const state = this.#workers[workerIndex];
+    const workers = this.#getWorkers();
+    const workerIndex = this.#getWorkerIndex(task, workers.length);
+    const state = workers[workerIndex];
     if (!state) {
       return executeRouteTransformTask(task, this.options);
     }
@@ -260,8 +285,8 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     return task;
   }
 
-  #getWorkerIndex(task: RouteTransformTask): number {
-    const workerCount = Math.max(1, this.#workers.length);
+  #getWorkerIndex(task: RouteTransformTask, workerCount: number): number {
+    const safeWorkerCount = Math.max(1, workerCount);
     if (
       this.balanceRouteModuleTransforms &&
       (task.kind === 'routeClientEntry' ||
@@ -272,9 +297,10 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
         task.resourcePath
       );
       if (existingWorkerIndex !== undefined) {
-        return existingWorkerIndex % workerCount;
+        return existingWorkerIndex % safeWorkerCount;
       }
-      const workerIndex = this.#nextSplitRouteAnalysisWorkerIndex % workerCount;
+      const workerIndex =
+        this.#nextSplitRouteAnalysisWorkerIndex % safeWorkerCount;
       this.#nextSplitRouteAnalysisWorkerIndex += 1;
       this.#splitRouteAnalysisWorkers.set(task.resourcePath, workerIndex);
       return workerIndex;
@@ -284,11 +310,11 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       task.kind === 'routeModule' &&
       !(task.environmentName === 'web' && !task.ssr && task.isSpaMode)
     ) {
-      const workerIndex = this.#nextRouteModuleWorkerIndex % workerCount;
+      const workerIndex = this.#nextRouteModuleWorkerIndex % safeWorkerCount;
       this.#nextRouteModuleWorkerIndex += 1;
       return workerIndex;
     }
-    return hashString(task.resourcePath) % workerCount;
+    return hashString(task.resourcePath) % safeWorkerCount;
   }
 }
 
@@ -297,6 +323,24 @@ export const createRouteTransformExecutor = ({
   routeChunkCache,
   splitRouteModules,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
+  return createRouteTransformExecutorWithWorkerFactory(
+    {
+      parallelTransforms,
+      routeChunkCache,
+      splitRouteModules,
+    },
+    createDefaultWorker
+  );
+};
+
+const createRouteTransformExecutorWithWorkerFactory = (
+  {
+    parallelTransforms,
+    routeChunkCache,
+    splitRouteModules,
+  }: RouteTransformExecutorOptions = {},
+  createWorker: RouteTransformWorkerFactory
+): RouteTransformExecutor => {
   const options = { routeChunkCache };
   if (parallelTransforms === false) {
     return {
@@ -319,6 +363,13 @@ export const createRouteTransformExecutor = ({
   return new ParallelRouteTransformExecutor(
     workerCount,
     options,
-    Boolean(splitRouteModules)
+    Boolean(splitRouteModules),
+    createWorker
   );
 };
+
+export const createRouteTransformExecutorForTesting = (
+  options: RouteTransformExecutorOptions,
+  createWorker: RouteTransformWorkerFactory
+): RouteTransformExecutor =>
+  createRouteTransformExecutorWithWorkerFactory(options, createWorker);

@@ -6,9 +6,14 @@ import {
   type RouteModuleTransformTask,
 } from '../src/route-transform-tasks';
 import {
+  createRouteTransformExecutorForTesting,
   createRouteTransformExecutor,
   getDefaultWorkerCount,
 } from '../src/parallel-route-transforms';
+import type {
+  WorkerRequest,
+  WorkerResponse,
+} from '../src/parallel-route-transform-protocol';
 import type { RouteChunkConfig } from '../src/route-chunks';
 
 const routeChunkConfig: RouteChunkConfig = {
@@ -42,6 +47,34 @@ const createRouteModuleTask = (
   rootRoutePath: '/app/root.tsx',
   ...overrides,
 });
+
+type FakeWorkerHandler = (value: any) => void;
+
+class FakeRouteTransformWorker {
+  readonly messages: WorkerRequest[] = [];
+  readonly handlers = new Map<string, FakeWorkerHandler[]>();
+  terminateCalls = 0;
+
+  on(event: string, handler: FakeWorkerHandler): this {
+    this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
+    return this;
+  }
+
+  postMessage(message: WorkerRequest): void {
+    this.messages.push(message);
+  }
+
+  async terminate(): Promise<number> {
+    this.terminateCalls += 1;
+    return 0;
+  }
+
+  emit(event: string, value: unknown): void {
+    for (const handler of this.handlers.get(event) ?? []) {
+      handler(value);
+    }
+  }
+}
 
 describe('parallel route transforms', () => {
   it.each([
@@ -109,6 +142,34 @@ describe('parallel route transforms', () => {
     } finally {
       await executor.close();
     }
+  });
+
+  it('does not create route transform workers until work is scheduled', async () => {
+    let createdWorkers = 0;
+    const worker = new FakeRouteTransformWorker();
+    const executor = createRouteTransformExecutorForTesting(
+      {
+        parallelTransforms: 1,
+      },
+      () => {
+        createdWorkers += 1;
+        return worker;
+      }
+    );
+
+    expect(createdWorkers).toBe(0);
+
+    const pending = executor.run(createRouteModuleTask());
+    expect(createdWorkers).toBe(1);
+    worker.emit('message', {
+      id: worker.messages[0]!.id,
+      ok: true,
+      result: { code: 'created lazily' },
+    } satisfies WorkerResponse);
+    await expect(pending).resolves.toEqual({ code: 'created lazily' });
+
+    await executor.close();
+    expect(worker.terminateCalls).toBe(1);
   });
 
   it('executes route client entry tasks through the shared task executor', async () => {
