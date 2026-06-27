@@ -328,9 +328,9 @@ If no configuration is provided, the following defaults will be used:
 }
 ```
 
-Route transforms run in worker threads by default. The automatic worker count
-uses available CPU cores minus 2. Pass a positive integer to override that count,
-or `false` to force inline transforms.
+Route transforms run in worker threads by default. The automatic worker count is
+capped at 2 to avoid oversubscribing parallel web and node dev compilers. Pass a
+positive integer to override that count, or `false` to force inline transforms.
 
 For builds with 256+ routes, detailed file-size reporting is compacted to totals
 by default to avoid gzipping and printing thousands of assets. Set

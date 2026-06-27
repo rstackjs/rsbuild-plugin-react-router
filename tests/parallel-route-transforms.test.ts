@@ -82,12 +82,12 @@ describe('parallel route transforms', () => {
     [2, 1],
     [3, 1],
     [4, 2],
-    [6, 4],
-    [8, 6],
-    [10, 8],
-    [12, 10],
-    [24, 22],
-  ])('defaults worker count to CPU cores minus two with at least one worker', (cpus, workers) => {
+    [6, 2],
+    [8, 2],
+    [10, 2],
+    [12, 2],
+    [24, 2],
+  ])('caps default worker count at two workers', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
 
