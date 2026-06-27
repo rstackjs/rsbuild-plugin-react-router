@@ -54,7 +54,6 @@ async function verifyRegistration(writer, reader) {
   assert(startHook, 'Expected a pre dev-server start hook');
   assert(closeHook, 'Expected a pre dev-server close hook');
   const start = startHook.handler;
-  const close = closeHook.handler;
   const server = {
     close: async () => undefined,
     environments: { node: { loadBundle: async () => build } },
@@ -63,7 +62,13 @@ async function verifyRegistration(writer, reader) {
   await start({ environments: {}, server });
 
   const pending = reader.loadReactRouterServerBuild(server);
-  await close();
+  for (const close of closes) {
+    if (typeof close === 'function') {
+      await close();
+    } else {
+      await close.handler?.();
+    }
+  }
   await assert.rejects(pending, /closed before a React Router build was ready/);
   await assert.rejects(
     reader.loadReactRouterServerBuild(server),
