@@ -16,9 +16,28 @@ export const benchmarkFixtureNames = [
   'reexports',
   'import-fanout',
   'chunk-saturated',
+  'large',
 ];
 
 const stressFixtureNames = new Set(benchmarkFixtureNames);
+
+export const largeFixtureConfig = Object.freeze({
+  seed: 8675309,
+  routes: 355,
+  componentsPerRoute: 18,
+  utilitiesPerRoute: 4,
+  lazyModulesPerRoute: 3,
+  workers: 120,
+  restrictedModules: 1187,
+  svgAssets: 1184,
+  cssModules: 217,
+  localeFiles: 111,
+  localeTotalBytes: 151289856,
+  payloadEntriesPerComponent: 72,
+  reactCompilerEvery: 3,
+  secretEvery: 7,
+  restrictedImportEvery: 6,
+});
 
 export const padRoute = number => String(number).padStart(4, '0');
 
@@ -259,6 +278,7 @@ const createRsbuildConfig = ({
     ...(ssr ? [`      serverOutput: 'module',`] : []),
     ...renderParallelTransformsOption(parallelTransforms),
     lazyCompilationOption,
+    `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
     '    }),',
     '  ],',
     '  output: {',
@@ -280,9 +300,7 @@ const createReactRouterConfig = variant => {
     '',
     'export default {',
     `  ssr: ${ssr ? 'true' : 'false'},`,
-    `  future: {`,
-    `    v8_splitRouteModules: ${splitRouteModules ? 'true' : 'false'},`,
-    '  },',
+    `  splitRouteModules: ${splitRouteModules ? 'true' : 'false'},`,
     '} satisfies Config;',
     '',
   ].join('\n');
@@ -355,6 +373,438 @@ const writeFanoutFixtures = async root => {
   );
 };
 
+const largeId = index => String(index).padStart(4, '0');
+const largePairId = index => String(index).padStart(2, '0');
+
+const normalizeLargeConfig = (routeCount, largeConfig = {}) => ({
+  ...largeFixtureConfig,
+  ...largeConfig,
+  routes: largeConfig.routes ?? routeCount ?? largeFixtureConfig.routes,
+});
+
+const createLargeStats = config => ({
+  codeModules:
+    config.routes *
+      (2 +
+        config.componentsPerRoute +
+        config.utilitiesPerRoute +
+        config.lazyModulesPerRoute) +
+    config.workers +
+    config.restrictedModules +
+    3,
+  dynamicImports: config.routes * config.lazyModulesPerRoute,
+  routes: config.routes,
+  components: config.routes * config.componentsPerRoute,
+  utilities: config.routes * config.utilitiesPerRoute,
+  lazyModules: config.routes * config.lazyModulesPerRoute,
+  workers: config.workers,
+  restrictedModules: config.restrictedModules,
+  svgAssets: config.svgAssets,
+  cssModules: config.cssModules,
+  localeFiles: config.localeFiles,
+  localeTotalBytes: config.localeTotalBytes,
+});
+
+const seededNumber = (seed, index) => {
+  let value = (seed + index * 1103515245 + 12345) >>> 0;
+  value ^= value << 13;
+  value ^= value >>> 17;
+  value ^= value << 5;
+  return value >>> 0;
+};
+
+const writeInBatches = async (items, writer, batchSize = 128) => {
+  for (let start = 0; start < items.length; start += batchSize) {
+    await Promise.all(items.slice(start, start + batchSize).map(writer));
+  }
+};
+
+const range = length => Array.from({ length }, (_, index) => index);
+
+const writeFiles = (files, batchSize) =>
+  writeInBatches(
+    files,
+    ([filePath, contents]) => writeFile(filePath, contents),
+    batchSize
+  );
+
+const createLargeRoutesConfig = routeCount => {
+  const routes = [];
+  for (let index = 0; index < routeCount; index += 1) {
+    const id = `route-${largeId(index)}`;
+    routes.push(
+      [
+        '  {',
+        `    id: '${id}',`,
+        `    file: 'generated/routes/${id}.tsx',`,
+        index === 0 ? '    index: true,' : `    path: '${id}',`,
+        '  },',
+      ].join('\n')
+    );
+  }
+
+  return [
+    `import type { RouteConfigEntry } from '@react-router/dev/routes';`,
+    '',
+    'export const generatedRoutes = [',
+    ...routes,
+    '] satisfies RouteConfigEntry[];',
+    '',
+    'export default generatedRoutes;',
+    '',
+  ].join('\n');
+};
+
+const createLargeRootModule = () =>
+  [
+    `import { createElement } from 'react';`,
+    `import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';`,
+    `export function Layout({ children }) {`,
+    `  return createElement('html', null, createElement('head', null, createElement(Meta), createElement(Links)), createElement('body', null, children, createElement(ScrollRestoration), createElement(Scripts)));`,
+    `}`,
+    `export default function Root() { return createElement(Outlet); }`,
+    `export function ErrorBoundary() { return createElement('main', null, 'Synthetic benchmark error'); }`,
+    '',
+  ].join('\n');
+
+const createLargeUtilityModule = ({ featureIndex, utilityIndex, config }) => {
+  const feature = largeId(featureIndex);
+  const utility = largePairId(utilityIndex);
+  const values = range(16).map(index =>
+    seededNumber(config.seed, featureIndex * 1000 + utilityIndex * 100 + index)
+  );
+
+  return [
+    `export const utility${feature}_${utility}Values = ${JSON.stringify(values)};`,
+    `export function utility${feature}_${utility}(input) {`,
+    `  return utility${feature}_${utility}Values.reduce((total, value, index) => total + ((value ^ input.length ^ index) % 997), 0);`,
+    `}`,
+    '',
+  ].join('\n');
+};
+
+const createLargeComponentModule = ({
+  featureIndex,
+  componentIndex,
+  config,
+}) => {
+  const feature = largeId(featureIndex);
+  const component = largePairId(componentIndex);
+  const cssIndex = largeId(
+    (featureIndex * config.componentsPerRoute + componentIndex) %
+      config.cssModules
+  );
+  const svgIndex = largeId(
+    (featureIndex * config.componentsPerRoute + componentIndex) %
+      config.svgAssets
+  );
+  const utilityIndex = componentIndex % config.utilitiesPerRoute;
+  const restrictedIndex =
+    (featureIndex * config.componentsPerRoute + componentIndex) %
+    config.restrictedModules;
+  const includeRestricted =
+    config.restrictedModules > 0 &&
+    (featureIndex * config.componentsPerRoute + componentIndex) %
+      config.restrictedImportEvery ===
+      0;
+  const payload = range(config.payloadEntriesPerComponent).map(
+    index =>
+      `'${feature}:${component}:${largePairId(index)}:${seededNumber(
+        config.seed,
+        featureIndex * 10000 + componentIndex * 100 + index
+      ).toString(36)}'`
+  );
+
+  return [
+    ...(featureIndex % config.reactCompilerEvery === 0 ? [`'use memo';`] : []),
+    `import styles from '../../../styles/style-${cssIndex}.module.css';`,
+    `import iconUrl from '../../../assets/icons/icon-${svgIndex}.svg';`,
+    `import { utility${feature}_${largePairId(utilityIndex)} } from '../utils/utility-${largePairId(utilityIndex)}';`,
+    ...(includeRestricted
+      ? [
+          `import { restrictedValue${largeId(restrictedIndex)} } from '../../../restricted/restricted-${largeId(restrictedIndex)}';`,
+        ]
+      : []),
+    '',
+    `const payload = [${payload.join(', ')}];`,
+    `const secretMarker = ${componentIndex % config.secretEvery === 0 ? `'synthetic-secret-${feature}-${component}'` : 'null'};`,
+    '',
+    `export function Card${feature}_${component}({ label = 'Feature ${feature}' }) {`,
+    `  const score = utility${feature}_${largePairId(utilityIndex)}(label);`,
+    includeRestricted
+      ? `  const restricted = restrictedValue${largeId(restrictedIndex)};`
+      : `  const restricted = '';`,
+    `  return (`,
+    `    <article className={styles.card} data-score={score} data-secret={secretMarker ?? undefined}>`,
+    `      <img src={iconUrl} alt="" />`,
+    `      <h2>{label}</h2>`,
+    `      <p>{payload[(score + restricted.length) % payload.length]}</p>`,
+    `    </article>`,
+    `  );`,
+    `}`,
+    '',
+  ].join('\n');
+};
+
+const createLargeShellModule = ({ featureIndex, config }) => {
+  const feature = largeId(featureIndex);
+  const imports = range(config.componentsPerRoute).map(
+    componentIndex =>
+      `import { Card${feature}_${largePairId(componentIndex)} } from './components/card-${largePairId(componentIndex)}';`
+  );
+  const cards = range(config.componentsPerRoute).map(
+    componentIndex =>
+      `      <Card${feature}_${largePairId(componentIndex)} key="${largePairId(componentIndex)}" label="Feature ${feature} card ${largePairId(componentIndex)}" />`
+  );
+
+  return [
+    ...imports,
+    '',
+    `export function FeatureShell${feature}() {`,
+    `  return (`,
+    `    <section data-feature="${feature}">`,
+    ...cards,
+    `    </section>`,
+    `  );`,
+    `}`,
+    '',
+  ].join('\n');
+};
+
+const createLargeLazyModule = ({ featureIndex, lazyIndex, config }) => {
+  const feature = largeId(featureIndex);
+  const lazy = largePairId(lazyIndex);
+  const values = range(24).map(index =>
+    seededNumber(config.seed, featureIndex * 1000 + lazyIndex * 100 + index)
+  );
+
+  return [
+    `export const lazyValue${feature}_${lazy} = ${JSON.stringify(values)};`,
+    `export function Lazy${feature}_${lazy}() { return null; }`,
+    '',
+  ].join('\n');
+};
+
+const createLargeRouteModule = ({ featureIndex, config, isSpa }) => {
+  const feature = largeId(featureIndex);
+  const workerIndex = largeId(featureIndex % config.workers);
+  const localeIndex = largeId(featureIndex % config.localeFiles);
+  const lazyImports = range(config.lazyModulesPerRoute).map(
+    lazyIndex =>
+      `import('../features/feature-${feature}/lazy/lazy-${largePairId(lazyIndex)}')`
+  );
+
+  return [
+    `import { FeatureShell${feature} } from '../features/feature-${feature}/shell';`,
+    '',
+    `const lazyModules = [${lazyImports.join(', ')}];`,
+    `const localeUrl = '/generated/locales/synthetic-${localeIndex}.json';`,
+    '',
+    `export const handle = { syntheticFeature: ${featureIndex}, category: 'benchmark' };`,
+    `export function meta() { return [{ title: 'Synthetic feature ${feature}' }]; }`,
+    `export function shouldRevalidate() { return false; }`,
+    `export async function clientLoader() {`,
+    `  const modules = await Promise.all(lazyModules);`,
+    `  if (typeof Worker !== 'undefined') {`,
+    `    const worker = new Worker(new URL('../workers/worker-${workerIndex}.ts', import.meta.url), { type: 'module' });`,
+    `    worker.terminate();`,
+    `  }`,
+    `  return { lazyCount: modules.length, localeUrl };`,
+    `}`,
+    ...(isSpa
+      ? []
+      : [
+          `export async function loader() { return { localeUrl }; }`,
+          `export function headers() { return { 'x-synthetic-route': '${feature}' }; }`,
+          `export function HydrateFallback() { return null; }`,
+        ]),
+    `export default function Route${feature}() { return <FeatureShell${feature} />; }`,
+    '',
+  ].join('\n');
+};
+
+const writeLargeLocaleFiles = async (root, config) => {
+  await mkdir(path.join(root, 'public/generated/locales'), { recursive: true });
+  const baseSize = Math.floor(config.localeTotalBytes / config.localeFiles);
+  const remainder = config.localeTotalBytes % config.localeFiles;
+
+  await writeInBatches(
+    range(config.localeFiles),
+    index => {
+      const id = largeId(index);
+      const targetSize = baseSize + (index < remainder ? 1 : 0);
+      const prefix = `{"id":"synthetic-${id}","messages":["`;
+      const suffix = `"]}\n`;
+      const payloadSize = Math.max(
+        0,
+        targetSize - Buffer.byteLength(prefix) - Buffer.byteLength(suffix)
+      );
+      return writeFile(
+        path.join(root, `public/generated/locales/synthetic-${id}.json`),
+        `${prefix}${'x'.repeat(payloadSize)}${suffix}`
+      );
+    },
+    8
+  );
+};
+
+const generateLargeFixture = async ({
+  root,
+  routeCount,
+  variant,
+  sourceMap,
+  pluginImportPath,
+  pluginReactImportPath,
+  parallelTransforms,
+  largeConfig,
+}) => {
+  const config = normalizeLargeConfig(routeCount, largeConfig);
+  const isSpa = variant === 'spa';
+  const generatedRoot = path.join(root, 'app/generated');
+
+  await rm(root, { recursive: true, force: true });
+  await Promise.all(
+    [
+      'assets/icons',
+      'features',
+      'restricted',
+      'routes',
+      'styles',
+      'workers',
+    ].map(directory =>
+      mkdir(path.join(generatedRoot, directory), { recursive: true })
+    )
+  );
+
+  await writeFiles([
+    [
+      path.join(root, 'package.json'),
+      JSON.stringify({ type: 'module', private: true }, null, 2),
+    ],
+    [
+      path.join(root, 'rsbuild.config.mjs'),
+      createRsbuildConfig({
+        variant,
+        sourceMap,
+        pluginImportPath,
+        pluginReactImportPath,
+        parallelTransforms,
+      }),
+    ],
+    [
+      path.join(root, 'react-router.config.ts'),
+      createReactRouterConfig(variant),
+    ],
+    [
+      path.join(root, 'app/routes.ts'),
+      `export { default } from './generated/route-config';\n`,
+    ],
+    [path.join(root, 'app/root.tsx'), createLargeRootModule()],
+    [
+      path.join(generatedRoot, 'route-config.ts'),
+      createLargeRoutesConfig(config.routes),
+    ],
+    [
+      path.join(generatedRoot, 'shared-types.ts'),
+      `export type SyntheticPayload = { id: string; score: number };\n`,
+    ],
+    [
+      path.join(generatedRoot, 'catalog.ts'),
+      `export const syntheticRouteCount = ${config.routes};\n`,
+    ],
+  ]);
+
+  await writeFiles(
+    range(config.svgAssets).map(index => [
+      path.join(generatedRoot, `assets/icons/icon-${largeId(index)}.svg`),
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="#${seededNumber(config.seed, index).toString(16).slice(0, 6).padEnd(6, '0')}" d="M2 2h28v28H2z"/><path fill="#fff" d="M8 16h16v2H8z"/></svg>\n`,
+    ])
+  );
+
+  await writeFiles(
+    range(config.cssModules).map(index => [
+      path.join(generatedRoot, `styles/style-${largeId(index)}.module.css`),
+      `.card { display: grid; gap: 4px; padding: ${4 + (index % 5)}px; color: #1f2937; }\n.card img { width: 16px; height: 16px; }\n`,
+    ])
+  );
+
+  await writeFiles(
+    range(config.restrictedModules).map(index => [
+      path.join(generatedRoot, `restricted/restricted-${largeId(index)}.ts`),
+      `export const restrictedValue${largeId(index)} = 'restricted-${largeId(index)}';\n`,
+    ])
+  );
+
+  await writeFiles(
+    range(config.workers).map(index => [
+      path.join(generatedRoot, `workers/worker-${largeId(index)}.ts`),
+      `self.onmessage = event => { self.postMessage({ id: '${largeId(index)}', value: event.data }); };\n`,
+    ])
+  );
+
+  await writeInBatches(
+    range(config.routes),
+    async featureIndex => {
+      const feature = largeId(featureIndex);
+      const featureRoot = path.join(
+        generatedRoot,
+        `features/feature-${feature}`
+      );
+      await Promise.all([
+        mkdir(path.join(featureRoot, 'components'), { recursive: true }),
+        mkdir(path.join(featureRoot, 'lazy'), { recursive: true }),
+        mkdir(path.join(featureRoot, 'utils'), { recursive: true }),
+      ]);
+
+      await writeFiles([
+        [
+          path.join(featureRoot, 'shell.tsx'),
+          createLargeShellModule({ featureIndex, config }),
+        ],
+        [
+          path.join(generatedRoot, `routes/route-${feature}.tsx`),
+          createLargeRouteModule({ featureIndex, config, isSpa }),
+        ],
+        ...range(config.utilitiesPerRoute).map(utilityIndex => [
+          path.join(
+            featureRoot,
+            `utils/utility-${largePairId(utilityIndex)}.ts`
+          ),
+          createLargeUtilityModule({ featureIndex, utilityIndex, config }),
+        ]),
+        ...range(config.componentsPerRoute).map(componentIndex => [
+          path.join(
+            featureRoot,
+            `components/card-${largePairId(componentIndex)}.tsx`
+          ),
+          createLargeComponentModule({
+            featureIndex,
+            componentIndex,
+            config,
+          }),
+        ]),
+        ...range(config.lazyModulesPerRoute).map(lazyIndex => [
+          path.join(featureRoot, `lazy/lazy-${largePairId(lazyIndex)}.tsx`),
+          createLargeLazyModule({ featureIndex, lazyIndex, config }),
+        ]),
+      ]);
+    },
+    24
+  );
+
+  await writeLargeLocaleFiles(root, config);
+
+  return {
+    root,
+    routeCount: config.routes,
+    variant,
+    sourceMap,
+    fixture: 'large',
+    parallelTransforms,
+    stats: createLargeStats(config),
+  };
+};
+
 export async function generateSyntheticFixture({
   root,
   routeCount,
@@ -364,11 +814,25 @@ export async function generateSyntheticFixture({
   pluginReactImportPath = '@rsbuild/plugin-react',
   fixture = 'default',
   parallelTransforms,
+  largeConfig,
 }) {
   if (!stressFixtureNames.has(fixture)) {
     throw new Error(
       `Unknown benchmark fixture "${fixture}". Use ${benchmarkFixtureNames.join(', ')}.`
     );
+  }
+
+  if (fixture === 'large') {
+    return generateLargeFixture({
+      root,
+      routeCount,
+      variant,
+      sourceMap,
+      pluginImportPath,
+      pluginReactImportPath,
+      parallelTransforms,
+      largeConfig,
+    });
   }
 
   const isSpa = variant === 'spa';

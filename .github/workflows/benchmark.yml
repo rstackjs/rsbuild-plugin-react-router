@@ -2,7 +2,6 @@ name: Benchmark
 
 on:
   pull_request:
-    branches: [main]
 
 permissions:
   contents: write
@@ -15,14 +14,16 @@ concurrency:
 
 jobs:
   benchmark:
-    name: Compare build benchmarks
+    name: Compare large dev benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     env:
-      BENCHMARK_PROFILE: default
-      BENCHMARK_ITERATIONS: '5'
-      BENCHMARK_WARMUP: '1'
+      BENCHMARK_PROFILE: large
+      BENCHMARK_MODE: dev
+      BENCHMARK_ITERATIONS: '3'
+      BENCHMARK_WARMUP: '0'
+      BENCHMARK_DEV_ROUTES: auto
       BENCHMARK_HISTORY_BRANCH: benchmark-results
 
     steps:
@@ -87,8 +88,10 @@ jobs:
         run: |
           node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mjs" \
             --profile "$BENCHMARK_PROFILE" \
+            --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
+            --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
             --out "$GITHUB_WORKSPACE/benchmark-output/base"
@@ -98,8 +101,10 @@ jobs:
         run: |
           node scripts/bench-builds.mjs \
             --profile "$BENCHMARK_PROFILE" \
+            --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
+            --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
             --out "$GITHUB_WORKSPACE/benchmark-output/head"

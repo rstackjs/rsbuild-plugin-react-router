@@ -48,6 +48,9 @@ const speedup = (base, head) =>
     : null;
 
 const medianWall = benchmark => benchmark?.summary?.wallMs?.median ?? null;
+const medianReady = benchmark => benchmark?.summary?.readyMs?.median ?? null;
+const medianRouteTotal = benchmark =>
+  benchmark?.summary?.routeTotalMs?.median ?? null;
 const p95Rss = benchmark => benchmark?.summary?.maxRssKb?.p95 ?? null;
 const cpuMedian = benchmark => {
   const user = benchmark?.summary?.userMs?.median;
@@ -75,12 +78,20 @@ const benchmarks = benchmarkIds.map(id => {
   const headBenchmark = headBenchmarks.get(id);
   const baseWallMs = medianWall(baseBenchmark);
   const headWallMs = medianWall(headBenchmark);
+  const baseReadyMs = medianReady(baseBenchmark);
+  const headReadyMs = medianReady(headBenchmark);
+  const baseRouteTotalMs = medianRouteTotal(baseBenchmark);
+  const headRouteTotalMs = medianRouteTotal(headBenchmark);
   return {
     id,
     routeCount: headBenchmark?.routeCount ?? baseBenchmark?.routeCount ?? null,
     variant: headBenchmark?.variant ?? baseBenchmark?.variant ?? null,
     baseWallMs,
     headWallMs,
+    baseReadyMs,
+    headReadyMs,
+    baseRouteTotalMs,
+    headRouteTotalMs,
     wallDeltaPercent: percentDelta(baseWallMs, headWallMs),
     wallSpeedup: speedup(baseWallMs, headWallMs),
     baseCpuMs: cpuMedian(baseBenchmark),
@@ -90,20 +101,36 @@ const benchmarks = benchmarkIds.map(id => {
   };
 });
 
-const totalBaseWallMs = benchmarks.reduce(
-  (sum, benchmark) => sum + (benchmark.baseWallMs ?? 0),
-  0
-);
-const totalHeadWallMs = benchmarks.reduce(
-  (sum, benchmark) => sum + (benchmark.headWallMs ?? 0),
-  0
-);
+const sumMetric = (benchmarks, key) => {
+  const values = benchmarks
+    .map(benchmark => benchmark[key])
+    .filter(value => typeof value === 'number');
+  return values.length === 0
+    ? null
+    : values.reduce((sum, value) => sum + value, 0);
+};
+
+const totalBaseWallMs = sumMetric(benchmarks, 'baseWallMs');
+const totalHeadWallMs = sumMetric(benchmarks, 'headWallMs');
+const totalBaseReadyMs = sumMetric(benchmarks, 'baseReadyMs');
+const totalHeadReadyMs = sumMetric(benchmarks, 'headReadyMs');
+const totalBaseRouteTotalMs = sumMetric(benchmarks, 'baseRouteTotalMs');
+const totalHeadRouteTotalMs = sumMetric(benchmarks, 'headRouteTotalMs');
 
 const summary = {
   baseWallMs: totalBaseWallMs,
   headWallMs: totalHeadWallMs,
+  baseReadyMs: totalBaseReadyMs,
+  headReadyMs: totalHeadReadyMs,
+  baseRouteTotalMs: totalBaseRouteTotalMs,
+  headRouteTotalMs: totalHeadRouteTotalMs,
   wallDeltaPercent: percentDelta(totalBaseWallMs, totalHeadWallMs),
   wallSpeedup: speedup(totalBaseWallMs, totalHeadWallMs),
+  readyDeltaPercent: percentDelta(totalBaseReadyMs, totalHeadReadyMs),
+  routeTotalDeltaPercent: percentDelta(
+    totalBaseRouteTotalMs,
+    totalHeadRouteTotalMs
+  ),
 };
 
 const report = {
@@ -121,6 +148,7 @@ const report = {
   },
   runUrl: values['run-url'] ?? null,
   profile: head.profile ?? base.profile ?? null,
+  mode: head.mode ?? base.mode ?? 'build',
   iterations: head.iterations ?? base.iterations ?? null,
   warmup: head.warmup ?? base.warmup ?? null,
   summary,
@@ -135,20 +163,26 @@ const renderComment = () => {
     `Compared PR head \`${report.head.sha?.slice(0, 7) ?? 'unknown'}\` against base \`${report.base.sha?.slice(0, 7) ?? 'unknown'}\`.`,
     '',
     `**Total median wall time:** ${formatSeconds(summary.baseWallMs)} -> ${formatSeconds(summary.headWallMs)} (${formatPercent(summary.wallDeltaPercent)}, ${formatSpeedup(summary.wallSpeedup)} speedup)`,
+    ...(report.mode === 'dev'
+      ? [
+          `**Compiler ready median:** ${formatSeconds(summary.baseReadyMs)} -> ${formatSeconds(summary.headReadyMs)} (${formatPercent(summary.readyDeltaPercent)})`,
+          `**Route load median:** ${formatSeconds(summary.baseRouteTotalMs)} -> ${formatSeconds(summary.headRouteTotalMs)} (${formatPercent(summary.routeTotalDeltaPercent)})`,
+        ]
+      : []),
     '',
-    '| Benchmark | Base | Head | Delta | Speedup | Head RSS p95 |',
-    '|---|---:|---:|---:|---:|---:|',
+    '| Benchmark | Base total | Head total | Delta | Head ready | Head routes | Speedup | Head RSS p95 |',
+    '|---|---:|---:|---:|---:|---:|---:|---:|',
   ];
 
   for (const benchmark of benchmarks) {
     lines.push(
-      `| \`${benchmark.id}\` | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`
+      `| \`${benchmark.id}\` | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.headReadyMs)} | ${formatSeconds(benchmark.headRouteTotalMs)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`
     );
   }
 
   lines.push(
     '',
-    `Profile: \`${report.profile ?? 'unknown'}\`; iterations: \`${report.iterations ?? 'unknown'}\`; warmup: \`${report.warmup ?? 'unknown'}\`.`,
+    `Profile: \`${report.profile ?? 'unknown'}\`; mode: \`${report.mode ?? 'unknown'}\`; iterations: \`${report.iterations ?? 'unknown'}\`; warmup: \`${report.warmup ?? 'unknown'}\`.`,
     ...(report.runUrl ? [`[Workflow run](${report.runUrl})`] : []),
     ''
   );
