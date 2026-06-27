@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
+import { Effect } from 'effect';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import {
   createRequestHandler,
@@ -30,6 +31,7 @@ import type {
 } from './react-router-config.js';
 import { resolveServerBuildModule } from './server-utils.js';
 import type { PluginOptions, Route } from './types.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
 type ReactRouterManifest = Awaited<
   ReturnType<typeof getReactRouterManifestForDev>
@@ -401,6 +403,19 @@ const validatePrerenderPathMatches = (
   }
 };
 
+export const runBoundedPrerenderTasks = (
+  prerenderPaths: string[],
+  concurrency: number,
+  renderPath: (path: string) => Promise<void>
+): Promise<void> =>
+  runPluginEffect(
+    Effect.forEach(
+      prerenderPaths,
+      path => tryPluginPromise(() => renderPath(path)),
+      { concurrency, discard: true }
+    )
+  );
+
 const runPrerenderPaths = async ({
   build,
   requestHandler,
@@ -415,7 +430,6 @@ const runPrerenderPaths = async ({
   const { api, basename, future, prerenderConfig, prerenderPaths } = options;
   const buildRoutes = createPrerenderRoutes(build.routes);
   const concurrency = getPrerenderConcurrency(prerenderConfig);
-  const pending = new Set<Promise<void>>();
 
   const enqueue = async (path: string) => {
     const matches = matchRoutes(buildRoutes, normalizePrerenderMatchPath(path));
@@ -492,15 +506,7 @@ const runPrerenderPaths = async ({
     });
   };
 
-  for (const path of prerenderPaths) {
-    const task = enqueue(path);
-    pending.add(task);
-    task.finally(() => pending.delete(task));
-    if (pending.size >= concurrency) {
-      await Promise.race(pending);
-    }
-  }
-  await Promise.all(pending);
+  await runBoundedPrerenderTasks(prerenderPaths, concurrency, enqueue);
 };
 
 export const runReactRouterPrerenderBuild = async (

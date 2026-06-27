@@ -77,6 +77,7 @@ describe('React Router typegen runner', () => {
       runBuild: rstest.fn().mockResolvedValue(undefined),
     };
     const api = {
+      context: { action: 'dev' },
       logger: { warn: rstest.fn() },
       onAfterDevCompile: rstest.fn(callback => {
         afterDevCompile = callback;
@@ -93,5 +94,26 @@ describe('React Router typegen runner', () => {
     expect(result).toBeUndefined();
     afterDevCompile();
     expect(runner.startWatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not register the dev watch hook during production builds', () => {
+    const runner: ReactRouterTypegenRunner = {
+      startWatch: rstest.fn().mockResolvedValue(undefined),
+      closeWatch: rstest.fn().mockResolvedValue(undefined),
+      runBuild: rstest.fn().mockResolvedValue(undefined),
+    };
+    const api = {
+      context: { action: 'build' },
+      logger: { warn: rstest.fn() },
+      onAfterDevCompile: rstest.fn(),
+      onBeforeStartDevServer: rstest.fn(),
+      onCloseDevServer: rstest.fn(),
+      onBeforeBuild: rstest.fn(),
+    };
+
+    registerReactRouterTypegen(api as never, runner);
+
+    expect(api.onAfterDevCompile).not.toHaveBeenCalled();
+    expect(api.onBeforeBuild).toHaveBeenCalled();
   });
 });

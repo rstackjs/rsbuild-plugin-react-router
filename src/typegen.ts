@@ -124,17 +124,19 @@ export const registerReactRouterTypegen = (
 ): void => {
   let devWatchStarted = false;
 
-  api.onAfterDevCompile(() => {
-    if (devWatchStarted) {
-      return;
-    }
-    devWatchStarted = true;
-    void runner.startWatch().catch(error => {
-      api.logger.warn(
-        `[react-router] Failed to start React Router typegen watch: ${error}`
-      );
+  if (api.context.action !== 'build') {
+    api.onAfterDevCompile(() => {
+      if (devWatchStarted) {
+        return;
+      }
+      devWatchStarted = true;
+      void runner.startWatch().catch(error => {
+        api.logger.warn(
+          `[react-router] Failed to start React Router typegen watch: ${error}`
+        );
+      });
     });
-  });
+  }
 
   api.onCloseDevServer(() => runner.closeWatch());
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
+import { runBoundedPrerenderTasks } from '../src/prerender-build';
 import {
   createPrerenderRoutes,
   getPrerenderConcurrency,
@@ -327,5 +328,52 @@ describe('prerender helpers', () => {
     ).toBe(
       'The `prerender.unstable_concurrency` config must be a positive integer if specified.'
     );
+  });
+});
+
+describe('prerender build scheduler', () => {
+  it('runs prerender tasks with a concurrency cap', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const completed: string[] = [];
+
+    await runBoundedPrerenderTasks(
+      ['/slow', '/fast', '/medium'],
+      2,
+      async path => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise(resolve =>
+          setTimeout(resolve, path === '/slow' ? 15 : 1)
+        );
+        completed.push(path);
+        active -= 1;
+      }
+    );
+
+    expect(maxActive).toBeLessThanOrEqual(2);
+    expect(completed.sort()).toEqual(['/fast', '/medium', '/slow']);
+  });
+
+  it('rejects without starting later prerender tasks after an early failure', async () => {
+    const started: string[] = [];
+
+    await expect(
+      runBoundedPrerenderTasks(
+        ['/fail', '/slow', '/later'],
+        2,
+        async path => {
+          started.push(path);
+          await new Promise(resolve =>
+            setTimeout(resolve, path === '/fail' ? 1 : 15)
+          );
+          if (path === '/fail') {
+            throw new Error('prerender failed');
+          }
+        }
+      )
+    ).rejects.toThrow('prerender failed');
+
+    expect(started).toEqual(['/fail', '/slow']);
   });
 });
