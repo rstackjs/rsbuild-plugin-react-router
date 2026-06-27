@@ -1,10 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { Effect } from 'effect';
 import { setBoundedCacheEntry } from './bounded-cache.js';
-import {
-  getAvailableCpuCount,
-  getDefaultConcurrency,
-} from './concurrency.js';
+import { getAvailableCpuCount, getDefaultConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import {
   executeRouteTransformTask,

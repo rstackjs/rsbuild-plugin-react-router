@@ -1,4 +1,5 @@
 import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
+import { Effect } from 'effect';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
 import {
@@ -23,6 +24,12 @@ import {
   createDevRuntimeSessionManager,
   type RuntimeBinding,
 } from './dev-runtime-session.js';
+import {
+  normalizeEffectError,
+  runPluginEffect,
+  tryPluginPromise,
+  tryPluginSync,
+} from './effect-runtime.js';
 
 type ServerSetup = Exclude<
   NonNullable<NonNullable<RsbuildConfig['server']>['setup']>,
@@ -122,25 +129,38 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
-  const finishRuntimeAttempt = async (
+  const finishRuntimeAttemptEffect = (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
     stats: Rspack.Stats | Rspack.MultiStats,
     changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
     identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
-  ): Promise<void> => {
-    const result = await binding.runtime.finishAttempt(
-      stats,
-      changes,
-      identity
+  ): Effect.Effect<void, Error, never> =>
+    tryPluginPromise(() =>
+      binding.runtime.finishAttempt(stats, changes, identity)
+    ).pipe(
+      Effect.flatMap(result =>
+        tryPluginSync(() => {
+          if (
+            result === 'retry-node' &&
+            sessions.getActiveBinding()?.id === binding.id
+          ) {
+            pair.node.watching?.invalidate();
+          }
+        })
+      )
     );
-    if (
-      result === 'retry-node' &&
-      sessions.getActiveBinding()?.id === binding.id
-    ) {
-      pair.node.watching?.invalidate();
-    }
-  };
+
+  const finishRuntimeAttempt = (
+    binding: RuntimeBinding,
+    pair: DevCompilerPair,
+    stats: Rspack.Stats | Rspack.MultiStats,
+    changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
+    identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
+  ): Promise<void> =>
+    runPluginEffect(
+      finishRuntimeAttemptEffect(binding, pair, stats, changes, identity)
+    );
 
   const flushSettledAttempt = (
     binding: RuntimeBinding,
@@ -162,23 +182,23 @@ export const createReactRouterDevRuntimeController = ({
     ) {
       return;
     }
-    void binding.runtime
-      .finishAttempt(pending.stats, pending.changes, pending.identity)
-      .then(result => {
-        if (
-          result === 'retry-node' &&
-          sessions.getActiveBinding()?.id === binding.id
-        ) {
-          pair.node.watching?.invalidate();
-        }
-      })
-      .catch(cause => {
-        if (sessions.getActiveBinding()?.id === binding.id) {
-          binding.runtime.failAttempt(
-            cause instanceof Error ? cause : new Error(String(cause))
-          );
-        }
-      });
+    void runPluginEffect(
+      finishRuntimeAttemptEffect(
+        binding,
+        pair,
+        pending.stats,
+        pending.changes,
+        pending.identity
+      ).pipe(
+        Effect.catchAll(cause =>
+          tryPluginSync(() => {
+            if (sessions.getActiveBinding()?.id === binding.id) {
+              binding.runtime.failAttempt(normalizeEffectError(cause));
+            }
+          })
+        )
+      )
+    );
   };
 
   const rejectUnsupportedCompiler = (reason: string): void => {
