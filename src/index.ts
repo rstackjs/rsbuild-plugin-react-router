@@ -8,6 +8,7 @@ import {
   type RsbuildPlugin,
   type Rspack,
 } from '@rsbuild/core';
+import { Effect } from 'effect';
 import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
@@ -79,6 +80,7 @@ import {
 } from './performance.js';
 import { mapVirtualModules } from './virtual-modules.js';
 import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import {
   clearConfigImportCache,
@@ -484,27 +486,68 @@ export const pluginReactRouter = (
       ...routeTopologyWatchFiles,
     ];
     let closeRouteTopologyWatcher: (() => Promise<void>) | undefined;
+    let routeTopologyWatcherStartup: Promise<void> | undefined;
+    let routeTopologyWatcherClosed = false;
 
-    api.onBeforeStartDevServer(async () => {
-      await ensureDevRestartMarker(routeRestartMarkerPath);
-      closeRouteTopologyWatcher = await createRouteTopologyWatcher({
-        watchDirectory,
-        getRouteTopology: getWatchedRouteTopology,
-        initialRouteTopology: createRouteTopologySnapshot(
-          rootRouteFile,
-          routeConfig
-        ),
-        restartMarkerPath: routeRestartMarkerPath,
-        onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-        onError: error => {
-          api.logger.warn(
-            `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
+    const reportRouteTopologyWatcherError = (error: unknown): void => {
+      api.logger.warn(
+        `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
+      );
+    };
+
+    const startRouteTopologyWatcher = (): void => {
+      if (
+        routeTopologyWatcherClosed ||
+        routeTopologyWatcherStartup ||
+        closeRouteTopologyWatcher
+      ) {
+        return;
+      }
+
+      routeTopologyWatcherStartup = runPluginEffect(
+        Effect.gen(function* () {
+          yield* tryPluginPromise(() =>
+            ensureDevRestartMarker(routeRestartMarkerPath)
           );
-        },
+          const closeWatcher = yield* tryPluginPromise(() =>
+            createRouteTopologyWatcher({
+              watchDirectory,
+              getRouteTopology: getWatchedRouteTopology,
+              initialRouteTopology: createRouteTopologySnapshot(
+                rootRouteFile,
+                routeConfig
+              ),
+              restartMarkerPath: routeRestartMarkerPath,
+              onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
+              onError: reportRouteTopologyWatcherError,
+            })
+          );
+          if (routeTopologyWatcherClosed) {
+            yield* tryPluginPromise(() => closeWatcher());
+            return;
+          }
+          closeRouteTopologyWatcher = closeWatcher;
+        })
+      )
+        .catch(reportRouteTopologyWatcherError)
+        .finally(() => {
+          routeTopologyWatcherStartup = undefined;
+        });
+    };
+
+    if (!isBuild) {
+      api.onBeforeStartDevServer(() => {
+        routeTopologyWatcherClosed = false;
       });
-    });
+
+      api.onAfterDevCompile(() => {
+        startRouteTopologyWatcher();
+      });
+    }
 
     api.onCloseDevServer(async () => {
+      routeTopologyWatcherClosed = true;
+      await routeTopologyWatcherStartup;
       await closeRouteTopologyWatcher?.();
       closeRouteTopologyWatcher = undefined;
     });
