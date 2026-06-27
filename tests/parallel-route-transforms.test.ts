@@ -240,6 +240,44 @@ describe('parallel route transforms', () => {
     await executor.close();
   });
 
+  it('creates only worker slots that receive scheduled work', async () => {
+    const workers: FakeRouteTransformWorker[] = [];
+    const executor = createRouteTransformExecutorForTesting(
+      {
+        parallelTransforms: 4,
+        splitRouteModules: true,
+      },
+      () => {
+        const worker = new FakeRouteTransformWorker();
+        workers.push(worker);
+        return worker;
+      }
+    );
+
+    const first = executor.run(createRouteModuleTask());
+    const second = executor.run(
+      createRouteModuleTask({ resourcePath: '/app/routes/other.tsx' })
+    );
+
+    expect(workers).toHaveLength(2);
+
+    for (const worker of workers) {
+      worker.emit('message', {
+        id: worker.messages[0]!.id,
+        ok: true,
+        result: { code: 'done' },
+      } satisfies WorkerResponse);
+    }
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { code: 'done' },
+      { code: 'done' },
+    ]);
+
+    await executor.close();
+    expect(workers.map(worker => worker.terminateCalls)).toEqual([1, 1]);
+  });
+
   it('executes route client entry tasks through the shared task executor', async () => {
     await expect(
       executeRouteTransformTask({

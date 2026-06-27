@@ -120,7 +120,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #nextRouteModuleWorkerIndex = 0;
   #nextSplitRouteAnalysisWorkerIndex = 0;
   #splitRouteAnalysisWorkers = new Map<string, number>();
-  #workers: WorkerState[] | undefined;
+  #workers: Array<WorkerState | undefined> | undefined;
 
   constructor(
     private readonly workerCount: number,
@@ -152,7 +152,9 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       return this.#closePromise;
     }
     this.#closed = true;
-    const workers = this.#workers ?? [];
+    const workers = (this.#workers ?? []).filter(
+      (state): state is WorkerState => Boolean(state)
+    );
     this.#workers = [];
     this.#closePromise = Promise.all(
       workers.map(async state => {
@@ -171,7 +173,9 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       return;
     }
     this.#workersDisabled = true;
-    const workers = this.#workers ?? [];
+    const workers = (this.#workers ?? []).filter(
+      (state): state is WorkerState => Boolean(state)
+    );
     this.#workers = [];
     for (const state of workers) {
       for (const pending of state.pending.values()) {
@@ -222,33 +226,28 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     return state;
   }
 
-  #getWorkers(): WorkerState[] {
+  #getWorker(index: number): WorkerState | undefined {
     if (this.#closed || this.#workersDisabled) {
-      return [];
+      return undefined;
     }
-    if (this.#workers) {
-      return this.#workers;
+    this.#workers ??= new Array(this.workerCount);
+    const existingWorker = this.#workers[index];
+    if (existingWorker) {
+      return existingWorker;
     }
-    const workers: WorkerState[] = [];
+
     try {
-      for (let index = 0; index < this.workerCount; index += 1) {
-        workers.push(this.#createWorkerState());
-      }
+      const worker = this.#createWorkerState();
+      this.#workers[index] = worker;
+      return worker;
     } catch (error) {
-      for (const state of workers) {
-        void state.worker.terminate();
-      }
-      this.#workers = [];
       throw error;
     }
-    this.#workers = workers;
-    return workers;
   }
 
   #runInWorker(task: RouteTransformTask): Promise<RouteTransformResult> {
-    const workers = this.#getWorkers();
-    const workerIndex = this.#getWorkerIndex(task, workers.length);
-    const state = workers[workerIndex];
+    const workerIndex = this.#getWorkerIndex(task, this.workerCount);
+    const state = this.#getWorker(workerIndex);
     if (!state) {
       return executeRouteTransformTask(task, this.options);
     }
