@@ -78,8 +78,8 @@ class FakeRouteTransformWorker {
 
 describe('parallel route transforms', () => {
   it.each([
-    [1, 1],
-    [2, 1],
+    [1, 0],
+    [2, 0],
     [3, 1],
     [4, 2],
     [6, 2],

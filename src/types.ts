@@ -49,7 +49,7 @@ export type PluginOptions = {
   /**
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or an integer to override the default worker count.
-   * @default true. The default pool is capped at 2 workers.
+   * @default true. The default uses available CPU cores minus 2, capped at 2.
    */
   parallelTransforms?: false | number;
 

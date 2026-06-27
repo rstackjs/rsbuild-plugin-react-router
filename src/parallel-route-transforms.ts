@@ -61,10 +61,7 @@ const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const DEFAULT_WORKER_COUNT_LIMIT = 2;
 
 export const getDefaultWorkerCount = (cpuCount?: number): number =>
-  Math.max(
-    1,
-    Math.min(getDefaultConcurrency(cpuCount), DEFAULT_WORKER_COUNT_LIMIT)
-  );
+  Math.min(getDefaultConcurrency(cpuCount), DEFAULT_WORKER_COUNT_LIMIT);
 
 const getConfiguredWorkerCount = (
   parallelTransforms: ParallelTransformsConfig
