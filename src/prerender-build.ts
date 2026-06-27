@@ -23,7 +23,6 @@ import {
   getPrerenderConcurrency,
   getSsrFalsePrerenderExportErrors,
   normalizePrerenderMatchPath,
-  withBuildRequest,
 } from './prerender.js';
 import type {
   Config,
@@ -132,6 +131,34 @@ const createDataRequestPath = (
     ? '/_root.data'
     : `${prerenderPath.replace(/\/$/, '')}.data`;
 };
+
+export const createBuildRequestEffect = <T>(
+  input: string | URL,
+  init: RequestInit | undefined,
+  handle: (request: Request) => Promise<T>
+): Effect.Effect<T, Error, never> =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => new AbortController()),
+    controller =>
+      tryPluginPromise(() =>
+        handle(
+          new Request(input, {
+            ...init,
+            signal: controller.signal,
+          })
+        )
+      ),
+    controller =>
+      Effect.sync(() => {
+        controller.abort();
+      })
+  );
+
+export const withBuildRequest = <T>(
+  input: string | URL,
+  init: RequestInit | undefined,
+  handle: (request: Request) => Promise<T>
+): Promise<T> => runPluginEffect(createBuildRequestEffect(input, init, handle));
 
 const prerenderData = async ({
   handler,

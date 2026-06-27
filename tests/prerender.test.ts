@@ -1,5 +1,9 @@
 import { describe, expect, it } from '@rstest/core';
-import { runBoundedPrerenderTasks } from '../src/prerender-build';
+import {
+  createBuildRequestEffect,
+  runBoundedPrerenderTasks,
+  withBuildRequest,
+} from '../src/prerender-build';
 import {
   createPrerenderRoutes,
   getPrerenderConcurrency,
@@ -8,8 +12,8 @@ import {
   normalizePrerenderMatchPath,
   resolvePrerenderPaths,
   validatePrerenderConfig,
-  withBuildRequest,
 } from '../src/prerender';
+import { runPluginEffect } from '../src/effect-runtime';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
 const routes: RouteConfigEntry[] = [
@@ -167,6 +171,22 @@ describe('prerender helpers', () => {
     );
 
     expect(result).toBe('handled');
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('aborts effect build request signals after the handler rejects', async () => {
+    const failure = new Error('prerender handler failed');
+    let signal: AbortSignal | undefined;
+
+    await expect(
+      runPluginEffect(
+        createBuildRequestEffect('http://localhost/about', undefined, request => {
+          signal = request.signal;
+          throw failure;
+        })
+      )
+    ).rejects.toBe(failure);
+
     expect(signal?.aborted).toBe(true);
   });
 
