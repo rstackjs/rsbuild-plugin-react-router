@@ -146,10 +146,17 @@ export const registerReactRouterTypegen = (
     });
   }
 
-  api.onCloseDevServer(async () => {
-    await devWatchTask.cancel();
-    await runner.closeWatch();
-  });
+  api.onCloseDevServer(() =>
+    runPluginEffect(
+      devWatchTask
+        .cancelEffect()
+        .pipe(
+          Effect.zipRight(
+            tryPluginPromise(() => runner.closeWatch()).pipe(Effect.asVoid)
+          )
+        )
+    )
+  );
 
   api.onBeforeBuild(() => runner.runBuild());
 };

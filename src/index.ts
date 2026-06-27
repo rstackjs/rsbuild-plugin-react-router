@@ -545,18 +545,33 @@ export const pluginReactRouter = (
       });
     }
 
-    api.onCloseDevServer(async () => {
-      routeTopologyWatcherClosed = true;
-      await routeTopologyWatcherTask.cancel();
-      await closeRouteTopologyWatcher?.();
-      closeRouteTopologyWatcher = undefined;
-    });
-    api.onCloseBuild(async () => {
-      await routeTransformExecutor.close();
-    });
-    api.onCloseDevServer(async () => {
-      await routeTransformExecutor.close();
-    });
+    const closeRouteTopologyWatcherEffect = (): Effect.Effect<
+      void,
+      Error,
+      never
+    > =>
+      Effect.gen(function* () {
+        routeTopologyWatcherClosed = true;
+        yield* tryPluginPromise(() => routeTopologyWatcherTask.cancel());
+        yield* tryPluginPromise(() => closeRouteTopologyWatcher?.());
+        closeRouteTopologyWatcher = undefined;
+      });
+    const closeRouteTransformExecutorEffect = (): Effect.Effect<
+      void,
+      Error,
+      never
+    > => tryPluginPromise(() => routeTransformExecutor.close());
+
+    api.onCloseDevServer(() =>
+      runPluginEffect(
+        closeRouteTopologyWatcherEffect().pipe(
+          Effect.zipRight(closeRouteTransformExecutorEffect())
+        )
+      )
+    );
+    api.onCloseBuild(() =>
+      runPluginEffect(closeRouteTransformExecutorEffect())
+    );
 
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
@@ -717,31 +732,35 @@ export const pluginReactRouter = (
       }
     );
 
-    api.onAfterBuild(async ({ environments }) => {
-      await runReactRouterPrerenderBuild({
-        api,
-        hasWebEnvironment: Boolean(environments.web),
-        buildDirectory,
-        serverBuildFile,
-        ssr,
-        isPrerenderEnabled,
-        prerenderConfig,
-        prerenderPaths,
-        basename,
-        future,
-        routes,
-        latestBrowserManifest,
-        latestBrowserManifestModuleExports,
-        clientStats,
-        pluginOptions,
-        appDirectory,
-        assetPrefix,
-        routeChunkOptions,
-        buildManifest,
-        resolvedConfigWithRoutes,
-        buildEnd,
-      });
-    });
+    api.onAfterBuild(({ environments }) =>
+      runPluginEffect(
+        tryPluginPromise(() =>
+          runReactRouterPrerenderBuild({
+            api,
+            hasWebEnvironment: Boolean(environments.web),
+            buildDirectory,
+            serverBuildFile,
+            ssr,
+            isPrerenderEnabled,
+            prerenderConfig,
+            prerenderPaths,
+            basename,
+            future,
+            routes,
+            latestBrowserManifest,
+            latestBrowserManifestModuleExports,
+            clientStats,
+            pluginOptions,
+            appDirectory,
+            assetPrefix,
+            routeChunkOptions,
+            buildManifest,
+            resolvedConfigWithRoutes,
+            buildEnd,
+          })
+        )
+      )
+    );
 
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;

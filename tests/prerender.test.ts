@@ -1,5 +1,7 @@
 import { describe, expect, it } from '@rstest/core';
+import { Effect } from 'effect';
 import {
+  createBoundedPrerenderTasksEffect,
   createBuildRequestEffect,
   runBoundedPrerenderTasks,
   withBuildRequest,
@@ -352,6 +354,32 @@ describe('prerender helpers', () => {
 });
 
 describe('prerender build scheduler', () => {
+  it('runs prerender task effects with a concurrency cap', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const completed: string[] = [];
+
+    await runPluginEffect(
+      createBoundedPrerenderTasksEffect(
+        ['/slow', '/fast', '/medium'],
+        2,
+        path =>
+          Effect.promise(async () => {
+            active += 1;
+            maxActive = Math.max(maxActive, active);
+            await new Promise(resolve =>
+              setTimeout(resolve, path === '/slow' ? 15 : 1)
+            );
+            completed.push(path);
+            active -= 1;
+          })
+      )
+    );
+
+    expect(maxActive).toBeLessThanOrEqual(2);
+    expect(completed.sort()).toEqual(['/fast', '/medium', '/slow']);
+  });
+
   it('runs prerender tasks with a concurrency cap', async () => {
     let active = 0;
     let maxActive = 0;

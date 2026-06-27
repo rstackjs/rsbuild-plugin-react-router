@@ -436,29 +436,50 @@ export const runBoundedPrerenderTasks = (
   renderPath: (path: string) => Promise<void>
 ): Promise<void> =>
   runPluginEffect(
-    Effect.forEach(
-      prerenderPaths,
-      path => tryPluginPromise(() => renderPath(path)),
-      { concurrency, discard: true }
+    createBoundedPrerenderTasksEffect(prerenderPaths, concurrency, path =>
+      tryPluginPromise(() => renderPath(path))
     )
   );
 
-const runPrerenderPaths = async ({
+export const createBoundedPrerenderTasksEffect = (
+  prerenderPaths: string[],
+  concurrency: number,
+  renderPath: (path: string) => Effect.Effect<void, Error, never>
+): Effect.Effect<void, Error, never> =>
+  Effect.forEach(prerenderPaths, renderPath, { concurrency, discard: true });
+
+const createPrerenderDataEffect = (
+  options: Parameters<typeof prerenderData>[0]
+): Effect.Effect<string, Error, never> =>
+  tryPluginPromise(() => prerenderData(options));
+
+const createPrerenderRouteEffect = (
+  options: Parameters<typeof prerenderRoute>[0]
+): Effect.Effect<void, Error, never> =>
+  tryPluginPromise(() => prerenderRoute(options));
+
+const createPrerenderResourceRouteEffect = (
+  options: Parameters<typeof prerenderResourceRoute>[0]
+): Effect.Effect<void, Error, never> =>
+  tryPluginPromise(() => prerenderResourceRoute(options));
+
+const createPrerenderPathEffect = ({
+  path,
   build,
+  buildRoutes,
   requestHandler,
   clientBuildDir,
   options,
 }: {
+  path: string;
   build: PrerenderServerBuild;
+  buildRoutes: ReturnType<typeof createPrerenderRoutes>;
   requestHandler: (request: Request) => Promise<Response>;
   clientBuildDir: string;
   options: RunReactRouterPrerenderBuildOptions;
-}): Promise<void> => {
-  const { api, basename, future, prerenderConfig, prerenderPaths } = options;
-  const buildRoutes = createPrerenderRoutes(build.routes);
-  const concurrency = getPrerenderConcurrency(prerenderConfig);
-
-  const enqueue = async (path: string) => {
+}): Effect.Effect<void, Error, never> =>
+  Effect.gen(function* () {
+    const { api, basename, future } = options;
     const matches = matchRoutes(buildRoutes, normalizePrerenderMatchPath(path));
     if (!matches) {
       return;
@@ -472,7 +493,7 @@ const runPrerenderPaths = async ({
 
     if (isResourceRoute) {
       if (manifestRoute.loader && routeId) {
-        await prerenderData({
+        yield* createPrerenderDataEffect({
           handler: requestHandler,
           prerenderPath: path,
           onlyRoutes: [routeId],
@@ -482,7 +503,7 @@ const runPrerenderPaths = async ({
             future.unstable_trailingSlashAwareDataRequests,
           api,
         });
-        await prerenderResourceRoute({
+        yield* createPrerenderResourceRouteEffect({
           handler: requestHandler,
           prerenderPath: path,
           clientBuildDir,
@@ -490,9 +511,11 @@ const runPrerenderPaths = async ({
           api,
         });
       } else {
-        api.logger.warn(
-          `⚠️ Skipping prerendering for resource route without a loader: ${routeId}`
-        );
+        yield* Effect.sync(() => {
+          api.logger.warn(
+            `⚠️ Skipping prerendering for resource route without a loader: ${routeId}`
+          );
+        });
       }
       return;
     }
@@ -504,20 +527,20 @@ const runPrerenderPaths = async ({
       }
       return build.assets?.routes?.[matchedRouteId]?.hasLoader;
     });
-    let data: string | undefined;
-    if (hasLoaders) {
-      data = await prerenderData({
-        handler: requestHandler,
-        prerenderPath: path,
-        onlyRoutes: null,
-        clientBuildDir,
-        basename,
-        trailingSlashAwareDataRequests:
-          future.unstable_trailingSlashAwareDataRequests,
-        api,
-      });
-    }
-    await prerenderRoute({
+    const data = hasLoaders
+      ? yield* createPrerenderDataEffect({
+          handler: requestHandler,
+          prerenderPath: path,
+          onlyRoutes: null,
+          clientBuildDir,
+          basename,
+          trailingSlashAwareDataRequests:
+            future.unstable_trailingSlashAwareDataRequests,
+          api,
+        })
+      : undefined;
+
+    yield* createPrerenderRouteEffect({
       handler: requestHandler,
       prerenderPath: path,
       clientBuildDir,
@@ -531,9 +554,35 @@ const runPrerenderPaths = async ({
           }
         : undefined,
     });
-  };
+  });
 
-  await runBoundedPrerenderTasks(prerenderPaths, concurrency, enqueue);
+const runPrerenderPaths = async ({
+  build,
+  requestHandler,
+  clientBuildDir,
+  options,
+}: {
+  build: PrerenderServerBuild;
+  requestHandler: (request: Request) => Promise<Response>;
+  clientBuildDir: string;
+  options: RunReactRouterPrerenderBuildOptions;
+}): Promise<void> => {
+  const { prerenderConfig, prerenderPaths } = options;
+  const buildRoutes = createPrerenderRoutes(build.routes);
+  const concurrency = getPrerenderConcurrency(prerenderConfig);
+
+  await runPluginEffect(
+    createBoundedPrerenderTasksEffect(prerenderPaths, concurrency, path =>
+      createPrerenderPathEffect({
+        path,
+        build,
+        buildRoutes,
+        requestHandler,
+        clientBuildDir,
+        options,
+      })
+    )
+  );
 };
 
 export const runReactRouterPrerenderBuild = async (

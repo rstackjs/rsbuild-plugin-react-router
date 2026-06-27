@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { RsbuildConfig } from '@rsbuild/core';
-import { Effect } from 'effect';
+import { Duration, Effect, Fiber } from 'effect';
 import { dirname, resolve } from 'pathe';
 import { getDefaultConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
@@ -9,6 +9,7 @@ import type { Route } from './types.js';
 
 const ROUTE_RESTART_MARKER_ASSET = '.react-router/route-watch';
 const INITIAL_RESTART_MARKER_CONTENT = 'react-router-route-watch';
+const ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS = 100;
 const ROUTE_DIRECTORY_SCAN_CONCURRENCY = Math.max(
   1,
   Math.min(16, getDefaultConcurrency() || 1)
@@ -119,8 +120,13 @@ const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
 };
 
 const readRouteDirectories = (watchDirectory: string): Promise<Set<string>> => {
-  const directories = new Set<string>();
+  return runPluginEffect(readRouteDirectoriesEffect(watchDirectory));
+};
 
+const readRouteDirectoriesEffect = (
+  watchDirectory: string
+): Effect.Effect<Set<string>, Error, never> => {
+  const directories = new Set<string>();
   const walkDirectory = (directory: string): Effect.Effect<void> =>
     tryPluginPromise(() => readdir(directory, { withFileTypes: true })).pipe(
       Effect.catchAll(() => Effect.succeed([])),
@@ -138,7 +144,7 @@ const readRouteDirectories = (watchDirectory: string): Promise<Set<string>> => {
       )
     );
 
-  return runPluginEffect(walkDirectory(watchDirectory)).then(() => directories);
+  return walkDirectory(watchDirectory).pipe(Effect.as(directories));
 };
 
 export const createRouteTopologyWatcher = async ({
@@ -180,14 +186,19 @@ export const createRouteTopologyWatcher = async ({
     routeTopology: initialRouteTopology ?? discoveredState.routeTopology,
   };
   let closed = false;
-  let rescanTimer: ReturnType<typeof setTimeout> | undefined;
+  let scheduledRescanFiber: ReturnType<typeof Effect.runFork> | undefined;
+  let scheduledRescanToken: symbol | undefined;
   let rescanQueue = Promise.resolve();
   const directoryWatchers = new Map<string, DirectoryWatcher>();
 
-  const touchRestartMarker = async (): Promise<void> => {
-    await mkdir(dirname(restartMarkerPath), { recursive: true });
-    await writeFile(restartMarkerPath, String(Date.now()));
-  };
+  const touchRestartMarkerEffect = (): Effect.Effect<void, Error, never> =>
+    tryPluginPromise(() =>
+      mkdir(dirname(restartMarkerPath), { recursive: true })
+    ).pipe(
+      Effect.zipRight(
+        tryPluginPromise(() => writeFile(restartMarkerPath, String(Date.now())))
+      )
+    );
 
   const closeRemovedDirectoryWatchers = (
     nextDirectories: Set<string>
@@ -226,74 +237,129 @@ export const createRouteTopologyWatcher = async ({
     watchNewDirectories(nextDirectories);
   };
 
-  const applyNextState = async (nextState: RouteDirectoryState) => {
-    if (closed) {
-      return;
-    }
-    syncDirectoryWatchers(nextState.directories);
-    if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
-      if (onRouteTopologyChange) {
-        // This is a notification boundary, not part of the rescan
-        // transaction. A custom-server callback may close this watcher while
-        // replacing its compiler, so awaiting it here would deadlock close().
-        state = nextState;
-        try {
-          void Promise.resolve(onRouteTopologyChange()).catch(onError);
-        } catch (error) {
-          onError(error);
-        }
-        return;
-      } else {
-        await touchRestartMarker();
+  const applyNextStateEffect = (
+    nextState: RouteDirectoryState
+  ): Effect.Effect<void, Error, never> =>
+    Effect.suspend(() => {
+      if (closed) {
+        return Effect.void;
       }
+      syncDirectoryWatchers(nextState.directories);
+      if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
+        if (onRouteTopologyChange) {
+          // This is a notification boundary, not part of the rescan
+          // transaction. A custom-server callback may close this watcher while
+          // replacing its compiler, so awaiting it here would deadlock close().
+          state = nextState;
+          return Effect.sync(() => {
+            try {
+              void Promise.resolve(onRouteTopologyChange()).catch(onError);
+            } catch (error) {
+              onError(error);
+            }
+          });
+        }
+        return touchRestartMarkerEffect().pipe(
+          Effect.zipRight(
+            Effect.sync(() => {
+              if (!closed) {
+                state = nextState;
+              }
+            })
+          )
+        );
+      }
+      state = nextState;
+      return Effect.void;
+    });
+
+  const runRescanEffect = (): Effect.Effect<void, never, never> => {
+    let nextDirectories: Set<string> | undefined;
+    return Effect.gen(function* () {
       if (closed) {
         return;
       }
-      state = nextState;
-      return;
-    }
-    state = nextState;
-  };
-
-  const runRescan = async (): Promise<void> => {
-    if (closed) {
-      return;
-    }
-    let nextDirectories: Set<string> | undefined;
-    try {
-      nextDirectories = await readRouteDirectories(watchDirectory);
+      nextDirectories = yield* readRouteDirectoriesEffect(watchDirectory);
       if (closed) {
         return;
       }
       const nextState = {
         directories: nextDirectories,
-        routeTopology: await getRouteTopology(),
+        routeTopology: yield* tryPluginPromise(getRouteTopology),
       };
       if (closed) {
         return;
       }
-      await applyNextState(nextState);
-    } catch (error) {
-      if (nextDirectories && !closed) {
-        syncDirectoryWatchers(nextDirectories);
-      }
-      onError(error);
-    }
+      yield* applyNextStateEffect(nextState);
+    }).pipe(
+      Effect.catchAll(error =>
+        Effect.sync(() => {
+          if (nextDirectories && !closed) {
+            syncDirectoryWatchers(nextDirectories);
+          }
+          onError(error);
+        })
+      )
+    );
   };
 
   const rescan = (): Promise<void> => {
-    rescanQueue = rescanQueue.then(runRescan, runRescan);
+    rescanQueue = rescanQueue.then(
+      () => runPluginEffect(runRescanEffect()),
+      () => runPluginEffect(runRescanEffect())
+    );
     return rescanQueue;
   };
 
-  const scheduleRescan = (): void => {
-    if (rescanTimer) {
-      clearTimeout(rescanTimer);
+  const cancelScheduledRescan = (): Promise<void> => {
+    const fiber = scheduledRescanFiber;
+    scheduledRescanFiber = undefined;
+    scheduledRescanToken = undefined;
+    if (!fiber) {
+      return Promise.resolve();
     }
-    rescanTimer = setTimeout(() => {
-      rescanTimer = undefined;
-      void rescan();
-    }, 100);
+    return runPluginEffect(Fiber.interrupt(fiber).pipe(Effect.asVoid));
+  };
+
+  const scheduleRescan = (): void => {
+    const previousFiber = scheduledRescanFiber;
+    if (previousFiber) {
+      void runPluginEffect(
+        Fiber.interrupt(previousFiber).pipe(Effect.asVoid)
+      ).catch(onError);
+    }
+
+    const token = Symbol();
+    scheduledRescanToken = token;
+    scheduledRescanFiber = Effect.runFork(
+      Effect.sleep(Duration.millis(ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS)).pipe(
+        Effect.zipRight(
+          Effect.suspend(() => {
+            if (closed || scheduledRescanToken !== token) {
+              return Effect.void;
+            }
+            return tryPluginPromise(rescan).pipe(Effect.asVoid);
+          })
+        ),
+        Effect.catchAll(error =>
+          Effect.sync(() => {
+            onError(error);
+          })
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (scheduledRescanToken === token) {
+              scheduledRescanFiber = undefined;
+              scheduledRescanToken = undefined;
+            }
+          })
+        )
+      )
+    );
+  };
+
+  const applyNextState = async (nextState: RouteDirectoryState) => {
+    await runPluginEffect(applyNextStateEffect(nextState));
   };
 
   try {
@@ -304,13 +370,12 @@ export const createRouteTopologyWatcher = async ({
 
   return async () => {
     if (closed) {
+      await cancelScheduledRescan();
       await rescanQueue;
       return;
     }
     closed = true;
-    if (rescanTimer) {
-      clearTimeout(rescanTimer);
-    }
+    await cancelScheduledRescan();
     for (const watcher of directoryWatchers.values()) {
       watcher.close();
     }

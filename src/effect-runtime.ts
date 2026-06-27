@@ -41,6 +41,7 @@ export const tryPluginPromise = <A>(
 
 type DelayedPluginTask = {
   schedule(): void;
+  cancelEffect(): Effect.Effect<void, Error, never>;
   cancel(): Promise<void>;
 };
 
@@ -55,6 +56,18 @@ export const createDelayedPluginTask = ({
 }): DelayedPluginTask => {
   let activeFiber: ReturnType<typeof Effect.runFork> | undefined;
   let activeToken: symbol | undefined;
+
+  const cancelEffect = (): Effect.Effect<void, Error, never> =>
+    Effect.sync(() => {
+      const fiber = activeFiber;
+      activeToken = undefined;
+      activeFiber = undefined;
+      return fiber;
+    }).pipe(
+      Effect.flatMap(fiber =>
+        fiber ? Fiber.interrupt(fiber).pipe(Effect.asVoid) : Effect.void
+      )
+    );
 
   return {
     schedule(): void {
@@ -84,14 +97,10 @@ export const createDelayedPluginTask = ({
       );
     },
 
+    cancelEffect,
+
     async cancel(): Promise<void> {
-      const fiber = activeFiber;
-      activeToken = undefined;
-      activeFiber = undefined;
-      if (!fiber) {
-        return;
-      }
-      await runPluginEffect(Fiber.interrupt(fiber).pipe(Effect.asVoid));
+      await runPluginEffect(cancelEffect());
     },
   };
 };

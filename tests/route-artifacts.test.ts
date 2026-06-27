@@ -1,7 +1,10 @@
 import { describe, expect, it } from '@rstest/core';
+import { runPluginEffect } from '../src/effect-runtime';
 import {
   createRouteChunkArtifact,
+  createRouteChunkArtifactEffect,
   createRouteClientEntryArtifact,
+  createRouteClientEntryArtifactEffect,
 } from '../src/route-artifacts';
 import {
   emptyRouteChunkSnippet,
@@ -132,6 +135,27 @@ describe('route artifact helpers', () => {
         )};`,
       });
     });
+
+    it('generates route reexports through the Effect API', async () => {
+      const result = await runPluginEffect(
+        createRouteClientEntryArtifactEffect({
+          code: `
+            export async function clientLoader() { return null; }
+            export default function Route() { return null; }
+          `,
+          resourcePath,
+          environmentName: 'web',
+          isBuild: false,
+          routeChunkConfig: disabledRouteChunkConfig,
+        })
+      );
+
+      expect(result).toEqual({
+        code: `export { clientLoader, default } from ${JSON.stringify(
+          routeRequest
+        )};`,
+      });
+    });
   });
 
   describe('createRouteChunkArtifact', () => {
@@ -180,6 +204,34 @@ describe('route artifact helpers', () => {
       );
 
       const result = await createRouteChunk(source, 'clientAction', { cache });
+
+      expect(result).toEqual({ code: expectedCode, map: null });
+    });
+
+    it('generates route chunks through the Effect API', async () => {
+      const source = `
+        export const clientAction = async () => {};
+        export default function Route() { return null; }
+      `;
+      const cache: RouteChunkCache = new Map();
+      const expectedCode = await getRouteChunkIfEnabled(
+        cache,
+        routeChunkConfig,
+        resourcePath,
+        'clientAction',
+        source
+      );
+
+      const result = await runPluginEffect(
+        createRouteChunkArtifactEffect({
+          code: source,
+          resource: getRouteChunkModuleId(resourcePath, 'clientAction'),
+          resourcePath,
+          routeChunkConfig,
+          routeChunkCache: cache,
+          isBuild: true,
+        })
+      );
 
       expect(result).toEqual({ code: expectedCode, map: null });
     });

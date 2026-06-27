@@ -56,4 +56,21 @@ describe('effect runtime helpers', () => {
 
     expect(run).not.toHaveBeenCalled();
   });
+
+  it('supports Effect-based cancellation for delayed plugin tasks', async () => {
+    const run = rstest.fn();
+    const task = createDelayedPluginTask({
+      delayMs: 1000,
+      run: () => Effect.sync(run),
+      onError: error => {
+        throw error;
+      },
+    });
+
+    task.schedule();
+    await runPluginEffect(task.cancelEffect());
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(run).not.toHaveBeenCalled();
+  });
 });

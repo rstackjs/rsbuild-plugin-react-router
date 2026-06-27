@@ -2,10 +2,12 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
+import { runPluginEffect } from '../src/effect-runtime';
 import {
   createReactRouterManifestStats,
   configRoutesToRouteManifest,
   configRoutesToRouteManifestEntries,
+  generateReactRouterManifestForDevEffect,
   generateReactRouterManifestForDev,
   getReactRouterManifestForDev,
   getReactRouterManifestChunkNames,
@@ -375,6 +377,39 @@ describe('manifest', () => {
         expect.arrayContaining(['headers', 'action', 'loader', 'default'])
       );
       expect(routeManifest).not.toHaveProperty('headers');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('generates manifests through the Effect API', async () => {
+    const { root, appDir } = createTempApp(`
+      export async function loader() { return null; }
+      export default function Page() { return null; }
+    `);
+    try {
+      const { manifest, moduleExportsByRouteId } = await runPluginEffect(
+        generateReactRouterManifestForDevEffect(
+          routes,
+          {},
+          clientStats,
+          appDir,
+          '/',
+          {
+            isBuild: true,
+            rootRouteFile: 'root.tsx',
+            splitRouteModules: false,
+          }
+        )
+      );
+
+      expect(manifest.routes['routes/page']).toMatchObject({
+        hasLoader: true,
+        hasDefaultExport: true,
+      });
+      expect(moduleExportsByRouteId['routes/page']).toEqual(
+        expect.arrayContaining(['loader', 'default'])
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
