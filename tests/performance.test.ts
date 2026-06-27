@@ -1,4 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
+import { Effect } from 'effect';
+import { runPluginEffect } from '../src/effect-runtime';
 import { createReactRouterPerformanceProfiler } from '../src/performance';
 
 const parsePerformanceReport = (message: string) => {
@@ -196,6 +198,30 @@ describe('React Router performance profiler', () => {
         return operation;
       })
     ).resolves.toBe('route-module');
+    profiler.flush('web');
+
+    const report = parsePerformanceReport(logs[0]);
+    expect(report.operations['route:module'].count).toBe(1);
+  });
+
+  it('records Effect operations and preserves failures', async () => {
+    const logs: string[] = [];
+    const profiler = createReactRouterPerformanceProfiler({
+      enabled: true,
+      log: message => logs.push(message),
+    });
+    const failure = new Error('effect operation failed');
+
+    await expect(
+      runPluginEffect(
+        profiler.recordEffect(
+          'web',
+          'route:module',
+          'app/routes/effect.tsx',
+          Effect.fail(failure)
+        )
+      )
+    ).rejects.toBe(failure);
     profiler.flush('web');
 
     const report = parsePerformanceReport(logs[0]);

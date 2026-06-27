@@ -1,3 +1,5 @@
+import { Effect } from 'effect';
+
 type OperationTiming = {
   count: number;
   // Total sums every recorded duration, so parallel work can make it larger
@@ -70,6 +72,12 @@ export type ReactRouterPerformanceProfiler = {
     resource: string,
     callback: () => T
   ): T;
+  recordEffect<T, E>(
+    environment: string | undefined,
+    operation: string,
+    resource: string,
+    effect: Effect.Effect<T, E, never>
+  ): Effect.Effect<T, E, never>;
   flush(
     environment: string | undefined,
     details?: Pick<ReactRouterPerformanceReport, 'compilerLifecycleMs'>
@@ -224,6 +232,30 @@ export const createReactRouterPerformanceProfiler = ({
         const end = performance.now();
         recordDuration(resolvedEnvironment, operation, resource, start, end);
       }
+    },
+    recordEffect(environment, operation, resource, effect) {
+      if (!enabled) {
+        return effect;
+      }
+
+      const resolvedEnvironment = environment ?? 'unknown';
+      return Effect.suspend(() => {
+        const start = performance.now();
+        return effect.pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              const end = performance.now();
+              recordDuration(
+                resolvedEnvironment,
+                operation,
+                resource,
+                start,
+                end
+              );
+            })
+          )
+        );
+      });
     },
     flush(environment, details = {}) {
       if (!enabled) {
