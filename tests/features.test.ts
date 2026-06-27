@@ -240,6 +240,14 @@ describe('pluginReactRouter', () => {
       const hasUrlAssetRule = (rule: any) =>
         rule.resourceQuery?.toString().includes('url') &&
         rule.exclude?.test('app/styles.css') &&
+        rule.resourceQuery?.test('?url') &&
+        rule.resourceQuery?.test('?foo=bar&url') &&
+        !rule.resourceQuery?.test('?raw') &&
+        !rule.resourceQuery?.test('?inline') &&
+        !rule.resourceQuery?.test('?url&raw') &&
+        !rule.resourceQuery?.test('?raw&url') &&
+        !rule.resourceQuery?.test('?url&inline') &&
+        !rule.resourceQuery?.test('?inline&url') &&
         rule.type === 'asset/resource';
 
       expect(getRules('web').some(hasUrlAssetRule)).toBe(true);
