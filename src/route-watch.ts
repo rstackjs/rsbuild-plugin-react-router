@@ -1,11 +1,18 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { RsbuildConfig } from '@rsbuild/core';
+import { Effect } from 'effect';
 import { dirname, resolve } from 'pathe';
+import { getDefaultConcurrency } from './concurrency.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import type { Route } from './types.js';
 
 const ROUTE_RESTART_MARKER_ASSET = '.react-router/route-watch';
 const INITIAL_RESTART_MARKER_CONTENT = 'react-router-route-watch';
+const ROUTE_DIRECTORY_SCAN_CONCURRENCY = Math.max(
+  1,
+  Math.min(16, getDefaultConcurrency() || 1)
+);
 
 type RouteManifestSnapshotEntry = Pick<
   Route,
@@ -111,32 +118,27 @@ const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
   return true;
 };
 
-const readRouteDirectories = async (
-  watchDirectory: string
-): Promise<Set<string>> => {
+const readRouteDirectories = (watchDirectory: string): Promise<Set<string>> => {
   const directories = new Set<string>();
 
-  const walkDirectory = async (directory: string): Promise<void> => {
-    let entries;
-    try {
-      entries = await readdir(directory, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    directories.add(directory);
-    await Promise.all(
-      entries.map(async entry => {
-        const entryPath = resolve(directory, entry.name);
-        if (entry.isDirectory()) {
-          await walkDirectory(entryPath);
-        }
-      })
+  const walkDirectory = (directory: string): Effect.Effect<void> =>
+    tryPluginPromise(() => readdir(directory, { withFileTypes: true })).pipe(
+      Effect.catchAll(() => Effect.succeed([])),
+      Effect.map(entries => {
+        directories.add(directory);
+        return entries
+          .filter(entry => entry.isDirectory())
+          .map(entry => resolve(directory, entry.name));
+      }),
+      Effect.flatMap(childDirectories =>
+        Effect.forEach(childDirectories, walkDirectory, {
+          concurrency: ROUTE_DIRECTORY_SCAN_CONCURRENCY,
+          discard: true,
+        })
+      )
     );
-  };
 
-  await walkDirectory(watchDirectory);
-  return directories;
+  return runPluginEffect(walkDirectory(watchDirectory)).then(() => directories);
 };
 
 export const createRouteTopologyWatcher = async ({
