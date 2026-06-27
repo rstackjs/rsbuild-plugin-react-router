@@ -65,4 +65,14 @@ describe('resolveReactRouterConfig', () => {
     expect(disabledResult.resolved.splitRouteModules).toBe(false);
     expect(enforcedResult.resolved.splitRouteModules).toBe('enforce');
   });
+
+  it('resolves stable subresource integrity from top-level config', async () => {
+    const defaultResult = await resolveReactRouterConfig({});
+    const enabledResult = await resolveReactRouterConfig({
+      subResourceIntegrity: true,
+    } as any);
+
+    expect(defaultResult.resolved.subResourceIntegrity).toBe(false);
+    expect(enabledResult.resolved.subResourceIntegrity).toBe(true);
+  });
 });

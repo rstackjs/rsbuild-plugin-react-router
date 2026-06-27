@@ -17,10 +17,11 @@ type SplitRouteModulesConfig = boolean | 'enforce';
 
 export type Config = Omit<
   ReactRouterConfig,
-  'buildEnd' | 'splitRouteModules'
+  'buildEnd' | 'splitRouteModules' | 'subResourceIntegrity'
 > & {
   buildEnd?: BuildEndHook;
   splitRouteModules?: SplitRouteModulesConfig;
+  subResourceIntegrity?: boolean;
 };
 
 type FutureConfig = {
@@ -56,6 +57,7 @@ export type ResolvedReactRouterConfig = Readonly<{
   serverBundles?: Config['serverBundles'];
   serverModuleFormat: NonNullable<ReactRouterConfig['serverModuleFormat']>;
   splitRouteModules: SplitRouteModulesConfig;
+  subResourceIntegrity: boolean;
   ssr: NonNullable<ReactRouterConfig['ssr']>;
   allowedActionOrigins: string[] | false;
   unstable_routeConfig: RouteConfigEntry[];
@@ -68,6 +70,7 @@ const DEFAULT_CONFIG = {
   serverBuildFile: 'index.js',
   serverModuleFormat: 'esm',
   splitRouteModules: true,
+  subResourceIntegrity: false,
   ssr: true,
   future: {
     unstable_optimizeDeps: false,
@@ -164,12 +167,17 @@ export const resolveReactRouterConfig = async (
     userAndPresetConfigs.splitRouteModules ??
     userAndPresetConfigs.future?.v8_splitRouteModules ??
     DEFAULT_CONFIG.splitRouteModules;
+  const subResourceIntegrity =
+    userAndPresetConfigs.subResourceIntegrity ??
+    userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
+    DEFAULT_CONFIG.subResourceIntegrity;
 
   let resolved: ResolvedReactRouterConfig = {
     ...DEFAULT_CONFIG,
     ...userAndPresetConfigs,
     future: resolvedFuture,
     splitRouteModules,
+    subResourceIntegrity,
     allowedActionOrigins:
       userAndPresetConfigs.allowedActionOrigins ??
       DEFAULT_CONFIG.allowedActionOrigins,

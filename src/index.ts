@@ -82,6 +82,7 @@ import {
 import { mapVirtualModules } from './virtual-modules.js';
 import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
 import { registerReactRouterTypegen } from './typegen.js';
+import { collectConfigDependencyWatchPaths } from './config-dependencies.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -187,8 +188,13 @@ export const pluginReactRouter = (
     // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
+    const configDependencyWatchPaths = configExists
+      ? await collectConfigDependencyWatchPaths(configPath)
+      : [];
     const configWatchPaths = configExists
-      ? configPath
+      ? configDependencyWatchPaths.length > 0
+        ? [configPath, ...configDependencyWatchPaths]
+        : configPath
       : JS_EXTENSIONS.map(extension =>
           resolve(`react-router.config${extension}`)
         );
@@ -233,6 +239,7 @@ export const pluginReactRouter = (
       serverBuildFile,
       serverModuleFormat,
       splitRouteModules,
+      subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
 
@@ -961,7 +968,7 @@ export const pluginReactRouter = (
       () => assetPrefix,
       routeChunkOptions,
       {
-        future,
+        subResourceIntegrity,
         manifestChunkNames,
         onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
           stageLatestManifests(

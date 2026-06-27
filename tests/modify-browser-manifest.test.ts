@@ -229,7 +229,7 @@ describe('modify browser manifest plugin', () => {
         '/',
         { isBuild: true },
         {
-          future: { unstable_subResourceIntegrity: true },
+          subResourceIntegrity: true,
           onManifest(_manifest, sri) {
             reportedSri = sri;
           },

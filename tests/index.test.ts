@@ -103,6 +103,71 @@ describe('pluginReactRouter', () => {
     );
   });
 
+  it('reloads the dev server when imported config dependencies change', async () => {
+    const readFileSync = rstest
+      .spyOn(fs, 'readFileSync')
+      .mockImplementation(path => {
+        const filePath = String(path);
+        if (filePath.endsWith('react-router.config.ts')) {
+          return "import './config/server-bundles'; export default {};";
+        }
+        if (filePath.endsWith('config/server-bundles.ts')) {
+          return 'export const value = 1;';
+        }
+        return '';
+      });
+    const statSync = rstest.spyOn(fs, 'statSync').mockImplementation(path => {
+      const filePath = String(path);
+      if (
+        filePath.endsWith('react-router.config.ts') ||
+        filePath.endsWith('config/server-bundles.ts')
+      ) {
+        return { isFile: () => true } as fs.Stats;
+      }
+      throw new Error(`Missing test file: ${filePath}`);
+    });
+    const existsSyncMock = fs.existsSync as unknown as {
+      mockImplementation: (implementation: (path: unknown) => boolean) => void;
+      mockReturnValue: (value: boolean) => void;
+    };
+    existsSyncMock.mockImplementation(path => {
+      const filePath = String(path);
+      if (filePath.includes('react-router.config')) {
+        return filePath.endsWith('react-router.config.ts');
+      }
+      if (filePath.includes('config/server-bundles')) {
+        return filePath.endsWith('config/server-bundles.ts');
+      }
+      return (
+        filePath.endsWith('app/routes.ts') ||
+        filePath.endsWith('app/root.tsx')
+      );
+    });
+
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      const configWatch = config.dev.watchFiles.find(
+        (watchFile: { paths: unknown }) => Array.isArray(watchFile.paths)
+      );
+      expect(configWatch).toMatchObject({
+        paths: expect.arrayContaining([
+          expect.stringMatching(/config\/server-bundles\.ts$/),
+        ]),
+        type: 'reload-server',
+      });
+    } finally {
+      readFileSync.mockRestore();
+      statSync.mockRestore();
+      existsSyncMock.mockReturnValue(true);
+    }
+  });
+
   it('watches all supported config filenames when the config does not exist yet', async () => {
     const existsSyncMock = fs.existsSync as unknown as {
       mockImplementation: (implementation: (path: unknown) => boolean) => void;

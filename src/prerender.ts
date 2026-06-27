@@ -15,6 +15,7 @@ type PrerenderPathsConfig =
 
 type PrerenderConfigObject = {
   paths?: PrerenderPathsConfig;
+  concurrency?: number;
   unstable_concurrency?: number;
 } | null;
 
@@ -287,9 +288,11 @@ export const getPrerenderConcurrency = (
   if (
     typeof prerender === 'object' &&
     prerender !== null &&
-    'unstable_concurrency' in prerender
+    ('concurrency' in prerender || 'unstable_concurrency' in prerender)
   ) {
-    const value = (prerender as PrerenderConfigObject)?.unstable_concurrency;
+    const value =
+      (prerender as PrerenderConfigObject)?.concurrency ??
+      (prerender as PrerenderConfigObject)?.unstable_concurrency;
     if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
       return value;
     }
@@ -332,15 +335,16 @@ export const validatePrerenderConfig = (
   const concurrency =
     typeof prerender === 'object' &&
     prerender !== null &&
-    'unstable_concurrency' in prerender
-      ? (prerender as PrerenderConfigObject)?.unstable_concurrency
+    ('concurrency' in prerender || 'unstable_concurrency' in prerender)
+      ? ((prerender as PrerenderConfigObject)?.concurrency ??
+        (prerender as PrerenderConfigObject)?.unstable_concurrency)
       : undefined;
 
   if (
     concurrency !== undefined &&
     (!Number.isInteger(concurrency) || concurrency <= 0)
   ) {
-    return 'The `prerender.unstable_concurrency` config must be a positive integer if specified.';
+    return 'The `prerender.concurrency` config must be a positive integer if specified.';
   }
 
   return null;

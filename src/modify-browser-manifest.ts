@@ -13,6 +13,7 @@ import jsesc from 'jsesc';
 
 type ModifyBrowserManifestOptions = {
   future?: { unstable_subResourceIntegrity?: boolean };
+  subResourceIntegrity?: boolean;
   manifestChunkNames?: ReadonlySet<string>;
   onManifest?: (
     manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
@@ -80,7 +81,8 @@ export function registerModifyBrowserManifestAssets(
     );
   const finalizeSri =
     routeChunkOptions?.isBuild &&
-    options?.future?.unstable_subResourceIntegrity;
+    (options?.subResourceIntegrity ??
+      options?.future?.unstable_subResourceIntegrity);
   const generatedManifests = finalizeSri
     ? new WeakMap<Rspack.Compilation, GeneratedManifest>()
     : undefined;

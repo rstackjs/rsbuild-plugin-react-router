@@ -6,6 +6,7 @@ import {
   getSsrFalsePrerenderExportErrors,
   normalizePrerenderMatchPath,
   resolvePrerenderPaths,
+  validatePrerenderConfig,
   withBuildRequest,
 } from '../src/prerender';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
@@ -92,12 +93,23 @@ describe('prerender helpers', () => {
   });
 
   it('supports prerender concurrency config', () => {
-    expect(
-      getPrerenderConcurrency({ paths: ['/'], unstable_concurrency: 3 })
-    ).toBe(3);
+    expect(getPrerenderConcurrency({ paths: ['/'], concurrency: 3 } as any)).toBe(
+      3
+    );
     expect(getPrerenderConcurrency({ paths: ['/'] }, 24)).toBe(1);
     expect(getPrerenderConcurrency({ paths: ['/'] }, 3)).toBe(1);
     expect(getPrerenderConcurrency({ paths: ['/'] }, 2)).toBe(1);
+  });
+
+  it('validates stable prerender concurrency config', () => {
+    expect(
+      validatePrerenderConfig({ paths: ['/'], concurrency: 2 } as any)
+    ).toBeNull();
+    expect(
+      validatePrerenderConfig({ paths: ['/'], concurrency: 0 } as any)
+    ).toBe(
+      'The `prerender.concurrency` config must be a positive integer if specified.'
+    );
   });
 
   it('creates React Router match routes from a route manifest', () => {
