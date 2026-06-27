@@ -274,6 +274,32 @@ describe('parallel route transforms', () => {
     expect(workers.map(worker => worker.terminateCalls)).toEqual([1, 1]);
   });
 
+  it('can prewarm worker slots before the first route transform', async () => {
+    const workers: FakeRouteTransformWorker[] = [];
+    const executor = createRouteTransformExecutorForTesting(
+      {
+        parallelTransforms: 4,
+      },
+      () => {
+        const worker = new FakeRouteTransformWorker();
+        workers.push(worker);
+        return worker;
+      }
+    );
+
+    executor.prewarm();
+    executor.prewarm();
+    expect(workers).toHaveLength(4);
+
+    executor.prewarm();
+    expect(workers).toHaveLength(4);
+
+    await executor.close();
+    expect(workers.map(worker => worker.terminateCalls)).toEqual([
+      1, 1, 1, 1,
+    ]);
+  });
+
   it('executes route client entry tasks through the shared task executor', async () => {
     await expect(
       executeRouteTransformTask({

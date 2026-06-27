@@ -522,6 +522,10 @@ export const pluginReactRouter = (
       api.onAfterDevCompile(() => {
         scheduleRouteTopologyWatcher();
       });
+
+      api.onAfterCreateCompiler(() => {
+        routeTransformExecutor.prewarm();
+      });
     }
 
     const closeRouteTopologyWatcherEffect = (): Effect.Effect<

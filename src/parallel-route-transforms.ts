@@ -26,6 +26,7 @@ export type RouteTransformExecutorOptions = RouteTransformTaskOptions & {
 
 export type RouteTransformExecutor = {
   run: (task: RouteTransformTask) => Promise<RouteTransformResult>;
+  prewarm: () => void;
   close: () => Promise<void>;
 };
 
@@ -121,6 +122,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #nextSplitRouteAnalysisWorkerIndex = 0;
   #splitRouteAnalysisWorkers = new Map<string, number>();
   #workers: Array<WorkerState | undefined> | undefined;
+  #prewarmScheduled = false;
 
   constructor(
     private readonly workerCount: number,
@@ -144,6 +146,38 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
         return executeRouteTransformTask(task, this.options);
       }
       throw error;
+    }
+  }
+
+  prewarm(): void {
+    if (this.#prewarmScheduled || this.#closed || this.#workersDisabled) {
+      return;
+    }
+    this.#prewarmScheduled = true;
+    void this.#prewarmWorkers();
+  }
+
+  async #prewarmWorkers(): Promise<void> {
+    try {
+      for (let index = 0; index < this.workerCount; index += 1) {
+        if (this.#closed || this.#workersDisabled) {
+          return;
+        }
+        try {
+          this.#getWorker(index);
+        } catch (error) {
+          const startupError = new WorkerStartupError(
+            error instanceof Error ? error.message : String(error)
+          );
+          if (error instanceof Error) {
+            startupError.stack = error.stack;
+          }
+          this.#disableWorkers(startupError);
+          return;
+        }
+      }
+    } finally {
+      this.#prewarmScheduled = false;
     }
   }
 
@@ -353,6 +387,7 @@ const createRouteTransformExecutorWithWorkerFactory = (
   if (parallelTransforms === false) {
     return {
       run: task => executeRouteTransformTask(task, options),
+      prewarm: () => {},
       close: async () => {},
     };
   }
@@ -364,6 +399,7 @@ const createRouteTransformExecutorWithWorkerFactory = (
   if (workerCount < 1) {
     return {
       run: task => executeRouteTransformTask(task, options),
+      prewarm: () => {},
       close: async () => {},
     };
   }
