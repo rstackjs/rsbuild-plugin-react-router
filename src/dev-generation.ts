@@ -1,4 +1,5 @@
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
+import { Deferred as EffectDeferred, Effect } from 'effect';
 import type { ServerBuild } from 'react-router';
 import {
   evaluateServerBuilds,
@@ -15,6 +16,7 @@ import {
   type ReactRouterServerBuilds,
   type WebArtifact,
 } from './dev-runtime-artifacts.js';
+import { runPluginEffect } from './effect-runtime.js';
 
 export { snapshotDevChangedFiles } from './dev-runtime-artifacts.js';
 export type {
@@ -25,12 +27,6 @@ export type {
   ReactRouterDevManifest,
   ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
-
-type Deferred<T> = {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-  reject: (error: Error) => void;
-};
 
 type CommittedGeneration = {
   buildsByEntryName: ReactRouterServerBuilds;
@@ -44,7 +40,7 @@ type RuntimeState =
   | {
       kind: 'starting';
       attemptId: number;
-      readiness: Deferred<CommittedGeneration>;
+      readiness: EffectDeferred.Deferred<CommittedGeneration, Error>;
     }
   | { kind: 'failed'; attemptId: number; error: Error }
   | {
@@ -250,18 +246,10 @@ const hasRouteManifestMetadataChanges = (
   return false;
 };
 
-const createDeferred = <T>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  let reject!: (error: Error) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  // Compilation can fail before a request asks for the build. Observe the
-  // rejection now while returning the same promise to future callers.
-  void promise.catch(() => undefined);
-  return { promise, resolve, reject };
-};
+const createReadinessDeferred = (): EffectDeferred.Deferred<
+  CommittedGeneration,
+  Error
+> => Effect.runSync(EffectDeferred.make<CommittedGeneration, Error>());
 
 export const createReactRouterDevRuntime = ({
   server,
@@ -276,7 +264,7 @@ export const createReactRouterDevRuntime = ({
   let state: RuntimeState = {
     kind: 'starting',
     attemptId: 0,
-    readiness: createDeferred(),
+    readiness: createReadinessDeferred(),
   };
   const manifestsByCompilation = new WeakMap<
     Rspack.Compilation,
@@ -352,7 +340,7 @@ export const createReactRouterDevRuntime = ({
     if (state.kind === 'starting') {
       const { readiness } = state;
       state = { kind: 'failed', attemptId, error };
-      readiness.reject(error);
+      Effect.runSync(EffectDeferred.fail(readiness, error));
     } else if (state.kind === 'ready') {
       state = { ...state, pendingAttemptId: null };
     }
@@ -371,7 +359,7 @@ export const createReactRouterDevRuntime = ({
     if (state.kind === 'starting') {
       const { readiness } = state;
       state = { kind: 'ready', committed, pendingAttemptId: null };
-      readiness.resolve(committed);
+      Effect.runSync(EffectDeferred.succeed(readiness, committed));
     } else if (state.kind === 'ready') {
       state = { kind: 'ready', committed, pendingAttemptId: null };
     }
@@ -413,7 +401,7 @@ export const createReactRouterDevRuntime = ({
         state = {
           kind: 'starting',
           attemptId,
-          readiness: createDeferred(),
+          readiness: createReadinessDeferred(),
         };
       } else if (state.kind === 'starting') {
         state = { ...state, attemptId };
@@ -632,11 +620,11 @@ export const createReactRouterDevRuntime = ({
         return Promise.resolve(selectBuild(state.committed, entryName));
       }
       if (state.kind === 'starting') {
-        const selected = state.readiness.promise.then(generation =>
-          selectBuild(generation, entryName)
+        const selected = runPluginEffect(
+          EffectDeferred.await(state.readiness).pipe(
+            Effect.map(generation => selectBuild(generation, entryName))
+          )
         );
-        // Compilation may fail before the request awaiting this selection has
-        // a chance to attach its own rejection handler.
         void selected.catch(() => undefined);
         return selected;
       }
@@ -653,7 +641,7 @@ export const createReactRouterDevRuntime = ({
           '[rsbuild-plugin-react-router] The development server closed before a React Router build was ready.'
         );
       if (state.kind === 'starting') {
-        state.readiness.reject(closeError);
+        Effect.runSync(EffectDeferred.fail(state.readiness, closeError));
       }
       state = { kind: 'closed', error: closeError };
     },

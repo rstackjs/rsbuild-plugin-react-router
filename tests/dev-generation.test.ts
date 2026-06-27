@@ -340,6 +340,45 @@ describe('React Router development runtime', () => {
     });
   });
 
+  it('resolves all initial waiters from one committed generation', async () => {
+    const { loadBundle, runtime } = createHarness(() =>
+      createBuild('shared')
+    );
+    const web = createCompilation('web');
+    const node = createCompilation('node');
+
+    runtime.beginAttempt();
+    captureWeb(runtime, web, 'shared');
+    const firstWaiting = runtime.load();
+    const secondWaiting = runtime.load();
+    await runtime.finishAttempt(
+      createGraphStats(web, node),
+      noKnownChanges,
+      graphIdentity(web, node)
+    );
+
+    const [first, second] = await Promise.all([firstWaiting, secondWaiting]);
+    expect(first).toBe(second);
+    expect(loadBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects all initial waiters when the runtime closes', async () => {
+    const { errors, runtime } = createHarness(() => createBuild('closed'));
+
+    runtime.beginAttempt();
+    const firstWaiting = runtime.load();
+    const secondWaiting = runtime.load();
+    runtime.close();
+
+    await expect(firstWaiting).rejects.toThrow(
+      'development server closed before a React Router build was ready'
+    );
+    await expect(secondWaiting).rejects.toThrow(
+      'development server closed before a React Router build was ready'
+    );
+    expect(errors).toEqual([]);
+  });
+
   it('rejects initial waiters on a fatal compiler failure and recovers', async () => {
     const { loadBundle, runtime } = createHarness(() =>
       createBuild('recovered')
