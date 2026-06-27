@@ -271,7 +271,7 @@ describe('route chunks', () => {
       ]);
     });
 
-    it('does not split client exports away from top-level side effects', async () => {
+    it('keeps top-level side effects in the main chunk while splitting independent client exports', async () => {
       const code = `
         import './polyfill';
         initialize();
@@ -281,7 +281,19 @@ describe('route chunks', () => {
 
       const result = await detect(code);
 
-      expectNoRouteChunks(result, ['clientAction', 'default']);
+      expectOnlyChunkedExport(result, 'clientAction');
+    });
+
+    it('keeps side-effect imports in the main chunk while splitting independent client exports', async () => {
+      const code = `
+        import './polyfill';
+        export const clientAction = async () => {};
+        export default function Route() { return null; }
+      `;
+
+      const result = await detect(code);
+
+      expectOnlyChunkedExport(result, 'clientAction');
     });
   });
 
@@ -358,6 +370,34 @@ describe('route chunks', () => {
       expect(chunk).toMatch(/import\s*\{\s*json\s*\}\s*from/);
       expect(chunk).not.toContain('useFetcher');
       await expectExports(chunk, ['clientLoader'], ['default']);
+    });
+
+    it('keeps side-effect imports in the main chunk and omits them from individual client chunks', async () => {
+      const code = `
+        import './polyfill';
+        export const clientAction = async () => {};
+        export default function Route() { return null; }
+      `;
+
+      const mainChunk = await getRouteChunkIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        'main',
+        code
+      );
+      const clientActionChunk = await getRouteChunkIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        'clientAction',
+        code
+      );
+
+      expect(mainChunk).toContain("import './polyfill'");
+      await expectExports(mainChunk, ['default'], ['clientAction']);
+      expect(clientActionChunk).not.toContain('polyfill');
+      await expectExports(clientActionChunk, ['clientAction'], ['default']);
     });
 
     it('returns null for the main chunk when only client exports exist', async () => {

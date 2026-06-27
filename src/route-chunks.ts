@@ -208,13 +208,6 @@ const getExportDependencies = (
       const exportDependencies = new Map<string, ExportDependencies>();
       const topLevelStatementCache = new Map<AnyNode, AnyNode>();
       const variableDeclaratorCache = new Map<AnyNode, AnyNode | null>();
-      const sharedTopLevelSideEffects = (module.ast as AnyNode).body.filter(
-        (statement: AnyNode) =>
-          (statement.type === 'ImportDeclaration' &&
-            statement.specifiers.length === 0) ||
-          statement.type === 'ExpressionStatement'
-      );
-
       const getCachedTopLevelStatementForNode = (node: AnyNode): AnyNode => {
         const cached = topLevelStatementCache.get(node);
         if (cached) {
@@ -324,11 +317,6 @@ const getExportDependencies = (
         } else {
           const statement = getCachedTopLevelStatementForNode(exportNode);
           scanNode(statement);
-        }
-
-        for (const statement of sharedTopLevelSideEffects) {
-          dependencies.topLevelStatements.add(statement);
-          dependencies.topLevelNonModuleStatements.add(statement);
         }
 
         exportDependencies.set(exportName, dependencies);

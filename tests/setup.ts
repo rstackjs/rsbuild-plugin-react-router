@@ -31,9 +31,7 @@ rstest.mock('jiti', () => ({
       }
       if (process.env.RR_TEST_SPLIT_ROUTE_MODULES === 'true') {
         return Promise.resolve({
-          future: {
-            v8_splitRouteModules: true,
-          },
+          splitRouteModules: true,
         });
       }
       return Promise.resolve({});

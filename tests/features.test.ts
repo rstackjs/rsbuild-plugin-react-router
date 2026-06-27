@@ -160,8 +160,7 @@ describe('pluginReactRouter', () => {
       expect(routeTransform).toBeDefined();
     });
 
-    it('should register build and dot file transforms', async () => {
-      process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
+    it('should register build, dot file, and route chunk transforms by default', async () => {
       const readFileSync = rstest
         .spyOn(fs, 'readFileSync')
         .mockReturnValue('export default function Route() { return null; }');
@@ -174,7 +173,6 @@ describe('pluginReactRouter', () => {
         const plugin = pluginReactRouter();
         await plugin.setup(rsbuild as any);
       } finally {
-        delete process.env.RR_TEST_SPLIT_ROUTE_MODULES;
         readFileSync.mockRestore();
       }
 
@@ -230,6 +228,24 @@ describe('pluginReactRouter', () => {
   });
 
   describe('asset handling', () => {
+    it('should treat non-CSS ?url imports as emitted assets in web and node builds', async () => {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+      const getRules = (name: 'web' | 'node') =>
+        config.environments?.[name]?.tools?.rspack?.module?.rules ?? [];
+      const hasUrlAssetRule = (rule: any) =>
+        rule.resourceQuery?.toString().includes('url') &&
+        rule.exclude?.test('app/styles.css') &&
+        rule.type === 'asset/resource';
+
+      expect(getRules('web').some(hasUrlAssetRule)).toBe(true);
+      expect(getRules('node').some(hasUrlAssetRule)).toBe(true);
+    });
+
     it('should emit package.json for node environment', async () => {
       const rsbuild = await createStubRsbuild({
         rsbuildConfig: {},

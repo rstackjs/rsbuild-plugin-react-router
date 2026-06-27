@@ -191,12 +191,10 @@ export default {
   basename: '/my-app',
 
   /**
-   * React Router future flags (optional).
-   * Example: split client route modules into separate chunks.
+   * Split client route module exports into separate chunks.
+   * @default true
    */
-  future: {
-    v8_splitRouteModules: true,
-  },
+  splitRouteModules: true,
 } satisfies Config;
 ```
 
@@ -749,7 +747,7 @@ React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild
 plugin aims to match the important behaviors without depending on Vite:
 
 - Typegen + Route Module API types (`./+types/*`)
-- Route module splitting (`future.v8_splitRouteModules`)
+- Route module splitting (`splitRouteModules`)
 - SPA mode (`ssr: false`), SSR mode, and static prerendering (`prerender`)
 
 Some Vite-specific integrations (for example Vite's environment API + critical

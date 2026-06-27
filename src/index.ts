@@ -122,6 +122,10 @@ const ensureFederationAsyncStartup = (
   }
 };
 
+const cssUrlAssetExtensions =
+  /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
+const urlAssetResourceQuery = /(?:\?|&)url(?:&|$)/;
+
 export const pluginReactRouter = (
   options: PluginOptions = {}
 ): RsbuildPlugin => ({
@@ -228,6 +232,7 @@ export const pluginReactRouter = (
       prerender: prerenderConfig,
       serverBuildFile,
       serverModuleFormat,
+      splitRouteModules,
       buildEnd,
     } = resolvedConfig;
 
@@ -401,7 +406,6 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
-    const splitRouteModules = future?.v8_splitRouteModules ?? false;
     const isPrerenderEnabled =
       prerenderConfig !== undefined && prerenderConfig !== false;
     const isSpaMode = !ssr && !isPrerenderEnabled;
@@ -558,7 +562,15 @@ export const pluginReactRouter = (
         };
 
         if (isBuild && splitRouteModules && route.id !== 'root') {
-          const source = readFileSync(routeFilePath, 'utf8');
+          let source: string;
+          try {
+            source = readFileSync(routeFilePath, 'utf8');
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+              return acc;
+            }
+            throw error;
+          }
           for (const exportName of routeChunkExportNames) {
             if (!source.includes(exportName)) {
               continue;
@@ -820,6 +832,15 @@ export const pluginReactRouter = (
             tools: {
               rspack: {
                 name: 'web',
+                module: {
+                  rules: [
+                    {
+                      resourceQuery: urlAssetResourceQuery,
+                      exclude: cssUrlAssetExtensions,
+                      type: 'asset/resource',
+                    },
+                  ],
+                },
                 ...(options.federation
                   ? {
                       output: {
@@ -862,6 +883,15 @@ export const pluginReactRouter = (
             tools: {
               rspack: {
                 target: options.federation ? 'async-node' : 'node',
+                module: {
+                  rules: [
+                    {
+                      resourceQuery: urlAssetResourceQuery,
+                      exclude: cssUrlAssetExtensions,
+                      type: 'asset/resource',
+                    },
+                  ],
+                },
                 externals: nodeExternals,
                 dependencies: ['web'],
                 externalsType: resolvedServerOutput,

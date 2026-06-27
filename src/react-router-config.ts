@@ -13,8 +13,14 @@ export type BuildEndHook = {
   }): void | Promise<void>;
 }['bivarianceHack'];
 
-export type Config = Omit<ReactRouterConfig, 'buildEnd'> & {
+type SplitRouteModulesConfig = boolean | 'enforce';
+
+export type Config = Omit<
+  ReactRouterConfig,
+  'buildEnd' | 'splitRouteModules'
+> & {
   buildEnd?: BuildEndHook;
+  splitRouteModules?: SplitRouteModulesConfig;
 };
 
 type FutureConfig = {
@@ -49,6 +55,7 @@ export type ResolvedReactRouterConfig = Readonly<{
   serverBuildFile: NonNullable<ReactRouterConfig['serverBuildFile']>;
   serverBundles?: Config['serverBundles'];
   serverModuleFormat: NonNullable<ReactRouterConfig['serverModuleFormat']>;
+  splitRouteModules: SplitRouteModulesConfig;
   ssr: NonNullable<ReactRouterConfig['ssr']>;
   allowedActionOrigins: string[] | false;
   unstable_routeConfig: RouteConfigEntry[];
@@ -60,6 +67,7 @@ const DEFAULT_CONFIG = {
   buildDirectory: 'build',
   serverBuildFile: 'index.js',
   serverModuleFormat: 'esm',
+  splitRouteModules: true,
   ssr: true,
   future: {
     unstable_optimizeDeps: false,
@@ -152,11 +160,16 @@ export const resolveReactRouterConfig = async (
     ...DEFAULT_CONFIG.future,
     ...(userAndPresetConfigs.future ?? {}),
   };
+  const splitRouteModules =
+    userAndPresetConfigs.splitRouteModules ??
+    userAndPresetConfigs.future?.v8_splitRouteModules ??
+    DEFAULT_CONFIG.splitRouteModules;
 
   let resolved: ResolvedReactRouterConfig = {
     ...DEFAULT_CONFIG,
     ...userAndPresetConfigs,
     future: resolvedFuture,
+    splitRouteModules,
     allowedActionOrigins:
       userAndPresetConfigs.allowedActionOrigins ??
       DEFAULT_CONFIG.allowedActionOrigins,
