@@ -55,6 +55,7 @@
     "bench:smoke": "node scripts/bench-builds.mjs --profile smoke --iterations 1 --warmup 0 --format both --out .benchmark/results/smoke",
     "bench:baseline": "node scripts/bench-builds.mjs --profile default --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/baseline",
     "bench:full": "node scripts/bench-builds.mjs --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",
+    "bench:large": "node scripts/bench-builds.mjs --profile large --iterations 1 --warmup 0 --clean cold --format both --out .benchmark/results/large",
     "e2e": "pnpm build && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e",
     "dev": "rslib build --watch",
     "test": "rstest run",
