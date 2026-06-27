@@ -22,7 +22,10 @@ export const captureWeb = (
 
 export const createDevRuntimeHarness = (
   loadBundle: (entryName: string) => Promise<unknown> | unknown,
-  options: { onCssAssetOwnershipChanged?: () => void } = {}
+  options: {
+    onCssAssetOwnershipChanged?: (change: 'removed' | 'restored') => void;
+    onRouteManifestChanged?: () => void;
+  } = {}
 ) => {
   const errors: Error[] = [];
   const warnings: string[] = [];
@@ -40,6 +43,7 @@ export const createDevRuntimeHarness = (
     },
     onEvaluationError: error => errors.push(error),
     onCssAssetOwnershipChanged: options.onCssAssetOwnershipChanged,
+    onRouteManifestChanged: options.onRouteManifestChanged,
     onWarning: warning => warnings.push(warning),
   });
   return { errors, loadBundle: loadBundleMock, runtime, server, warnings };

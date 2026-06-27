@@ -213,6 +213,12 @@ export const createReactRouterDevRuntimeController = ({
           reloadAfterCssAssetOwnershipRemoval = change === 'removed';
           sendCssAssetOwnershipReload();
         },
+        onRouteManifestChanged() {
+          if (sessions.getActiveBinding()?.runtime !== runtime) {
+            return;
+          }
+          server.sockWrite('full-reload', { path: '*' });
+        },
         onWarning: message => api.logger.warn(message),
       });
       const binding = sessions.createBinding(server, runtime);

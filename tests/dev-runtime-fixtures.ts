@@ -59,10 +59,11 @@ export const createBuild = (
     ssr: true,
   }) as unknown as TestServerBuild;
 
-const createRouteManifest = (
+export const createRouteManifest = (
   id: string,
   css: string[],
-  imports: string[] = []
+  imports: string[] = [],
+  overrides: Partial<ReactRouterDevManifest['routes'][string]> = {}
 ): ReactRouterDevManifest['routes'][string] => ({
   id,
   module: `/${id}.js`,
@@ -75,6 +76,7 @@ const createRouteManifest = (
   hasErrorBoundary: false,
   imports,
   css,
+  ...overrides,
 });
 
 export type DevManifestCss = {

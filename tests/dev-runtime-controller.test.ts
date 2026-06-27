@@ -12,7 +12,9 @@ import { createReactRouterDevRuntimeController } from '../src/dev-runtime-contro
 import {
   createBuild,
   createGraphStats,
+  createDevManifest,
   createManifestSet,
+  createRouteManifest,
   createStats,
 } from './dev-runtime-fixtures';
 
@@ -503,6 +505,53 @@ describe('React Router development runtime controller', () => {
       path: '*',
     });
     expect(server.sockWrite).toHaveBeenNthCalledWith(2, 'full-reload', {
+      path: '*',
+    });
+  });
+
+  it('hard reloads when route export metadata changes', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('base'));
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, {
+      'static/js/app': {
+        ...createDevManifest('web-base'),
+        routes: {
+          'routes/about': createRouteManifest('routes/about', [], [], {
+            hasClientLoader: false,
+          }),
+        },
+      },
+    });
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    callbacks.before();
+    const nextWeb = web.compile();
+    controller.captureWeb(nextWeb, {
+      'static/js/app': {
+        ...createDevManifest('web-next'),
+        routes: {
+          'routes/about': createRouteManifest('routes/about', [], [], {
+            hasClientLoader: true,
+            clientLoaderModule: '/routes/about.clientLoader.js',
+          }),
+        },
+      },
+    });
+    web.complete(nextWeb);
+    const nextNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(nextWeb, nextNode) });
+
+    expect(server.sockWrite).toHaveBeenCalledWith('full-reload', {
       path: '*',
     });
   });
