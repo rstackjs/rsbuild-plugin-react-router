@@ -5,6 +5,23 @@ import { pluginReactRouter } from '../src';
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
 };
+type PluginSetupApi = Parameters<
+  NonNullable<ReturnType<typeof pluginReactRouter>['setup']>
+>[0];
+type EnvironmentCompileHandler = (args: {
+  environment: { name: string };
+  stats: {
+    toJson: () => {
+      assets: never[];
+      assetsByChunkName: Record<string, string[]>;
+    };
+  };
+}) => void;
+type MockEnvironmentCompileHook = {
+  mock: {
+    calls: Array<[EnvironmentCompileHandler]>;
+  };
+};
 
 describe('pluginReactRouter', () => {
   it('should configure basic plugin options', async () => {
@@ -83,9 +100,10 @@ describe('pluginReactRouter', () => {
       rsbuildConfig: {},
     });
     const plugin = pluginReactRouter();
-    await plugin.setup(rsbuild as any);
+    await plugin.setup(rsbuild as PluginSetupApi);
 
-    const onAfterEnvironmentCompile = rsbuild.onAfterEnvironmentCompile as any;
+    const onAfterEnvironmentCompile =
+      rsbuild.onAfterEnvironmentCompile as MockEnvironmentCompileHook;
     const handler = onAfterEnvironmentCompile.mock.calls[0][0];
     const toJson = rstest.fn().mockReturnValue({
       assets: [],

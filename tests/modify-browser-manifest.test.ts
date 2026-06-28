@@ -10,6 +10,29 @@ import {
 const BROWSER_MANIFEST_PATH =
   'static/js/virtual/react-router/browser-manifest.js';
 
+type ManifestAsset = {
+  source: () => string;
+};
+type TestCompilation = {
+  assets: Record<string, ManifestAsset>;
+  getStats: () => {
+    toJson: () => {
+      assetsByChunkName: Record<string, string[]>;
+    };
+  };
+};
+type EmitHandler = (
+  compilation: TestCompilation,
+  callback: (error?: Error) => void
+) => Promise<void>;
+type TestCompiler = {
+  hooks: {
+    emit: {
+      tapAsync: (name: string, handler: EmitHandler) => void;
+    };
+  };
+};
+
 describe('collectSubresourceIntegrity', () => {
   it('uses official integrity metadata from stats and compilation assets', () => {
     const sri = collectSubresourceIntegrity(
@@ -87,12 +110,7 @@ describe('collectSubresourceIntegrity', () => {
     );
 
     try {
-      let emit:
-        | ((
-            compilation: any,
-            callback: (error?: Error) => void
-          ) => Promise<void>)
-        | undefined;
+      let emit: EmitHandler | undefined;
       let callbackSri: Record<string, string> | true | undefined;
       const plugin = createModifyBrowserManifestPlugin(
         {
@@ -119,17 +137,18 @@ describe('collectSubresourceIntegrity', () => {
         }
       );
 
-      plugin.apply({
+      const compiler: TestCompiler = {
         hooks: {
           emit: {
-            tapAsync: (_name: string, handler: typeof emit) => {
+            tapAsync: (_name, handler) => {
               emit = handler;
             },
           },
         },
-      } as any);
+      };
+      plugin.apply(compiler as Parameters<typeof plugin.apply>[0]);
 
-      const compilation = {
+      const compilation: TestCompilation = {
         assets: {
           [BROWSER_MANIFEST_PATH]: {
             source: () => 'window.__reactRouterManifest="PLACEHOLDER";',
@@ -145,8 +164,12 @@ describe('collectSubresourceIntegrity', () => {
         }),
       };
 
+      if (!emit) {
+        throw new Error('Expected manifest plugin to register an emit hook.');
+      }
+
       await new Promise<void>((resolve, reject) => {
-        emit?.(compilation, error => {
+        emit(compilation, error => {
           if (error) {
             reject(error);
             return;
