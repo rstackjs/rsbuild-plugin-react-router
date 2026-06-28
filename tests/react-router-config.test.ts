@@ -70,7 +70,7 @@ describe('resolveReactRouterConfig', () => {
     const defaultResult = await resolveReactRouterConfig({});
     const enabledResult = await resolveReactRouterConfig({
       subResourceIntegrity: true,
-    } as any);
+    });
 
     expect(defaultResult.resolved.subResourceIntegrity).toBe(false);
     expect(enabledResult.resolved.subResourceIntegrity).toBe(true);

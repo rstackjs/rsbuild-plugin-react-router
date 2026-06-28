@@ -188,16 +188,19 @@ export const pluginReactRouter = (
     // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
-    const configDependencyWatchPaths = configExists
-      ? await collectConfigDependencyWatchPaths(configPath)
-      : [];
-    const configWatchPaths = configExists
-      ? configDependencyWatchPaths.length > 0
-        ? [configPath, ...configDependencyWatchPaths]
-        : configPath
-      : JS_EXTENSIONS.map(extension =>
-          resolve(`react-router.config${extension}`)
-        );
+    let configWatchPaths: string | string[];
+    if (configExists) {
+      const dependencyWatchPaths =
+        await collectConfigDependencyWatchPaths(configPath);
+      configWatchPaths =
+        dependencyWatchPaths.length > 0
+          ? [configPath, ...dependencyWatchPaths]
+          : configPath;
+    } else {
+      configWatchPaths = JS_EXTENSIONS.map(extension =>
+        resolve(`react-router.config${extension}`)
+      );
+    }
     let reactRouterUserConfig: Config = {};
     if (!configExists) {
       console.warn(
