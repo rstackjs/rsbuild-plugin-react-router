@@ -538,7 +538,7 @@ describe('pluginReactRouter', () => {
     expect(nodeConfig.experiments.outputModule).toBe(true);
   });
 
-  it('should run development web and node compilers without a hard dependency edge', async () => {
+  it('should apply the resolved development compiler dependency policy', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
     });
@@ -547,11 +547,17 @@ describe('pluginReactRouter', () => {
     const config = await rsbuild.unwrapConfig();
 
     const nodeConfig = config.environments?.node?.tools?.rspack;
-    expect(nodeConfig.dependencies).toBeUndefined();
+    expect(nodeConfig.dependencies).toEqual(
+      shouldParallelizeEnvironmentBuilds({ isBuild: false })
+        ? undefined
+        : ['web']
+    );
   });
 
   it.each([
-    [{ isBuild: false, spareCoreCount: 1 }, true],
+    [{ isBuild: false, spareCoreCount: 4 }, true],
+    [{ isBuild: false, spareCoreCount: 3 }, false],
+    [{ isBuild: false, spareCoreCount: 1 }, false],
     [{ isBuild: false, spareCoreCount: 0 }, false],
     [{ isBuild: true, spareCoreCount: 8 }, false],
   ])('should resolve parallel environment build mode', (options, expected) => {

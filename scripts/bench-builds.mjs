@@ -85,6 +85,51 @@ const profiles = {
   ],
 };
 
+const DEFAULT_RESERVED_CORES = 2;
+const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
+const DEFAULT_ROUTE_TRANSFORM_WORKER_LIMIT = 4;
+const SMALL_MACHINE_ROUTE_TRANSFORM_WORKER_LIMIT = 1;
+const SMALL_MACHINE_CPU_COUNT = 4;
+
+const getAvailableCpuCount = () =>
+  typeof os.availableParallelism === 'function'
+    ? os.availableParallelism()
+    : os.cpus().length;
+
+const getDefaultConcurrency = cpuCount =>
+  Math.max(0, Math.floor(cpuCount) - DEFAULT_RESERVED_CORES);
+
+const getDefaultRouteTransformWorkerCount = cpuCount => {
+  const workerCount = getDefaultConcurrency(cpuCount);
+  if (workerCount < 1) {
+    return 0;
+  }
+  const workerLimit =
+    cpuCount <= SMALL_MACHINE_CPU_COUNT
+      ? SMALL_MACHINE_ROUTE_TRANSFORM_WORKER_LIMIT
+      : DEFAULT_ROUTE_TRANSFORM_WORKER_LIMIT;
+  return Math.min(workerCount, workerLimit);
+};
+
+const resolveConcurrency = parallelTransforms => {
+  const availableCpuCount = getAvailableCpuCount();
+  const spareCoreCount = getDefaultConcurrency(availableCpuCount);
+  return {
+    availableCpuCount,
+    reservedCoreCount: DEFAULT_RESERVED_CORES,
+    spareCoreCount,
+    minParallelEnvironmentBuildSpareCores:
+      MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES,
+    parallelEnvironmentBuilds:
+      spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES,
+    routeTransformWorkers:
+      parallelTransforms === false
+        ? 0
+        : (parallelTransforms ??
+          getDefaultRouteTransformWorkerCount(availableCpuCount)),
+  };
+};
+
 const parseArgs = argv => {
   const { values } = parseCliArgs({
     args: argv,
@@ -660,6 +705,7 @@ const formatRss = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
 
 const renderMarkdown = result => {
+  const concurrency = result.concurrency;
   const lines = [
     '# Rsbuild React Router Benchmark Baseline',
     '',
@@ -672,6 +718,9 @@ const renderMarkdown = result => {
     `- Mode: ${result.mode}`,
     `- Iterations: ${result.iterations}`,
     `- Warmup: ${result.warmup}`,
+    `- Available CPUs: ${concurrency.availableCpuCount}`,
+    `- Spare cores: ${concurrency.spareCoreCount}`,
+    `- Parallel environment builds: ${String(concurrency.parallelEnvironmentBuilds)}`,
     ...(result.mode === 'dev'
       ? [
           `- Dev routes: ${result.devRoutes}`,
@@ -679,6 +728,7 @@ const renderMarkdown = result => {
         ]
       : []),
     `- Parallel transforms: ${formatParallelTransforms(result.parallelTransforms)}`,
+    `- Resolved route transform workers: ${concurrency.routeTransformWorkers}`,
     `- Plugin performance logging: ${String(result.logPerformance)}`,
     `- Rspack profile: ${result.rspackProfile ?? 'false'}`,
     ...(result.rspackTraceOutput
@@ -931,6 +981,7 @@ const resolveRspackTraceOutput = async ({
 
 const main = async () => {
   const args = parseArgs(process.argv.slice(2));
+  const concurrency = resolveConcurrency(args.parallelTransforms);
   const useTime = await hasGnuTime();
   const outputPaths = resolveOutputPaths(args);
   const pluginImportPath = pathToFileURL(
@@ -1114,6 +1165,7 @@ const main = async () => {
       fixture: fixtureResult.fixture,
       fixtureStats: fixtureResult.stats ?? null,
       parallelTransforms: args.parallelTransforms,
+      resolvedRouteTransformWorkers: concurrency.routeTransformWorkers,
       devRoutePaths,
       cwd: path.relative(rootDir, fixtureRoot),
       command:
@@ -1143,6 +1195,7 @@ const main = async () => {
     warmup: args.warmup,
     clean: args.clean,
     logPerformance: args.logPerformance,
+    concurrency,
     devRoutes: args.mode === 'dev' ? args.devRoutes : null,
     devRouteTimeoutMs: args.mode === 'dev' ? args.devRouteTimeoutMs : null,
     parallelTransforms: args.parallelTransforms,

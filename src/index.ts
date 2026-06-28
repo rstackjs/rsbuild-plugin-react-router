@@ -88,13 +88,16 @@ import {
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
 
+const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
+
 export const shouldParallelizeEnvironmentBuilds = ({
   isBuild,
   spareCoreCount = getDefaultConcurrency(),
 }: {
   isBuild: boolean;
   spareCoreCount?: number;
-}): boolean => !isBuild && spareCoreCount > 0;
+}): boolean =>
+  !isBuild && spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES;
 
 type ModuleFederationPluginLike = {
   name?: string;
@@ -432,8 +435,9 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
-    const shouldDependOnWebCompiler =
-      !shouldParallelizeEnvironmentBuilds({ isBuild });
+    const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
+      isBuild,
+    });
     const isPrerenderEnabled =
       prerenderConfig !== undefined && prerenderConfig !== false;
     const isSpaMode = !ssr && !isPrerenderEnabled;
