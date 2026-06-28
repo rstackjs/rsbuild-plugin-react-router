@@ -156,6 +156,7 @@ export const pluginReactRouter = (
   async setup(api) {
     const defaultOptions = {
       customServer: false,
+      lazyCompilation: true,
       serverOutput: 'module' as const,
     };
 
@@ -896,10 +897,12 @@ export const pluginReactRouter = (
         serverBundleEntries,
       });
 
-      const configuredLazyCompilation =
-        pluginOptions.lazyCompilation === undefined
-          ? config.dev?.lazyCompilation
-          : pluginOptions.lazyCompilation;
+      const configuredLazyCompilation = Object.prototype.hasOwnProperty.call(
+        options,
+        'lazyCompilation'
+      )
+        ? pluginOptions.lazyCompilation
+        : (config.dev?.lazyCompilation ?? pluginOptions.lazyCompilation);
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
         entryClientPath: finalEntryClientPath,

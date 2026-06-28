@@ -61,7 +61,15 @@ describe('pluginReactRouter', () => {
     expect(config.dev.hmr).toBe(true);
     expect(config.dev.liveReload).toBe(true);
     expect(config.dev.writeToDisk).toBe(true);
-    expect(config.dev.lazyCompilation).toBeUndefined();
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: `${process.cwd()}/app/entry.client.tsx`,
+      })
+    ).toBe(false);
   });
 
   it('adds the committed custom-server build entry only in development', async () => {
