@@ -107,5 +107,13 @@ describe('prerender helpers', () => {
     ).toBe(
       'The `prerender.concurrency` config must be a positive integer if specified.'
     );
+    expect(
+      validatePrerenderConfig({
+        paths: ['/'],
+        unstable_concurrency: 0,
+      } as any)
+    ).toBe(
+      'The `prerender.unstable_concurrency` config must be a positive integer if specified.'
+    );
   });
 });

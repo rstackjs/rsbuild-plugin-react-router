@@ -193,7 +193,11 @@ export const validatePrerenderConfig = (
     concurrency !== undefined &&
     (!Number.isInteger(concurrency) || concurrency <= 0)
   ) {
-    return 'The `prerender.concurrency` config must be a positive integer if specified.';
+    const key =
+      (prerender as PrerenderConfigObject)?.concurrency !== undefined
+        ? 'prerender.concurrency'
+        : 'prerender.unstable_concurrency';
+    return `The \`${key}\` config must be a positive integer if specified.`;
   }
 
   return null;
