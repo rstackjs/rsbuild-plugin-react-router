@@ -58,15 +58,11 @@ describe('pluginReactRouter', () => {
       rsbuildConfig: {},
     });
 
-    try {
-      rsbuild.addPlugins([pluginReactRouter()]);
-      const config = await rsbuild.unwrapConfig();
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
 
-      expect(config.environments?.web?.security?.sri?.enable).toBe(true);
-      expect(config.environments?.node?.security?.sri).toBeUndefined();
-    } finally {
-      delete (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig;
-    }
+    expect(config.environments?.web?.security?.sri?.enable).toBe(true);
+    expect(config.environments?.node?.security?.sri).toBeUndefined();
   });
 
   it('should configure node environment correctly', async () => {

@@ -108,14 +108,16 @@ export function createModifyBrowserManifestPlugin(
             assetPrefix,
             routeChunkOptions
           );
-          const manifestForBrowser =
+          const shouldUseSri =
             routeChunkOptions?.isBuild &&
             (options?.subResourceIntegrity ??
-              options?.future?.unstable_subResourceIntegrity)
+              options?.future?.unstable_subResourceIntegrity);
+          const manifestForBrowser =
+            shouldUseSri
               ? { ...manifest, sri: true as const }
               : manifest;
           const sri =
-            manifestForBrowser.sri === true
+            shouldUseSri
               ? collectSubresourceIntegrity(stats, compilation, assetPrefix) ??
                 true
               : undefined;

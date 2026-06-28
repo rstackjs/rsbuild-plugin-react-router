@@ -493,9 +493,9 @@ export const pluginReactRouter = (
 
     let clientStats: Rspack.StatsCompilation | undefined;
     let clientSri: Record<string, string> | undefined;
-    let resolveClientStatsReady:
-      | ((stats: Rspack.StatsCompilation | undefined) => void)
-      | undefined;
+    let resolveClientStatsReady: (
+      stats: Rspack.StatsCompilation | undefined
+    ) => void = () => {};
     let clientStatsReadyResolved = false;
     const clientStatsReady = new Promise<Rspack.StatsCompilation | undefined>(
       resolve => {
@@ -509,16 +509,15 @@ export const pluginReactRouter = (
         return;
       }
       clientStatsReadyResolved = true;
-      resolveClientStatsReady?.(stats);
+      resolveClientStatsReady(stats);
     };
     const toClientManifestStats = (
       stats: Rspack.Stats | undefined
-    ): Rspack.StatsCompilation | undefined => {
-      return stats?.toJson({
+    ): Rspack.StatsCompilation | undefined =>
+      stats?.toJson({
         all: false,
         assets: true,
       });
-    };
 
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
       if (environment.name === 'web') {
