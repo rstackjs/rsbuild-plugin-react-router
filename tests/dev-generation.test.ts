@@ -99,7 +99,7 @@ const createDevManifest = (
   routes: Object.fromEntries(
     Object.entries(css.routes ?? {}).map(([id, routeCss]) => [
       id,
-        createRouteManifest(id, routeCss, css.routeImports?.[id]),
+      createRouteManifest(id, routeCss, css.routeImports?.[id]),
     ])
   ),
 });
