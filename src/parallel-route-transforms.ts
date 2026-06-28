@@ -236,13 +236,9 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
       return existingWorker;
     }
 
-    try {
-      const worker = this.#createWorkerState();
-      this.#workers[index] = worker;
-      return worker;
-    } catch (error) {
-      throw error;
-    }
+    const worker = this.#createWorkerState();
+    this.#workers[index] = worker;
+    return worker;
   }
 
   #runInWorker(task: RouteTransformTask): Promise<RouteTransformResult> {

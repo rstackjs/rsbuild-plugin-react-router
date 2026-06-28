@@ -262,11 +262,7 @@ describe('parallel route transforms', () => {
     expect(workers).toHaveLength(2);
 
     for (const worker of workers) {
-      worker.emit('message', {
-        id: worker.messages[0]!.id,
-        ok: true,
-        result: { code: 'done' },
-      } satisfies WorkerResponse);
+      resolveWorkerMessage(worker, { code: 'done' });
     }
 
     await expect(Promise.all([first, second])).resolves.toEqual([
