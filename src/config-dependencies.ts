@@ -64,8 +64,8 @@ export const collectConfigDependencyWatchPaths = async (
   const visited = new Set<string>([configPath]);
   const queue = [configPath];
 
-  while (queue.length > 0) {
-    const currentPath = queue.shift()!;
+  for (let index = 0; index < queue.length; index += 1) {
+    const currentPath = queue[index];
     for (const specifier of await collectDependencySpecifiers(currentPath)) {
       const dependencyPath = resolveDependencyFile(currentPath, specifier);
       if (!dependencyPath || visited.has(dependencyPath)) {

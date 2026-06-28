@@ -152,11 +152,7 @@ describe('pluginReactRouter', () => {
       }
       throw new Error(`Missing test file: ${filePath}`);
     });
-    const existsSyncMock = fs.existsSync as unknown as {
-      mockImplementation: (implementation: (path: unknown) => boolean) => void;
-      mockReturnValue: (value: boolean) => void;
-    };
-    existsSyncMock.mockImplementation(path => {
+    const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(path => {
       const filePath = String(path);
       if (filePath.includes('react-router.config')) {
         return filePath.endsWith('react-router.config.ts');
@@ -190,16 +186,12 @@ describe('pluginReactRouter', () => {
     } finally {
       readFileSync.mockRestore();
       statSync.mockRestore();
-      existsSyncMock.mockReturnValue(true);
+      existsSync.mockReturnValue(true);
     }
   });
 
   it('watches all supported config filenames when the config does not exist yet', async () => {
-    const existsSyncMock = fs.existsSync as unknown as {
-      mockImplementation: (implementation: (path: unknown) => boolean) => void;
-      mockReturnValue: (value: boolean) => void;
-    };
-    existsSyncMock.mockImplementation(
+    const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(
       path => !String(path).includes('react-router.config')
     );
 
@@ -226,7 +218,7 @@ describe('pluginReactRouter', () => {
         type: 'reload-server',
       });
     } finally {
-      existsSyncMock.mockReturnValue(true);
+      existsSync.mockReturnValue(true);
     }
   });
 
