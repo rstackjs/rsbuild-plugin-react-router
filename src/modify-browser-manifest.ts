@@ -33,6 +33,7 @@ type CompilationWithIntegrityAssets =
   | Pick<Rspack.Compilation, 'getAssets'>;
 
 type ModifyBrowserManifestOptions = {
+  subResourceIntegrity?: boolean;
   future?: { unstable_subResourceIntegrity?: boolean };
   subResourceIntegrity?: boolean;
   manifestChunkNames?: ReadonlySet<string>;
@@ -132,8 +133,8 @@ export function registerModifyBrowserManifestAssets(
     );
   const finalizeSri = Boolean(
     routeChunkOptions?.isBuild &&
-    (options?.subResourceIntegrity ??
-      options?.future?.unstable_subResourceIntegrity)
+      (options?.subResourceIntegrity ??
+        options?.future?.unstable_subResourceIntegrity)
   );
   const generatedManifests = finalizeSri
     ? new WeakMap<Rspack.Compilation, GeneratedManifest>()

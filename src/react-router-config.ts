@@ -2,10 +2,13 @@ import type {
   BuildManifest as ReactRouterBuildManifest,
   Config as ReactRouterConfig,
 } from '@react-router/dev/config';
+import { createRequire } from 'node:module';
 import type { NormalizedConfig } from '@rsbuild/core';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { Effect } from 'effect';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+
+const require = createRequire(import.meta.url);
 
 export type BuildEndHook = {
   bivarianceHack(args: {
@@ -19,10 +22,15 @@ type SplitRouteModulesConfig = boolean | 'enforce';
 
 export type Config = Omit<
   ReactRouterConfig,
-  'buildEnd' | 'future' | 'splitRouteModules' | 'subResourceIntegrity'
+  | 'buildEnd'
+  | 'future'
+  | 'prerender'
+  | 'splitRouteModules'
+  | 'subResourceIntegrity'
 > & {
   buildEnd?: BuildEndHook;
   future?: Partial<FutureConfig>;
+  prerender?: PrerenderConfig;
   splitRouteModules?: SplitRouteModulesConfig;
   subResourceIntegrity?: boolean;
 };
@@ -34,6 +42,15 @@ type FutureConfig = {
   v8_middleware: boolean;
   v8_splitRouteModules: boolean | 'enforce';
 };
+
+type PrerenderConfig =
+  | ReactRouterConfig['prerender']
+  | ({
+      paths?: ReactRouterConfig['prerender'];
+      concurrency?: number;
+      unstable_concurrency?: number;
+    } & Record<string, unknown>)
+  | undefined;
 
 type RouteManifestEntry = {
   id: string;
@@ -50,6 +67,23 @@ type ResolveReactRouterConfigResult = {
   resolved: ResolvedReactRouterConfig;
   presets: NonNullable<Config['presets']>;
   hasConfiguredServerModuleFormat: boolean;
+};
+
+const getInstalledReactRouterVersion = (): string | undefined => {
+  try {
+    return (
+      require('react-router/package.json') as { version?: string | undefined }
+    ).version;
+  } catch {
+    return undefined;
+  }
+};
+
+export const getDefaultTrailingSlashAwareDataRequests = (
+  reactRouterVersion: string | undefined = getInstalledReactRouterVersion()
+): boolean => {
+  const major = Number(reactRouterVersion?.split('.')[0]);
+  return Number.isInteger(major) && major >= 8;
 };
 
 export type ResolvedReactRouterConfig = Readonly<{
@@ -71,6 +105,15 @@ export type ResolvedReactRouterConfig = Readonly<{
   unstable_routeConfig: RouteConfigEntry[];
 }>;
 
+const createDefaultFutureConfig = (): FutureConfig => ({
+  unstable_optimizeDeps: false,
+  unstable_subResourceIntegrity: false,
+  unstable_trailingSlashAwareDataRequests:
+    getDefaultTrailingSlashAwareDataRequests(),
+  v8_middleware: false,
+  v8_splitRouteModules: false,
+});
+
 const DEFAULT_CONFIG = {
   appDirectory: 'app',
   basename: '/',
@@ -80,13 +123,7 @@ const DEFAULT_CONFIG = {
   splitRouteModules: true,
   subResourceIntegrity: false,
   ssr: true,
-  future: {
-    unstable_optimizeDeps: false,
-    unstable_subResourceIntegrity: false,
-    unstable_trailingSlashAwareDataRequests: false,
-    v8_middleware: false,
-    v8_splitRouteModules: false,
-  } satisfies FutureConfig,
+  future: createDefaultFutureConfig(),
   routeDiscovery: undefined,
   prerender: undefined,
   serverBundles: undefined,
@@ -178,13 +215,14 @@ export const resolveReactRouterConfigEffect = (
             reactRouterUserConfig;
           const presetConfig = yield* tryPluginPromise(() =>
             preset.reactRouterConfig?.({
-              reactRouterUserConfig: reactRouterUserConfigForPreset,
+              reactRouterUserConfig:
+                reactRouterUserConfigForPreset as ReactRouterConfig,
             })
           );
           if (!presetConfig) return null;
           const { presets: _presets, ...rest } = presetConfig as Config;
           return rest;
-        }),
+      }),
       { concurrency: 'unbounded' }
     );
 

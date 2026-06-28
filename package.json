@@ -57,7 +57,7 @@
     "bench:baseline": "node scripts/bench-builds.mts --profile default --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/baseline",
     "bench:full": "node scripts/bench-builds.mts --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",
     "bench:large": "node scripts/bench-builds.mts --profile large --iterations 1 --warmup 0 --clean cold --format both --out .benchmark/results/large",
-    "e2e": "pnpm build && pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e",
+    "e2e": "pnpm build && pnpm test:package-interop && pnpm test:react-router-matrix && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e",
     "dev": "rslib build --watch",
     "test": "rstest run",
     "test:watch": "rstest watch",
@@ -66,6 +66,7 @@
     "test:core": "rstest run -c ./rstest.config.ts",
     "test:core:watch": "rstest watch -c ./rstest.config.ts",
     "test:package-interop": "node scripts/test-package-interop.mts",
+    "test:react-router-matrix": "pnpm build && node scripts/test-react-router-version-matrix.mjs",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\"",
     "changeset": "changeset",
@@ -74,7 +75,7 @@
     "release:local": "pnpm build && changeset version && changeset publish && git add . && git commit -m \"chore: version packages\" && git push && git push --tags"
   },
   "dependencies": {
-    "@react-router/node": "^7.13.0",
+    "@react-router/node": "^7.0.0 || ^8.0.0",
     "@remix-run/node-fetch-server": "^0.13.0",
     "@rspack/plugin-react-refresh": "^2.0.2",
     "effect": "^3.21.4",
@@ -117,7 +118,9 @@
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "@rsbuild/core": "^2.0.0"
+    "@react-router/dev": "^7.0.0 || ^8.0.0",
+    "@rsbuild/core": "^2.0.0",
+    "react-router": "^7.0.0 || ^8.0.0"
   },
   "publishConfig": {
     "access": "public",

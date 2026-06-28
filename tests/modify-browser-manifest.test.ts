@@ -328,6 +328,52 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
+  it('enables SRI from the stable subResourceIntegrity config field', async () => {
+    const { root, appDir } = createTempApp();
+    const harness = createProcessAssetsHarness();
+    const optimizedEntrySource = 'console.log("stable sri");';
+    const assets = {
+      ...createBrowserManifestAssets(),
+      'static/js/entry.client.js': createAsset(optimizedEntrySource),
+    };
+    const compilation = createCompilation(
+      [['entry.client', { files: new Set(['static/js/entry.client.js']) }]],
+      assets
+    );
+    let reportedSri: Record<string, string> | undefined;
+
+    try {
+      registerModifyBrowserManifestAssets(
+        harness.api as never,
+        { root: rootRoute },
+        {},
+        appDir,
+        '/',
+        { isBuild: true },
+        {
+          subResourceIntegrity: true,
+          onManifest(_manifest, sri) {
+            reportedSri = sri;
+          },
+        }
+      );
+
+      expect(harness.getDescriptors()).toEqual([
+        { stage: 'additions', environments: ['web'] },
+        { stage: 'report', environments: ['web'] },
+      ]);
+
+      await harness.runStage('additions', { assets, compilation });
+      await harness.runStage('report', { assets, compilation });
+
+      expect(reportedSri?.['/static/js/entry.client.js']).toBe(
+        createSriHash(optimizedEntrySource)
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects the promise hook when build route analysis fails', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();

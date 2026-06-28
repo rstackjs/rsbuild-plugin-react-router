@@ -245,6 +245,7 @@ export const pluginReactRouter = (
       serverModuleFormat,
       splitRouteModules,
       buildEnd,
+      subResourceIntegrity,
     } = resolvedConfig;
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
@@ -416,7 +417,7 @@ export const pluginReactRouter = (
       resolvedConfigWithRoutes;
     for (const preset of configPresets) {
       await preset.reactRouterConfigResolved?.({
-        reactRouterConfig: resolvedConfigForPreset,
+        reactRouterConfig: resolvedConfigForPreset as never,
       });
     }
 
@@ -1064,6 +1065,7 @@ export const pluginReactRouter = (
       {
         subResourceIntegrity: resolvedConfigWithRoutes.subResourceIntegrity,
         future,
+        subResourceIntegrity,
         manifestChunkNames,
         onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
           stageLatestManifests(
