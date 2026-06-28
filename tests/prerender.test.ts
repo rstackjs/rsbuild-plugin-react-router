@@ -1,5 +1,10 @@
 import { describe, expect, it } from '@rstest/core';
-import { getPrerenderConcurrency, getStaticPrerenderPaths, resolvePrerenderPaths } from '../src/prerender';
+import {
+  getPrerenderConcurrency,
+  getStaticPrerenderPaths,
+  resolvePrerenderPaths,
+  validatePrerenderConfig,
+} from '../src/prerender';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
 const routes: RouteConfigEntry[] = [
@@ -84,9 +89,39 @@ describe('prerender helpers', () => {
   });
 
   it('supports prerender concurrency config', () => {
+    expect(getPrerenderConcurrency({ paths: ['/'], concurrency: 3 })).toBe(3);
+    expect(
+      getPrerenderConcurrency({
+        paths: ['/'],
+        concurrency: 4,
+        unstable_concurrency: 2,
+      })
+    ).toBe(4);
     expect(
       getPrerenderConcurrency({ paths: ['/'], unstable_concurrency: 3 })
     ).toBe(3);
     expect(getPrerenderConcurrency({ paths: ['/'] })).toBe(1);
+  });
+
+  it('validates stable prerender concurrency config', () => {
+    expect(validatePrerenderConfig({ paths: ['/'], concurrency: 2 })).toBeNull();
+    expect(
+      validatePrerenderConfig({
+        paths: ['/'],
+        concurrency: 2,
+        unstable_concurrency: 0,
+      })
+    ).toBeNull();
+    expect(validatePrerenderConfig({ paths: ['/'], concurrency: 0 })).toBe(
+      'The `prerender.concurrency` config must be a positive integer if specified.'
+    );
+    expect(
+      validatePrerenderConfig({
+        paths: ['/'],
+        unstable_concurrency: 0,
+      })
+    ).toBe(
+      'The `prerender.unstable_concurrency` config must be a positive integer if specified.'
+    );
   });
 });

@@ -32,21 +32,41 @@ describe('resolveReactRouterConfig', () => {
     expect(buildEndCalls).toBe(2);
   });
 
-  it('resolves stable subresource integrity from top-level config', async () => {
+  it('resolves stable config fields required by React Router 8', async () => {
     const defaultResult = await resolveReactRouterConfig({});
-    const enabledResult = await resolveReactRouterConfig({
+    const stableResult = await resolveReactRouterConfig({
+      splitRouteModules: 'enforce',
       subResourceIntegrity: true,
     });
     const futureResult = await resolveReactRouterConfig({
-      future: { unstable_subResourceIntegrity: true },
+      future: {
+        v8_splitRouteModules: 'enforce',
+        unstable_subResourceIntegrity: true,
+      },
+    });
+    const precedenceResult = await resolveReactRouterConfig({
+      splitRouteModules: true,
+      subResourceIntegrity: false,
+      future: {
+        v8_splitRouteModules: false,
+        unstable_subResourceIntegrity: true,
+      },
     });
 
+    expect(defaultResult.resolved.splitRouteModules).toBe(false);
     expect(defaultResult.resolved.subResourceIntegrity).toBe(false);
-    expect(enabledResult.resolved.subResourceIntegrity).toBe(true);
+    expect(stableResult.resolved.splitRouteModules).toBe('enforce');
+    expect(stableResult.resolved.subResourceIntegrity).toBe(true);
+    expect(futureResult.resolved.splitRouteModules).toBe('enforce');
     expect(futureResult.resolved.subResourceIntegrity).toBe(true);
     expect(futureResult.resolved.future.unstable_subResourceIntegrity).toBe(
       true
     );
+    expect(precedenceResult.resolved.splitRouteModules).toBe(true);
+    expect(precedenceResult.resolved.subResourceIntegrity).toBe(false);
+    expect(
+      precedenceResult.resolved.future.unstable_subResourceIntegrity
+    ).toBe(false);
   });
 
   it('lets user SRI config override preset aliases', async () => {

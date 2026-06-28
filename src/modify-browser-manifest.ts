@@ -112,15 +112,13 @@ export function createModifyBrowserManifestPlugin(
             routeChunkOptions?.isBuild &&
             (options?.subResourceIntegrity ??
               options?.future?.unstable_subResourceIntegrity);
-          const manifestForBrowser =
-            shouldUseSri
-              ? { ...manifest, sri: true as const }
-              : manifest;
-          const sri =
-            shouldUseSri
-              ? collectSubresourceIntegrity(stats, compilation, assetPrefix) ??
-                true
-              : undefined;
+          const manifestForBrowser = shouldUseSri
+            ? { ...manifest, sri: true as const }
+            : manifest;
+          const sri = shouldUseSri
+            ? (collectSubresourceIntegrity(stats, compilation, assetPrefix) ??
+              true)
+            : undefined;
 
           const virtualManifestPath =
             'static/js/virtual/react-router/browser-manifest.js';

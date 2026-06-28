@@ -13,11 +13,15 @@ export type BuildEndHook = {
   }): void | Promise<void>;
 }['bivarianceHack'];
 
+type SplitRouteModulesConfig = boolean | 'enforce';
+
 export type Config = Omit<
   ReactRouterConfig,
-  'buildEnd' | 'subResourceIntegrity'
+  'buildEnd' | 'future' | 'splitRouteModules' | 'subResourceIntegrity'
 > & {
   buildEnd?: BuildEndHook;
+  future?: Partial<FutureConfig>;
+  splitRouteModules?: SplitRouteModulesConfig;
   subResourceIntegrity?: boolean;
 };
 
@@ -53,6 +57,7 @@ export type ResolvedReactRouterConfig = Readonly<{
   serverBuildFile: NonNullable<ReactRouterConfig['serverBuildFile']>;
   serverBundles?: Config['serverBundles'];
   serverModuleFormat: NonNullable<ReactRouterConfig['serverModuleFormat']>;
+  splitRouteModules: SplitRouteModulesConfig;
   subResourceIntegrity: boolean;
   ssr: NonNullable<ReactRouterConfig['ssr']>;
   allowedActionOrigins: string[] | false;
@@ -65,6 +70,7 @@ const DEFAULT_CONFIG = {
   buildDirectory: 'build',
   serverBuildFile: 'index.js',
   serverModuleFormat: 'esm',
+  splitRouteModules: false,
   subResourceIntegrity: false,
   ssr: true,
   future: {
@@ -123,8 +129,7 @@ const mergeReactRouterConfig = (...configs: Config[]): Config => {
 
 const normalizeSubResourceIntegrity = (config: Config): Config => {
   const subResourceIntegrity =
-    config.subResourceIntegrity ??
-    config.future?.unstable_subResourceIntegrity;
+    config.subResourceIntegrity ?? config.future?.unstable_subResourceIntegrity;
 
   if (subResourceIntegrity === undefined) {
     return config;
@@ -181,11 +186,16 @@ export const resolveReactRouterConfig = async (
     ...(userAndPresetConfigs.future ?? {}),
     unstable_subResourceIntegrity: subResourceIntegrity,
   };
+  const splitRouteModules =
+    userAndPresetConfigs.splitRouteModules ??
+    userAndPresetConfigs.future?.v8_splitRouteModules ??
+    DEFAULT_CONFIG.splitRouteModules;
 
   let resolved: ResolvedReactRouterConfig = {
     ...DEFAULT_CONFIG,
     ...userAndPresetConfigs,
     future: resolvedFuture,
+    splitRouteModules,
     subResourceIntegrity,
     allowedActionOrigins:
       userAndPresetConfigs.allowedActionOrigins ??
