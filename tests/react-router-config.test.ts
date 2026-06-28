@@ -30,4 +30,18 @@ describe('resolveReactRouterConfig', () => {
     });
     expect(buildEndCalls).toBe(2);
   });
+
+  it('resolves stable subresource integrity from top-level config', async () => {
+    const defaultResult = await resolveReactRouterConfig({});
+    const enabledResult = await resolveReactRouterConfig({
+      subResourceIntegrity: true,
+    } as any);
+    const futureResult = await resolveReactRouterConfig({
+      future: { unstable_subResourceIntegrity: true },
+    });
+
+    expect(defaultResult.resolved.subResourceIntegrity).toBe(false);
+    expect(enabledResult.resolved.subResourceIntegrity).toBe(true);
+    expect(futureResult.resolved.subResourceIntegrity).toBe(true);
+  });
 });

@@ -13,8 +13,12 @@ export type BuildEndHook = {
   }): void | Promise<void>;
 }['bivarianceHack'];
 
-export type Config = Omit<ReactRouterConfig, 'buildEnd'> & {
+export type Config = Omit<
+  ReactRouterConfig,
+  'buildEnd' | 'subResourceIntegrity'
+> & {
   buildEnd?: BuildEndHook;
+  subResourceIntegrity?: boolean;
 };
 
 type FutureConfig = {
@@ -49,6 +53,7 @@ export type ResolvedReactRouterConfig = Readonly<{
   serverBuildFile: NonNullable<ReactRouterConfig['serverBuildFile']>;
   serverBundles?: Config['serverBundles'];
   serverModuleFormat: NonNullable<ReactRouterConfig['serverModuleFormat']>;
+  subResourceIntegrity: boolean;
   ssr: NonNullable<ReactRouterConfig['ssr']>;
   allowedActionOrigins: string[] | false;
   unstable_routeConfig: RouteConfigEntry[];
@@ -60,6 +65,7 @@ const DEFAULT_CONFIG = {
   buildDirectory: 'build',
   serverBuildFile: 'index.js',
   serverModuleFormat: 'esm',
+  subResourceIntegrity: false,
   ssr: true,
   future: {
     unstable_optimizeDeps: false,
@@ -151,11 +157,16 @@ export const resolveReactRouterConfig = async (
     ...DEFAULT_CONFIG.future,
     ...(userAndPresetConfigs.future ?? {}),
   };
+  const subResourceIntegrity =
+    userAndPresetConfigs.subResourceIntegrity ??
+    userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
+    DEFAULT_CONFIG.subResourceIntegrity;
 
   let resolved: ResolvedReactRouterConfig = {
     ...DEFAULT_CONFIG,
     ...userAndPresetConfigs,
     future: resolvedFuture,
+    subResourceIntegrity,
     allowedActionOrigins:
       userAndPresetConfigs.allowedActionOrigins ??
       DEFAULT_CONFIG.allowedActionOrigins,

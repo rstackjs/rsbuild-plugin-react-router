@@ -229,6 +229,7 @@ export const pluginReactRouter = (
       serverBuildFile,
       serverModuleFormat,
       serverBundles,
+      subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
 
@@ -1255,6 +1256,7 @@ export const pluginReactRouter = (
                     routeChunkOptions,
                     {
                       future,
+                      subResourceIntegrity,
                       onManifest: (manifest, sri) => {
                         const baseServerManifest = {
                           ...manifest,

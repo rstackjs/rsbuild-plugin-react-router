@@ -24,6 +24,7 @@ export function createModifyBrowserManifestPlugin(
   routeChunkOptions?: Parameters<typeof getReactRouterManifestForDev>[5],
   options?: {
     future?: { unstable_subResourceIntegrity?: boolean };
+    subResourceIntegrity?: boolean;
     onManifest?: (
       manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
       sri: Record<string, string> | undefined
@@ -103,7 +104,8 @@ export function createModifyBrowserManifestPlugin(
           let sri: Record<string, string> | undefined;
           if (
             routeChunkOptions?.isBuild &&
-            options?.future?.unstable_subResourceIntegrity
+            (options?.subResourceIntegrity ??
+              options?.future?.unstable_subResourceIntegrity)
           ) {
             const assets =
               typeof compilation.getAssets === 'function'
