@@ -108,6 +108,12 @@ export function createModifyBrowserManifestPlugin(
             assetPrefix,
             routeChunkOptions
           );
+          const manifestForBrowser =
+            routeChunkOptions?.isBuild &&
+            (options?.subResourceIntegrity ??
+              options?.future?.unstable_subResourceIntegrity)
+              ? { ...manifest, sri: true as const }
+              : manifest;
 
           const virtualManifestPath =
             'static/js/virtual/react-router/browser-manifest.js';
@@ -117,7 +123,7 @@ export function createModifyBrowserManifestPlugin(
               .toString();
             const newSource = originalSource.replace(
               /["'`]PLACEHOLDER["'`]/,
-              jsesc(manifest, { es6: true })
+              jsesc(manifestForBrowser, { es6: true })
             );
             compilation.assets[virtualManifestPath] = {
               source: () => newSource,
@@ -156,7 +162,7 @@ export function createModifyBrowserManifestPlugin(
               entryModulePath: entryJsAssets[0],
             });
             const manifestSource = `window.__reactRouterManifest=${jsesc(
-              manifest,
+              manifestForBrowser,
               { es6: true }
             )};`;
             compilation.assets[manifestPath] = new rspack.sources.RawSource(
@@ -164,7 +170,7 @@ export function createModifyBrowserManifestPlugin(
             );
           }
 
-          options?.onManifest?.(manifest, undefined);
+          options?.onManifest?.(manifestForBrowser, undefined);
           callback();
         }
       );

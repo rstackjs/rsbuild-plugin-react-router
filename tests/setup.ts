@@ -1,5 +1,13 @@
 import * as fs from 'node:fs';
-import { rstest } from '@rstest/core';
+import { afterEach, rstest } from '@rstest/core';
+
+type ReactRouterTestGlobal = typeof globalThis & {
+  __reactRouterTestConfig?: unknown;
+};
+
+afterEach(() => {
+  delete (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig;
+});
 
 // Mock the file system
 rstest.mock('node:fs', { spy: true });
@@ -19,8 +27,7 @@ rstest.mock('jiti', () => ({
         ]);
       }
       return Promise.resolve(
-        (globalThis as { __reactRouterTestConfig?: unknown })
-          .__reactRouterTestConfig ?? {}
+        (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig ?? {}
       );
     }),
   }),
