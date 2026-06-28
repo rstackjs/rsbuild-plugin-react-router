@@ -73,6 +73,7 @@ import {
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
+import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 
@@ -1082,6 +1083,18 @@ export const pluginReactRouter = (
         /\.js$/,
         ''
       );
+      const configuredLazyCompilation =
+        pluginOptions.lazyCompilation === undefined
+          ? config.dev?.lazyCompilation
+          : pluginOptions.lazyCompilation;
+      const guardedLazyCompilation = guardReactRouterLazyCompilation({
+        lazyCompilation: configuredLazyCompilation,
+        entryClientPath: finalEntryClientPath,
+      });
+      const lazyCompilation =
+        guardedLazyCompilation === undefined
+          ? {}
+          : { lazyCompilation: guardedLazyCompilation };
 
       const nodeEntries: Record<string, string> = {
         ...(hasServerApp
@@ -1110,6 +1123,7 @@ export const pluginReactRouter = (
         },
         dev: {
           writeToDisk: true,
+          ...lazyCompilation,
           // Only add SSR middleware if SSR is enabled and not using a custom server
           // In SPA mode (ssr: false), we just serve static files from the client build
           setupMiddlewares:

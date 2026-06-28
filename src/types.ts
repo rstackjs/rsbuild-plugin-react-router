@@ -1,3 +1,5 @@
+import type { RsbuildConfig } from '@rsbuild/core';
+
 export type Route = {
   id: string;
   parentId?: string;
@@ -27,6 +29,16 @@ export type PluginOptions = {
    * Federation mode configuration
    */
   federation?: boolean;
+
+  /**
+   * Opt in to Rsbuild's dev-only lazy compilation behavior.
+   *
+   * React Router hydration modules remain eager so initial dev requests can
+   * load the browser manifest and route modules without lazy proxy delays.
+   *
+   * @default undefined
+   */
+  lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
 };
 
 /**
