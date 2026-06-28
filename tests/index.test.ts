@@ -2,6 +2,28 @@ import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it } from '@rstest/core';
 import { pluginReactRouter } from '../src';
 
+type LazyCompilationTestModule = {
+  resource?: string;
+  nameForCondition?: () => string | null;
+};
+
+type LazyCompilationConfig = {
+  test?: (module: LazyCompilationTestModule) => boolean;
+};
+
+const getLazyCompilationTest = (
+  lazyCompilation: boolean | LazyCompilationConfig | undefined
+) => {
+  if (
+    !lazyCompilation ||
+    typeof lazyCompilation === 'boolean' ||
+    typeof lazyCompilation.test !== 'function'
+  ) {
+    throw new Error('Expected lazy compilation to install a test function.');
+  }
+  return lazyCompilation.test;
+};
+
 describe('pluginReactRouter', () => {
   it('should configure basic plugin options', async () => {
     const rsbuild = await createStubRsbuild({
@@ -50,13 +72,14 @@ describe('pluginReactRouter', () => {
       entries: true,
       imports: true,
     });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/root.tsx?__react-router-build-client-route',
       })
     ).toBe(false);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/components/card.tsx',
         nameForCondition: () => '/project/app/components/card.tsx',
       })
@@ -75,8 +98,9 @@ describe('pluginReactRouter', () => {
       entries: true,
       imports: true,
     });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: `${process.cwd()}/app/entry.client.tsx`,
       })
     ).toBe(false);
@@ -102,19 +126,20 @@ describe('pluginReactRouter', () => {
       entries: true,
       imports: false,
     });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/routes/home.tsx?__react-router-build-client-route',
       })
     ).toBe(false);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/components/card.tsx',
         nameForCondition: () => '/project/app/components/card.tsx',
       })
     ).toBe(true);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/vendor/react.tsx',
         nameForCondition: () => '/project/vendor/react.tsx',
       })

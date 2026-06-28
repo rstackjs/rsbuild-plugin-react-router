@@ -1083,15 +1083,15 @@ export const pluginReactRouter = (
         /\.js$/,
         ''
       );
-      const configuredLazyCompilation =
+      const requestedLazyCompilation =
         pluginOptions.lazyCompilation === undefined
           ? config.dev?.lazyCompilation
           : pluginOptions.lazyCompilation;
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
-        lazyCompilation: configuredLazyCompilation,
+        lazyCompilation: requestedLazyCompilation,
         entryClientPath: finalEntryClientPath,
       });
-      const lazyCompilation =
+      const devLazyCompilation =
         guardedLazyCompilation === undefined
           ? {}
           : { lazyCompilation: guardedLazyCompilation };
@@ -1123,7 +1123,7 @@ export const pluginReactRouter = (
         },
         dev: {
           writeToDisk: true,
-          ...lazyCompilation,
+          ...devLazyCompilation,
           // Only add SSR middleware if SSR is enabled and not using a custom server
           // In SPA mode (ssr: false), we just serve static files from the client build
           setupMiddlewares:

@@ -1,6 +1,27 @@
 import { describe, expect, it } from '@rstest/core';
 import { guardReactRouterLazyCompilation } from '../src/lazy-compilation';
 
+type LazyCompilationTestModule = {
+  request?: string;
+  rawRequest?: string;
+  resource?: string;
+  identifier?: () => string;
+  nameForCondition?: () => string | null;
+};
+
+const getGuardedTest = (
+  guarded: ReturnType<typeof guardReactRouterLazyCompilation>
+): ((module: LazyCompilationTestModule) => boolean) => {
+  if (
+    !guarded ||
+    typeof guarded === 'boolean' ||
+    typeof guarded.test !== 'function'
+  ) {
+    throw new Error('Expected a guarded lazy compilation test function.');
+  }
+  return guarded.test;
+};
+
 describe('guardReactRouterLazyCompilation', () => {
   const entryClientPath = '/project/app/entry.client.tsx';
 
@@ -29,16 +50,13 @@ describe('guardReactRouterLazyCompilation', () => {
       entries: true,
       imports: true,
     });
+    const test = getGuardedTest(guarded);
     expect(
-      guarded?.test?.({
+      test({
         resource: `${entryClientPath}!lazy-compilation-proxy`,
       })
     ).toBe(false);
-    expect(
-      guarded?.test?.({
-        resource: '/project/app/components/card.tsx',
-      })
-    ).toBe(true);
+    expect(test({ resource: '/project/app/components/card.tsx' })).toBe(true);
   });
 
   it('preserves user tests for non-React Router hydration modules', () => {
@@ -55,19 +73,20 @@ describe('guardReactRouterLazyCompilation', () => {
       entries: true,
       imports: false,
     });
+    const test = getGuardedTest(guarded);
     expect(
-      guarded?.test?.({
+      test({
         resource: '/project/app/root.tsx?__react-router-build-client-route',
       })
     ).toBe(false);
     expect(
-      guarded?.test?.({
+      test({
         resource: '/project/app/components/card.tsx',
         nameForCondition: () => '/project/app/components/card.tsx',
       })
     ).toBe(true);
     expect(
-      guarded?.test?.({
+      test({
         resource: '/project/vendor/react.tsx',
         nameForCondition: () => '/project/vendor/react.tsx',
       })
@@ -83,16 +102,17 @@ describe('guardReactRouterLazyCompilation', () => {
       },
       entryClientPath,
     });
+    const test = getGuardedTest(guarded);
 
     expect(
-      guarded?.test?.({
+      test({
         rawRequest: 'node_modules-loader!/project/app/page.tsx',
         resource: '/project/app/page.tsx',
         nameForCondition: () => '/project/app/page.tsx',
       })
     ).toBe(false);
     expect(
-      guarded?.test?.({
+      test({
         rawRequest: './react',
         resource: '/project/node_modules/react/index.js',
         nameForCondition: () => '/project/node_modules/react/index.js',
@@ -108,20 +128,21 @@ describe('guardReactRouterLazyCompilation', () => {
       },
       entryClientPath,
     });
+    const test = getGuardedTest(guarded);
 
     expect(
-      guarded?.test?.({
+      test({
         request: 'virtual/react-router/browser-manifest',
       })
     ).toBe(false);
     expect(
-      guarded?.test?.({
+      test({
         identifier: () =>
           '/project/app/routes/home.tsx?__react-router-build-client-route',
       })
     ).toBe(false);
     expect(
-      guarded?.test?.({
+      test({
         nameForCondition: () =>
           '/project/app/routes/home.tsx?react-router-route',
       })
