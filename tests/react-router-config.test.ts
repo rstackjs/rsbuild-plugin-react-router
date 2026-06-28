@@ -65,4 +65,35 @@ describe('resolveReactRouterConfig', () => {
     expect(disabledResult.resolved.splitRouteModules).toBe(false);
     expect(enforcedResult.resolved.splitRouteModules).toBe('enforce');
   });
+
+  it('resolves stable config fields required by React Router 8', async () => {
+    const defaultResult = await resolveReactRouterConfig({});
+    const stableResult = await resolveReactRouterConfig({
+      splitRouteModules: 'enforce',
+      subResourceIntegrity: true,
+    });
+    const futureResult = await resolveReactRouterConfig({
+      future: {
+        v8_splitRouteModules: 'enforce',
+        unstable_subResourceIntegrity: true,
+      },
+    });
+    const precedenceResult = await resolveReactRouterConfig({
+      splitRouteModules: true,
+      subResourceIntegrity: false,
+      future: {
+        v8_splitRouteModules: false,
+        unstable_subResourceIntegrity: true,
+      },
+    });
+
+    expect(defaultResult.resolved.splitRouteModules).toBe(true);
+    expect(defaultResult.resolved.subResourceIntegrity).toBe(false);
+    expect(stableResult.resolved.splitRouteModules).toBe('enforce');
+    expect(stableResult.resolved.subResourceIntegrity).toBe(true);
+    expect(futureResult.resolved.splitRouteModules).toBe('enforce');
+    expect(futureResult.resolved.subResourceIntegrity).toBe(true);
+    expect(precedenceResult.resolved.splitRouteModules).toBe(true);
+    expect(precedenceResult.resolved.subResourceIntegrity).toBe(false);
+  });
 });

@@ -961,6 +961,7 @@ export const pluginReactRouter = (
       () => assetPrefix,
       routeChunkOptions,
       {
+        subResourceIntegrity: resolvedConfigWithRoutes.subResourceIntegrity,
         future,
         manifestChunkNames,
         onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
