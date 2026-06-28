@@ -123,11 +123,9 @@ export const getSsrFalsePrerenderExportErrors = ({
   const errors: string[] = [];
   for (const [routeId, route] of Object.entries(manifestRoutes)) {
     const exports = routeExports[routeId] ?? [];
-    const invalidApis: string[] = [];
-
-    if (exports.includes('headers')) invalidApis.push('headers');
-    if (exports.includes('action')) invalidApis.push('action');
-    if (exports.includes('middleware')) invalidApis.push('middleware');
+    const invalidApis = ['headers', 'action', 'middleware'].filter(api =>
+      exports.includes(api)
+    );
 
     if (invalidApis.length > 0) {
       errors.push(

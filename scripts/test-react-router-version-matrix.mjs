@@ -56,10 +56,12 @@ const run = (command, args, options = {}) =>
 
 const writeFixture = async ({ appDir, version, tarball }) => {
   await mkdir(path.join(appDir, 'app', 'routes'), { recursive: true });
+  const writeAppFile = (file, contents) =>
+    writeFile(path.join(appDir, file), contents);
 
-  await writeFile(
-    path.join(appDir, 'package.json'),
-    `${JSON.stringify(
+  await writeAppFile(
+    'package.json',
+    JSON.stringify(
       {
         private: true,
         type: 'module',
@@ -85,11 +87,11 @@ const writeFixture = async ({ appDir, version, tarball }) => {
       },
       null,
       2
-    )}\n`
+    ) + '\n'
   );
 
-  await writeFile(
-    path.join(appDir, 'rsbuild.config.ts'),
+  await writeAppFile(
+    'rsbuild.config.ts',
     `import { defineConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { pluginReactRouter } from 'rsbuild-plugin-react-router';
@@ -100,8 +102,8 @@ export default defineConfig({
 `
   );
 
-  await writeFile(
-    path.join(appDir, 'react-router.config.ts'),
+  await writeAppFile(
+    'react-router.config.ts',
     `export default {
   ssr: true,
   routeDiscovery: { mode: 'initial' },
@@ -112,8 +114,8 @@ export default defineConfig({
 `
   );
 
-  await writeFile(
-    path.join(appDir, 'app', 'root.tsx'),
+  await writeAppFile(
+    path.join('app', 'root.tsx'),
     `import {
   Links,
   Meta,
@@ -140,16 +142,16 @@ export default function Root() {
 `
   );
 
-  await writeFile(
-    path.join(appDir, 'app', 'routes.ts'),
+  await writeAppFile(
+    path.join('app', 'routes.ts'),
     `import { index } from '@react-router/dev/routes';
 
 export default [index('routes/index.tsx')];
 `
   );
 
-  await writeFile(
-    path.join(appDir, 'app', 'routes', 'index.tsx'),
+  await writeAppFile(
+    path.join('app', 'routes', 'index.tsx'),
     `export function loader() {
   return { message: 'React Router ${version}' };
 }
@@ -172,14 +174,12 @@ const assertFile = async file => {
 const assertBrowserManifest = async clientDir => {
   const jsDir = path.join(clientDir, 'static', 'js');
   const files = await readdir(jsDir, { recursive: true });
-  if (
-    !files.some(
-      file =>
-        typeof file === 'string' &&
-        (file.startsWith('manifest-') ||
-          file === path.join('virtual', 'react-router', 'browser-manifest.js'))
-    )
-  ) {
+  const hasBrowserManifest = files.some(
+    file =>
+      file.startsWith('manifest-') ||
+      file === path.join('virtual', 'react-router', 'browser-manifest.js')
+  );
+  if (!hasBrowserManifest) {
     throw new Error(`Expected ${jsDir} to contain a React Router manifest`);
   }
 };
