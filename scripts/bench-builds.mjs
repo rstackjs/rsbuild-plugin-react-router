@@ -418,6 +418,7 @@ const runDevServerUntilReady = async ({
     let stdout = '';
     let stderr = '';
     let ready = false;
+    let readyWallMs = null;
     let readyMs = null;
     let routePhasePending = false;
     let routeTotalMs = null;
@@ -447,7 +448,7 @@ const runDevServerUntilReady = async ({
         signal,
         stdout,
         stderr,
-        wallMs: performance.now() - startedAt,
+        wallMs: readyWallMs ?? performance.now() - startedAt,
         readyMs,
         routeTotalMs,
         routeRequests,
@@ -485,7 +486,7 @@ const runDevServerUntilReady = async ({
     };
 
     const handleReady = async () => {
-      readyMs = performance.now() - startedAt;
+      readyMs = readyWallMs ?? performance.now() - startedAt;
       if (devRoutePaths.length > 0) {
         routePhasePending = true;
         const routeStartedAt = performance.now();
@@ -515,6 +516,7 @@ const runDevServerUntilReady = async ({
       }
       if ([...requiredReady].every(environment => seenReady.has(environment))) {
         ready = true;
+        readyWallMs = performance.now() - startedAt;
         void handleReady();
       }
     };

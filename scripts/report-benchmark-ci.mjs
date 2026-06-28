@@ -67,6 +67,15 @@ const indexBenchmarks = result =>
 
 const base = await readJson(values.base);
 const head = await readJson(values.head);
+const baseMode = base.mode ?? 'build';
+const headMode = head.mode ?? 'build';
+
+if (baseMode !== headMode) {
+  throw new Error(
+    `Cannot compare benchmark results with different modes: base=${baseMode}, head=${headMode}.`
+  );
+}
+
 const baseBenchmarks = indexBenchmarks(base);
 const headBenchmarks = indexBenchmarks(head);
 const benchmarkIds = [
@@ -148,7 +157,7 @@ const report = {
   },
   runUrl: values['run-url'] ?? null,
   profile: head.profile ?? base.profile ?? null,
-  mode: head.mode ?? base.mode ?? 'build',
+  mode: headMode,
   iterations: head.iterations ?? base.iterations ?? null,
   warmup: head.warmup ?? base.warmup ?? null,
   summary,

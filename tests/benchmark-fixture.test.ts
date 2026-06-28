@@ -1,4 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -366,5 +372,39 @@ describe('benchmark fixture generator', () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('No benchmarks matched filter "missing".');
     expect(result.stderr).not.toContain('Unknown profile "large"');
+  });
+
+  it('rejects mixed benchmark modes in CI reports', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
+    try {
+      const base = join(root, 'base.json');
+      const head = join(root, 'head.json');
+      writeFileSync(
+        base,
+        JSON.stringify({ mode: 'build', benchmarks: [] }),
+        'utf8'
+      );
+      writeFileSync(
+        head,
+        JSON.stringify({ mode: 'dev', benchmarks: [] }),
+        'utf8'
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        ['scripts/report-benchmark-ci.mjs', '--base', base, '--head', head],
+        {
+          cwd: process.cwd(),
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        'Cannot compare benchmark results with different modes: base=build, head=dev.'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

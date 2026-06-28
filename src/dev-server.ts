@@ -42,7 +42,7 @@ export const createDevServerMiddleware = (
         dependencies.loadBuild,
         'development'
       );
-      return createRequestListener(requestHandler);
+      return createRequestListener(request => requestHandler(request));
     })();
     return listenerPromise;
   };
