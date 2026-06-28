@@ -242,7 +242,6 @@ export const pluginReactRouter = (
       serverBuildFile,
       serverModuleFormat,
       splitRouteModules,
-      subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
 
@@ -971,7 +970,8 @@ export const pluginReactRouter = (
       () => assetPrefix,
       routeChunkOptions,
       {
-        subResourceIntegrity,
+        subResourceIntegrity: resolvedConfigWithRoutes.subResourceIntegrity,
+        future,
         manifestChunkNames,
         onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
           stageLatestManifests(
