@@ -135,6 +135,12 @@ export default {
   serverBundles: async ({ branch }) => branch[0]?.id ?? "main",
 
   /**
+   * Enable Subresource Integrity for browser assets.
+   * @default false
+   */
+  subResourceIntegrity: true,
+
+  /**
    * Hook called after the build completes.
    */
   buildEnd: async ({ buildManifest, reactRouterConfig }) => {
@@ -283,9 +289,16 @@ If no configuration is provided, the following defaults will be used:
   ssr: true,
   buildDirectory: 'build',
   appDirectory: 'app',
-  basename: '/'
+  basename: '/',
+  subResourceIntegrity: false
 }
 ```
+
+Subresource Integrity is disabled by default. Enable it with
+`subResourceIntegrity: true` in `react-router.config.*` when the deployed app
+should emit integrity metadata for browser scripts. The legacy
+`future.unstable_subResourceIntegrity` flag is still accepted and is normalized
+to the stable option.
 
 ### Route Configuration
 
