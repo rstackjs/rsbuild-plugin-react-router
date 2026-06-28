@@ -10,13 +10,20 @@ type PrerenderPathsConfig =
       getStaticPaths: () => string[];
     }) => boolean | string[] | Promise<boolean | string[]>);
 
-type PrerenderConfigObject = {
-  paths?: PrerenderPathsConfig;
-  concurrency?: number;
+type PrerenderConfigObject = Extract<
+  NonNullable<ReactRouterPrerenderConfig>,
+  { paths: unknown }
+> & {
   unstable_concurrency?: number;
 };
 
 type PrerenderConfig = ReactRouterPrerenderConfig | PrerenderConfigObject;
+type PrerenderConcurrencyConfig =
+  | {
+      key: 'prerender.concurrency' | 'prerender.unstable_concurrency';
+      value: number;
+    }
+  | undefined;
 
 type PrerenderResolveOptions = {
   logWarning?: boolean;
@@ -139,7 +146,7 @@ export const resolvePrerenderPaths = async (
 
 export const getPrerenderConcurrency = (prerender: PrerenderConfig): number => {
   const config = getPrerenderConfigObject(prerender);
-  const value = config?.concurrency ?? config?.unstable_concurrency;
+  const value = getPrerenderConcurrencyConfig(config)?.value;
   if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
     return value;
   }
@@ -154,6 +161,24 @@ const getPrerenderConfigObject = (
   !Array.isArray(prerender)
     ? (prerender as PrerenderConfigObject)
     : null;
+
+const getPrerenderConcurrencyConfig = (
+  config: PrerenderConfigObject | null
+): PrerenderConcurrencyConfig => {
+  if (config?.concurrency !== undefined) {
+    return {
+      key: 'prerender.concurrency',
+      value: config.concurrency,
+    };
+  }
+
+  if (config?.unstable_concurrency !== undefined) {
+    return {
+      key: 'prerender.unstable_concurrency',
+      value: config.unstable_concurrency,
+    };
+  }
+};
 
 const isValidPrerenderPathsConfig = (
   value: unknown
@@ -178,17 +203,13 @@ export const validatePrerenderConfig = (
     return 'The `prerender`/`prerender.paths` config must be a boolean, an array of string paths, or a function returning a boolean or array of string paths.';
   }
 
-  const concurrency = config?.concurrency ?? config?.unstable_concurrency;
+  const concurrency = getPrerenderConcurrencyConfig(config);
 
   if (
-    concurrency !== undefined &&
-    (!Number.isInteger(concurrency) || concurrency <= 0)
+    concurrency &&
+    (!Number.isInteger(concurrency.value) || concurrency.value <= 0)
   ) {
-    const key =
-      config?.concurrency !== undefined
-        ? 'prerender.concurrency'
-        : 'prerender.unstable_concurrency';
-    return `The \`${key}\` config must be a positive integer if specified.`;
+    return `The \`${concurrency.key}\` config must be a positive integer if specified.`;
   }
 
   return null;
