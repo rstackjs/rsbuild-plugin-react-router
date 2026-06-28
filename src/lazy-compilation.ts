@@ -19,17 +19,15 @@ const normalizeSlashes = (value: string): string => value.replace(/\\/g, '/');
 
 const getLazyCompilationModuleValues = (
   module: LazyCompilationModule
-): string[] => {
-  const values = [
+): string[] =>
+  [
     module.request,
     module.userRequest,
     module.rawRequest,
     module.resource,
     module.identifier?.(),
     module.nameForCondition?.(),
-  ];
-  return values.filter((value): value is string => Boolean(value));
-};
+  ].filter((value): value is string => Boolean(value));
 
 const matchesLazyCompilationTest = (
   test: LazyCompilationOptions['test'] | undefined,
