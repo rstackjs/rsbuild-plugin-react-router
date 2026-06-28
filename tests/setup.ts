@@ -18,7 +18,10 @@ rstest.mock('jiti', () => ({
           },
         ]);
       }
-      return Promise.resolve({});
+      return Promise.resolve(
+        (globalThis as { __reactRouterTestConfig?: unknown })
+          .__reactRouterTestConfig ?? {}
+      );
     }),
   }),
 }));

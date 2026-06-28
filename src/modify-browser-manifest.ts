@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { Route, PluginOptions } from './types.js';
 import { rspack } from '@rsbuild/core';
 import type { Rspack } from '@rsbuild/core';
@@ -8,6 +7,70 @@ import {
 } from './manifest.js';
 import { combineURLs } from './plugin-utils.js';
 import jsesc from 'jsesc';
+
+type StatsAssetWithIntegrity = {
+  name?: string;
+  integrity?: unknown;
+};
+
+type StatsWithIntegrity = {
+  assets?: StatsAssetWithIntegrity[];
+};
+
+type CompilationAssetWithIntegrity = {
+  name: string;
+  info?: {
+    integrity?: unknown;
+  };
+};
+
+const ABSOLUTE_URL_RE = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
+
+const toManifestAssetUrl = (assetPrefix: string, assetName: string) => {
+  if (
+    ABSOLUTE_URL_RE.test(assetName) ||
+    assetName.startsWith('//') ||
+    assetName.startsWith('/')
+  ) {
+    return assetName;
+  }
+  return combineURLs(assetPrefix, assetName);
+};
+
+const addIntegrity = (
+  sri: Record<string, string>,
+  assetPrefix: string,
+  assetName: unknown,
+  integrity: unknown
+) => {
+  if (typeof assetName !== 'string' || typeof integrity !== 'string') {
+    return;
+  }
+  sri[toManifestAssetUrl(assetPrefix, assetName)] = integrity;
+};
+
+export const collectSubresourceIntegrity = (
+  stats: StatsWithIntegrity | undefined,
+  compilation:
+    | Pick<Rspack.Compilation, 'getAssets'>
+    | { getAssets?: () => CompilationAssetWithIntegrity[] }
+    | undefined,
+  assetPrefix = '/'
+): Record<string, string> | undefined => {
+  const sri: Record<string, string> = {};
+
+  for (const asset of stats?.assets ?? []) {
+    addIntegrity(sri, assetPrefix, asset.name, asset.integrity);
+  }
+
+  if (typeof compilation?.getAssets === 'function') {
+    for (const asset of compilation.getAssets()) {
+      addIntegrity(sri, assetPrefix, asset.name, asset.info?.integrity);
+    }
+  }
+
+  return Object.keys(sri).length > 0 ? sri : undefined;
+};
 
 /**
  * Creates a Webpack/Rspack plugin that modifies the browser manifest
@@ -101,31 +164,7 @@ export function createModifyBrowserManifestPlugin(
             );
           }
 
-          let sri: Record<string, string> | undefined;
-          if (
-            routeChunkOptions?.isBuild &&
-            (options?.subResourceIntegrity ??
-              options?.future?.unstable_subResourceIntegrity)
-          ) {
-            const assets =
-              typeof compilation.getAssets === 'function'
-                ? compilation.getAssets()
-                : Object.entries(compilation.assets).map(([name, asset]) => ({
-                    name,
-                    source: asset,
-                  }));
-            sri = {};
-            for (const asset of assets) {
-              if (!asset.name.endsWith('.js')) {
-                continue;
-              }
-              const source = asset.source.source().toString();
-              const hash = createHash('sha384').update(source).digest('base64');
-              sri[combineURLs(assetPrefix, asset.name)] = `sha384-${hash}`;
-            }
-          }
-
-          options?.onManifest?.(manifest, sri);
+          options?.onManifest?.(manifest, undefined);
           callback();
         }
       );

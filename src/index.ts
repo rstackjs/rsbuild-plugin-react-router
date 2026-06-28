@@ -46,7 +46,10 @@ import {
   getReactRouterManifestForDev,
   configRoutesToRouteManifest,
 } from './manifest.js';
-import { createModifyBrowserManifestPlugin } from './modify-browser-manifest.js';
+import {
+  collectSubresourceIntegrity,
+  createModifyBrowserManifestPlugin,
+} from './modify-browser-manifest.js';
 import { createRequestHandler, matchRoutes } from 'react-router';
 import {
   getExportNames,
@@ -408,6 +411,27 @@ export const pluginReactRouter = (
     let latestServerManifest: ReactRouterManifest | null = null;
     const latestServerManifestsByBundleId: Record<string, ReactRouterManifest> =
       {};
+    const updateLatestServerManifestSri = (
+      sri: Record<string, string> | undefined
+    ) => {
+      if (!latestServerManifest) {
+        return;
+      }
+
+      latestServerManifest = {
+        ...latestServerManifest,
+        sri,
+      };
+
+      for (const [bundleId, manifest] of Object.entries(
+        latestServerManifestsByBundleId
+      )) {
+        latestServerManifestsByBundleId[bundleId] = {
+          ...manifest,
+          sri,
+        };
+      }
+    };
 
     const routeByFilePath = new Map(
       Object.values(routes).map(route => [
@@ -468,9 +492,46 @@ export const pluginReactRouter = (
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
 
     let clientStats: Rspack.StatsCompilation | undefined;
+    let clientSri: Record<string, string> | undefined;
+    let resolveClientStatsReady:
+      | ((stats: Rspack.StatsCompilation | undefined) => void)
+      | undefined;
+    let clientStatsReadyResolved = false;
+    const clientStatsReady = new Promise<Rspack.StatsCompilation | undefined>(
+      resolve => {
+        resolveClientStatsReady = resolve;
+      }
+    );
+    const resolveClientStatsOnce = (
+      stats: Rspack.StatsCompilation | undefined
+    ) => {
+      if (clientStatsReadyResolved) {
+        return;
+      }
+      clientStatsReadyResolved = true;
+      resolveClientStatsReady?.(stats);
+    };
+    const toClientManifestStats = (
+      stats: Rspack.Stats | undefined
+    ): Rspack.StatsCompilation | undefined => {
+      return stats?.toJson({
+        all: false,
+        assets: true,
+      });
+    };
+
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
       if (environment.name === 'web') {
-        clientStats = stats?.toJson();
+        clientStats = toClientManifestStats(stats);
+        if (isBuild && subResourceIntegrity) {
+          clientSri = collectSubresourceIntegrity(
+            clientStats,
+            undefined,
+            assetPrefix
+          );
+          updateLatestServerManifestSri(clientSri);
+        }
+        resolveClientStatsOnce(clientStats);
       }
       if (pluginOptions.federation && ssr) {
         const serverBuildDir = resolve(buildDirectory, 'server');
@@ -1129,6 +1190,15 @@ export const pluginReactRouter = (
         },
         environments: {
           web: {
+            ...(subResourceIntegrity
+              ? {
+                  security: {
+                    sri: {
+                      enable: true,
+                    },
+                  },
+                }
+              : {}),
             source: {
               entry: {
                 // no query needed when federation is disabled
@@ -1325,8 +1395,10 @@ export const pluginReactRouter = (
           /virtual\/react-router\/server-manifest(?:-([^?]+))?/
         );
         const bundleId = bundleMatch?.[1]?.replace(/\\.js$/, '');
+        const manifestStats =
+          isBuild && subResourceIntegrity ? await clientStatsReady : clientStats;
 
-        const manifest =
+        const manifestBase =
           (isBuild && latestServerManifest
             ? bundleId && latestServerManifestsByBundleId[bundleId]
               ? latestServerManifestsByBundleId[bundleId]
@@ -1335,11 +1407,24 @@ export const pluginReactRouter = (
           (await getReactRouterManifestForDev(
             routes,
             pluginOptions,
-            clientStats,
+            manifestStats ?? clientStats,
             appDirectory,
             assetPrefix,
             routeChunkOptions
           ));
+        const manifest =
+          isBuild && subResourceIntegrity
+            ? {
+                ...manifestBase,
+                sri:
+                  clientSri ??
+                  collectSubresourceIntegrity(
+                    manifestStats,
+                    undefined,
+                    assetPrefix
+                  ),
+              }
+            : manifestBase;
         return {
           code: `export default ${jsesc(manifest, { es6: true })};`,
         };
