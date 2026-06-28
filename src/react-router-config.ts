@@ -17,9 +17,10 @@ type SplitRouteModulesConfig = boolean | 'enforce';
 
 export type Config = Omit<
   ReactRouterConfig,
-  'buildEnd' | 'splitRouteModules' | 'subResourceIntegrity'
+  'buildEnd' | 'future' | 'splitRouteModules' | 'subResourceIntegrity'
 > & {
   buildEnd?: BuildEndHook;
+  future?: Partial<FutureConfig>;
   splitRouteModules?: SplitRouteModulesConfig;
   subResourceIntegrity?: boolean;
 };

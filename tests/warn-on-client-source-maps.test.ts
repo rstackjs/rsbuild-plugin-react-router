@@ -1,18 +1,23 @@
 import { describe, expect, it, rstest } from '@rstest/core';
+import type { NormalizedConfig } from '@rsbuild/core';
 import {
   isSourceMapEnabled,
   warnOnClientSourceMaps,
 } from '../src/warnings/warn-on-client-source-maps';
 
+const normalizedConfig = (
+  config: Record<string, unknown>
+): NormalizedConfig => config as NormalizedConfig;
+
 describe('warnOnClientSourceMaps', () => {
   it('does not warn in non-production mode', () => {
     const warn = rstest.fn();
     warnOnClientSourceMaps(
-      {
+      normalizedConfig({
         mode: 'development',
         output: { sourceMap: { js: 'source-map', css: false } },
         environments: {},
-      } as any,
+      }),
       warn
     );
     expect(warn).not.toHaveBeenCalled();
@@ -21,11 +26,11 @@ describe('warnOnClientSourceMaps', () => {
   it('warns when web environment source maps are enabled in production', () => {
     const warn = rstest.fn();
     warnOnClientSourceMaps(
-      {
+      normalizedConfig({
         mode: 'production',
         output: { sourceMap: false },
         environments: { web: { output: { sourceMap: { js: 'source-map' } } } },
-      } as any,
+      }),
       warn
     );
     expect(warn).toHaveBeenCalledTimes(1);
@@ -37,11 +42,11 @@ describe('warnOnClientSourceMaps', () => {
   it('warns when output.sourceMap is true in production', () => {
     const warn = rstest.fn();
     warnOnClientSourceMaps(
-      {
+      normalizedConfig({
         mode: 'production',
         output: { sourceMap: true },
         environments: {},
-      } as any,
+      }),
       warn
     );
     expect(warn).toHaveBeenCalledTimes(1);
@@ -50,11 +55,11 @@ describe('warnOnClientSourceMaps', () => {
   it('warns when output.sourceMap is a string in production', () => {
     const warn = rstest.fn();
     warnOnClientSourceMaps(
-      {
+      normalizedConfig({
         mode: 'production',
         output: { sourceMap: 'source-map' },
         environments: {},
-      } as any,
+      }),
       warn
     );
     expect(warn).toHaveBeenCalledTimes(1);
@@ -68,11 +73,11 @@ describe('warnOnClientSourceMaps', () => {
   it('does not warn when source maps are disabled in production', () => {
     const warn = rstest.fn();
     warnOnClientSourceMaps(
-      {
+      normalizedConfig({
         mode: 'production',
         output: { sourceMap: false },
         environments: { web: { output: { sourceMap: false } } },
-      } as any,
+      }),
       warn
     );
     expect(warn).not.toHaveBeenCalled();
@@ -80,12 +85,12 @@ describe('warnOnClientSourceMaps', () => {
   it('warns when rspack devtool enables source maps in production', () => {
     const warn = rstest.fn();
     warnOnClientSourceMaps(
-      {
+      normalizedConfig({
         mode: 'production',
         output: { sourceMap: false },
         tools: { rspack: { devtool: 'source-map' } },
         environments: {},
-      } as any,
+      }),
       warn
     );
     expect(warn).toHaveBeenCalledTimes(1);
@@ -94,13 +99,13 @@ describe('warnOnClientSourceMaps', () => {
   it('warns when web environment devtool enables source maps in production', () => {
     const warn = rstest.fn();
     warnOnClientSourceMaps(
-      {
+      normalizedConfig({
         mode: 'production',
         output: { sourceMap: false },
         environments: {
           web: { tools: { rspack: { devtool: 'inline-source-map' } } },
         },
-      } as any,
+      }),
       warn
     );
     expect(warn).toHaveBeenCalledTimes(1);
