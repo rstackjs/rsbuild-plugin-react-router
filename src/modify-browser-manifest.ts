@@ -90,7 +90,7 @@ export function createModifyBrowserManifestPlugin(
     subResourceIntegrity?: boolean;
     onManifest?: (
       manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
-      sri: Record<string, string> | undefined
+      sri: Record<string, string> | true | undefined
     ) => void;
   }
 ) {
@@ -114,6 +114,11 @@ export function createModifyBrowserManifestPlugin(
               options?.future?.unstable_subResourceIntegrity)
               ? { ...manifest, sri: true as const }
               : manifest;
+          const sri =
+            manifestForBrowser.sri === true
+              ? collectSubresourceIntegrity(stats, compilation, assetPrefix) ??
+                true
+              : undefined;
 
           const virtualManifestPath =
             'static/js/virtual/react-router/browser-manifest.js';
@@ -170,7 +175,7 @@ export function createModifyBrowserManifestPlugin(
             );
           }
 
-          options?.onManifest?.(manifestForBrowser, undefined);
+          options?.onManifest?.(manifestForBrowser, sri);
           callback();
         }
       );

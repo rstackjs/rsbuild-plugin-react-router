@@ -93,6 +93,7 @@ describe('collectSubresourceIntegrity', () => {
             callback: (error?: Error) => void
           ) => Promise<void>)
         | undefined;
+      let callbackSri: Record<string, string> | true | undefined;
       const plugin = createModifyBrowserManifestPlugin(
         {
           root: {
@@ -111,8 +112,9 @@ describe('collectSubresourceIntegrity', () => {
         },
         {
           subResourceIntegrity: true,
-          onManifest: manifest => {
+          onManifest: (manifest, sri) => {
             expect(manifest.sri).toBe(true);
+            callbackSri = sri;
           },
         }
       );
@@ -156,6 +158,7 @@ describe('collectSubresourceIntegrity', () => {
       expect(compilation.assets[BROWSER_MANIFEST_PATH].source()).toContain(
         "'sri':true"
       );
+      expect(callbackSri).toBe(true);
 
       const buildManifestAsset = Object.entries(compilation.assets).find(
         ([name]) => /^static\/js\/manifest-[a-f0-9]+\.js$/.test(name)
