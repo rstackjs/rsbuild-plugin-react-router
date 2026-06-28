@@ -1,7 +1,7 @@
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
-type PrerenderConfig = Config['prerender'];
+type ReactRouterPrerenderConfig = Config['prerender'];
 
 type PrerenderPathsConfig =
   | boolean
@@ -10,10 +10,20 @@ type PrerenderPathsConfig =
       getStaticPaths: () => string[];
     }) => boolean | string[] | Promise<boolean | string[]>);
 
-type PrerenderConfigObject = {
-  paths?: PrerenderPathsConfig;
+type PrerenderConfigObject = Extract<
+  NonNullable<ReactRouterPrerenderConfig>,
+  { paths: unknown }
+> & {
   unstable_concurrency?: number;
-} | null;
+};
+
+type PrerenderConfig = ReactRouterPrerenderConfig | PrerenderConfigObject;
+type PrerenderConcurrencyConfig =
+  | {
+      key: 'prerender.concurrency' | 'prerender.unstable_concurrency';
+      value: number;
+    }
+  | undefined;
 
 type PrerenderResolveOptions = {
   logWarning?: boolean;
@@ -135,17 +145,39 @@ export const resolvePrerenderPaths = async (
 };
 
 export const getPrerenderConcurrency = (prerender: PrerenderConfig): number => {
-  if (
-    typeof prerender === 'object' &&
-    prerender !== null &&
-    'unstable_concurrency' in prerender
-  ) {
-    const value = (prerender as PrerenderConfigObject)?.unstable_concurrency;
-    if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
-      return value;
-    }
+  const config = getPrerenderConfigObject(prerender);
+  const value = getPrerenderConcurrencyConfig(config)?.value;
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return value;
   }
   return 1;
+};
+
+const getPrerenderConfigObject = (
+  prerender: PrerenderConfig
+): PrerenderConfigObject | null =>
+  typeof prerender === 'object' &&
+  prerender !== null &&
+  !Array.isArray(prerender)
+    ? (prerender as PrerenderConfigObject)
+    : null;
+
+const getPrerenderConcurrencyConfig = (
+  config: PrerenderConfigObject | null
+): PrerenderConcurrencyConfig => {
+  if (config?.concurrency !== undefined) {
+    return {
+      key: 'prerender.concurrency',
+      value: config.concurrency,
+    };
+  }
+
+  if (config?.unstable_concurrency !== undefined) {
+    return {
+      key: 'prerender.unstable_concurrency',
+      value: config.unstable_concurrency,
+    };
+  }
 };
 
 const isValidPrerenderPathsConfig = (
@@ -162,34 +194,22 @@ export const validatePrerenderConfig = (
     return null;
   }
 
-  const pathsConfig =
-    typeof prerender === 'object' && prerender !== null && 'paths' in prerender
-      ? (prerender as PrerenderConfigObject)?.paths
-      : prerender;
+  const config = getPrerenderConfigObject(prerender);
+  const pathsConfig = config && 'paths' in config ? config.paths : prerender;
 
-  const isValidConfig =
-    isValidPrerenderPathsConfig(pathsConfig) ||
-    (typeof prerender === 'object' &&
-      prerender !== null &&
-      'paths' in prerender &&
-      isValidPrerenderPathsConfig((prerender as PrerenderConfigObject)?.paths));
+  const isValidConfig = isValidPrerenderPathsConfig(pathsConfig);
 
   if (!isValidConfig) {
     return 'The `prerender`/`prerender.paths` config must be a boolean, an array of string paths, or a function returning a boolean or array of string paths.';
   }
 
-  const concurrency =
-    typeof prerender === 'object' &&
-    prerender !== null &&
-    'unstable_concurrency' in prerender
-      ? (prerender as PrerenderConfigObject)?.unstable_concurrency
-      : undefined;
+  const concurrency = getPrerenderConcurrencyConfig(config);
 
   if (
-    concurrency !== undefined &&
-    (!Number.isInteger(concurrency) || concurrency <= 0)
+    concurrency &&
+    (!Number.isInteger(concurrency.value) || concurrency.value <= 0)
   ) {
-    return 'The `prerender.unstable_concurrency` config must be a positive integer if specified.';
+    return `The \`${concurrency.key}\` config must be a positive integer if specified.`;
   }
 
   return null;

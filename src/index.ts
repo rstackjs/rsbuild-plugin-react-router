@@ -386,7 +386,7 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
-    const splitRouteModules = future?.v8_splitRouteModules ?? false;
+    const splitRouteModules = resolvedConfigWithRoutes.splitRouteModules;
     const enforceSplitRouteModules = splitRouteModules === 'enforce';
     const routeChunkConfig: RouteChunkConfig = {
       splitRouteModules,
@@ -1254,6 +1254,8 @@ export const pluginReactRouter = (
                     assetPrefix,
                     routeChunkOptions,
                     {
+                      subResourceIntegrity:
+                        resolvedConfigWithRoutes.subResourceIntegrity,
                       future,
                       onManifest: (manifest, sri) => {
                         const baseServerManifest = {
