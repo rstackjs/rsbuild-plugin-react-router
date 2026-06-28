@@ -58,6 +58,7 @@ describe('pluginReactRouter', () => {
     expect(
       config.dev.lazyCompilation.test({
         resource: '/project/app/components/card.tsx',
+        nameForCondition: () => '/project/app/components/card.tsx',
       })
     ).toBe(true);
   });
@@ -109,11 +110,13 @@ describe('pluginReactRouter', () => {
     expect(
       config.dev.lazyCompilation.test({
         resource: '/project/app/components/card.tsx',
+        nameForCondition: () => '/project/app/components/card.tsx',
       })
     ).toBe(true);
     expect(
       config.dev.lazyCompilation.test({
         resource: '/project/vendor/react.tsx',
+        nameForCondition: () => '/project/vendor/react.tsx',
       })
     ).toBe(false);
   });

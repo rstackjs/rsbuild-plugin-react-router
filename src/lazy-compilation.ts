@@ -41,10 +41,12 @@ const matchesLazyCompilationTest = (
   if (typeof test === 'function') {
     return test(module as Parameters<typeof test>[0]);
   }
-  return getLazyCompilationModuleValues(module).some(value => {
-    test.lastIndex = 0;
-    return test.test(value);
-  });
+  const conditionName = module.nameForCondition?.();
+  if (!conditionName) {
+    return false;
+  }
+  test.lastIndex = 0;
+  return test.test(conditionName);
 };
 
 const isReactRouterHydrationModule = (

@@ -63,13 +63,41 @@ describe('guardReactRouterLazyCompilation', () => {
     expect(
       guarded?.test?.({
         resource: '/project/app/components/card.tsx',
+        nameForCondition: () => '/project/app/components/card.tsx',
       })
     ).toBe(true);
     expect(
       guarded?.test?.({
         resource: '/project/vendor/react.tsx',
+        nameForCondition: () => '/project/vendor/react.tsx',
       })
     ).toBe(false);
+  });
+
+  it('applies RegExp user tests to the module condition name', () => {
+    const guarded = guardReactRouterLazyCompilation({
+      lazyCompilation: {
+        entries: true,
+        imports: true,
+        test: /node_modules/g,
+      },
+      entryClientPath,
+    });
+
+    expect(
+      guarded?.test?.({
+        rawRequest: 'node_modules-loader!/project/app/page.tsx',
+        resource: '/project/app/page.tsx',
+        nameForCondition: () => '/project/app/page.tsx',
+      })
+    ).toBe(false);
+    expect(
+      guarded?.test?.({
+        rawRequest: './react',
+        resource: '/project/node_modules/react/index.js',
+        nameForCondition: () => '/project/node_modules/react/index.js',
+      })
+    ).toBe(true);
   });
 
   it('guards all React Router hydration-critical module shapes', () => {
