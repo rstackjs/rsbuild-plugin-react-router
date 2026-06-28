@@ -92,10 +92,10 @@ describe('resolveReactRouterConfig', () => {
     const defaultResult = await resolveReactRouterConfig({});
     const disabledResult = await resolveReactRouterConfig({
       splitRouteModules: false,
-    } as any);
+    });
     const enforcedResult = await resolveReactRouterConfig({
       splitRouteModules: 'enforce',
-    } as any);
+    });
 
     expect(defaultResult.resolved.splitRouteModules).toBe(true);
     expect(disabledResult.resolved.splitRouteModules).toBe(false);

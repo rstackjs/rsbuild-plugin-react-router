@@ -94,6 +94,12 @@ export { resolveReactRouterServerBuild };
 
 const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
 
+type ReactRouterPresetResolvedConfig = Parameters<
+  NonNullable<
+    NonNullable<Config['presets']>[number]['reactRouterConfigResolved']
+  >
+>[0]['reactRouterConfig'];
+
 export const shouldParallelizeEnvironmentBuilds = ({
   isBuild,
   spareCoreCount = getDefaultConcurrency(),
@@ -417,7 +423,8 @@ export const pluginReactRouter = (
       resolvedConfigWithRoutes;
     for (const preset of configPresets) {
       await preset.reactRouterConfigResolved?.({
-        reactRouterConfig: resolvedConfigForPreset as never,
+        reactRouterConfig:
+          resolvedConfigForPreset as ReactRouterPresetResolvedConfig,
       });
     }
 
