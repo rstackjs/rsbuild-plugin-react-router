@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
 import { resolveReactRouterConfig } from '../src/react-router-config';
+import type { Config } from '../src/react-router-config';
 
 describe('resolveReactRouterConfig', () => {
   it('merges presets and combines buildEnd hooks', async () => {
@@ -35,7 +36,7 @@ describe('resolveReactRouterConfig', () => {
     const defaultResult = await resolveReactRouterConfig({});
     const enabledResult = await resolveReactRouterConfig({
       subResourceIntegrity: true,
-    } as any);
+    });
     const futureResult = await resolveReactRouterConfig({
       future: { unstable_subResourceIntegrity: true },
     });
@@ -59,7 +60,7 @@ describe('resolveReactRouterConfig', () => {
         },
       ],
       future: { unstable_subResourceIntegrity: false },
-    } as any);
+    } as Config);
     const disabledByTopLevel = await resolveReactRouterConfig({
       presets: [
         {
@@ -70,7 +71,7 @@ describe('resolveReactRouterConfig', () => {
         },
       ],
       subResourceIntegrity: false,
-    } as any);
+    } as Config);
 
     expect(disabledByFuture.resolved.subResourceIntegrity).toBe(false);
     expect(
