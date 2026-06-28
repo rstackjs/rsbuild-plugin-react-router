@@ -552,7 +552,7 @@ export const pluginReactRouter = (
     > =>
       Effect.gen(function* () {
         routeTopologyWatcherClosed = true;
-        yield* tryPluginPromise(() => routeTopologyWatcherTask.cancel());
+        yield* routeTopologyWatcherTask.cancelEffect();
         yield* tryPluginPromise(() => closeRouteTopologyWatcher?.());
         closeRouteTopologyWatcher = undefined;
       });

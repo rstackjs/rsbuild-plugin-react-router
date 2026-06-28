@@ -157,8 +157,9 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     const workers = this.#workers ?? [];
     this.#workers = [];
     this.#closePromise = runPluginEffect(
-      Effect.all(
-        workers.map(state =>
+      Effect.forEach(
+        workers,
+        state =>
           Effect.sync(() => {
             for (const pending of state.pending.values()) {
               pending.reject(new Error('Route transform worker closed.'));
@@ -170,10 +171,9 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
                 Effect.asVoid
               )
             )
-          )
-        ),
-        { concurrency: 'unbounded' }
-      ).pipe(Effect.asVoid)
+          ),
+        { concurrency: 'unbounded', discard: true }
+      )
     );
     return this.#closePromise;
   }

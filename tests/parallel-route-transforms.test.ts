@@ -3,6 +3,7 @@ import { mapWithConcurrency } from '../src/concurrency';
 import { getExportNames } from '../src/export-utils';
 import {
   executeRouteTransformTask,
+  type RouteTransformResult,
   type RouteModuleTransformTask,
 } from '../src/route-transform-tasks';
 import {
@@ -80,6 +81,18 @@ class FakeRouteTransformWorker {
     }
   }
 }
+
+const resolveWorkerMessage = (
+  worker: FakeRouteTransformWorker,
+  result: RouteTransformResult,
+  messageIndex = worker.messages.length - 1
+): void => {
+  worker.emit('message', {
+    id: worker.messages[messageIndex]!.id,
+    ok: true,
+    result,
+  } satisfies WorkerResponse);
+};
 
 describe('parallel route transforms', () => {
   it.each([
@@ -167,11 +180,7 @@ describe('parallel route transforms', () => {
 
     const pending = executor.run(createRouteModuleTask());
     expect(createdWorkers).toBe(1);
-    worker.emit('message', {
-      id: worker.messages[0]!.id,
-      ok: true,
-      result: { code: 'created lazily' },
-    } satisfies WorkerResponse);
+    resolveWorkerMessage(worker, { code: 'created lazily' });
     await expect(pending).resolves.toEqual({ code: 'created lazily' });
 
     await executor.close();
@@ -217,11 +226,7 @@ describe('parallel route transforms', () => {
 
     const firstRun = executor.run(task);
     expect(worker.messages[0]?.task.code).toBe(task.code);
-    worker.emit('message', {
-      id: worker.messages[0]!.id,
-      ok: true,
-      result: { code: 'first' },
-    } satisfies WorkerResponse);
+    resolveWorkerMessage(worker, { code: 'first' }, 0);
     await expect(firstRun).resolves.toEqual({ code: 'first' });
 
     worker.failNextPostMessage = true;
@@ -229,11 +234,7 @@ describe('parallel route transforms', () => {
 
     const thirdRun = executor.run(task);
     expect(worker.messages[1]?.task.code).toBe(task.code);
-    worker.emit('message', {
-      id: worker.messages[1]!.id,
-      ok: true,
-      result: { code: 'third' },
-    } satisfies WorkerResponse);
+    resolveWorkerMessage(worker, { code: 'third' }, 1);
     await expect(thirdRun).resolves.toEqual({ code: 'third' });
 
     await executor.close();
