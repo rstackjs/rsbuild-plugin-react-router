@@ -43,5 +43,42 @@ describe('resolveReactRouterConfig', () => {
     expect(defaultResult.resolved.subResourceIntegrity).toBe(false);
     expect(enabledResult.resolved.subResourceIntegrity).toBe(true);
     expect(futureResult.resolved.subResourceIntegrity).toBe(true);
+    expect(futureResult.resolved.future.unstable_subResourceIntegrity).toBe(
+      true
+    );
+  });
+
+  it('lets user SRI config override preset aliases', async () => {
+    const disabledByFuture = await resolveReactRouterConfig({
+      presets: [
+        {
+          name: 'sri-preset',
+          reactRouterConfig: async () => ({
+            subResourceIntegrity: true,
+          }),
+        },
+      ],
+      future: { unstable_subResourceIntegrity: false },
+    } as any);
+    const disabledByTopLevel = await resolveReactRouterConfig({
+      presets: [
+        {
+          name: 'sri-preset',
+          reactRouterConfig: async () => ({
+            future: { unstable_subResourceIntegrity: true },
+          }),
+        },
+      ],
+      subResourceIntegrity: false,
+    } as any);
+
+    expect(disabledByFuture.resolved.subResourceIntegrity).toBe(false);
+    expect(
+      disabledByFuture.resolved.future.unstable_subResourceIntegrity
+    ).toBe(false);
+    expect(disabledByTopLevel.resolved.subResourceIntegrity).toBe(false);
+    expect(
+      disabledByTopLevel.resolved.future.unstable_subResourceIntegrity
+    ).toBe(false);
   });
 });

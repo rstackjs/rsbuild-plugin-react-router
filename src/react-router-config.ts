@@ -121,6 +121,25 @@ const mergeReactRouterConfig = (...configs: Config[]): Config => {
   return configs.reduce(reducer, {});
 };
 
+const normalizeSubResourceIntegrity = (config: Config): Config => {
+  const subResourceIntegrity =
+    config.subResourceIntegrity ??
+    config.future?.unstable_subResourceIntegrity;
+
+  if (subResourceIntegrity === undefined) {
+    return config;
+  }
+
+  return {
+    ...config,
+    subResourceIntegrity,
+    future: {
+      ...(config.future ?? {}),
+      unstable_subResourceIntegrity: subResourceIntegrity,
+    },
+  };
+};
+
 export const resolveReactRouterConfig = async (
   reactRouterUserConfig: Config
 ): Promise<{
@@ -149,18 +168,19 @@ export const resolveReactRouterConfig = async (
   );
 
   const userAndPresetConfigs = mergeReactRouterConfig(
-    ...(presets.filter(Boolean) as Config[]),
-    reactRouterUserConfig
+    ...(presets.filter(Boolean) as Config[]).map(normalizeSubResourceIntegrity),
+    normalizeSubResourceIntegrity(reactRouterUserConfig)
   );
 
-  const resolvedFuture: FutureConfig = {
-    ...DEFAULT_CONFIG.future,
-    ...(userAndPresetConfigs.future ?? {}),
-  };
   const subResourceIntegrity =
     userAndPresetConfigs.subResourceIntegrity ??
     userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
     DEFAULT_CONFIG.subResourceIntegrity;
+  const resolvedFuture: FutureConfig = {
+    ...DEFAULT_CONFIG.future,
+    ...(userAndPresetConfigs.future ?? {}),
+    unstable_subResourceIntegrity: subResourceIntegrity,
+  };
 
   let resolved: ResolvedReactRouterConfig = {
     ...DEFAULT_CONFIG,
