@@ -1,9 +1,11 @@
-import { Link, useLoaderData, useParams } from 'react-router';
+import { Link, useLoaderData } from 'react-router';
 import type { Route } from './+types/project';
+
+type LoaderData = Route.ComponentProps['loaderData'];
 
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => data.project.name,
+    breadcrumb: (data: LoaderData) => data.project.name,
   };
 }
 
@@ -74,7 +76,7 @@ function Avatar({ name, initials }: { name: string; initials: string }) {
 }
 
 export default function Project() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<LoaderData>();
 
   return (
     <div className="space-y-6">

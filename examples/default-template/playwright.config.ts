@@ -5,10 +5,12 @@ export default defineConfig({
   // Maximum time one test can run for
   timeout: 30 * 1000,
   expect: {
-    timeout: 5000
+    timeout: 5000,
   },
-  // Run tests in files in parallel
+  // Keep this example serial because dev-route-watch mutates route config and
+  // restarts the shared dev server.
   fullyParallel: false,
+  workers: 1,
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
   // Retry on CI only
@@ -47,4 +49,4 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
-}); 
+});

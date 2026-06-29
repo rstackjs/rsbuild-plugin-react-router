@@ -8,7 +8,6 @@ A Rsbuild plugin that provides seamless integration with React Router, supportin
 
 ## Features
 
-
 - 🚀 Zero-config setup with sensible defaults
 - 🔄 Automatic route generation from file system
 - 🖥️ Server-Side Rendering (SSR) support
@@ -58,11 +57,11 @@ export default defineConfig(() => {
         // Optional: Enable custom server mode
         customServer: false,
         // Optional: Specify server output format
-        serverOutput: "commonjs",
+        serverOutput: 'commonjs',
         // Optional: enable experimental support for module federation
-        federation: false
-      }), 
-      pluginReact()
+        federation: false,
+      }),
+      pluginReact(),
     ],
   };
 });
@@ -73,6 +72,7 @@ export default defineConfig(() => {
 The plugin uses a two-part configuration system:
 
 1. **Plugin Options** (in `rsbuild.config.ts`):
+
 ```ts
 pluginReactRouter({
   /**
@@ -87,7 +87,37 @@ pluginReactRouter({
    * Options: "commonjs" | "module"
    * @default "module"
    */
-  serverOutput?: "commonjs" | "module"
+  serverOutput?: "commonjs" | "module",
+
+  /**
+   * Rsbuild dev-only lazy compilation behavior.
+   * The plugin guards React Router hydration-critical modules so
+   * `lazyCompilation: { entries: true }` remains enabled without replacing
+   * manifest route modules with lazy entry proxies.
+   * @default undefined
+   */
+  lazyCompilation?: boolean | Rspack.LazyCompilationOptions,
+
+  /**
+   * Emit structured React Router plugin timing logs.
+   * @default false
+   */
+  logPerformance?: boolean,
+
+  /**
+   * Run route transforms in a worker-thread pool.
+   * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
+   * @default Automatically enabled for 256+ resolved routes. The automatic
+   * pool uses available CPU cores minus 2.
+   */
+  parallelTransforms?: boolean | { maxWorkers?: number },
+
+  /**
+   * Route-topology notification for programmatic/custom dev servers.
+   * Recreate the Rsbuild server when this fires.
+   */
+  onRouteTopologyChange?: () => void | Promise<void>,
+
   /**
    * Enable experimental support for module federation
    * @default false
@@ -106,6 +136,7 @@ passing the build to React Router's request handler.
 ```
 
 2. **React Router Configuration** (in `react-router.config.*`):
+
 ```ts
 import type { Config } from '@react-router/dev/config';
 
@@ -120,19 +151,19 @@ export default {
    * The file name for the server build output.
    * @default "index.js"
    */
-  serverBuildFile: "index.js",
+  serverBuildFile: 'index.js',
 
   /**
    * The output format for the server build.
    * Options: "esm" | "cjs"
    * @default "esm"
    */
-  serverModuleFormat: "esm",
+  serverModuleFormat: 'esm',
 
   /**
    * Split server bundles by route branch (advanced).
    */
-  serverBundles: async ({ branch }) => branch[0]?.id ?? "main",
+  serverBundles: async ({ branch }) => branch[0]?.id ?? 'main',
 
   /**
    * Enable Subresource Integrity for browser assets.
@@ -166,12 +197,10 @@ export default {
   basename: '/my-app',
 
   /**
-   * React Router future flags (optional).
-   * Example: split client route modules into separate chunks.
+   * Split client route module exports into separate chunks.
+   * @default true
    */
-  future: {
-    v8_splitRouteModules: true,
-  },
+  splitRouteModules: true,
 } satisfies Config;
 ```
 
@@ -262,13 +291,14 @@ export default {
 } satisfies Config;
 ```
 
-For large sites, you can tune prerender concurrency:
+Prerendering defaults to one path at a time, matching React Router. You can opt
+into concurrent prerendering for large sites:
 
 ```ts
 export default {
   ssr: false,
   prerender: {
-    paths: ['/','/about'],
+    paths: ['/', '/about'],
     unstable_concurrency: 4,
   },
 } satisfies Config;
@@ -281,7 +311,12 @@ If no configuration is provided, the following defaults will be used:
 ```ts
 // Plugin defaults (rsbuild.config.ts)
 {
-  customServer: false
+  customServer: false,
+  serverOutput: 'module',
+  federation: false,
+  lazyCompilation: undefined, // Rsbuild's dev defaults still apply
+  logPerformance: false,
+  parallelTransforms: undefined // adaptive: workers for 256+ resolved routes
 }
 
 // Router defaults (react-router.config.ts)
@@ -293,6 +328,19 @@ If no configuration is provided, the following defaults will be used:
   subResourceIntegrity: false
 }
 ```
+
+Route transforms run inline for fewer than 256 resolved routes and use worker
+threads for larger route graphs. The automatic worker count uses available CPU
+cores minus 2. Pass `true` to force workers, `{ maxWorkers }` to override that
+count, or `false` to force inline transforms.
+
+For builds with 256+ routes, detailed file-size reporting is compacted to totals
+by default to avoid gzipping and printing thousands of assets. Set
+`performance.printFileSize` to an object to customize that output.
+
+Route transform source maps are generated in development only. If you enable
+Rsbuild source maps for faster local debugging, prefer a cheap JS map:
+`output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
 
 Subresource Integrity is disabled by default. Enable it with
 `subResourceIntegrity: true` in `react-router.config.*` when the deployed app
@@ -339,6 +387,7 @@ export default [
 ```
 
 The plugin provides several helper functions for defining routes:
+
 - `index()` - Creates an index route
 - `route()` - Creates a regular route with a path
 - `layout()` - Creates a layout route with nested children
@@ -349,6 +398,7 @@ The plugin provides several helper functions for defining routes:
 Route components support the following exports:
 
 #### Client-side Exports
+
 - `default` - The route component
 - `ErrorBoundary` - Error boundary component
 - `HydrateFallback` - Loading component during hydration
@@ -362,6 +412,7 @@ Route components support the following exports:
 - `shouldRevalidate` - Revalidation control
 
 #### Server-side Exports
+
 - `loader` - Server-side data loading
 - `action` - Server-side form actions
 - `middleware` - Server-side middleware
@@ -400,34 +451,37 @@ export default defineConfig(() => {
   return {
     plugins: [
       pluginReactRouter({
-        customServer: true
-      }), 
-      pluginReact()
+        customServer: true,
+      }),
+      pluginReact(),
     ],
   };
 });
 ```
 
-When using a custom server, you'll need to:
+If the server is created programmatically with `createDevServer()`, pass
+`onRouteTopologyChange` and use it to recreate that server. Rsbuild's
+`reload-server` watcher is owned by the CLI and is not installed by the
+programmatic API. The callback is a notification and is not awaited, so it can
+safely start a serialized replacement task. Always `await` the active server's
+`close()` before calling `createDevServer()` again; the plugin rejects overlapping
+or out-of-order replacement instead of closing one server from inside another
+server's startup hooks. If startup fails before returning a server, or if
+`close()` rejects, restart the process before retrying unless you can externally
+prove and force complete teardown; a fresh Rsbuild instance alone is not
+sufficient. Do not launch concurrent `createDevServer()` calls.
 
-1. Create a server handler (`server/index.ts`):
-```ts
-import { createRequestHandler } from '@react-router/express';
+Create one server entry point (`server.js`) and let it own the React Router
+request handler in both development and production. Only the build provider
+changes between modes:
 
-export const app = createRequestHandler({
-  build: () => import('virtual/react-router/server-build'),
-  getLoadContext() {
-    // Add custom context available to your loaders/actions
-    return {
-      // ... your custom context
-    };
-  },
-});
-```
-
-2. Set up your server entry point (`server.js`):
 ```js
 import { createRsbuild, loadConfig } from '@rsbuild/core';
+import { createRequestHandler } from '@react-router/express';
+import {
+  loadReactRouterServerBuild,
+  resolveReactRouterServerBuild,
+} from 'rsbuild-plugin-react-router';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -439,61 +493,83 @@ const app = express();
 const isDev = process.env.NODE_ENV !== 'production';
 
 async function startServer() {
+  let devServer;
+  let build;
+
   if (isDev) {
     const config = await loadConfig();
     const rsbuild = await createRsbuild({
       rsbuildConfig: config.content,
     });
-    const devServer = await rsbuild.createDevServer();
-    app.use(devServer.middlewares);
-
-    app.use(async (req, res, next) => {
-      try {
-        const bundle = await devServer.environments.node.loadBundle('app');
-        await bundle.app(req, res, next);
-      } catch (e) {
-        next(e);
-      }
-    });
-
-    const port = Number.parseInt(process.env.PORT || '3000', 10);
-    const server = app.listen(port, () => {
-      console.log(`Development server is running on http://localhost:${port}`);
-      devServer.afterListen();
-    });
-    devServer.connectWebSocket({ server });
+    const currentDevServer = await rsbuild.createDevServer();
+    devServer = currentDevServer;
+    app.use(currentDevServer.middlewares);
+    build = () => loadReactRouterServerBuild(currentDevServer);
   } else {
-    // Production mode
-    app.use(express.static(path.join(__dirname, 'build/client'), {
-      index: false
-    }));
-
-    // Load the server bundle
-    const serverBundle = await import('./build/server/static/js/app.js');
-    // Mount the server app after static file handling
-    app.use(async (req, res, next) => {
-      try {
-        await serverBundle.default.app(req, res, next);
-      } catch (e) {
-        next(e);
-      }
-    });
-
-    const port = Number.parseInt(process.env.PORT || '3000', 10);
-    app.listen(port, () => {
-      console.log(`Production server is running on http://localhost:${port}`);
-    });
+    app.use(
+      express.static(path.join(__dirname, 'build/client'), {
+        index: false,
+      })
+    );
+    build = await resolveReactRouterServerBuild(
+      import('./build/server/static/js/app.js')
+    );
   }
+
+  app.use(
+    createRequestHandler({
+      build,
+      mode: isDev ? 'development' : 'production',
+      getLoadContext() {
+        return {
+          // Add custom loader/action context here.
+        };
+      },
+    })
+  );
+
+  const port = Number.parseInt(process.env.PORT || '3000', 10);
+  const server = app.listen(port, () => {
+    const mode = isDev ? 'Development' : 'Production';
+    console.log(`${mode} server is running on http://localhost:${port}`);
+    devServer?.afterListen();
+  });
+  devServer?.connectWebSocket({ server });
 }
 
 startServer().catch(console.error);
 ```
 
-3. Update your `package.json` scripts:
+`loadReactRouterServerBuild` waits for a complete React Router development
+generation. During rebuilds it returns the last successfully evaluated server
+build, whose embedded manifest is paired with the selected web compilation.
+A failed or incomplete candidate does not replace that last-good pair. The
+built-in development middleware uses the same path. Calling
+`devServer.environments.node.loadBundle()` directly bypasses this guarantee.
+
+When `serverBundles` is configured, pass its exact Rsbuild entry name as the
+optional second argument (for example, `bundle-a/index`). The default build
+and every configured bundle are
+evaluated and published as one generation; one failing bundle keeps the whole
+previous generation active.
+
+`resolveReactRouterServerBuild` accepts an imported production server module,
+normalizes ESM and CommonJS namespace shapes, resolves supported asynchronous
+build exports, and validates the result before it reaches React Router.
+
+This guarantee covers the eagerly evaluated server entry object and its
+embedded manifest. It does not snapshot deferred server chunks, make emitted
+client assets immutable, or delay Rsbuild's WebSocket success notification.
+Same-path server or client chunks can change before the matching framework
+generation commits. Closing that publication gap requires a supported Rsbuild
+graph-settled hook plus immutable or staged outputs.
+
+Then update your `package.json` scripts:
+
 ```json
 {
   "scripts": {
-    "dev": "node server.js",
+    "dev": "NODE_ENV=development NODE_OPTIONS=\"--experimental-vm-modules\" node server.js",
     "build": "rsbuild build",
     "start": "NODE_ENV=production node server.js"
   }
@@ -501,6 +577,7 @@ startServer().catch(console.error);
 ```
 
 The custom server setup allows you to:
+
 - Add custom middleware
 - Handle API routes
 - Integrate with databases
@@ -513,6 +590,7 @@ The custom server setup allows you to:
 To deploy your React Router app to Cloudflare Workers:
 
 1. **Configure Rsbuild** (`rsbuild.config.ts`):
+
 ```ts
 import { defineConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
@@ -537,17 +615,24 @@ export default defineConfig({
             module: true,
           },
           resolve: {
-            conditionNames: ['workerd', 'worker', 'browser', 'import', 'require'],
+            conditionNames: [
+              'workerd',
+              'worker',
+              'browser',
+              'import',
+              'require',
+            ],
           },
         },
       },
     },
   },
-  plugins: [pluginReactRouter({customServer: true}), pluginReact()],
+  plugins: [pluginReactRouter({ customServer: true }), pluginReact()],
 });
 ```
 
 2. **Configure Wrangler** (`wrangler.toml`):
+
 ```toml
 workers_dev = true
 name = "my-react-router-worker"
@@ -565,6 +650,7 @@ VALUE_FROM_CLOUDFLARE = "Hello from Cloudflare"
 ```
 
 3. **Create Worker Entry** (`server/index.ts`):
+
 ```ts
 import { createRequestHandler } from 'react-router';
 
@@ -601,6 +687,7 @@ export default {
 ```
 
 4. **Update Package Dependencies**:
+
 ```json
 {
   "dependencies": {
@@ -618,6 +705,7 @@ export default {
 ```
 
 5. **Setup Deployment Scripts** (`package.json`):
+
 ```json
 {
   "scripts": {
@@ -643,6 +731,7 @@ export default {
 ### Development Workflow:
 
 1. Local Development:
+
    ```bash
    # Start local development server
    npm run dev
@@ -659,6 +748,7 @@ export default {
 ## Development
 
 The plugin automatically:
+
 - Runs type generation during development and build
 - Sets up development server with live reload
 - Handles route-based code splitting
@@ -670,7 +760,7 @@ React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild
 plugin aims to match the important behaviors without depending on Vite:
 
 - Typegen + Route Module API types (`./+types/*`)
-- Route module splitting (`future.v8_splitRouteModules`)
+- Route module splitting (`splitRouteModules`)
 - SPA mode (`ssr: false`), SSR mode, and static prerendering (`prerender`)
 
 Some Vite-specific integrations (for example Vite's environment API + critical
@@ -680,17 +770,17 @@ CSS endpoint) are not supported 1:1.
 
 The repository includes several examples demonstrating different use cases:
 
-| Example | Description | Port | Command |
-|---------|-------------|------|---------|
-| [default-template](./examples/default-template) | Standard SSR setup with React Router | 3000 | `pnpm dev` |
-| [spa-mode](./examples/spa-mode) | Single Page Application (`ssr: false`) | 3001 | `pnpm dev` |
-| [prerender](./examples/prerender) | Static prerendering for multiple routes | 3002 | `pnpm dev` |
-| [custom-node-server](./examples/custom-node-server) | Custom Express server with SSR | 3003 | `pnpm dev` |
-| [cloudflare](./examples/cloudflare) | Cloudflare Workers deployment | 3004 | `pnpm dev` |
-| [client-only](./examples/client-only) | `.client` modules with SSR hydration | 3010 | `pnpm dev` |
-| [epic-stack](./examples/epic-stack) | Full-featured Epic Stack example | 3005 | `pnpm dev` |
-| [federation/epic-stack](./examples/federation/epic-stack) | Module Federation host | 3006 | `pnpm dev` |
-| [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote | 3007 | `pnpm dev` |
+| Example                                                                 | Description                             | Port | Command    |
+| ----------------------------------------------------------------------- | --------------------------------------- | ---- | ---------- |
+| [default-template](./examples/default-template)                         | Standard SSR setup with React Router    | 3000 | `pnpm dev` |
+| [spa-mode](./examples/spa-mode)                                         | Single Page Application (`ssr: false`)  | 3001 | `pnpm dev` |
+| [prerender](./examples/prerender)                                       | Static prerendering for multiple routes | 3002 | `pnpm dev` |
+| [custom-node-server](./examples/custom-node-server)                     | Custom Express server with SSR          | 3003 | `pnpm dev` |
+| [cloudflare](./examples/cloudflare)                                     | Cloudflare Workers deployment           | 3004 | `pnpm dev` |
+| [client-only](./examples/client-only)                                   | `.client` modules with SSR hydration    | 3010 | `pnpm dev` |
+| [epic-stack](./examples/epic-stack)                                     | Full-featured Epic Stack example        | 3005 | `pnpm dev` |
+| [federation/epic-stack](./examples/federation/epic-stack)               | Module Federation host                  | 3006 | `pnpm dev` |
+| [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote                | 3007 | `pnpm dev` |
 
 Each example has unique ports configured to allow running multiple examples simultaneously.
 

@@ -6,11 +6,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "RSDOCTOR=false PORT=3003 NODE_OPTIONS=\"--experimental-vm-modules --experimental-global-webcrypto\" node server.js",
+    "dev": "NODE_ENV=development RSDOCTOR=false PORT=3003 NODE_OPTIONS=\"--experimental-vm-modules --experimental-global-webcrypto\" node server.js",
     "start": "NODE_ENV=production PORT=3003 node server.js",
     "build": "rsbuild build",
-    "typecheck": "react-router typegen && tsc",
-    "test:e2e": "playwright test"
+    "typecheck": "react-router typegen && tsc --noEmit",
+    "test:e2e": "RR_E2E_REUSE_EXISTING_SERVER=false playwright test && corepack pnpm run test:production",
+    "test:production": "corepack pnpm run test:production:module && corepack pnpm run test:production:commonjs",
+    "test:production:module": "RR_SERVER_OUTPUT=module corepack pnpm run build && node scripts/smoke-production.mjs",
+    "test:production:commonjs": "RR_SERVER_OUTPUT=commonjs corepack pnpm run build && node scripts/smoke-production.mjs"
   },
   "keywords": [],
   "author": "",
@@ -27,8 +30,8 @@
   "devDependencies": {
     "@playwright/test": "^1.58.0",
     "@react-router/dev": "^7.13.0",
-    "@rsbuild/core": "2.0.15",
-    "@rsbuild/plugin-react": "^2.0.1",
+    "@rsbuild/core": "2.1.0",
+    "@rsbuild/plugin-react": "^2.1.0",
     "@rsdoctor/rspack-plugin": "^1.5.13",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/express": "^5.0.6",

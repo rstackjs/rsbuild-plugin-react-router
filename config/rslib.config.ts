@@ -13,7 +13,6 @@ export const nodeMinifyConfig: Minify = {
   css: false,
   jsOptions: {
     minimizerOptions: {
-      // preserve variable name and disable minify for easier debugging
       mangle: false,
       minify: false,
       compress: true,
@@ -21,14 +20,13 @@ export const nodeMinifyConfig: Minify = {
   },
 };
 
-// Clean tsc cache to ensure the dts files can be generated correctly
 export const pluginCleanTscCache: RsbuildPlugin = {
   name: 'plugin-clean-tsc-cache',
   setup(api) {
     api.onBeforeBuild(() => {
       const tsbuildinfo = path.join(
-          api.context.rootPath,
-          'tsconfig.tsbuildinfo',
+        api.context.rootPath,
+        'tsconfig.tsbuildinfo'
       );
       if (fs.existsSync(tsbuildinfo)) {
         fs.rmSync(tsbuildinfo);
@@ -42,8 +40,8 @@ export const esmConfig: LibConfig = {
   syntax: 'es2021',
   shims: {
     esm: {
-      __dirname: true
-    }
+      __dirname: true,
+    },
   },
   dts: {
     build: true,
@@ -51,10 +49,6 @@ export const esmConfig: LibConfig = {
   plugins: [pluginCleanTscCache],
   output: {
     minify: nodeMinifyConfig,
-    externals: {
-      '@babel/traverse': 'commonjs @babel/traverse',
-      '@babel/generator': 'commonjs @babel/generator',
-    }
   },
 };
 

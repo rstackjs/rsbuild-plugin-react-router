@@ -18,6 +18,17 @@ rstest.mock('jiti', () => ({
   createJiti: () => ({
     import: rstest.fn().mockImplementation((path) => {
       if (path.includes('routes.ts')) {
+        const routeCount = Number(process.env.RR_TEST_ROUTE_COUNT ?? 0);
+        if (routeCount > 0) {
+          const childRouteCount = Math.max(0, routeCount - 1);
+          return Promise.resolve(
+            Array.from({ length: childRouteCount }, (_, index) => ({
+              id: `routes/route-${index}`,
+              file: `routes/route-${index}.tsx`,
+              index: index === 0,
+            }))
+          );
+        }
         return Promise.resolve([
           {
             id: 'routes/index',
@@ -25,6 +36,13 @@ rstest.mock('jiti', () => ({
             index: true,
           },
         ]);
+      }
+      if (process.env.RR_TEST_SPLIT_ROUTE_MODULES === 'true') {
+        return Promise.resolve({
+          ...((globalThis as ReactRouterTestGlobal)
+            .__reactRouterTestConfig as object | undefined),
+          splitRouteModules: true,
+        });
       }
       return Promise.resolve(
         (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig ?? {}
@@ -61,7 +79,7 @@ const deepMerge = (base: any, overrides: any): any => {
 
 // Mock the @scripts/test-helper module
 rstest.mock('@scripts/test-helper', () => ({
-  createStubRsbuild: rstest.fn().mockImplementation(async ({ rsbuildConfig = {} } = {}) => {
+  createStubRsbuild: rstest.fn().mockImplementation(async ({ action = 'dev', rsbuildConfig = {} } = {}) => {
     const baseConfig = {
       dev: {
         // Match Rsbuild defaults so plugin changes are observable in tests.
@@ -101,7 +119,7 @@ rstest.mock('@scripts/test-helper', () => ({
       tools: {
         rspack: {
           plugins: [
-            { constructor: { name: 'RspackVirtualModulePlugin' } },
+            { constructor: { name: 'VirtualModulesPlugin' } },
           ],
         },
       },
@@ -120,8 +138,13 @@ rstest.mock('@scripts/test-helper', () => ({
       unwrapConfig: rstest.fn(),
       processAssets: rstest.fn(),
       onBeforeStartDevServer: rstest.fn(),
+      onCloseDevServer: rstest.fn(),
+      onCloseBuild: rstest.fn(),
       onBeforeBuild: rstest.fn(),
       onAfterBuild: rstest.fn(),
+      onBeforeDevCompile: rstest.fn(),
+      onAfterDevCompile: rstest.fn(),
+      onAfterCreateCompiler: rstest.fn(),
       getNormalizedConfig: rstest.fn().mockImplementation(() => mergedConfig),
       modifyRsbuildConfig: rstest.fn(),
       onAfterEnvironmentCompile: rstest.fn(),
@@ -137,7 +160,7 @@ rstest.mock('@scripts/test-helper', () => ({
       },
       context: {
         rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
-        action: 'dev',
+        action,
       },
       compiler: {
         webpack: {

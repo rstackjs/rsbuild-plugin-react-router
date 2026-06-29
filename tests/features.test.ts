@@ -1,6 +1,10 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
+import { rspack } from '@rsbuild/core';
+import * as fs from 'node:fs';
+import path from 'node:path';
 import { pluginReactRouter } from '../src';
+import { getVirtualModuleFilePath } from '../src/virtual-modules';
 
 describe('pluginReactRouter', () => {
   describe('basic configuration', () => {
@@ -85,10 +89,57 @@ describe('pluginReactRouter', () => {
 
       const plugins = config.tools?.rspack?.plugins || [];
       const virtualModulePlugin = plugins.find(
-        (p) => p.constructor.name === 'RspackVirtualModulePlugin'
+        (p: any) => p.constructor.name === 'VirtualModulesPlugin'
       );
 
       expect(virtualModulePlugin).toBeDefined();
+
+      const compiler = {
+        context: '/virtual/project',
+        hooks: {
+          afterEnvironment: {
+            tap: (_name: string, handler: () => void) => handler(),
+          },
+        },
+      } as any;
+      virtualModulePlugin.apply(compiler);
+
+      const virtualFiles =
+        rspack.experiments.VirtualModulesPlugin.__internal__take_virtual_files(
+          compiler
+        );
+      const virtualFilePaths = virtualFiles?.map(file => file.path) || [];
+      const virtualModulePath = (id: string) =>
+        path.join(compiler.context, getVirtualModuleFilePath(id));
+
+      expect(virtualFilePaths).toContain(
+        virtualModulePath('virtual/react-router/browser-manifest')
+      );
+      expect(virtualFilePaths).toContain(
+        virtualModulePath('virtual/react-router/server-build')
+      );
+      expect(virtualFilePaths).toContain(
+        virtualModulePath('virtual/react-router/with-props')
+      );
+      expect(virtualFilePaths).not.toContain(
+        '/virtual/project/virtual/react-router/browser-manifest'
+      );
+    });
+
+    it('should map bare React Router virtual module ids to resolvable files', () => {
+      expect(
+        getVirtualModuleFilePath('virtual/react-router/browser-manifest')
+      ).toBe('node_modules/virtual/react-router/browser-manifest.js');
+      expect(
+        getVirtualModuleFilePath('virtual/react-router/server-build-edge')
+      ).toBe('node_modules/virtual/react-router/server-build-edge.js');
+
+      expect(() =>
+        getVirtualModuleFilePath('virtual/react-router/../server-build')
+      ).toThrow('Invalid virtual module id');
+      expect(() =>
+        getVirtualModuleFilePath('virtual/other/server-build')
+      ).toThrow('Virtual module id must start');
     });
   });
 
@@ -109,13 +160,21 @@ describe('pluginReactRouter', () => {
       expect(routeTransform).toBeDefined();
     });
 
-    it('should register build and dot file transforms', async () => {
+    it('should register build, dot file, and route chunk transforms by default', async () => {
+      const readFileSync = rstest
+        .spyOn(fs, 'readFileSync')
+        .mockReturnValue('export default function Route() { return null; }');
       const rsbuild = await createStubRsbuild({
+        action: 'build',
         rsbuildConfig: {},
       });
 
-      const plugin = pluginReactRouter();
-      await plugin.setup(rsbuild as any);
+      try {
+        const plugin = pluginReactRouter();
+        await plugin.setup(rsbuild as any);
+      } finally {
+        readFileSync.mockRestore();
+      }
 
       const calls = (rsbuild.transform as any).mock.calls.map(
         (call: any[]) => call[0]
@@ -129,16 +188,64 @@ describe('pluginReactRouter', () => {
       ).toBe(true);
 
       expect(
-        calls.some((call: any) => call.test?.toString().includes('\\.server'))
+        calls.some(
+          (call: any) =>
+            call.resourceQuery?.toString().includes('route-chunk=') &&
+            call.environments?.includes('web')
+        )
+      ).toBe(true);
+
+      const splitRouteExportsTransform = calls.find(
+        (call: any) =>
+          typeof call.test === 'function' &&
+          call.resourceQuery?.not?.toString().includes('route-chunk=') &&
+          call.environments?.includes('web')
+      );
+      expect(splitRouteExportsTransform).toBeDefined();
+      expect(
+        splitRouteExportsTransform.test(path.resolve('app/routes/index.tsx'))
+      ).toBe(true);
+      expect(splitRouteExportsTransform.test(path.resolve('app/other.tsx'))).toBe(
+        false
+      );
+
+      expect(
+        calls.some(
+          (call: any) =>
+            call.test?.toString().includes('\\.server') &&
+            call.environments?.includes('web')
+        )
       ).toBe(true);
 
       expect(
-        calls.some((call: any) => call.test?.toString().includes('\\.client'))
+        calls.some(
+          (call: any) =>
+            call.test?.toString().includes('\\.client') &&
+            call.environments?.includes('node')
+        )
       ).toBe(true);
     });
   });
 
   describe('asset handling', () => {
+    it('should treat non-CSS ?url imports as emitted assets in web and node builds', async () => {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+      const getRules = (name: 'web' | 'node') =>
+        config.environments?.[name]?.tools?.rspack?.module?.rules ?? [];
+      const hasUrlAssetRule = (rule: any) =>
+        rule.resourceQuery?.toString().includes('url') &&
+        rule.exclude?.test('app/styles.css') &&
+        rule.type === 'asset/resource';
+
+      expect(getRules('web').some(hasUrlAssetRule)).toBe(true);
+      expect(getRules('node').some(hasUrlAssetRule)).toBe(true);
+    });
+
     it('should emit package.json for node environment', async () => {
       const rsbuild = await createStubRsbuild({
         rsbuildConfig: {},

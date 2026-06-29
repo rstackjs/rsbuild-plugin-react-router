@@ -1,11 +1,19 @@
 import { describe, expect, it } from '@rstest/core';
+import { generate, parse } from '../src/yuku';
 import {
   combineURLs,
   stripFileExtension,
   createRouteId,
   generateWithProps,
   normalizeAssetPrefix,
+  transformRoute,
 } from '../src/plugin-utils';
+
+const transformRouteCode = (code: string) => {
+  const ast = parse(code, { sourceType: 'module' });
+  transformRoute(ast);
+  return generate(ast).code;
+};
 
 describe('plugin-utils', () => {
   describe('combineURLs', () => {
@@ -119,6 +127,186 @@ describe('plugin-utils', () => {
 
     it('should keep trailing slash intact', () => {
       expect(normalizeAssetPrefix('/assets/')).toBe('/assets/');
+    });
+  });
+
+  describe('transformRoute', () => {
+    it('preserves bundler directives while transforming routes', () => {
+      const result = transformRouteCode(`
+        export default function Route() {
+          return import(/* webpackChunkName: "route-data" */ './data');
+        }
+      `);
+
+      expect(result).toContain('webpackChunkName');
+    });
+
+    it('preserves named default class bindings', () => {
+      const result = transformRouteCode(`
+        export default class Route {}
+        Route.displayName = 'Route';
+      `);
+
+      expect(result).toMatch(/class Route/);
+      expect(result).toMatch(/export default _withComponentProps\(Route\)/);
+      expect(result).toContain(`Route.displayName = 'Route'`);
+    });
+
+    it('wraps default class exports with component props', () => {
+      const result = transformRouteCode(`
+        export default class Route {}
+      `);
+
+      expect(result).toContain('withComponentProps');
+      expect(result).toMatch(/class Route/);
+      expect(result).toMatch(/export default _withComponentProps\(Route\)/);
+    });
+
+    it('wraps named class component exports', () => {
+      const result = transformRouteCode(`
+        export class ErrorBoundary {}
+      `);
+
+      expect(result).toContain('withErrorBoundaryProps');
+      expect(result).toMatch(
+        /export const ErrorBoundary = _withErrorBoundaryProps\(class ErrorBoundary/
+      );
+    });
+
+    it('wraps component exports declared through export specifiers', () => {
+      const result = transformRouteCode(`
+        function Boundary() {
+          return null;
+        }
+        export { Boundary as ErrorBoundary };
+      `);
+
+      expect(result).toContain('withErrorBoundaryProps');
+      expect(result).toMatch(
+        /const _ErrorBoundary = _withErrorBoundaryProps\(Boundary\)/
+      );
+      expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
+    });
+
+    it('wraps component exports re-exported from another module', () => {
+      const result = transformRouteCode(`
+        export { Boundary as ErrorBoundary } from './boundary';
+      `);
+
+      expect(result).toMatch(
+        /import \{ Boundary as _ErrorBoundarySource \} from ["']\.\/boundary["']/
+      );
+      expect(result).toMatch(
+        /const _ErrorBoundary = _withErrorBoundaryProps\(_ErrorBoundarySource\)/
+      );
+      expect(result).toMatch(/export \{ _ErrorBoundary as ErrorBoundary \}/);
+    });
+
+    it('wraps default route component re-exports', () => {
+      const result = transformRouteCode(`
+        export { default } from './Route';
+      `);
+
+      expect(result).toContain('withComponentProps');
+      expect(result).not.toContain('withdefaultProps');
+      expect(result).toContain('export { _default as default }');
+    });
+
+    it('keeps directives before generated HOC imports', () => {
+      const result = transformRouteCode(`
+        "use client";
+        function Route() {
+          return null;
+        }
+        export { Route as default };
+      `);
+
+      expect(result.indexOf("'use client'")).toBeLessThan(
+        result.indexOf('virtual/react-router/with-props')
+      );
+      expect(result).toContain('withComponentProps');
+      expect(result).not.toContain('withdefaultProps');
+    });
+
+    it('preserves side-effect import order before wrapped source re-exports', () => {
+      const result = transformRouteCode(`
+        import './setup';
+        export { Boundary as ErrorBoundary } from './boundary';
+      `);
+
+      expect(result.indexOf("import './setup'")).toBeLessThan(
+        result.search(
+          /import\s*\{\s*Boundary as _ErrorBoundarySource\s*\}\s*from ['"]\.\/boundary['"]/
+        )
+      );
+    });
+
+    it('does not turn type-only exports into runtime component wrappers', () => {
+      const result = transformRouteCode(`
+        type Boundary = { message: string };
+        export type { Boundary as ErrorBoundary };
+      `);
+
+      expect(result).not.toContain('withErrorBoundaryProps');
+      expect(result).not.toContain('const _ErrorBoundary');
+    });
+
+    it('does not wrap erased default interface exports', () => {
+      const result = transformRouteCode(`
+        export default interface Route {
+          value: string;
+        }
+      `);
+
+      expect(result).not.toContain('withComponentProps');
+      expect(result).toContain('export default interface Route');
+    });
+
+    it('avoids top-level generated helper name collisions', () => {
+      const result = transformRouteCode(`
+        const _withComponentProps = 'reserved';
+        export default function Route() { return null; }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps2');
+      expect(result).toContain('export default _withComponentProps2');
+    });
+
+    it('does not reserve generated helper names used only in local scopes', () => {
+      const result = transformRouteCode(`
+        export default function Route() {
+          const _withComponentProps = 'local';
+          return _withComponentProps;
+        }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps');
+      expect(result).toContain('function Route');
+      expect(result).toContain('export default _withComponentProps(Route)');
+      expect(result).not.toContain('_withComponentProps2');
+    });
+
+    it('does not reserve generated helper names from re-export specifiers', () => {
+      const result = transformRouteCode(`
+        export { foo as _withComponentProps } from './foo';
+        export default function Route() { return null; }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps');
+      expect(result).toContain('export default _withComponentProps');
+      expect(result).not.toContain('_withComponentProps2');
+    });
+
+    it('avoids top-level generated helper name collisions with enums', () => {
+      const result = transformRouteCode(`
+        enum _withComponentProps {
+          reserved = 'reserved'
+        }
+        export default function Route() { return null; }
+      `);
+
+      expect(result).toContain('withComponentProps as _withComponentProps2');
+      expect(result).toContain('export default _withComponentProps2(Route)');
     });
   });
 });

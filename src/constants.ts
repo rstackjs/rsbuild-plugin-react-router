@@ -28,6 +28,10 @@ export const SERVER_ONLY_ROUTE_EXPORTS = [
   'headers',
 ] as const;
 
+export const SERVER_ONLY_ROUTE_EXPORTS_SET: ReadonlySet<string> = new Set(
+  SERVER_ONLY_ROUTE_EXPORTS
+);
+
 // Client route exports are split into non-component exports and component exports.
 // This mirrors upstream React Router Vite plugin intent and is used for export filtering.
 export const CLIENT_NON_COMPONENT_EXPORTS = [
@@ -52,10 +56,18 @@ export const CLIENT_ROUTE_EXPORTS: readonly (
   | (typeof CLIENT_COMPONENT_EXPORTS)[number]
 )[] = [...CLIENT_NON_COMPONENT_EXPORTS, ...CLIENT_COMPONENT_EXPORTS];
 
+export const CLIENT_ROUTE_EXPORTS_SET: ReadonlySet<string> = new Set(
+  CLIENT_ROUTE_EXPORTS
+);
+
 export const NAMED_COMPONENT_EXPORTS = [
   'HydrateFallback',
   'ErrorBoundary',
 ] as const;
+
+export const NAMED_COMPONENT_EXPORTS_SET: ReadonlySet<string> = new Set(
+  NAMED_COMPONENT_EXPORTS
+);
 
 export const SERVER_EXPORTS = {
   loader: 'loader',

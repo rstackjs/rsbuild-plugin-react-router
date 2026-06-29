@@ -1,9 +1,11 @@
 import { Form, Link, useLoaderData, useNavigation } from 'react-router';
 import type { Route } from './+types/settings';
 
+type LoaderData = Route.ComponentProps['loaderData'];
+
 export function handle() {
   return {
-    breadcrumb: (data: Route.LoaderData) => `${data.project.name} Settings`,
+    breadcrumb: (data: LoaderData) => `${data.project.name} Settings`,
   };
 }
 
@@ -64,7 +66,7 @@ function SettingsSection({
 }
 
 export default function ProjectSettings() {
-  const { project } = useLoaderData<Route.LoaderData>();
+  const { project } = useLoaderData<LoaderData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
 

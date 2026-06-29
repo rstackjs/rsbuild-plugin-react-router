@@ -32,6 +32,41 @@ describe('resolveReactRouterConfig', () => {
     expect(buildEndCalls).toBe(2);
   });
 
+  it('preserves server bundle selection in SSR mode', async () => {
+    const serverBundles = async () => 'bundle';
+
+    const result = await resolveReactRouterConfig({
+      ssr: true,
+      serverBundles,
+    });
+
+    expect(result.resolved.serverBundles).toBe(serverBundles);
+  });
+
+  it('distinguishes an explicit server module format from its default', async () => {
+    const defaultResult = await resolveReactRouterConfig({});
+    const configuredResult = await resolveReactRouterConfig({
+      serverModuleFormat: 'cjs',
+    });
+
+    expect(defaultResult.hasConfiguredServerModuleFormat).toBe(false);
+    expect(configuredResult.hasConfiguredServerModuleFormat).toBe(true);
+  });
+
+  it('defaults route module splitting on and respects the stable top-level option', async () => {
+    const defaultResult = await resolveReactRouterConfig({});
+    const disabledResult = await resolveReactRouterConfig({
+      splitRouteModules: false,
+    } as any);
+    const enforcedResult = await resolveReactRouterConfig({
+      splitRouteModules: 'enforce',
+    } as any);
+
+    expect(defaultResult.resolved.splitRouteModules).toBe(true);
+    expect(disabledResult.resolved.splitRouteModules).toBe(false);
+    expect(enforcedResult.resolved.splitRouteModules).toBe('enforce');
+  });
+
   it('resolves stable config fields required by React Router 8', async () => {
     const defaultResult = await resolveReactRouterConfig({});
     const stableResult = await resolveReactRouterConfig({
@@ -53,7 +88,7 @@ describe('resolveReactRouterConfig', () => {
       },
     });
 
-    expect(defaultResult.resolved.splitRouteModules).toBe(false);
+    expect(defaultResult.resolved.splitRouteModules).toBe(true);
     expect(defaultResult.resolved.subResourceIntegrity).toBe(false);
     expect(stableResult.resolved.splitRouteModules).toBe('enforce');
     expect(stableResult.resolved.subResourceIntegrity).toBe(true);

@@ -70,7 +70,7 @@ const DEFAULT_CONFIG = {
   buildDirectory: 'build',
   serverBuildFile: 'index.js',
   serverModuleFormat: 'esm',
-  splitRouteModules: false,
+  splitRouteModules: true,
   subResourceIntegrity: false,
   ssr: true,
   future: {
@@ -150,6 +150,7 @@ export const resolveReactRouterConfig = async (
 ): Promise<{
   resolved: ResolvedReactRouterConfig;
   presets: NonNullable<Config['presets']>;
+  hasConfiguredServerModuleFormat: boolean;
 }> => {
   const presets = await Promise.all(
     (reactRouterUserConfig.presets ?? []).map(async preset => {
@@ -202,7 +203,6 @@ export const resolveReactRouterConfig = async (
       DEFAULT_CONFIG.allowedActionOrigins,
     routes: DEFAULT_CONFIG.routes,
     unstable_routeConfig: DEFAULT_CONFIG.unstable_routeConfig,
-    serverBundles: DEFAULT_CONFIG.serverBundles,
   };
   if (!resolved.ssr) {
     resolved = {
@@ -214,5 +214,7 @@ export const resolveReactRouterConfig = async (
   return {
     resolved,
     presets: reactRouterUserConfig.presets ?? [],
+    hasConfiguredServerModuleFormat:
+      userAndPresetConfigs.serverModuleFormat !== undefined,
   };
 };

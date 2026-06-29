@@ -1,67 +1,57 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { normalizeBuildModule, resolveBuildExports } from './server-utils.js';
+import type { ServerBuild } from 'react-router';
 
 export type DevServerMiddleware = (
   req: IncomingMessage,
   res: ServerResponse,
-  next: (err?: any) => void
+  next: (err?: unknown) => void
 ) => Promise<void>;
 
-export const createDevServerMiddleware = (server: any): DevServerMiddleware => {
-  return async (
-    req: IncomingMessage,
-    res: ServerResponse,
-    next: (err?: any) => void
-  ): Promise<void> => {
-    try {
-      const tryLoadBundle = async (entryName: string) => {
-        try {
-          return await server.environments.node.loadBundle(entryName);
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message.includes("Can't find entry")
-          ) {
-            return null;
-          }
-          throw error;
-        }
-      };
+type RequestHandler = (request: Request) => Response | Promise<Response>;
+type BuildProvider = () => Promise<ServerBuild>;
 
-      const bundle =
-        (await tryLoadBundle('static/js/app')) ?? (await tryLoadBundle('app'));
+export type DevServerMiddlewareDependencies = {
+  loadBuild: BuildProvider;
+  createRequestHandler?: (
+    build: BuildProvider,
+    mode: 'development'
+  ) => RequestHandler;
+  createRequestListener?: (
+    handler: RequestHandler
+  ) => (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
+};
 
-      if (!bundle || !bundle.routes) {
-        throw new Error('Server bundle not found or invalid');
-      }
+export const createDevServerMiddleware = (
+  dependencies: DevServerMiddlewareDependencies
+): DevServerMiddleware => {
+  let listenerPromise:
+    | Promise<
+        (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
+      >
+    | undefined;
 
-      // Use the modern request listener implementation directly to reduce
-      // our reliance on the deprecated `@mjackson/node-fetch-server` package.
-      const rr = await import('react-router');
-      const nfs = await import('@remix-run/node-fetch-server');
-      if (typeof rr.createRequestHandler !== 'function') {
-        throw new Error(
-          '[rsbuild-plugin-react-router] Missing `createRequestHandler` export from `react-router`'
-        );
-      }
-      if (typeof nfs.createRequestListener !== 'function') {
-        throw new Error(
-          '[rsbuild-plugin-react-router] Missing `createRequestListener` export from `@remix-run/node-fetch-server`'
-        );
-      }
-      const normalizedBuild = normalizeBuildModule(bundle);
-      const build = await resolveBuildExports(normalizedBuild);
-      const requestHandler = rr.createRequestHandler(build, 'development');
-      // `createRequestListener` provides `client` info but React Router's
-      // request handler expects an app-defined `loadContext` object.
-      // For the built-in dev middleware we don't currently provide a load
-      // context, so pass `undefined`.
-      const listener = nfs.createRequestListener(request =>
-        requestHandler(request)
+  const getListener = () => {
+    listenerPromise ??= (async () => {
+      const createRequestHandler =
+        dependencies.createRequestHandler ??
+        (await import('react-router')).createRequestHandler;
+      const createRequestListener =
+        dependencies.createRequestListener ??
+        (await import('@remix-run/node-fetch-server')).createRequestListener;
+      const requestHandler = createRequestHandler(
+        dependencies.loadBuild,
+        'development'
       );
+      return createRequestListener(requestHandler);
+    })();
+    return listenerPromise;
+  };
+
+  return async (req, res, next): Promise<void> => {
+    try {
+      const listener = await getListener();
       await listener(req, res);
     } catch (error) {
-      console.error('SSR Error:', error);
       next(error);
     }
   };

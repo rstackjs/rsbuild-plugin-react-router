@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@rstest/core';
 import type { Config } from '../src/react-router-config';
-import { getBuildManifest } from '../src/build-manifest';
+import {
+  getBuildManifest,
+  getRoutesByServerBundleId,
+} from '../src/build-manifest';
 
 describe('build manifest', () => {
   it('returns routes only when serverBundles is not configured', async () => {
@@ -52,6 +55,9 @@ describe('build manifest', () => {
     expect(result).toHaveProperty('serverBundles');
     expect(result).toHaveProperty('routeIdToServerBundleId');
     expect(result?.routes.root.file).toBeDefined();
+    const bundleRoutes = getRoutesByServerBundleId(result, routes).bundle_2;
+    expect(bundleRoutes.root.file).toBe('root.tsx');
+    expect(bundleRoutes['routes/about'].file).toBe('routes/about.tsx');
   });
 
   it('validates server bundle IDs based on vite environment API flag', async () => {

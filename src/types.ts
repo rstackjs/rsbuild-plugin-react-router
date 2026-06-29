@@ -39,19 +39,32 @@ export type PluginOptions = {
    * @default undefined
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
-};
 
-/**
- * Arguments passed to transform functions
- */
-export type TransformArgs = {
-  code: string;
-  resource: string;
-  resourcePath: string;
-  context?: string | null;
-  environment?: {
-    name: string;
-  };
+  /**
+   * Emit structured React Router plugin timing logs.
+   * @default false
+   */
+  logPerformance?: boolean;
+
+  /**
+   * Run route transforms in a worker-thread pool.
+   * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
+   * @default Automatically enabled for 256+ resolved routes. The automatic
+   * pool uses available CPU cores minus 2.
+   */
+  parallelTransforms?:
+    | boolean
+    | {
+        maxWorkers?: number;
+      };
+
+  /**
+   * Called when the route graph changes during development.
+   * Programmatic/custom servers can use this to recreate their Rsbuild server;
+   * the CLI uses its built-in reload-server watcher when this is omitted. This
+   * notification is not awaited, so it may safely close the current server.
+   */
+  onRouteTopologyChange?: () => void | Promise<void>;
 };
 
 export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {

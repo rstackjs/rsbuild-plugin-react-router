@@ -42,9 +42,10 @@ export default defineConfig({
 
   // Web server configuration - starts dev server for custom node server
   webServer: {
-    command: 'pnpm run dev',
+    command: 'corepack pnpm run dev',
     url: 'http://localhost:3003',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer:
+      !process.env.CI && process.env.RR_E2E_REUSE_EXISTING_SERVER !== 'false',
     timeout: 120000,
   },
-}); 
+});

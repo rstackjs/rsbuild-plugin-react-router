@@ -1,6 +1,13 @@
-import type { NodePath } from './babel.js';
-import { generate, parse, t, traverse } from './babel.js';
+import {
+  Analyzer,
+  type Module,
+  type Symbol as YukuSymbol,
+} from 'yuku-analyzer';
+import { print } from 'yuku-codegen';
+import { walk } from 'yuku-parser';
 import { normalize, relative, resolve } from 'pathe';
+
+type AnyNode = Record<string, any>;
 
 export type RouteChunkExportName =
   | 'clientAction'
@@ -16,7 +23,7 @@ export type RouteChunkConfig = {
   rootRouteFile: string;
 };
 
-export type RouteChunkCacheEntry<T> = {
+type RouteChunkCacheEntry<T> = {
   value: T;
   version: string;
 };
@@ -24,6 +31,7 @@ export type RouteChunkCacheEntry<T> = {
 export type RouteChunkCache = Map<string, RouteChunkCacheEntry<unknown>>;
 
 export type RouteChunkInfo = {
+  exportNames: string[];
   hasRouteChunks: boolean;
   hasRouteChunkByExportName: Record<RouteChunkExportName, boolean>;
   chunkedExports: RouteChunkExportName[];
@@ -40,6 +48,18 @@ export const routeChunkNames: RouteChunkName[] = [
   'main',
   ...routeChunkExportNames,
 ];
+
+export const mightContainRouteChunkExportName = (source: string): boolean =>
+  routeChunkExportNames.some(exportName => source.includes(exportName));
+
+const createRouteChunkExportMap = (
+  getValue: (exportName: RouteChunkExportName) => boolean
+): Record<RouteChunkExportName, boolean> =>
+  Object.fromEntries(
+    routeChunkExportNames.map(exportName => [exportName, getValue(exportName)])
+  ) as Record<RouteChunkExportName, boolean>;
+
+export const emptyRouteChunkSnippet = (): string => 'export {};';
 
 const routeChunkQueryStringPrefix = '?route-chunk=';
 
@@ -68,14 +88,11 @@ const invariant: (value: unknown, message: string) => asserts value = (
 };
 
 const getOrSetFromCache = <T>(
-  cache: RouteChunkCache | undefined,
+  cache: RouteChunkCache,
   key: string,
   version: string,
   getValue: () => T
 ): T => {
-  if (!cache) {
-    return getValue();
-  }
   const entry = cache.get(key) as RouteChunkCacheEntry<T> | undefined;
   if (entry?.version === version) {
     return entry.value;
@@ -85,362 +102,81 @@ const getOrSetFromCache = <T>(
   return value;
 };
 
-const codeToAst = (
+const hasCachedValue = (
+  cache: RouteChunkCache,
+  key: string,
+  version: string
+): boolean => cache.get(key)?.version === version;
+
+type AnalyzedModule = {
+  module: Module;
+  // Dependency sets use these node identities. Consumers must shallow-copy
+  // any node whose children they narrow instead of mutating this cached AST.
+  program: AnyNode;
+};
+
+const analyzeCode = (
   code: string,
-  cache: RouteChunkCache | undefined,
+  cache: RouteChunkCache,
   cacheKey: string
-) => {
-  return structuredClone(
-    getOrSetFromCache(cache, `${cacheKey}::codeToAst`, code, () =>
-      parse(code, { sourceType: 'module' })
-    )
-  );
-};
-
-const assertNodePath: (
-  path: NodePath | NodePath[] | null | undefined
-) => asserts path is NodePath = path => {
-  invariant(
-    path && !Array.isArray(path),
-    `Expected a Path, but got ${Array.isArray(path) ? 'an array' : path}`
-  );
-};
-
-const isNodePathWithNode = (path: unknown): path is NodePath => {
-  if (!path || typeof path !== 'object' || Array.isArray(path)) {
-    return false;
-  }
-  if (!('node' in path)) {
-    return false;
-  }
-  return Boolean((path as { node?: unknown }).node);
-};
-
-const assertNodePathIsStatement: (
-  path: NodePath | NodePath[] | null | undefined
-) => asserts path is NodePath = path => {
-  invariant(
-    path && !Array.isArray(path) && t.isStatement(path.node),
-    `Expected a Statement path, but got ${
-      Array.isArray(path) ? 'an array' : path?.node?.type
-    }`
-  );
-};
-
-const assertNodePathIsVariableDeclarator: (
-  path: NodePath | NodePath[] | null | undefined
-) => asserts path is NodePath = path => {
-  invariant(
-    path && !Array.isArray(path) && t.isVariableDeclarator(path.node),
-    `Expected a VariableDeclarator path, but got ${
-      Array.isArray(path) ? 'an array' : path?.node?.type
-    }`
-  );
-};
-
-const assertNodePathIsPattern: (
-  path: NodePath | NodePath[] | null | undefined
-) => asserts path is NodePath = path => {
-  invariant(
-    path && !Array.isArray(path) && t.isPattern(path.node),
-    `Expected a Pattern path, but got ${
-      Array.isArray(path) ? 'an array' : path?.node?.type
-    }`
-  );
+): AnalyzedModule => {
+  return getOrSetFromCache(cache, `${cacheKey}::analyzeCode`, code, () => {
+    const analyzer = new Analyzer();
+    const module = analyzer.addFile(cacheKey, code, {
+      lang: 'tsx',
+      sourceType: 'module',
+      attachComments: true,
+    });
+    const errors = module.diagnostics.filter(
+      diagnostic => diagnostic.severity === 'error'
+    );
+    if (errors.length > 0) {
+      throw new Error(errors.map(error => error.message).join('\n'));
+    }
+    return { module, program: module.ast as AnyNode };
+  });
 };
 
 type ExportDependencies = {
-  topLevelStatements: Set<t.Statement>;
-  topLevelNonModuleStatements: Set<t.Statement>;
+  topLevelStatements: Set<AnyNode>;
+  topLevelNonModuleStatements: Set<AnyNode>;
   importedIdentifierNames: Set<string>;
-  exportedVariableDeclarators: Set<t.VariableDeclarator>;
+  exportedVariableDeclarators: Set<AnyNode>;
 };
 
-const getExportDependencies = (
-  code: string,
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
-): Map<string, ExportDependencies> => {
-  return getOrSetFromCache(
-    cache,
-    `${cacheKey}::getExportDependencies`,
-    code,
-    () => {
-      const exportDependencies = new Map<string, ExportDependencies>();
-      const ast = codeToAst(code, cache, cacheKey);
+const getTopLevelStatementForNode = (
+  module: Module,
+  node: AnyNode
+): AnyNode => {
+  let current: AnyNode = node;
+  let parent = module.parentOf(current as never) as AnyNode | null;
+  while (parent && parent.type !== 'Program') {
+    current = parent;
+    parent = module.parentOf(current as never) as AnyNode | null;
+  }
+  invariant(parent?.type === 'Program', 'Expected node to be within Program');
+  return current;
+};
 
-      function handleExport(
-        exportName: string,
-        exportPath: NodePath,
-        identifiersPath: NodePath = exportPath
-      ) {
-        const identifiers = getDependentIdentifiersForPath(identifiersPath);
-        const topLevelStatements = new Set<t.Statement>([
-          exportPath.node as t.Statement,
-          ...getTopLevelStatementsForPaths(identifiers),
-        ]);
-        const topLevelNonModuleStatements = new Set(
-          Array.from(topLevelStatements).filter(
-            statement =>
-              !t.isImportDeclaration(statement) &&
-              !t.isExportDeclaration(statement)
-          )
-        );
-        const importedIdentifierNames = new Set<string>();
-        for (const identifier of identifiers) {
-          if (
-            t.isIdentifier(identifier.node) &&
-            identifier.parentPath?.parentPath?.isImportDeclaration()
-          ) {
-            importedIdentifierNames.add(identifier.node.name);
-          }
-        }
-        const exportedVariableDeclarators = new Set<t.VariableDeclarator>();
-        for (const identifier of identifiers) {
-          if (identifier.parentPath?.isVariableDeclarator()) {
-            const parentPath = identifier.parentPath;
-            if (parentPath.parentPath?.parentPath?.isExportNamedDeclaration()) {
-              exportedVariableDeclarators.add(
-                parentPath.node as t.VariableDeclarator
-              );
-              continue;
-            }
-          }
-          const isWithinExportDestructuring = Boolean(
-            identifier.findParent(path =>
-              Boolean(
-                path.isPattern() &&
-                path.parentPath?.isVariableDeclarator() &&
-                path.parentPath.parentPath?.parentPath?.isExportNamedDeclaration()
-              )
-            )
-          );
-          if (isWithinExportDestructuring) {
-            let currentPath: NodePath | null = identifier;
-            while (currentPath) {
-              if (
-                currentPath.parentPath?.isVariableDeclarator() &&
-                currentPath.parentKey === 'id'
-              ) {
-                exportedVariableDeclarators.add(
-                  currentPath.parentPath.node as t.VariableDeclarator
-                );
-                break;
-              }
-              currentPath = currentPath.parentPath;
-            }
-          }
-        }
-        exportDependencies.set(exportName, {
-          topLevelStatements,
-          topLevelNonModuleStatements,
-          importedIdentifierNames,
-          exportedVariableDeclarators,
-        });
-      }
-
-      traverse(ast, {
-        ExportDeclaration(exportPath) {
-          const { node } = exportPath;
-          if (t.isExportAllDeclaration(node)) {
-            return;
-          }
-          if (t.isExportDefaultDeclaration(node)) {
-            handleExport('default', exportPath);
-            return;
-          }
-          const { declaration } = node;
-          if (t.isVariableDeclaration(declaration)) {
-            const { declarations } = declaration;
-            for (let i = 0; i < declarations.length; i++) {
-              const declarator = declarations[i];
-              if (t.isIdentifier(declarator.id)) {
-                const declaratorPath = exportPath.get(
-                  `declaration.declarations.${i}`
-                );
-                assertNodePathIsVariableDeclarator(declaratorPath);
-                handleExport(declarator.id.name, exportPath, declaratorPath);
-                continue;
-              }
-              if (t.isPattern(declarator.id)) {
-                const exportedPatternPath = exportPath.get(
-                  `declaration.declarations.${i}.id`
-                );
-                assertNodePathIsPattern(exportedPatternPath);
-                const identifiers =
-                  getIdentifiersForPatternPath(exportedPatternPath);
-                for (const identifier of identifiers) {
-                  if (!t.isIdentifier(identifier.node)) {
-                    continue;
-                  }
-                  handleExport(identifier.node.name, exportPath, identifier);
-                }
-              }
-            }
-            return;
-          }
-          if (
-            t.isFunctionDeclaration(declaration) ||
-            t.isClassDeclaration(declaration)
-          ) {
-            invariant(
-              declaration.id,
-              'Expected exported function or class declaration to have a name when not the default export'
-            );
-            handleExport(declaration.id.name, exportPath);
-            return;
-          }
-          if (t.isExportNamedDeclaration(node)) {
-            for (const specifier of node.specifiers) {
-              if (t.isIdentifier(specifier.exported)) {
-                const name = specifier.exported.name;
-                const specifierPath = exportPath
-                  .get('specifiers')
-                  .find(path => path.node === specifier);
-                invariant(
-                  specifierPath,
-                  `Expected to find specifier path for ${name}`
-                );
-                handleExport(name, exportPath, specifierPath);
-              }
-            }
-            return;
-          }
-          throw new Error('Unknown export node type');
-        },
-      });
-
-      return exportDependencies;
+const getVariableDeclaratorForNode = (
+  module: Module,
+  node: AnyNode
+): AnyNode | null => {
+  let current: AnyNode | null = node;
+  while (current) {
+    if (current.type === 'VariableDeclarator') {
+      return current;
     }
-  );
+    current = module.parentOf(current as never) as AnyNode | null;
+  }
+  return null;
 };
 
-const getDependentIdentifiersForPath = (
-  path: NodePath,
-  state?: { visited: Set<NodePath>; identifiers: Set<NodePath> }
-): Set<NodePath> => {
-  const { visited, identifiers } = state ?? {
-    visited: new Set<NodePath>(),
-    identifiers: new Set<NodePath>(),
-  };
-  if (visited.has(path)) {
-    return identifiers;
+const getExportedName = (exported: AnyNode): string => {
+  if (exported.type === 'Identifier') {
+    return exported.name;
   }
-  visited.add(path);
-  path.traverse({
-    Identifier(pathInner) {
-      if (identifiers.has(pathInner)) {
-        return;
-      }
-      identifiers.add(pathInner);
-      const binding = pathInner.scope.getBinding(pathInner.node.name);
-      if (!binding) {
-        return;
-      }
-      getDependentIdentifiersForPath(binding.path, { visited, identifiers });
-      for (const reference of binding.referencePaths) {
-        if (reference.isExportNamedDeclaration()) {
-          continue;
-        }
-        getDependentIdentifiersForPath(reference, { visited, identifiers });
-      }
-      for (const constantViolation of binding.constantViolations) {
-        getDependentIdentifiersForPath(constantViolation, {
-          visited,
-          identifiers,
-        });
-      }
-    },
-  });
-  const topLevelStatement = getTopLevelStatementPathForPath(path);
-  const withinImportStatement = topLevelStatement.isImportDeclaration();
-  const withinExportStatement = topLevelStatement.isExportDeclaration();
-  if (!withinImportStatement && !withinExportStatement) {
-    getDependentIdentifiersForPath(topLevelStatement, { visited, identifiers });
-  }
-  if (
-    withinExportStatement &&
-    path.isIdentifier() &&
-    (t.isPattern(path.parentPath.node) ||
-      t.isPattern(path.parentPath.parentPath?.node))
-  ) {
-    const variableDeclarator = path.findParent(p => p.isVariableDeclarator());
-    if (variableDeclarator) {
-      assertNodePath(variableDeclarator);
-      getDependentIdentifiersForPath(variableDeclarator, {
-        visited,
-        identifiers,
-      });
-    }
-  }
-  return identifiers;
-};
-
-const getTopLevelStatementPathForPath = (path: NodePath) => {
-  const ancestry = path.getAncestry();
-  const topLevelStatement = ancestry[ancestry.length - 2];
-  assertNodePathIsStatement(topLevelStatement);
-  return topLevelStatement;
-};
-
-const getTopLevelStatementsForPaths = (paths: Set<NodePath>) => {
-  const topLevelStatements = new Set<t.Statement>();
-  for (const path of paths) {
-    const topLevelStatement = getTopLevelStatementPathForPath(path);
-    topLevelStatements.add(topLevelStatement.node as t.Statement);
-  }
-  return topLevelStatements;
-};
-
-const getIdentifiersForPatternPath = (
-  patternPath: NodePath,
-  identifiers: Set<NodePath> = new Set()
-) => {
-  function walk(currentPath: NodePath) {
-    if (currentPath.isIdentifier()) {
-      identifiers.add(currentPath);
-      return;
-    }
-    if (currentPath.isObjectPattern()) {
-      const { properties } = currentPath.node;
-      for (let i = 0; i < properties.length; i++) {
-        const property = properties[i];
-        if (t.isObjectProperty(property)) {
-          const valuePath = currentPath.get(`properties.${i}.value`);
-          if (isNodePathWithNode(valuePath)) {
-            walk(valuePath);
-          }
-        } else if (t.isRestElement(property)) {
-          const argumentPath = currentPath.get(`properties.${i}.argument`);
-          if (isNodePathWithNode(argumentPath)) {
-            walk(argumentPath);
-          }
-        }
-      }
-    } else if (currentPath.isArrayPattern()) {
-      const { elements } = currentPath.node;
-      for (let i = 0; i < elements.length; i++) {
-        const element = elements[i];
-        if (element) {
-          const elementPath = currentPath.get(`elements.${i}`);
-          if (isNodePathWithNode(elementPath)) {
-            walk(elementPath);
-          }
-        }
-      }
-    } else if (currentPath.isRestElement()) {
-      const argumentPath = currentPath.get('argument');
-      if (isNodePathWithNode(argumentPath)) {
-        walk(argumentPath);
-      }
-    }
-  }
-  walk(patternPath);
-  return identifiers;
-};
-
-const getExportedName = (exported: t.Identifier | t.StringLiteral) => {
-  return t.isIdentifier(exported) ? exported.name : exported.value;
+  return String(exported.value);
 };
 
 const setsIntersect = <T>(set1: Set<T>, set2: Set<T>) => {
@@ -458,76 +194,245 @@ const setsIntersect = <T>(set1: Set<T>, set2: Set<T>) => {
   return false;
 };
 
+const getExportDependencies = (
+  code: string,
+  cache: RouteChunkCache,
+  cacheKey: string
+): Map<string, ExportDependencies> => {
+  return getOrSetFromCache(
+    cache,
+    `${cacheKey}::getExportDependencies`,
+    code,
+    () => {
+      const { module } = analyzeCode(code, cache, cacheKey);
+      const exportDependencies = new Map<string, ExportDependencies>();
+      const topLevelStatementCache = new Map<AnyNode, AnyNode>();
+      const variableDeclaratorCache = new Map<AnyNode, AnyNode | null>();
+      const getCachedTopLevelStatementForNode = (node: AnyNode): AnyNode => {
+        const cached = topLevelStatementCache.get(node);
+        if (cached) {
+          return cached;
+        }
+        const statement = getTopLevelStatementForNode(module, node);
+        topLevelStatementCache.set(node, statement);
+        return statement;
+      };
+
+      const getCachedVariableDeclaratorForNode = (
+        node: AnyNode
+      ): AnyNode | null => {
+        if (variableDeclaratorCache.has(node)) {
+          return variableDeclaratorCache.get(node) ?? null;
+        }
+        const declarator = getVariableDeclaratorForNode(module, node);
+        variableDeclaratorCache.set(node, declarator);
+        return declarator;
+      };
+
+      const addCachedTopLevelStatement = (
+        dependencies: ExportDependencies,
+        node: AnyNode
+      ) => {
+        const statement = getCachedTopLevelStatementForNode(node);
+        dependencies.topLevelStatements.add(statement);
+        if (
+          statement.type !== 'ImportDeclaration' &&
+          !statement.type.startsWith('Export')
+        ) {
+          dependencies.topLevelNonModuleStatements.add(statement);
+        }
+        return statement;
+      };
+
+      const handleExport = (
+        exportName: string,
+        exportNode: AnyNode,
+        localSymbol: YukuSymbol | null
+      ) => {
+        const dependencies: ExportDependencies = {
+          topLevelStatements: new Set(),
+          topLevelNonModuleStatements: new Set(),
+          importedIdentifierNames: new Set(),
+          exportedVariableDeclarators: new Set(),
+        };
+        const visitedSymbols = new Set<YukuSymbol>();
+        const scannedNodes = new Set<AnyNode>();
+
+        const scanNode = (node: AnyNode) => {
+          if (scannedNodes.has(node)) {
+            return;
+          }
+          scannedNodes.add(node);
+          walk(node as any, {
+            Identifier(node: AnyNode) {
+              const reference = module.referenceOf(node as never);
+              if (reference?.symbol) {
+                visitSymbol(reference.symbol);
+              }
+            },
+          });
+        };
+
+        const visitSymbol = (symbol: YukuSymbol) => {
+          if (visitedSymbols.has(symbol)) {
+            return;
+          }
+          visitedSymbols.add(symbol);
+
+          for (const declaration of symbol.declarations as AnyNode[]) {
+            const statement = addCachedTopLevelStatement(
+              dependencies,
+              declaration
+            );
+            if (statement.type === 'ImportDeclaration') {
+              dependencies.importedIdentifierNames.add(symbol.name);
+            }
+            const declarator = getCachedVariableDeclaratorForNode(declaration);
+            if (
+              declarator &&
+              getCachedTopLevelStatementForNode(declarator).type ===
+                'ExportNamedDeclaration'
+            ) {
+              dependencies.exportedVariableDeclarators.add(declarator);
+            }
+            scanNode(declarator ?? statement);
+          }
+
+          for (const reference of symbol.references as any[]) {
+            const statement = addCachedTopLevelStatement(
+              dependencies,
+              reference.node
+            );
+            const declarator = getCachedVariableDeclaratorForNode(
+              reference.node
+            );
+            scanNode(declarator ?? statement);
+          }
+        };
+
+        addCachedTopLevelStatement(dependencies, exportNode);
+
+        if (localSymbol) {
+          visitSymbol(localSymbol);
+        } else {
+          const statement = getCachedTopLevelStatementForNode(exportNode);
+          scanNode(statement);
+        }
+
+        exportDependencies.set(exportName, dependencies);
+      };
+
+      for (const exp of module.exports as any[]) {
+        if (exp.typeOnly || exp.isStar || exp.isExportEquals) {
+          continue;
+        }
+        handleExport(exp.name, exp.node as AnyNode, exp.local ?? null);
+      }
+
+      return exportDependencies;
+    }
+  );
+};
+
+const isExportChunkable = (
+  exportName: string,
+  exportDependencies: Map<string, ExportDependencies>
+) => {
+  const dependencies = exportDependencies.get(exportName);
+  if (!dependencies) {
+    return false;
+  }
+  for (const [currentExportName, currentDependencies] of exportDependencies) {
+    if (currentExportName === exportName) {
+      continue;
+    }
+    if (
+      setsIntersect(
+        currentDependencies.topLevelNonModuleStatements,
+        dependencies.topLevelNonModuleStatements
+      )
+    ) {
+      return false;
+    }
+  }
+  if (dependencies.exportedVariableDeclarators.size > 1) {
+    return false;
+  }
+  if (dependencies.exportedVariableDeclarators.size > 0) {
+    for (const [currentExportName, currentDependencies] of exportDependencies) {
+      if (currentExportName === exportName) {
+        continue;
+      }
+      if (
+        setsIntersect(
+          currentDependencies.exportedVariableDeclarators,
+          dependencies.exportedVariableDeclarators
+        )
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+const getChunkableExportMap = (
+  code: string,
+  cache: RouteChunkCache,
+  cacheKey: string
+): Record<RouteChunkExportName, boolean> =>
+  getOrSetFromCache(cache, `${cacheKey}::getChunkableExportMap`, code, () => {
+    const exportDependencies = getExportDependencies(code, cache, cacheKey);
+    return createRouteChunkExportMap(exportName =>
+      isExportChunkable(exportName, exportDependencies)
+    );
+  });
+
 const hasChunkableExport = (
   code: string,
   exportName: string,
-  cache: RouteChunkCache | undefined,
+  cache: RouteChunkCache,
   cacheKey: string
+) =>
+  (routeChunkExportNames as string[]).includes(exportName)
+    ? getChunkableExportMap(code, cache, cacheKey)[
+        exportName as RouteChunkExportName
+      ]
+    : false;
+
+const generateCode = (program: AnyNode): string | undefined => {
+  if (program.body.length === 0) {
+    return undefined;
+  }
+  const result = print(program as any, { comments: true });
+  if (result.errors.length > 0) {
+    throw new Error(result.errors.map(error => error.message).join('\n'));
+  }
+  return result.code;
+};
+
+const filterImportSpecifiers = (
+  node: AnyNode,
+  shouldKeep: (importedName: string) => boolean
 ) => {
-  return getOrSetFromCache(
-    cache,
-    `${cacheKey}::hasChunkableExport::${exportName}`,
-    code,
-    () => {
-      const exportDependencies = getExportDependencies(code, cache, cacheKey);
-      const dependencies = exportDependencies.get(exportName);
-      if (!dependencies) {
-        return false;
-      }
-      for (const [
-        currentExportName,
-        currentDependencies,
-      ] of exportDependencies) {
-        if (currentExportName === exportName) {
-          continue;
-        }
-        if (
-          setsIntersect(
-            currentDependencies.topLevelNonModuleStatements,
-            dependencies.topLevelNonModuleStatements
-          )
-        ) {
-          return false;
-        }
-      }
-      if (dependencies.exportedVariableDeclarators.size > 1) {
-        return false;
-      }
-      if (dependencies.exportedVariableDeclarators.size > 0) {
-        for (const [
-          currentExportName,
-          currentDependencies,
-        ] of exportDependencies) {
-          if (currentExportName === exportName) {
-            continue;
-          }
-          if (
-            setsIntersect(
-              currentDependencies.exportedVariableDeclarators,
-              dependencies.exportedVariableDeclarators
-            )
-          ) {
-            return false;
-          }
-        }
-      }
-      return true;
-    }
+  if (node.specifiers.length === 0) {
+    return node;
+  }
+  const specifiers = node.specifiers.filter((specifier: AnyNode) =>
+    shouldKeep(specifier.local.name)
   );
+  return specifiers.length > 0 ? { ...node, specifiers } : null;
 };
 
 const getChunkedExport = (
   code: string,
   exportName: string,
-  generateOptions: Record<string, unknown> = {},
-  cache: RouteChunkCache | undefined,
+  cache: RouteChunkCache,
   cacheKey: string
 ): string | undefined => {
   return getOrSetFromCache(
     cache,
-    `${cacheKey}::getChunkedExport::${exportName}::${JSON.stringify(
-      generateOptions
-    )}`,
+    `${cacheKey}::getChunkedExport::${exportName}`,
     code,
     () => {
       if (!hasChunkableExport(code, exportName, cache, cacheKey)) {
@@ -537,104 +442,94 @@ const getChunkedExport = (
       const dependencies = exportDependencies.get(exportName);
       invariant(dependencies, 'Expected export to have dependencies');
 
-      const topLevelStatementsArray = Array.from(
-        dependencies.topLevelStatements
-      );
-      const exportedVariableDeclaratorsArray = Array.from(
-        dependencies.exportedVariableDeclarators
-      );
-
-      const ast = codeToAst(code, cache, cacheKey);
-      ast.program.body = ast.program.body
-        .filter(node =>
-          topLevelStatementsArray.some(statement =>
-            t.isNodesEquivalent(node, statement)
-          )
-        )
-        .map(node => {
-          if (!t.isImportDeclaration(node)) {
+      const program = analyzeCode(code, cache, cacheKey).program;
+      const body = program.body
+        .filter((node: AnyNode) => dependencies.topLevelStatements.has(node))
+        .map((node: AnyNode) => {
+          if (node.type !== 'ImportDeclaration') {
             return node;
           }
           if (dependencies.importedIdentifierNames.size === 0) {
             return null;
           }
-          node.specifiers = node.specifiers.filter(specifier =>
-            dependencies.importedIdentifierNames.has(specifier.local.name)
+          return filterImportSpecifiers(node, importedName =>
+            dependencies.importedIdentifierNames.has(importedName)
           );
-          invariant(
-            node.specifiers.length > 0,
-            'Expected import statement to have used specifiers'
-          );
-          return node;
         })
-        .map(node => {
-          if (!t.isExportDeclaration(node)) {
+        .map((node: AnyNode | null) => {
+          if (!node || !node.type.startsWith('Export')) {
             return node;
           }
-          if (t.isExportAllDeclaration(node)) {
+          if (node.type === 'ExportAllDeclaration') {
             return null;
           }
-          if (t.isExportDefaultDeclaration(node)) {
+          if (node.type === 'ExportDefaultDeclaration') {
             return exportName === 'default' ? node : null;
           }
           const { declaration } = node;
-          if (t.isVariableDeclaration(declaration)) {
-            declaration.declarations = declaration.declarations.filter(
-              declarationNode =>
-                exportedVariableDeclaratorsArray.some(declarator =>
-                  t.isNodesEquivalent(declarationNode, declarator)
-                )
+          if (declaration?.type === 'VariableDeclaration') {
+            const declarations = declaration.declarations.filter(
+              (declarationNode: AnyNode) =>
+                dependencies.exportedVariableDeclarators.has(declarationNode)
             );
-            if (declaration.declarations.length === 0) {
-              return null;
-            }
-            return node;
+            return declarations.length > 0
+              ? {
+                  ...node,
+                  declaration: { ...declaration, declarations },
+                }
+              : null;
           }
           if (
-            t.isFunctionDeclaration(node.declaration) ||
-            t.isClassDeclaration(node.declaration)
+            declaration?.type === 'FunctionDeclaration' ||
+            declaration?.type === 'ClassDeclaration'
           ) {
-            return node.declaration.id?.name === exportName ? node : null;
+            return declaration.id?.name === exportName ? node : null;
           }
-          if (t.isExportNamedDeclaration(node)) {
-            if (node.specifiers.length === 0) {
-              return null;
-            }
-            node.specifiers = node.specifiers.filter(
-              specifier => getExportedName(specifier.exported) === exportName
+          if (node.type === 'ExportNamedDeclaration') {
+            const specifiers = node.specifiers.filter(
+              (specifier: AnyNode) =>
+                getExportedName(specifier.exported) === exportName
             );
-            if (node.specifiers.length === 0) {
-              return null;
-            }
-            return node;
+            return specifiers.length > 0 ? { ...node, specifiers } : null;
           }
           throw new Error('Unknown export node type');
         })
-        .filter(Boolean) as t.Statement[];
+        .filter(Boolean) as AnyNode[];
 
-      return generate(ast, generateOptions).code;
+      return generateCode({ ...program, body });
     }
   );
 };
 
+const getChunkedExportCacheKey = (
+  cacheKey: string,
+  exportName: RouteChunkExportName
+) => `${cacheKey}::getChunkedExport::${exportName}`;
+
+const hasCachedChunkedExport = (
+  code: string,
+  exportName: RouteChunkExportName,
+  cache: RouteChunkCache,
+  cacheKey: string
+): boolean =>
+  hasCachedValue(cache, getChunkedExportCacheKey(cacheKey, exportName), code);
+
 const omitChunkedExports = (
   code: string,
   exportNames: string[],
-  generateOptions: Record<string, unknown> = {},
-  cache: RouteChunkCache | undefined,
+  cache: RouteChunkCache,
   cacheKey: string
 ): string | undefined => {
   return getOrSetFromCache(
     cache,
-    `${cacheKey}::omitChunkedExports::${exportNames.join(',')}::${JSON.stringify(
-      generateOptions
-    )}`,
+    `${cacheKey}::omitChunkedExports::${exportNames.join(',')}`,
     code,
     () => {
-      const isChunkable = (exportName: string) =>
-        hasChunkableExport(code, exportName, cache, cacheKey);
+      const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
+      const exportNameSet = new Set(exportNames);
       const isOmitted = (exportName: string) =>
-        exportNames.includes(exportName) && isChunkable(exportName);
+        exportNameSet.has(exportName) &&
+        Boolean(chunkableExportMap[exportName as RouteChunkExportName]);
       const isRetained = (exportName: string) => !isOmitted(exportName);
 
       const exportDependencies = getExportDependencies(code, cache, cacheKey);
@@ -642,9 +537,10 @@ const omitChunkedExports = (
       const omittedExportNames = allExportNames.filter(isOmitted);
       const retainedExportNames = allExportNames.filter(isRetained);
 
-      const omittedStatements = new Set<t.Statement>();
-      const omittedExportedVariableDeclarators =
-        new Set<t.VariableDeclarator>();
+      const omittedStatements = new Set<AnyNode>();
+      const omittedExportedVariableDeclarators = new Set<AnyNode>();
+      const retainedImportedIdentifierNames = new Set<string>();
+      const omittedImportedIdentifierNames = new Set<string>();
 
       for (const omittedExportName of omittedExportNames) {
         const dependencies = exportDependencies.get(omittedExportName);
@@ -658,104 +554,94 @@ const omitChunkedExports = (
         for (const declarator of dependencies.exportedVariableDeclarators) {
           omittedExportedVariableDeclarators.add(declarator);
         }
+        for (const importedName of dependencies.importedIdentifierNames) {
+          omittedImportedIdentifierNames.add(importedName);
+        }
       }
 
-      const ast = codeToAst(code, cache, cacheKey);
-      const omittedStatementsArray = Array.from(omittedStatements);
-      const omittedExportedVariableDeclaratorsArray = Array.from(
-        omittedExportedVariableDeclarators
-      );
-      ast.program.body = ast.program.body
-        .filter(node =>
-          omittedStatementsArray.every(
-            statement => !t.isNodesEquivalent(node, statement)
-          )
-        )
-        .map(node => {
-          if (!t.isImportDeclaration(node)) {
+      for (const retainedExportName of retainedExportNames) {
+        const dependencies = exportDependencies.get(retainedExportName);
+        if (!dependencies) {
+          continue;
+        }
+        for (const importedName of dependencies.importedIdentifierNames) {
+          retainedImportedIdentifierNames.add(importedName);
+        }
+      }
+
+      const program = analyzeCode(code, cache, cacheKey).program;
+      const body = program.body
+        .filter((node: AnyNode) => !omittedStatements.has(node))
+        .map((node: AnyNode) => {
+          if (node.type !== 'ImportDeclaration') {
             return node;
           }
-          if (node.specifiers.length === 0) {
-            return node;
-          }
-          node.specifiers = node.specifiers.filter(specifier => {
-            const importedName = specifier.local.name;
-            for (const retainedExportName of retainedExportNames) {
-              const dependencies = exportDependencies.get(retainedExportName);
-              if (dependencies?.importedIdentifierNames?.has(importedName)) {
-                return true;
-              }
-            }
-            for (const omittedExportName of omittedExportNames) {
-              const dependencies = exportDependencies.get(omittedExportName);
-              if (dependencies?.importedIdentifierNames?.has(importedName)) {
-                return false;
-              }
-            }
+          return filterImportSpecifiers(node, importedName => {
+            if (retainedImportedIdentifierNames.has(importedName)) return true;
+            if (omittedImportedIdentifierNames.has(importedName)) return false;
             return true;
           });
-          if (node.specifiers.length === 0) {
-            return null;
-          }
-          return node;
         })
-        .map(node => {
-          if (!t.isExportDeclaration(node)) {
+        .map((node: AnyNode | null) => {
+          if (!node || !node.type.startsWith('Export')) {
             return node;
           }
-          if (t.isExportAllDeclaration(node)) {
+          if (node.type === 'ExportAllDeclaration') {
             return node;
           }
-          if (t.isExportDefaultDeclaration(node)) {
+          if (node.type === 'ExportDefaultDeclaration') {
             return isOmitted('default') ? null : node;
           }
-          if (t.isVariableDeclaration(node.declaration)) {
-            node.declaration.declarations =
-              node.declaration.declarations.filter(declarationNode =>
-                omittedExportedVariableDeclaratorsArray.every(
-                  declarator =>
-                    !t.isNodesEquivalent(declarationNode, declarator)
-                )
-              );
-            if (node.declaration.declarations.length === 0) {
-              return null;
-            }
-            return node;
+          if (node.declaration?.type === 'VariableDeclaration') {
+            const declarations = node.declaration.declarations.filter(
+              (declarationNode: AnyNode) =>
+                !omittedExportedVariableDeclarators.has(declarationNode)
+            );
+            return declarations.length > 0
+              ? {
+                  ...node,
+                  declaration: { ...node.declaration, declarations },
+                }
+              : null;
           }
           if (
-            t.isFunctionDeclaration(node.declaration) ||
-            t.isClassDeclaration(node.declaration)
+            node.declaration?.type === 'FunctionDeclaration' ||
+            node.declaration?.type === 'ClassDeclaration'
           ) {
-            const declarationId = node.declaration.id;
-            invariant(
-              declarationId,
-              'Expected exported function or class declaration to have a name when not the default export'
-            );
-            return isOmitted(declarationId.name) ? null : node;
+            return isOmitted(node.declaration.id.name) ? null : node;
           }
-          if (t.isExportNamedDeclaration(node)) {
-            if (node.specifiers.length === 0) {
-              return node;
-            }
-            node.specifiers = node.specifiers.filter(specifier => {
+          if (node.type === 'ExportNamedDeclaration') {
+            const specifiers = node.specifiers.filter((specifier: AnyNode) => {
               const exportedName = getExportedName(specifier.exported);
               return !isOmitted(exportedName);
             });
-            if (node.specifiers.length === 0) {
-              return null;
-            }
-            return node;
+            return specifiers.length > 0 || node.declaration
+              ? { ...node, specifiers }
+              : null;
           }
           throw new Error('Unknown node type');
         })
-        .filter(Boolean) as t.Statement[];
+        .filter(Boolean) as AnyNode[];
 
-      if (ast.program.body.length === 0) {
-        return undefined;
-      }
-      return generate(ast, generateOptions).code;
+      return generateCode({ ...program, body });
     }
   );
+};
+
+const precomputeChunkedExports = (
+  code: string,
+  cache: RouteChunkCache,
+  cacheKey: string
+) => {
+  const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
+  for (const exportName of routeChunkExportNames) {
+    if (!chunkableExportMap[exportName]) {
+      continue;
+    }
+    if (!hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
+      getChunkedExport(code, exportName, cache, cacheKey);
+    }
+  }
 };
 
 export const detectRouteChunks = (
@@ -763,17 +649,23 @@ export const detectRouteChunks = (
   cache: RouteChunkCache | undefined,
   cacheKey: string
 ): RouteChunkInfo => {
-  const hasRouteChunkByExportName = Object.fromEntries(
-    routeChunkExportNames.map(exportName => [
-      exportName,
-      hasChunkableExport(code, exportName, cache, cacheKey),
-    ])
-  ) as Record<RouteChunkExportName, boolean>;
+  const analysisCache = cache ?? new Map();
+  const exportDependencies = getExportDependencies(
+    code,
+    analysisCache,
+    cacheKey
+  );
+  const hasRouteChunkByExportName = getChunkableExportMap(
+    code,
+    analysisCache,
+    cacheKey
+  );
   const chunkedExports = Object.entries(hasRouteChunkByExportName)
     .filter(([, isChunked]) => isChunked)
     .map(([exportName]) => exportName as RouteChunkExportName);
   const hasRouteChunks = chunkedExports.length > 0;
   return {
+    exportNames: Array.from(exportDependencies.keys()),
     hasRouteChunks,
     hasRouteChunkByExportName,
     chunkedExports,
@@ -791,10 +683,19 @@ export const getRouteChunkCode: (
   cache: RouteChunkCache | undefined,
   cacheKey: string
 ) => {
+  const analysisCache = cache ?? new Map();
   if (chunkName === 'main') {
-    return omitChunkedExports(code, routeChunkExportNames, {}, cache, cacheKey);
+    return omitChunkedExports(
+      code,
+      routeChunkExportNames,
+      analysisCache,
+      cacheKey
+    );
   }
-  return getChunkedExport(code, chunkName, {}, cache, cacheKey);
+  if (!hasCachedChunkedExport(code, chunkName, analysisCache, cacheKey)) {
+    precomputeChunkedExports(code, analysisCache, cacheKey);
+  }
+  return getChunkedExport(code, chunkName, analysisCache, cacheKey);
 };
 
 export const getRouteChunkModuleId = (
@@ -803,9 +704,7 @@ export const getRouteChunkModuleId = (
 ) => `${filePath}${routeChunkQueryStrings[chunkName]}`;
 
 export const isRouteChunkModuleId: (id: string) => boolean = (id: string) =>
-  Object.values(routeChunkQueryStrings).some(queryString =>
-    id.endsWith(queryString)
-  );
+  getRouteChunkNameFromModuleId(id) !== null;
 
 const isRouteChunkName = (name: string): name is RouteChunkName =>
   name === 'main' || (routeChunkExportNames as string[]).includes(name);
@@ -813,10 +712,16 @@ const isRouteChunkName = (name: string): name is RouteChunkName =>
 export const getRouteChunkNameFromModuleId = (
   id: string
 ): RouteChunkName | null => {
-  if (!id.includes(routeChunkQueryStringPrefix)) {
+  const queryIndex = id.indexOf(routeChunkQueryStringPrefix);
+  if (queryIndex === -1) {
     return null;
   }
-  const chunkName = id.split(routeChunkQueryStringPrefix)[1].split('&')[0];
+  const chunkNameStart = queryIndex + routeChunkQueryStringPrefix.length;
+  const chunkNameEnd = id.indexOf('&', chunkNameStart);
+  const chunkName = id.slice(
+    chunkNameStart,
+    chunkNameEnd === -1 ? undefined : chunkNameEnd
+  );
   if (!isRouteChunkName(chunkName)) {
     return null;
   }
@@ -832,6 +737,38 @@ const normalizeRelativeFilePath = (file: string, appDirectory: string) => {
 const isRootRouteModuleId = (config: RouteChunkConfig, id: string) =>
   normalizeRelativeFilePath(id, config.appDirectory) === config.rootRouteFile;
 
+export const shouldAnalyzeRouteChunks = (
+  config: RouteChunkConfig,
+  id: string,
+  code: string
+): boolean =>
+  Boolean(config.splitRouteModules) &&
+  mightContainRouteChunkExportName(code) &&
+  !isRootRouteModuleId(config, id);
+
+export const createEmptyRouteChunkByExportName = (): Record<
+  RouteChunkExportName,
+  boolean
+> => createRouteChunkExportMap(() => false);
+
+export const buildEnforceChunkValidity = (
+  exportNames: readonly string[]
+): Record<RouteChunkExportName, boolean> => {
+  const exportNameSet = new Set(exportNames);
+  return createRouteChunkExportMap(
+    exportName => !exportNameSet.has(exportName)
+  );
+};
+
+export const buildManifestChunkValidity = (
+  exportNames: ReadonlySet<string>,
+  hasRouteChunkByExportName: Readonly<Record<RouteChunkExportName, boolean>>
+): Record<RouteChunkExportName, boolean> =>
+  createRouteChunkExportMap(
+    exportName =>
+      !exportNames.has(exportName) || hasRouteChunkByExportName[exportName]
+  );
+
 export const detectRouteChunksIfEnabled: (
   cache: RouteChunkCache | undefined,
   config: RouteChunkConfig,
@@ -844,23 +781,13 @@ export const detectRouteChunksIfEnabled: (
   code: string
 ) => {
   const noRouteChunks = (): RouteChunkInfo => ({
+    exportNames: [],
     chunkedExports: [] as RouteChunkExportName[],
     hasRouteChunks: false,
-    hasRouteChunkByExportName: {
-      clientAction: false,
-      clientLoader: false,
-      clientMiddleware: false,
-      HydrateFallback: false,
-    } as Record<RouteChunkExportName, boolean>,
+    hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
   });
 
-  if (!config.splitRouteModules) {
-    return noRouteChunks();
-  }
-  if (isRootRouteModuleId(config, id)) {
-    return noRouteChunks();
-  }
-  if (!routeChunkExportNames.some(exportName => code.includes(exportName))) {
+  if (!shouldAnalyzeRouteChunks(config, id, code)) {
     return noRouteChunks();
   }
 
@@ -882,6 +809,13 @@ export const getRouteChunkIfEnabled: (
   code: string
 ) => {
   if (!config.splitRouteModules) {
+    return null;
+  }
+  if (chunkName === 'main') {
+    if (!mightContainRouteChunkExportName(code)) {
+      return code;
+    }
+  } else if (!code.includes(chunkName)) {
     return null;
   }
   const cacheKey = normalizeRelativeFilePath(id, config.appDirectory);

@@ -2,7 +2,7 @@
   "include": [
     "./.react-router/types/**/*",
     "./app/**/*",
-    "./server/**/*"
+    "./server.js"
   ],
   "exclude": ["./build"],
   "compilerOptions": {
@@ -10,7 +10,7 @@
     "strict": true,
     "checkJs": true,
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "types": ["@rsbuild/core/types"],
+    "types": ["@rsbuild/core/types", "node"],
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",

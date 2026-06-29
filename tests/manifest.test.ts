@@ -1,7 +1,159 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
-import { configRoutesToRouteManifest } from '../src/manifest';
+import {
+  createReactRouterManifestStats,
+  configRoutesToRouteManifest,
+  configRoutesToRouteManifestEntries,
+  generateReactRouterManifestForDev,
+  getReactRouterManifestForDev,
+  getReactRouterManifestChunkNames,
+} from '../src/manifest';
+
+const createTempApp = (routeCode: string) => {
+  const root = mkdtempSync(join(tmpdir(), 'rr-manifest-'));
+  const appDir = join(root, 'app');
+  const routesDir = join(appDir, 'routes');
+  mkdirSync(routesDir, { recursive: true });
+
+  writeFileSync(
+    join(appDir, 'root.tsx'),
+    `export default function Root() { return null; }`
+  );
+  writeFileSync(join(routesDir, 'page.tsx'), routeCode);
+
+  return { root, appDir };
+};
+
+const routes = {
+  root: { id: 'root', file: 'root.tsx', path: '' },
+  'routes/page': {
+    id: 'routes/page',
+    parentId: 'root',
+    file: 'routes/page.tsx',
+    path: 'page',
+  },
+};
+
+const clientStats = {
+  assetsByChunkName: {
+    'entry.client': ['static/js/entry.client.js'],
+    root: ['static/js/root.js'],
+    'routes/page': ['static/js/routes/page.js'],
+  },
+};
 
 describe('manifest', () => {
+  it('creates manifest stats from named chunks without stats JSON', () => {
+    const compilation = {
+      namedChunks: new Map([
+        [
+          'runtime',
+          {
+            files: new Set(['static/js/runtime.js']),
+          },
+        ],
+        [
+          'entry.client',
+          {
+            files: new Set([
+              'static/js/entry.client.js',
+              'static/css/entry.client.css',
+            ]),
+          },
+        ],
+        [
+          'routes/page',
+          {
+            files: new Set(['static/js/routes/page.js']),
+          },
+        ],
+      ]),
+    };
+
+    expect(createReactRouterManifestStats(compilation)).toEqual({
+      assetsByChunkName: {
+        runtime: ['static/js/runtime.js'],
+        'entry.client': [
+          'static/js/entry.client.js',
+          'static/css/entry.client.css',
+        ],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
+  it('filters manifest stats to requested chunk names', () => {
+    const compilation = {
+      namedChunks: new Map([
+        ['runtime', { files: new Set(['static/js/runtime.js']) }],
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+        ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
+        ['vendor', { files: new Set(['static/js/vendor.js']) }],
+      ]),
+    };
+
+    expect(
+      createReactRouterManifestStats(
+        compilation,
+        new Set(['entry.client', 'routes/page'])
+      )
+    ).toEqual({
+      assetsByChunkName: {
+        'entry.client': ['static/js/entry.client.js'],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
+  it('uses direct named chunk lookup for filtered manifest stats when available', () => {
+    const chunks = new Map([
+      ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+      ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
+    ]);
+    const compilation = {
+      namedChunks: {
+        get: (chunkName: string) => chunks.get(chunkName),
+        *[Symbol.iterator](): IterableIterator<
+          [string, { files: Set<string> }]
+        > {
+          throw new Error('filtered manifest stats should not scan all chunks');
+        },
+      },
+    };
+
+    expect(
+      createReactRouterManifestStats(
+        compilation,
+        new Set(['entry.client', 'routes/page'])
+      )
+    ).toEqual({
+      assetsByChunkName: {
+        'entry.client': ['static/js/entry.client.js'],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
+  it('collects only manifest-readable chunk names', () => {
+    expect(Array.from(getReactRouterManifestChunkNames(routes, false))).toEqual(
+      ['entry.client', 'root', 'routes/page']
+    );
+
+    expect(getReactRouterManifestChunkNames(routes, true)).toEqual(
+      new Set([
+        'entry.client',
+        'root',
+        'routes/page',
+        'routes/page-client-action',
+        'routes/page-client-loader',
+        'routes/page-client-middleware',
+        'routes/page-hydrate-fallback',
+      ])
+    );
+  });
+
   describe('configRoutesToRouteManifest', () => {
     it('should convert simple route config to manifest', () => {
       const routeConfig = [
@@ -19,6 +171,25 @@ describe('manifest', () => {
       expect(result['routes/home'].id).toBe('routes/home');
       expect(result['routes/home'].path).toBe('/');
       expect(result['routes/home'].index).toBe(true);
+    });
+
+    it('preserves declaration order in route manifest entries', () => {
+      const routeConfig = [
+        {
+          id: '2',
+          file: 'routes/two.tsx',
+          path: ':value',
+        },
+        {
+          id: '1',
+          file: 'routes/one.tsx',
+          path: ':value',
+        },
+      ];
+
+      const result = configRoutesToRouteManifestEntries('app', routeConfig);
+
+      expect(result.map(([id]) => id)).toEqual(['2', '1']);
     });
 
     it('should handle nested routes with parentId', () => {
@@ -171,5 +342,68 @@ describe('manifest', () => {
 
     expect(item).toHaveProperty('hasClientMiddleware', false);
     expect(item).toHaveProperty('hasDefaultExport', false);
+  });
+
+  it('tracks route exports outside the manifest payload', async () => {
+    const { root, appDir } = createTempApp(`
+      export function headers() { return {}; }
+      export async function action() { return null; }
+      export async function loader() { return null; }
+      export default function Page() { return null; }
+    `);
+    try {
+      const { manifest, moduleExportsByRouteId } =
+        await generateReactRouterManifestForDev(
+          routes,
+          {},
+          clientStats,
+          appDir,
+          '/',
+          {
+            isBuild: true,
+            rootRouteFile: 'root.tsx',
+            splitRouteModules: false,
+          }
+        );
+
+      const routeManifest = manifest.routes['routes/page'];
+      expect(routeManifest).toMatchObject({
+        hasAction: true,
+        hasLoader: true,
+      });
+      expect(moduleExportsByRouteId['routes/page']).toEqual(
+        expect.arrayContaining(['headers', 'action', 'loader', 'default'])
+      );
+      expect(routeManifest).not.toHaveProperty('headers');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves dev css fallback when route analysis uses transformed code', async () => {
+    const { root, appDir } = createTempApp(`
+      import './page.css';
+      export default function Page() { return <h1>Page</h1>; }
+    `);
+    try {
+      const manifest = await getReactRouterManifestForDev(
+        routes,
+        {},
+        clientStats,
+        appDir,
+        '/',
+        {
+          isBuild: false,
+          rootRouteFile: 'root.tsx',
+          splitRouteModules: false,
+        }
+      );
+
+      expect(manifest.routes['routes/page'].css).toEqual([
+        '/static/css/routes/page.css',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

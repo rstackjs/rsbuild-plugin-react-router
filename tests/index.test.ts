@@ -1,26 +1,10 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
+import * as fs from 'node:fs';
 import { pluginReactRouter } from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
-};
-type PluginSetupApi = Parameters<
-  NonNullable<ReturnType<typeof pluginReactRouter>['setup']>
->[0];
-type EnvironmentCompileHandler = (args: {
-  environment: { name: string };
-  stats: {
-    toJson: () => {
-      assets: never[];
-      assetsByChunkName: Record<string, string[]>;
-    };
-  };
-}) => void;
-type MockEnvironmentCompileHook = {
-  mock: {
-    calls: Array<[EnvironmentCompileHandler]>;
-  };
 };
 
 type LazyCompilationTestModule = {
@@ -45,6 +29,21 @@ const getLazyCompilationTest = (
   return lazyCompilation.test;
 };
 
+const captureEnv = (keys: string[]) => {
+  const previousValues = new Map(
+    keys.map(key => [key, process.env[key]] as const)
+  );
+  return () => {
+    for (const [key, value] of previousValues) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  };
+};
+
 describe('pluginReactRouter', () => {
   it('should configure basic plugin options', async () => {
     const rsbuild = await createStubRsbuild({
@@ -58,6 +57,154 @@ describe('pluginReactRouter', () => {
     expect(config.dev.hmr).toBe(true);
     expect(config.dev.liveReload).toBe(true);
     expect(config.dev.writeToDisk).toBe(true);
+    expect(config.dev.lazyCompilation).toBeUndefined();
+  });
+
+  it('adds the committed custom-server build entry only in development', async () => {
+    const devRsbuild = await createStubRsbuild({ rsbuildConfig: {} });
+    devRsbuild.addPlugins([pluginReactRouter({ customServer: true })]);
+    const devConfig = await devRsbuild.unwrapConfig();
+
+    expect(
+      devConfig.environments.node.source.entry[
+        'static/js/react-router-server-build'
+      ]
+    ).toBe('virtual/react-router/server-build');
+
+    const buildRsbuild = await createStubRsbuild({
+      action: 'build',
+      rsbuildConfig: {},
+    });
+    buildRsbuild.addPlugins([pluginReactRouter({ customServer: true })]);
+    const buildConfig = await buildRsbuild.unwrapConfig();
+
+    expect(
+      buildConfig.environments.node.source.entry[
+        'static/js/react-router-server-build'
+      ]
+    ).toBeUndefined();
+    expect(buildRsbuild.onBeforeDevCompile).not.toHaveBeenCalled();
+    expect(buildRsbuild.onAfterDevCompile).not.toHaveBeenCalled();
+    expect(buildRsbuild.onAfterCreateCompiler).not.toHaveBeenCalled();
+  });
+
+  it('should restart the dev server when route entries are added', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: {
+          watchFiles: {
+            paths: 'custom.config.ts',
+            type: 'reload-server',
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.watchFiles).toEqual(
+      expect.arrayContaining([
+        {
+          paths: 'custom.config.ts',
+          type: 'reload-server',
+        },
+        {
+          paths: expect.stringMatching(
+            /react-router\.config\.[cm]?[jt]sx?$/
+          ),
+          type: 'reload-server',
+        },
+        {
+          paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
+          type: 'reload-server',
+        },
+        {
+          paths: expect.stringMatching(
+            /build\/client\/\.react-router\/route-watch$/
+          ),
+          type: 'reload-server',
+        },
+      ])
+    );
+  });
+
+  it('watches all supported config filenames when the config does not exist yet', async () => {
+    const existsSyncMock = fs.existsSync as unknown as {
+      mockImplementation: (implementation: (path: unknown) => boolean) => void;
+      mockReturnValue: (value: boolean) => void;
+    };
+    existsSyncMock.mockImplementation(
+      path => !String(path).includes('react-router.config')
+    );
+
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+      const configWatch = config.dev.watchFiles.find(
+        (watchFile: { paths: unknown }) => Array.isArray(watchFile.paths)
+      );
+
+      expect(configWatch).toMatchObject({
+        paths: expect.arrayContaining([
+          expect.stringMatching(/react-router\.config\.tsx$/),
+          expect.stringMatching(/react-router\.config\.ts$/),
+          expect.stringMatching(/react-router\.config\.jsx$/),
+          expect.stringMatching(/react-router\.config\.js$/),
+          expect.stringMatching(/react-router\.config\.mjs$/),
+          expect.stringMatching(/react-router\.config\.mts$/),
+        ]),
+        type: 'reload-server',
+      });
+    } finally {
+      existsSyncMock.mockReturnValue(true);
+    }
+  });
+
+  it('lets custom route topology callbacks own route restart handling', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([
+      pluginReactRouter({
+        onRouteTopologyChange: () => {},
+      }),
+    ]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.watchFiles).toEqual(
+      expect.arrayContaining([
+        {
+          paths: expect.stringMatching(
+            /react-router\.config\.[cm]?[jt]sx?$/
+          ),
+          type: 'reload-server',
+        },
+      ])
+    );
+    expect(config.dev.watchFiles).not.toEqual(
+      expect.arrayContaining([
+        {
+          paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
+          type: 'reload-server',
+        },
+      ])
+    );
+    expect(config.dev.watchFiles).not.toEqual(
+      expect.arrayContaining([
+        {
+          paths: expect.stringMatching(
+            /build\/client\/\.react-router\/route-watch$/
+          ),
+          type: 'reload-server',
+        },
+      ])
+    );
   });
 
   it('should respect server output format', async () => {
@@ -72,6 +219,111 @@ describe('pluginReactRouter', () => {
     expect(nodeConfig.output.chunkFormat).toBe('commonjs');
     expect(nodeConfig.output.chunkLoading).toBe('require');
     expect(nodeConfig.output.module).toBe(false);
+  });
+
+  it('configures web entries to avoid unnecessary entry IIFEs', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.avoidEntryIife
+    ).toBe(true);
+  });
+
+  it('reduces file size reporting overhead for medium split route builds by default', async () => {
+    const restoreEnv = captureEnv([
+      'RR_TEST_SPLIT_ROUTE_MODULES',
+      'RR_TEST_ROUTE_COUNT',
+    ]);
+    process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
+    process.env.RR_TEST_ROUTE_COUNT = '256';
+    const readFileSync = rstest
+      .spyOn(fs, 'readFileSync')
+      .mockReturnValue('export default function Route() { return null; }');
+    try {
+      const rsbuild = await createStubRsbuild({
+        action: 'build',
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      expect(config.performance?.printFileSize).toEqual({
+        total: true,
+        detail: false,
+        compressed: false,
+      });
+    } finally {
+      readFileSync.mockRestore();
+      restoreEnv();
+    }
+  });
+
+  it('reduces file size reporting overhead for medium route builds by default', async () => {
+    const restoreEnv = captureEnv(['RR_TEST_ROUTE_COUNT']);
+    process.env.RR_TEST_ROUTE_COUNT = '256';
+    const readFileSync = rstest
+      .spyOn(fs, 'readFileSync')
+      .mockReturnValue('export default function Route() { return null; }');
+    try {
+      const rsbuild = await createStubRsbuild({
+        action: 'build',
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      expect(config.performance?.printFileSize).toEqual({
+        total: true,
+        detail: false,
+        compressed: false,
+      });
+    } finally {
+      readFileSync.mockRestore();
+      restoreEnv();
+    }
+  });
+
+  it('keeps explicit object file size reporting config for large split route builds', async () => {
+    const restoreEnv = captureEnv([
+      'RR_TEST_SPLIT_ROUTE_MODULES',
+      'RR_TEST_ROUTE_COUNT',
+    ]);
+    process.env.RR_TEST_SPLIT_ROUTE_MODULES = 'true';
+    process.env.RR_TEST_ROUTE_COUNT = '1024';
+    const readFileSync = rstest
+      .spyOn(fs, 'readFileSync')
+      .mockReturnValue('export default function Route() { return null; }');
+    try {
+      const rsbuild = await createStubRsbuild({
+        action: 'build',
+        rsbuildConfig: {
+          performance: {
+            printFileSize: {
+              detail: true,
+              compressed: true,
+            },
+          },
+        },
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      expect(config.performance?.printFileSize).toEqual({
+        detail: true,
+        compressed: true,
+      });
+    } finally {
+      readFileSync.mockRestore();
+      restoreEnv();
+    }
   });
 
   it('should forward lazy compilation when explicitly configured', async () => {
@@ -191,6 +443,18 @@ describe('pluginReactRouter', () => {
     expect(webConfig.externalsType).toBe('module');
     expect(webConfig.output.chunkFormat).toBe('module');
     expect(webConfig.output.module).toBe(true);
+
+    const webEntries = config.environments?.web?.source?.entry;
+    expect(webEntries['entry.client']).toEqual(
+      expect.stringMatching(/entry\.client/)
+    );
+    expect(webEntries['virtual/react-router/browser-manifest']).toEqual({
+      import: 'virtual/react-router/browser-manifest',
+      html: false,
+    });
+    expect(webEntries['routes/index']).toMatchObject({
+      html: false,
+    });
   });
 
   it('should enable Rsbuild SRI for the web environment when configured', async () => {
@@ -219,33 +483,6 @@ describe('pluginReactRouter', () => {
     const nodeConfig = config.environments?.node?.tools?.rspack;
     expect(nodeConfig.externals).toContain('express');
     expect(nodeConfig.experiments.outputModule).toBe(true);
-  });
-
-  it('should serialize only asset stats after web compilation', async () => {
-    const rsbuild = await createStubRsbuild({
-      rsbuildConfig: {},
-    });
-    const plugin = pluginReactRouter();
-    await plugin.setup(rsbuild as PluginSetupApi);
-
-    const onAfterEnvironmentCompile =
-      rsbuild.onAfterEnvironmentCompile as MockEnvironmentCompileHook;
-    const handler = onAfterEnvironmentCompile.mock.calls[0][0];
-    const toJson = rstest.fn().mockReturnValue({
-      assets: [],
-      assetsByChunkName: {},
-    });
-
-    handler({
-      environment: { name: 'web' },
-      stats: { toJson },
-    });
-
-    expect(toJson).toHaveBeenCalledTimes(1);
-    expect(toJson).toHaveBeenCalledWith({
-      all: false,
-      assets: true,
-    });
   });
 
   it('should use async-node target for federation builds', async () => {

@@ -2,13 +2,14 @@ import type { NormalizedConfig } from '@rsbuild/core';
 
 type Warn = (message: string) => void;
 type ToolsRspackConfig = NonNullable<NormalizedConfig['tools']>['rspack'];
+type SourceMapConfigObject = { js?: unknown };
 
 function isProdBuild(mode?: string): boolean {
   // Prefer Rsbuild's normalized `mode` (explicit) and fall back to NODE_ENV.
   return mode === 'production' || process.env.NODE_ENV === 'production';
 }
 
-function isSourceMapEnabled(value: unknown): boolean {
+export function isSourceMapEnabled(value: unknown): boolean {
   // Rsbuild normalizes `output.sourceMap` into either:
   //  - boolean
   //  - { js?: devtool; css: boolean }
@@ -16,7 +17,7 @@ function isSourceMapEnabled(value: unknown): boolean {
   if (value === false || value == null) return false;
   if (typeof value === 'string') return true;
   if (typeof value === 'object') {
-    const js = (value as any).js;
+    const js = (value as SourceMapConfigObject).js;
     // Any truthy devtool string/object means source maps are on for JS.
     return Boolean(js);
   }
@@ -30,8 +31,7 @@ function isDevtoolSourceMap(value: unknown): boolean {
     return value.includes('source-map');
   }
   // Unknown object shape - treat as enabled to be safe.
-  if (typeof value === 'object') return true;
-  return false;
+  return typeof value === 'object';
 }
 
 export function getClientSourceMapSetting(
