@@ -250,10 +250,6 @@ export const pluginReactRouter = (
       }
     }
 
-    const jiti = createJiti(process.cwd(), {
-      moduleCache: false,
-    });
-
     const {
       resolved: resolvedConfig,
       presets: configPresets,
@@ -350,8 +346,13 @@ export const pluginReactRouter = (
       );
     }
 
-    const loadRouteConfig = async (): Promise<RouteConfigEntry[]> => {
-      const routeConfigExport = await jiti.import<RouteConfigEntry[]>(
+    const jiti = createJiti(process.cwd(), {
+      moduleCache: false,
+    });
+    const importRouteConfig = async (
+      importer: Pick<typeof jiti, 'import'>
+    ): Promise<RouteConfigEntry[]> => {
+      const routeConfigExport = await importer.import<RouteConfigEntry[]>(
         routesPath,
         {
           default: true,
@@ -367,7 +368,32 @@ export const pluginReactRouter = (
       }
       return validation.routeConfig;
     };
-    const routeConfig = await loadRouteConfig();
+    const loadRouteConfig = () => importRouteConfig(jiti);
+    const routeConfigJiti = createJiti(process.cwd(), {
+      moduleCache: true,
+    });
+    const routeConfigCacheKeysBeforeImport = new Set(
+      Object.keys(routeConfigJiti.cache)
+    );
+    let routeConfigWatchPaths: string | string[] = routesPath;
+    let importedRouteConfigPaths: string[] = [];
+    let routeConfig: RouteConfigEntry[];
+    try {
+      routeConfig = await importRouteConfig(routeConfigJiti);
+    } finally {
+      importedRouteConfigPaths = collectConfigImportWatchPaths(
+        routesPath,
+        routeConfigJiti.cache,
+        routeConfigCacheKeysBeforeImport
+      );
+      clearConfigImportCache(routeConfigJiti.cache, [
+        routesPath,
+        ...importedRouteConfigPaths,
+      ]);
+    }
+    if (importedRouteConfigPaths.length > 0) {
+      routeConfigWatchPaths = [routesPath, ...importedRouteConfigPaths];
+    }
 
     const entryClientPath = findEntryFile(
       resolve(appDirectory, 'entry.client')
@@ -475,7 +501,7 @@ export const pluginReactRouter = (
         ? []
         : [
             {
-              paths: routesPath,
+              paths: routeConfigWatchPaths,
               type: 'reload-server',
             },
             {

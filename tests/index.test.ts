@@ -133,6 +133,41 @@ describe('pluginReactRouter', () => {
     );
   });
 
+  it('reloads the dev server when imported route config helpers change', async () => {
+    testGlobal.__reactRouterTestJitiCache = {
+      '/project/node_modules/jiti/dist/jiti.cjs': {
+        filename: '/project/node_modules/jiti/dist/jiti.cjs',
+      },
+    };
+    testGlobal.__reactRouterTestJitiCacheAfterImport = {
+      '/project/app/routes.ts': {
+        filename: '/project/app/routes.ts',
+      },
+      '/project/app/dev-routes.ts': {
+        filename: '/project/app/dev-routes.ts',
+      },
+    };
+
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.watchFiles).toEqual(
+      expect.arrayContaining([
+        {
+          paths: expect.arrayContaining([
+            expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
+            expect.stringMatching(/app\/dev-routes\.ts$/),
+          ]),
+          type: 'reload-server',
+        },
+      ])
+    );
+  });
+
   it('watches all supported config filenames when the config does not exist yet', async () => {
     const existsSyncMock = fs.existsSync as unknown as {
       mockImplementation: (implementation: (path: unknown) => boolean) => void;

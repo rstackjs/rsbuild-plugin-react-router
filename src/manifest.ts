@@ -214,6 +214,11 @@ export type ReactRouterManifestGenerationResult = {
   moduleExportsByRouteId: RouteManifestModuleExports;
 };
 
+type ChunkAssets = {
+  js: string[];
+  css: string[];
+};
+
 const DEFAULT_MANIFEST_DIR = 'static/js';
 
 const getManifestDirFromEntryAsset = (entryModulePath?: string): string => {
@@ -297,34 +302,47 @@ export function generateReactRouterManifestForDevEffect(
           }
         : null;
 
-    const getAssetsForChunk = (chunkName: string): string[] => {
+    const chunkAssetsByName = new Map<string, ChunkAssets>();
+    const getAssetsForChunk = (chunkName: string): ChunkAssets => {
+      const cached = chunkAssetsByName.get(chunkName);
+      if (cached) {
+        return cached;
+      }
+
       const assets = clientStats?.assetsByChunkName?.[chunkName];
       if (!assets) {
-        return [`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`];
+        const fallback = `${DEFAULT_MANIFEST_DIR}/${chunkName}.js`;
+        const result = { js: [fallback], css: [] };
+        chunkAssetsByName.set(chunkName, result);
+        return result;
       }
-      const entrypointCssAssets =
-        clientStats?.entrypointFilesByName?.[chunkName]?.filter(asset =>
-          asset.endsWith('.css')
-        ) ?? [];
-      const cssAssets = [
-        ...assets.filter(asset => asset.endsWith('.css')),
-        ...entrypointCssAssets,
-      ].filter((asset, index, all) => all.indexOf(asset) === index);
-      const nonCssAssets = assets.filter(asset => !asset.endsWith('.css'));
 
-      if (!nonCssAssets.some(asset => asset.endsWith('.js'))) {
-        return [
-          `${DEFAULT_MANIFEST_DIR}/${chunkName}.js`,
-          ...nonCssAssets,
-          ...cssAssets,
-        ];
+      const cssAssets = new Set<string>();
+      const jsAssets: string[] = [];
+      for (const asset of assets) {
+        if (asset.endsWith('.css')) {
+          cssAssets.add(asset);
+        } else if (asset.endsWith('.js')) {
+          jsAssets.push(asset);
+        }
       }
-      return [...nonCssAssets, ...cssAssets];
+      for (const asset of clientStats?.entrypointFilesByName?.[chunkName] ??
+        []) {
+        if (asset.endsWith('.css')) {
+          cssAssets.add(asset);
+        }
+      }
+      if (jsAssets.length === 0) {
+        jsAssets.push(`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`);
+      }
+
+      const result = { js: jsAssets, css: [...cssAssets] };
+      chunkAssetsByName.set(chunkName, result);
+      return result;
     };
 
     const getModulePathForChunk = (chunkName: string): string | undefined => {
-      const assets = getAssetsForChunk(chunkName);
-      const jsAssets = assets.filter(asset => asset.endsWith('.js'));
+      const { js: jsAssets } = getAssetsForChunk(chunkName);
       return jsAssets[0] ? combineURLs(assetPrefix, jsAssets[0]) : undefined;
     };
 
@@ -333,42 +351,41 @@ export function generateReactRouterManifestForDevEffect(
       ([key, route]) =>
         Effect.gen(function* () {
           const routeEntryName = getRouteEntryName(route);
-          const assets = getAssetsForChunk(routeEntryName);
-          const jsAssets = assets.filter(asset => asset.endsWith('.js'));
-          let cssAssets = assets.filter(asset => asset.endsWith('.css'));
+          const { js: jsAssets, css: discoveredCssAssets } =
+            getAssetsForChunk(routeEntryName);
           const routeFilePath = resolve(context, route.file);
-          let exports = new Set<string>();
-          let routeModuleExports: readonly string[] = [];
-          let hasRouteChunkByExportName: ReturnType<
-            typeof createEmptyRouteChunkByExportName
-          > | null = null;
+          const defaultRouteAnalysis = {
+            cssAssets: discoveredCssAssets,
+            exports: new Set<string>(),
+            routeModuleExports: [] as readonly string[],
+            hasRouteChunkByExportName: null as ReturnType<
+              typeof createEmptyRouteChunkByExportName
+            > | null,
+          };
 
-          const routeAnalysis = yield* Effect.gen(function* () {
-            const { code, exports: exportNames } = yield* tryPluginPromise(() =>
-              getRouteModuleAnalysis(routeFilePath)
-            );
-            const fallbackCssAssets =
+          const routeAnalysis = yield* tryPluginPromise(async () => {
+            const { code, exports: exportNames } =
+              await getRouteModuleAnalysis(routeFilePath);
+            const cssAssets =
               !isBuild &&
-              cssAssets.length === 0 &&
+              discoveredCssAssets.length === 0 &&
               /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/.test(code)
                 ? [
                     `${DEFAULT_MANIFEST_DIR.replace('/js', '/css')}/${routeEntryName}.css`,
                   ]
-                : cssAssets;
+                : discoveredCssAssets;
             const chunkInfo =
               isBuild && routeChunkConfig
-                ? yield* tryPluginPromise(() =>
-                    detectRouteChunksIfEnabled(
-                      routeChunkOptions?.cache,
-                      routeChunkConfig,
-                      routeFilePath,
-                      code
-                    )
+                ? await detectRouteChunksIfEnabled(
+                    routeChunkOptions?.cache,
+                    routeChunkConfig,
+                    routeFilePath,
+                    code
                   )
                 : null;
 
             return {
-              cssAssets: fallbackCssAssets,
+              cssAssets,
               exports: new Set(exportNames),
               routeModuleExports: exportNames,
               hasRouteChunkByExportName:
@@ -384,35 +401,29 @@ export function generateReactRouterManifestForDevEffect(
                   `Failed to analyze route file ${routeFilePath}:`,
                   error
                 );
-                return {
-                  cssAssets,
-                  exports,
-                  routeModuleExports,
-                  hasRouteChunkByExportName,
-                };
+                return defaultRouteAnalysis;
               });
             })
           );
 
-          cssAssets = routeAnalysis.cssAssets;
-          exports = routeAnalysis.exports;
-          routeModuleExports = routeAnalysis.routeModuleExports;
-          hasRouteChunkByExportName = routeAnalysis.hasRouteChunkByExportName;
-
-          const hasClientAction = exports.has(CLIENT_EXPORTS.clientAction);
-          const hasClientLoader = exports.has(CLIENT_EXPORTS.clientLoader);
-          const hasClientMiddleware = exports.has(
+          const hasClientAction = routeAnalysis.exports.has(
+            CLIENT_EXPORTS.clientAction
+          );
+          const hasClientLoader = routeAnalysis.exports.has(
+            CLIENT_EXPORTS.clientLoader
+          );
+          const hasClientMiddleware = routeAnalysis.exports.has(
             CLIENT_EXPORTS.clientMiddleware
           );
-          const hasDefaultExport = exports.has('default');
-          const routeChunkMap = hasRouteChunkByExportName;
+          const hasDefaultExport = routeAnalysis.exports.has('default');
+          const routeChunkMap = routeAnalysis.hasRouteChunkByExportName;
 
           if (isBuild && enforceSplitRouteModules && routeChunkConfig) {
             validateRouteChunks({
               config: routeChunkConfig,
               id: routeFilePath,
               valid: buildManifestChunkValidity(
-                exports,
+                routeAnalysis.exports,
                 routeChunkMap ?? createEmptyRouteChunkByExportName()
               ),
             });
@@ -447,17 +458,21 @@ export function generateReactRouterManifestForDevEffect(
                     getRouteChunkEntryName(route.id, 'HydrateFallback')
                   )
                 : undefined,
-              hasAction: exports.has(SERVER_EXPORTS.action),
-              hasLoader: exports.has(SERVER_EXPORTS.loader),
+              hasAction: routeAnalysis.exports.has(SERVER_EXPORTS.action),
+              hasLoader: routeAnalysis.exports.has(SERVER_EXPORTS.loader),
               hasClientAction,
               hasClientLoader,
               hasClientMiddleware,
               hasDefaultExport,
-              hasErrorBoundary: exports.has(CLIENT_EXPORTS.ErrorBoundary),
+              hasErrorBoundary: routeAnalysis.exports.has(
+                CLIENT_EXPORTS.ErrorBoundary
+              ),
               imports: jsAssets.map(asset => combineURLs(assetPrefix, asset)),
-              css: cssAssets.map(asset => combineURLs(assetPrefix, asset)),
+              css: routeAnalysis.cssAssets.map(asset =>
+                combineURLs(assetPrefix, asset)
+              ),
             },
-            routeModuleExports,
+            routeAnalysis.routeModuleExports,
           ] as const;
         }),
       {
@@ -478,9 +493,8 @@ export function generateReactRouterManifestForDevEffect(
       routeModuleExportsByRouteId[key] = routeModuleExports;
     }
 
-    const entryAssets = getAssetsForChunk('entry.client');
-    const entryJsAssets = entryAssets.filter(asset => asset.endsWith('.js'));
-    const entryCssAssets = entryAssets.filter(asset => asset.endsWith('.css'));
+    const { js: entryJsAssets, css: entryCssAssets } =
+      getAssetsForChunk('entry.client');
 
     const fingerprintedValues = {
       entry: {

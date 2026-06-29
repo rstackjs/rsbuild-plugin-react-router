@@ -7,10 +7,9 @@ export const normalizeEffectError = (cause: unknown): Error =>
 
 const normalizeEffectCause = <E>(cause: Cause.Cause<E>): Error => {
   const failure = Cause.failureOption(cause);
-  if (Option.isSome(failure)) {
-    return normalizeEffectError(failure.value);
-  }
-  return normalizeEffectError(Cause.squash(cause));
+  return normalizeEffectError(
+    Option.isSome(failure) ? failure.value : Cause.squash(cause)
+  );
 };
 
 export const runPluginEffect = async <A, E>(
@@ -55,12 +54,10 @@ export const createDelayedPluginTask = ({
   onError: (error: Error) => void;
 }): DelayedPluginTask => {
   let activeFiber: ReturnType<typeof Effect.runFork> | undefined;
-  let activeToken: symbol | undefined;
 
   const cancelEffect = (): Effect.Effect<void, Error, never> =>
     Effect.sync(() => {
       const fiber = activeFiber;
-      activeToken = undefined;
       activeFiber = undefined;
       return fiber;
     }).pipe(
@@ -75,9 +72,8 @@ export const createDelayedPluginTask = ({
         return;
       }
 
-      const token = Symbol();
-      activeToken = token;
-      activeFiber = Effect.runFork(
+      let fiber: ReturnType<typeof Effect.runFork>;
+      fiber = Effect.runFork(
         Effect.sleep(Duration.millis(delayMs)).pipe(
           Effect.zipRight(Effect.suspend(run)),
           Effect.catchAll(error =>
@@ -87,14 +83,14 @@ export const createDelayedPluginTask = ({
           ),
           Effect.ensuring(
             Effect.sync(() => {
-              if (activeToken === token) {
-                activeToken = undefined;
+              if (activeFiber === fiber) {
                 activeFiber = undefined;
               }
             })
           )
         )
       );
+      activeFiber = fiber;
     },
 
     cancelEffect,

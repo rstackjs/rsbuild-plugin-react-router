@@ -117,6 +117,8 @@ export const createReactRouterDevRuntimeController = ({
       pair.pendingAttempt = undefined;
       pair.currentAttemptIdentity = undefined;
       pair.latestCompletedWebIdentity = undefined;
+      pair.latestCompletedWebStats = undefined;
+      pair.latestCompletedNodeStats = undefined;
       pair.latestWebStart = undefined;
       pair.latestNodeStart = undefined;
     }
@@ -373,6 +375,15 @@ export const createReactRouterDevRuntimeController = ({
         pair.latestCompletedWebIdentity = getCompilationIdentity(
           stats.compilation
         );
+        pair.latestCompletedWebStats = stats;
+      }
+    );
+    node.hooks.done.tap(
+      { name: `${PLUGIN_NAME}:dev-node-complete`, stage: -1000 },
+      stats => {
+        if (sessions.getActiveBinding()?.id === sessionId) {
+          pair.latestCompletedNodeStats = stats;
+        }
       }
     );
     web.hooks.thisCompilation.tap(
@@ -449,8 +460,10 @@ export const createReactRouterDevRuntimeController = ({
     if (!binding || !pair) {
       return;
     }
-    const webStats = getEnvironmentStats(stats, 'web');
-    const nodeStats = getEnvironmentStats(stats, 'node');
+    const webStats =
+      getEnvironmentStats(stats, 'web') ?? pair.latestCompletedWebStats;
+    const nodeStats =
+      getEnvironmentStats(stats, 'node') ?? pair.latestCompletedNodeStats;
     if (
       (webStats && webStats.compilation.compiler !== pair.web) ||
       (nodeStats && nodeStats.compilation.compiler !== pair.node)
@@ -492,12 +505,18 @@ export const createReactRouterDevRuntimeController = ({
           )
         : undefined,
     };
+    const finishStats =
+      webStats && nodeStats
+        ? ({
+            stats: [webStats, nodeStats],
+          } as Rspack.MultiStats)
+        : stats;
     if (!webStats || !nodeStats) {
-      await finishRuntimeAttempt(binding, pair, stats, changes, identity);
+      await finishRuntimeAttempt(binding, pair, finishStats, changes, identity);
       return;
     }
     pair.pendingAttempt = {
-      stats,
+      stats: finishStats,
       changes,
       identity,
       webCompilation: webStats.compilation,

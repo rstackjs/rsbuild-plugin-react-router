@@ -13,6 +13,8 @@ export type DevCompilerPair = {
   pendingAttempt?: PendingDevCompilation;
   currentAttemptIdentity?: DevCompileAttemptIdentity;
   latestCompletedWebIdentity?: DevCompilationIdentity;
+  latestCompletedWebStats?: Rspack.Stats;
+  latestCompletedNodeStats?: Rspack.Stats;
   latestWebStart?: CompilationStart;
   latestNodeStart?: CompilationStart;
 };
