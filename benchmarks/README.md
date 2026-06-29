@@ -31,7 +31,7 @@ Pass `--mode dev` to measure dev-server startup readiness instead of production
 builds:
 
 ```sh
-node scripts/bench-builds.mjs --profile=large --mode=dev --iterations=3 --warmup=0
+node scripts/bench-builds.mjs --profile=large --mode=dev --iterations=5 --warmup=0
 ```
 
 Dev mode starts `rsbuild dev`, waits for the required compilers to print ready
