@@ -24,11 +24,17 @@ describe('React Router development middleware', () => {
       }
     );
     const listener = rstest.fn(
-      async (_req: IncomingMessage, _res: ServerResponse) => {
-        await requestHandler(new Request('http://localhost/'));
+      async (
+        handler: (request: Request) => Response | Promise<Response>,
+        _req: IncomingMessage,
+        _res: ServerResponse
+      ) => {
+        await handler(new Request('http://localhost/'));
       }
     );
-    const createRequestListener = rstest.fn(() => listener);
+    const createRequestListener = rstest.fn(handler =>
+      listener.bind(undefined, handler)
+    );
     const next = rstest.fn();
     const middleware = createDevServerMiddleware({
       loadBuild,

@@ -162,6 +162,13 @@ export const createReactRouterDevRuntimeController = ({
             pair.node.watching?.invalidate();
           }
         })
+      ),
+      Effect.catchAll(cause =>
+        tryPluginSync(() => {
+          if (sessions.getActiveBinding()?.id === binding.id) {
+            binding.runtime.failAttempt(normalizeEffectError(cause));
+          }
+        })
       )
     );
 

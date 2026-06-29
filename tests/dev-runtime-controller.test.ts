@@ -573,6 +573,36 @@ describe('React Router development runtime controller', () => {
     expect(loadBundle).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps last-good output when a one-sided node compile cannot evaluate', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    let build: unknown = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+    const committed = await controller.createBuildLoader()();
+
+    build = {};
+    node.setChanges(['/app/node-only.ts']);
+    callbacks.before();
+    const nextNode = node.compile();
+    await expect(callbacks.after({ stats: createStats(nextNode) })).resolves.toBe(
+      undefined
+    );
+
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(controller.createBuildLoader()()).resolves.toBe(committed);
+  });
+
   it('publishes an initial same-attempt compile when node starts before web completes', async () => {
     const { callbacks, controller, loadBundle, server } = createHarness();
     loadBundle.mockImplementation(() => createBuild('parallel'));

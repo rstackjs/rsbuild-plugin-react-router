@@ -80,6 +80,51 @@ describe('React Router development runtime', () => {
     });
   });
 
+  it('evaluates changed node output during css ownership removals', async () => {
+    const routePath = '/app/routes/about.tsx';
+    const onCssAssetOwnershipChanged = rstest.fn();
+    let build = createBuild('initial');
+    const { loadBundle, runtime, warnings } = createHarness(() => build, {
+      onCssAssetOwnershipChanged,
+    });
+    const firstWeb = createCompilation('web');
+    const firstNode = createCompilation('node');
+
+    runtime.beginAttempt();
+    captureWeb(runtime, firstWeb, 'with-css', {
+      routes: { 'routes/about': ['/assets/about.css'] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(firstWeb, firstNode),
+      noKnownChanges,
+      graphIdentity(firstWeb, firstNode)
+    );
+
+    build = createBuild('node-next');
+    const removedCssWeb = createCompilation('web');
+    const nextNode = createCompilation('node');
+    runtime.beginAttempt();
+    captureWeb(runtime, removedCssWeb, 'without-css', {
+      routes: { 'routes/about': [] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(removedCssWeb, nextNode),
+      {
+        web: { known: true, files: new Set([routePath]) },
+        node: { known: true, files: new Set([routePath]) },
+      },
+      graphIdentity(removedCssWeb, nextNode)
+    );
+
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
+    expect(warnings).toEqual([]);
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(runtime.load()).resolves.toMatchObject({
+      marker: 'node-next',
+      assets: { version: 'without-css' },
+    });
+  });
+
   it('keeps normal hmr for css-only additions, stable css assets, and node-only compiles', async () => {
     const routePath = '/app/routes/about.tsx';
     const onCssAssetOwnershipChanged = rstest.fn();

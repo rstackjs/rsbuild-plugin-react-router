@@ -515,7 +515,10 @@ export const createReactRouterDevRuntime = ({
           previous.web.manifestsByEntryName,
           manifestsByEntryName
         );
-      const reusePreviousNodeBuild = !!previous && cssOnlyWebManifestChange;
+      const reusePreviousNodeBuild =
+        !!previous &&
+        cssOnlyWebManifestChange &&
+        (!nodeChanged || identity.nodeWeb !== webIdentity);
       const sameCompileAttempt =
         !!identity.webAttempt &&
         !!identity.nodeAttempt &&
