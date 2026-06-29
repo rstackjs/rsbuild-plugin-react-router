@@ -1,9 +1,11 @@
-import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
-import { registerModifyBrowserManifestAssets } from '../src/modify-browser-manifest';
+import {
+  collectSubresourceIntegrity,
+  registerModifyBrowserManifestAssets,
+} from '../src/modify-browser-manifest';
 
 const BROWSER_MANIFEST_PATH =
   'static/js/virtual/react-router/browser-manifest.js';
@@ -25,7 +27,8 @@ const createTempApp = () => {
   return { root, appDir };
 };
 
-const createAsset = (source: string) => ({
+const createAsset = (source: string, integrity?: string) => ({
+  info: integrity ? { integrity } : {},
   source: () => source,
   size: () => source.length,
 });
@@ -109,7 +112,11 @@ const createCompilation = (
     assets[name] = source;
   },
   getAssets() {
-    return Object.entries(assets).map(([name, source]) => ({ name, source }));
+    return Object.entries(assets).map(([name, source]) => ({
+      name,
+      source,
+      info: source.info,
+    }));
   },
 });
 
@@ -129,10 +136,73 @@ const createBrowserManifestAssets = () => ({
   [BROWSER_MANIFEST_PATH]: createAsset(PLACEHOLDER_MANIFEST_SOURCE),
 });
 
-const createSriHash = (source: string) =>
-  `sha384-${createHash('sha384').update(source).digest('base64')}`;
-
 describe('modify browser manifest plugin', () => {
+  it('uses official integrity metadata from stats and compilation assets', () => {
+    const sri = collectSubresourceIntegrity(
+      {
+        assets: [
+          {
+            name: 'static/js/entry.client.js',
+            integrity: 'sha384-entry',
+          },
+          {
+            name: 'static/css/entry.client.css',
+            integrity: 'sha384-css',
+          },
+          {
+            name: 'static/js/no-integrity.js',
+          },
+        ],
+      },
+      {
+        getAssets: () => [
+          {
+            name: 'static/js/route.js',
+            info: {
+              integrity: 'sha384-route',
+            },
+          },
+          {
+            name: '/static/js/already-prefixed.js',
+            info: {
+              integrity: 'sha384-prefixed',
+            },
+          },
+        ],
+      },
+      '/assets/'
+    );
+
+    expect(sri).toEqual({
+      '/assets/static/js/entry.client.js': 'sha384-entry',
+      '/assets/static/css/entry.client.css': 'sha384-css',
+      '/assets/static/js/route.js': 'sha384-route',
+      '/static/js/already-prefixed.js': 'sha384-prefixed',
+    });
+  });
+
+  it('returns undefined when Rspack does not provide integrity metadata', () => {
+    const sri = collectSubresourceIntegrity(
+      {
+        assets: [
+          {
+            name: 'static/js/entry.client.js',
+          },
+        ],
+      },
+      {
+        getAssets: () => [
+          {
+            name: 'static/js/route.js',
+            info: {},
+          },
+        ],
+      }
+    );
+
+    expect(sri).toBeUndefined();
+  });
+
   it('registers browser manifest mutation with Rsbuild processAssets', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
@@ -201,7 +271,7 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
-  it('hashes build SRI after later asset stages mutate JavaScript', async () => {
+  it('collects build SRI after later asset stages attach integrity metadata', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
     const originalEntrySource = 'console.log("before optimize");';
@@ -246,15 +316,12 @@ describe('modify browser manifest plugin', () => {
 
       compilation.updateAsset(
         'static/js/entry.client.js',
-        createAsset(optimizedEntrySource)
+        createAsset(optimizedEntrySource, 'sha384-optimized-entry')
       );
       await harness.runStage('report', { assets, compilation });
 
       expect(reportedSri?.['/static/js/entry.client.js']).toBe(
-        createSriHash(optimizedEntrySource)
-      );
-      expect(reportedSri?.['/static/js/entry.client.js']).not.toBe(
-        createSriHash(originalEntrySource)
+        'sha384-optimized-entry'
       );
     } finally {
       rmSync(root, { recursive: true, force: true });

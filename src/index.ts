@@ -496,7 +496,7 @@ export const pluginReactRouter = (
 
     const stageLatestManifests = (
       manifest: ReactRouterManifest,
-      sri: Record<string, string> | undefined,
+      sri: ReactRouterManifest['sri'],
       moduleExportsByRouteId: RouteManifestModuleExports,
       compilation: Rspack.Compilation
     ) => {
@@ -810,6 +810,15 @@ export const pluginReactRouter = (
         },
         environments: {
           web: {
+            ...(resolvedConfigWithRoutes.subResourceIntegrity
+              ? {
+                  security: {
+                    sri: {
+                      enable: true,
+                    },
+                  },
+                }
+              : {}),
             source: {
               entry: {
                 // no query needed when federation is disabled

@@ -93,7 +93,7 @@ export type ReactRouterManifestForDev = {
     imports: string[];
     css: string[];
   };
-  sri?: Record<string, string>;
+  sri?: Record<string, string> | true;
   routes: Record<string, RouteManifestItem>;
 };
 

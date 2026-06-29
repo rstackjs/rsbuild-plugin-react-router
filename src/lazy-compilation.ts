@@ -19,17 +19,15 @@ const normalizeSlashes = (value: string): string => value.replace(/\\/g, '/');
 
 const getLazyCompilationModuleValues = (
   module: LazyCompilationModule
-): string[] => {
-  const values = [
+): string[] =>
+  [
     module.request,
     module.userRequest,
     module.rawRequest,
     module.resource,
     module.identifier?.(),
     module.nameForCondition?.(),
-  ];
-  return values.filter((value): value is string => Boolean(value));
-};
+  ].filter((value): value is string => Boolean(value));
 
 const matchesLazyCompilationTest = (
   test: LazyCompilationOptions['test'] | undefined,
@@ -41,16 +39,15 @@ const matchesLazyCompilationTest = (
   if (typeof test === 'function') {
     return test(module as Parameters<typeof test>[0]);
   }
-  return getLazyCompilationModuleValues(module).some(value => {
-    test.lastIndex = 0;
-    return test.test(value);
-  });
+  const conditionName = module.nameForCondition?.();
+  if (!conditionName) {
+    return false;
+  }
+  test.lastIndex = 0;
+  return test.test(conditionName);
 };
 
-const isReactRouterHydrationModule = (
-  module: LazyCompilationModule,
-  entryClientPath: string
-): boolean => {
+const createReactRouterHydrationModuleTest = (entryClientPath: string) => {
   const eagerPatterns = [
     normalizeSlashes(entryClientPath),
     'virtual/react-router/browser-manifest',
@@ -58,9 +55,11 @@ const isReactRouterHydrationModule = (
     '?react-router-route',
   ];
 
-  return getLazyCompilationModuleValues(module)
-    .map(normalizeSlashes)
-    .some(value => eagerPatterns.some(pattern => value.includes(pattern)));
+  return (module: LazyCompilationModule): boolean =>
+    getLazyCompilationModuleValues(module).some(value => {
+      const normalizedValue = normalizeSlashes(value);
+      return eagerPatterns.some(pattern => normalizedValue.includes(pattern));
+    });
 };
 
 export const guardReactRouterLazyCompilation = ({
@@ -79,12 +78,14 @@ export const guardReactRouterLazyCompilation = ({
       ? { entries: true, imports: true }
       : lazyCompilation;
   const userTest = options.test;
+  const isReactRouterHydrationModule =
+    createReactRouterHydrationModuleTest(entryClientPath);
 
   return {
     ...options,
     test(module) {
       const lazyModule = module as LazyCompilationModule;
-      if (isReactRouterHydrationModule(lazyModule, entryClientPath)) {
+      if (isReactRouterHydrationModule(lazyModule)) {
         return false;
       }
       return matchesLazyCompilationTest(userTest, lazyModule);

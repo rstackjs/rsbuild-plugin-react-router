@@ -3,6 +3,32 @@ import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
 import { pluginReactRouter } from '../src';
 
+type ReactRouterTestGlobal = typeof globalThis & {
+  __reactRouterTestConfig?: unknown;
+};
+
+type LazyCompilationTestModule = {
+  resource?: string;
+  nameForCondition?: () => string | null;
+};
+
+type LazyCompilationConfig = {
+  test?: (module: LazyCompilationTestModule) => boolean;
+};
+
+const getLazyCompilationTest = (
+  lazyCompilation: boolean | LazyCompilationConfig | undefined
+) => {
+  if (
+    !lazyCompilation ||
+    typeof lazyCompilation === 'boolean' ||
+    typeof lazyCompilation.test !== 'function'
+  ) {
+    throw new Error('Expected lazy compilation to install a test function.');
+  }
+  return lazyCompilation.test;
+};
+
 const captureEnv = (keys: string[]) => {
   const previousValues = new Map(
     keys.map(key => [key, process.env[key]] as const)
@@ -319,14 +345,16 @@ describe('pluginReactRouter', () => {
       entries: true,
       imports: true,
     });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/root.tsx?__react-router-build-client-route',
       })
     ).toBe(false);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/components/card.tsx',
+        nameForCondition: () => '/project/app/components/card.tsx',
       })
     ).toBe(true);
   });
@@ -343,8 +371,9 @@ describe('pluginReactRouter', () => {
       entries: true,
       imports: true,
     });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: `${process.cwd()}/app/entry.client.tsx`,
       })
     ).toBe(false);
@@ -370,19 +399,22 @@ describe('pluginReactRouter', () => {
       entries: true,
       imports: false,
     });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/routes/home.tsx?__react-router-build-client-route',
       })
     ).toBe(false);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/app/components/card.tsx',
+        nameForCondition: () => '/project/app/components/card.tsx',
       })
     ).toBe(true);
     expect(
-      config.dev.lazyCompilation.test({
+      test({
         resource: '/project/vendor/react.tsx',
+        nameForCondition: () => '/project/vendor/react.tsx',
       })
     ).toBe(false);
   });
@@ -423,6 +455,21 @@ describe('pluginReactRouter', () => {
     expect(webEntries['routes/index']).toMatchObject({
       html: false,
     });
+  });
+
+  it('should enable Rsbuild SRI for the web environment when configured', async () => {
+    (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig = {
+      subResourceIntegrity: true,
+    };
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.environments?.web?.security?.sri?.enable).toBe(true);
+    expect(config.environments?.node?.security?.sri).toBeUndefined();
   });
 
   it('should configure node environment correctly', async () => {

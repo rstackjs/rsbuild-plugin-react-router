@@ -166,6 +166,12 @@ export default {
   serverBundles: async ({ branch }) => branch[0]?.id ?? 'main',
 
   /**
+   * Enable Subresource Integrity for browser assets.
+   * @default false
+   */
+  subResourceIntegrity: true,
+
+  /**
    * Hook called after the build completes.
    */
   buildEnd: async ({ buildManifest, reactRouterConfig }) => {
@@ -318,7 +324,8 @@ If no configuration is provided, the following defaults will be used:
   ssr: true,
   buildDirectory: 'build',
   appDirectory: 'app',
-  basename: '/'
+  basename: '/',
+  subResourceIntegrity: false
 }
 ```
 
@@ -334,6 +341,12 @@ by default to avoid gzipping and printing thousands of assets. Set
 Route transform source maps are generated in development only. If you enable
 Rsbuild source maps for faster local debugging, prefer a cheap JS map:
 `output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
+
+Subresource Integrity is disabled by default. Enable it with
+`subResourceIntegrity: true` in `react-router.config.*` when the deployed app
+should emit integrity metadata for browser scripts. The legacy
+`future.unstable_subResourceIntegrity` flag is still accepted and is normalized
+to the stable option.
 
 ### Route Configuration
 
