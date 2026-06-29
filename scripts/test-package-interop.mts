@@ -12,12 +12,6 @@ import {
 
 const require = createRequire(import.meta.url);
 const execFileAsync = promisify(execFile);
-const [esm, commonjs] = await runScriptEffect(
-  Effect.all([
-    tryScriptPromise(() => import('../dist/index.js')),
-    tryScriptSync(() => require('../dist/index.cjs')),
-  ])
-);
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const build = {
   entry: { module: { default: () => new Response() } },
@@ -36,87 +30,99 @@ const build = {
 const collect = hooks => hook => hooks.push(hook);
 const noop = () => undefined;
 
-async function verifyRegistration(writer, reader) {
-  const starts = [];
-  const closes = [];
-  const api = {
-    context: { action: 'dev', rootPath: process.cwd() },
-    logger: { info: noop, warn: noop, error: noop },
-    getNormalizedConfig: () => ({}),
-    modifyRsbuildConfig: noop,
-    modifyEnvironmentConfig: noop,
-    onBeforeBuild: noop,
-    onBeforeStartDevServer: collect(starts),
-    onCloseDevServer: collect(closes),
-    onCloseBuild: noop,
-    onAfterEnvironmentCompile: noop,
-    onAfterBuild: noop,
-    processAssets: noop,
-    transform: noop,
-    onBeforeDevCompile: noop,
-    onAfterCreateCompiler: noop,
-    onAfterDevCompile: noop,
-  };
-  await writer.pluginReactRouter({ customServer: true }).setup(api);
+const loadEntryPointsEffect = () =>
+  Effect.all([
+    tryScriptPromise(() => import('../dist/index.js')),
+    tryScriptSync(() => require('../dist/index.cjs')),
+  ]);
 
-  const startHook = starts.find(hook => hook.order === 'pre');
-  const closeHook = closes.find(hook => hook.order === 'pre');
-  assert(startHook, 'Expected a pre dev-server start hook');
-  assert(closeHook, 'Expected a pre dev-server close hook');
-  const start = startHook.handler;
-  const server = {
-    close: async () => undefined,
-    environments: { node: { loadBundle: async () => build } },
-    sockWrite: noop,
-  };
-  await start({ environments: {}, server });
-
-  const pending = reader.loadReactRouterServerBuild(server);
-  for (const close of closes) {
-    if (typeof close === 'function') {
-      await close();
-    } else {
-      await close.handler?.();
-    }
-  }
-  await assert.rejects(pending, /closed before a React Router build was ready/);
-  await assert.rejects(
-    reader.loadReactRouterServerBuild(server),
-    /not registered/
-  );
-}
-
-async function verifyPackIncludesOriginalSource() {
-  const { stdout } = await runScriptEffect(
-    tryScriptPromise(() =>
-      execFileAsync('npm', ['pack', '--dry-run', '--json'], {
-        cwd: packageRoot,
-      })
-    )
-  );
-  const [pack] = JSON.parse(stdout);
-  const files = new Set(pack.files.map(file => file.path));
-
-  assert(
-    files.has('src/index.ts'),
-    'Expected npm package to include src/index.ts'
-  );
-  assert(
-    files.has('src/templates/entry.client.tsx'),
-    'Expected npm package to include source templates'
-  );
-}
-
-await runScriptEffect(
+const verifyRegistrationEffect = (writer, reader) =>
   tryScriptPromise(async () => {
-    await verifyPackIncludesOriginalSource();
+    const starts = [];
+    const closes = [];
+    const api = {
+      context: { action: 'dev', rootPath: process.cwd() },
+      logger: { info: noop, warn: noop, error: noop },
+      getNormalizedConfig: () => ({}),
+      modifyRsbuildConfig: noop,
+      modifyEnvironmentConfig: noop,
+      onBeforeBuild: noop,
+      onBeforeStartDevServer: collect(starts),
+      onCloseDevServer: collect(closes),
+      onCloseBuild: noop,
+      onAfterEnvironmentCompile: noop,
+      onAfterBuild: noop,
+      processAssets: noop,
+      transform: noop,
+      onBeforeDevCompile: noop,
+      onAfterCreateCompiler: noop,
+      onAfterDevCompile: noop,
+    };
+    await writer.pluginReactRouter({ customServer: true }).setup(api);
 
+    const startHook = starts.find(hook => hook.order === 'pre');
+    const closeHook = closes.find(hook => hook.order === 'pre');
+    assert(startHook, 'Expected a pre dev-server start hook');
+    assert(closeHook, 'Expected a pre dev-server close hook');
+    const start = startHook.handler;
+    const server = {
+      close: async () => undefined,
+      environments: { node: { loadBundle: async () => build } },
+      sockWrite: noop,
+    };
+    await start({ environments: {}, server });
+
+    const pending = reader.loadReactRouterServerBuild(server);
+    for (const close of closes) {
+      if (typeof close === 'function') {
+        await close();
+      } else {
+        await close.handler?.();
+      }
+    }
+    await assert.rejects(
+      pending,
+      /closed before a React Router build was ready/
+    );
+    await assert.rejects(
+      reader.loadReactRouterServerBuild(server),
+      /not registered/
+    );
+  });
+
+const verifyPackIncludesOriginalSourceEffect = () =>
+  tryScriptPromise(async () => {
+    const { stdout } = await execFileAsync(
+      'npm',
+      ['pack', '--dry-run', '--json'],
+      {
+        cwd: packageRoot,
+      }
+    );
+    const [pack] = JSON.parse(stdout);
+    const files = new Set(pack.files.map(file => file.path));
+
+    assert(
+      files.has('src/index.ts'),
+      'Expected npm package to include src/index.ts'
+    );
+    assert(
+      files.has('src/templates/entry.client.tsx'),
+      'Expected npm package to include source templates'
+    );
+  });
+
+const mainEffect = Effect.gen(function* () {
+  const [esm, commonjs] = yield* loadEntryPointsEffect();
+  yield* verifyPackIncludesOriginalSourceEffect();
+  yield* tryScriptSync(() =>
     process.chdir(
       fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
-    );
-    await verifyRegistration(esm, commonjs);
-    await verifyRegistration(commonjs, esm);
-
+    )
+  );
+  yield* verifyRegistrationEffect(esm, commonjs);
+  yield* verifyRegistrationEffect(commonjs, esm);
+  yield* tryScriptPromise(async () => {
     assert.deepEqual(
       await esm.resolveReactRouterServerBuild({ default: build }),
       build
@@ -125,7 +131,14 @@ await runScriptEffect(
       await commonjs.resolveReactRouterServerBuild({ default: build }),
       build
     );
-  })
-);
+  });
+});
 
-console.log('ESM and CommonJS package entrypoints share runtime state.');
+runScriptEffect(mainEffect)
+  .then(() => {
+    console.log('ESM and CommonJS package entrypoints share runtime state.');
+  })
+  .catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
