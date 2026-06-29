@@ -127,6 +127,24 @@ const mergeReactRouterConfig = (...configs: Config[]): Config => {
   return configs.reduce(reducer, {});
 };
 
+const normalizeSubResourceIntegrity = (config: Config): Config => {
+  const subResourceIntegrity =
+    config.subResourceIntegrity ?? config.future?.unstable_subResourceIntegrity;
+
+  if (subResourceIntegrity === undefined) {
+    return config;
+  }
+
+  return {
+    ...config,
+    subResourceIntegrity,
+    future: {
+      ...(config.future ?? {}),
+      unstable_subResourceIntegrity: subResourceIntegrity,
+    },
+  };
+};
+
 export const resolveReactRouterConfig = async (
   reactRouterUserConfig: Config
 ): Promise<{
@@ -155,22 +173,23 @@ export const resolveReactRouterConfig = async (
   );
 
   const userAndPresetConfigs = mergeReactRouterConfig(
-    ...(presets.filter(Boolean) as Config[]),
-    reactRouterUserConfig
+    ...(presets.filter(Boolean) as Config[]).map(normalizeSubResourceIntegrity),
+    normalizeSubResourceIntegrity(reactRouterUserConfig)
   );
 
+  const subResourceIntegrity =
+    userAndPresetConfigs.subResourceIntegrity ??
+    userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
+    DEFAULT_CONFIG.subResourceIntegrity;
   const resolvedFuture: FutureConfig = {
     ...DEFAULT_CONFIG.future,
     ...(userAndPresetConfigs.future ?? {}),
+    unstable_subResourceIntegrity: subResourceIntegrity,
   };
   const splitRouteModules =
     userAndPresetConfigs.splitRouteModules ??
     userAndPresetConfigs.future?.v8_splitRouteModules ??
     DEFAULT_CONFIG.splitRouteModules;
-  const subResourceIntegrity =
-    userAndPresetConfigs.subResourceIntegrity ??
-    userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
-    DEFAULT_CONFIG.subResourceIntegrity;
 
   let resolved: ResolvedReactRouterConfig = {
     ...DEFAULT_CONFIG,

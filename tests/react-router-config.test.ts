@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
 import { resolveReactRouterConfig } from '../src/react-router-config';
+import type { Config } from '../src/react-router-config';
 
 describe('resolveReactRouterConfig', () => {
   it('merges presets and combines buildEnd hooks', async () => {
@@ -58,7 +59,53 @@ describe('resolveReactRouterConfig', () => {
     expect(stableResult.resolved.subResourceIntegrity).toBe(true);
     expect(futureResult.resolved.splitRouteModules).toBe('enforce');
     expect(futureResult.resolved.subResourceIntegrity).toBe(true);
+    expect(futureResult.resolved.future.unstable_subResourceIntegrity).toBe(
+      true
+    );
     expect(precedenceResult.resolved.splitRouteModules).toBe(true);
     expect(precedenceResult.resolved.subResourceIntegrity).toBe(false);
+    expect(
+      precedenceResult.resolved.future.unstable_subResourceIntegrity
+    ).toBe(false);
+  });
+
+  it('lets user SRI config override preset aliases', async () => {
+    const disablesPresetSriWithFuture = {
+      presets: [
+        {
+          name: 'sri-preset',
+          reactRouterConfig: async () => ({
+            subResourceIntegrity: true,
+          }),
+        },
+      ],
+      future: { unstable_subResourceIntegrity: false },
+    } satisfies Config;
+    const disablesPresetSriWithTopLevel = {
+      presets: [
+        {
+          name: 'sri-preset',
+          reactRouterConfig: async () => ({
+            future: { unstable_subResourceIntegrity: true },
+          }),
+        },
+      ],
+      subResourceIntegrity: false,
+    } satisfies Config;
+
+    const disabledByFuture = await resolveReactRouterConfig(
+      disablesPresetSriWithFuture
+    );
+    const disabledByTopLevel = await resolveReactRouterConfig(
+      disablesPresetSriWithTopLevel
+    );
+    expect(disabledByFuture.resolved.subResourceIntegrity).toBe(false);
+    expect(
+      disabledByFuture.resolved.future.unstable_subResourceIntegrity
+    ).toBe(false);
+    expect(disabledByTopLevel.resolved.subResourceIntegrity).toBe(false);
+    expect(
+      disabledByTopLevel.resolved.future.unstable_subResourceIntegrity
+    ).toBe(false);
   });
 });

@@ -127,7 +127,7 @@ export async function getReactRouterManifestForDev(
     imports: string[];
     css: string[];
   };
-  sri?: Record<string, string>;
+  sri?: Record<string, string> | true;
   routes: Record<string, RouteManifestItem>;
 }> {
   const result: Record<string, RouteManifestItem> = {};

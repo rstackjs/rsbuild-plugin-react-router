@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { Route, PluginOptions } from './types.js';
 import { rspack } from '@rsbuild/core';
 import type { Rspack } from '@rsbuild/core';
@@ -8,6 +7,81 @@ import {
 } from './manifest.js';
 import { combineURLs } from './plugin-utils.js';
 import jsesc from 'jsesc';
+
+type StatsAssetWithIntegrity = {
+  name?: string;
+  integrity?: unknown;
+};
+
+type StatsWithIntegrity = {
+  assets?: StatsAssetWithIntegrity[];
+};
+
+type CompilationAssetWithIntegrity = {
+  name: string;
+  info?: {
+    integrity?: unknown;
+  };
+};
+
+type CompilationWithIntegrityAssets =
+  | {
+      getAssets?: () => readonly CompilationAssetWithIntegrity[];
+    }
+  | Pick<Rspack.Compilation, 'getAssets'>;
+
+const ABSOLUTE_URL_RE = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
+
+const toManifestAssetUrl = (assetPrefix: string, assetName: string) => {
+  if (
+    ABSOLUTE_URL_RE.test(assetName) ||
+    assetName.startsWith('//') ||
+    assetName.startsWith('/')
+  ) {
+    return assetName;
+  }
+  return combineURLs(assetPrefix, assetName);
+};
+
+const addIntegrity = (
+  sri: Record<string, string>,
+  assetPrefix: string,
+  assetName: unknown,
+  integrity: unknown
+) => {
+  if (typeof assetName !== 'string' || typeof integrity !== 'string') {
+    return;
+  }
+  sri[toManifestAssetUrl(assetPrefix, assetName)] = integrity;
+};
+
+export const collectSubresourceIntegrity = (
+  stats: StatsWithIntegrity | undefined,
+  compilation: CompilationWithIntegrityAssets | undefined,
+  assetPrefix = '/'
+): Record<string, string> | undefined => {
+  const sri: Record<string, string> = {};
+
+  for (const asset of stats?.assets ?? []) {
+    addIntegrity(sri, assetPrefix, asset.name, asset.integrity);
+  }
+
+  if (typeof compilation?.getAssets === 'function') {
+    const assets =
+      compilation.getAssets() as readonly CompilationAssetWithIntegrity[];
+    for (const asset of assets) {
+      addIntegrity(sri, assetPrefix, asset.name, asset.info?.integrity);
+    }
+  }
+
+  return Object.keys(sri).length > 0 ? sri : undefined;
+};
+
+const getManifestStats = (compilation: Rspack.Compilation) =>
+  compilation.getStats().toJson({
+    all: false,
+    assets: true,
+  });
 
 /**
  * Creates a Webpack/Rspack plugin that modifies the browser manifest
@@ -23,11 +97,11 @@ export function createModifyBrowserManifestPlugin(
   assetPrefix = '/',
   routeChunkOptions?: Parameters<typeof getReactRouterManifestForDev>[5],
   options?: {
-    subResourceIntegrity?: boolean;
     future?: { unstable_subResourceIntegrity?: boolean };
+    subResourceIntegrity?: boolean;
     onManifest?: (
       manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
-      sri: Record<string, string> | undefined
+      sri: Record<string, string> | true | undefined
     ) => void;
   }
 ) {
@@ -36,7 +110,7 @@ export function createModifyBrowserManifestPlugin(
       compiler.hooks.emit.tapAsync(
         'ModifyBrowserManifest',
         async (compilation: Rspack.Compilation, callback) => {
-          const stats = compilation.getStats().toJson();
+          const stats = getManifestStats(compilation);
           const manifest = await getReactRouterManifestForDev(
             routes,
             pluginOptions,
@@ -45,6 +119,18 @@ export function createModifyBrowserManifestPlugin(
             assetPrefix,
             routeChunkOptions
           );
+          const shouldUseSri = Boolean(
+            routeChunkOptions?.isBuild &&
+            (options?.subResourceIntegrity ??
+              options?.future?.unstable_subResourceIntegrity)
+          );
+          const manifestForBrowser = shouldUseSri
+            ? { ...manifest, sri: true as const }
+            : manifest;
+          const sri = shouldUseSri
+            ? (collectSubresourceIntegrity(stats, compilation, assetPrefix) ??
+              true)
+            : undefined;
 
           const virtualManifestPath =
             'static/js/virtual/react-router/browser-manifest.js';
@@ -54,7 +140,7 @@ export function createModifyBrowserManifestPlugin(
               .toString();
             const newSource = originalSource.replace(
               /["'`]PLACEHOLDER["'`]/,
-              jsesc(manifest, { es6: true })
+              jsesc(manifestForBrowser, { es6: true })
             );
             compilation.assets[virtualManifestPath] = {
               source: () => newSource,
@@ -93,7 +179,7 @@ export function createModifyBrowserManifestPlugin(
               entryModulePath: entryJsAssets[0],
             });
             const manifestSource = `window.__reactRouterManifest=${jsesc(
-              manifest,
+              manifestForBrowser,
               { es6: true }
             )};`;
             compilation.assets[manifestPath] = new rspack.sources.RawSource(
@@ -101,31 +187,7 @@ export function createModifyBrowserManifestPlugin(
             );
           }
 
-          let sri: Record<string, string> | undefined;
-          if (
-            routeChunkOptions?.isBuild &&
-            (options?.subResourceIntegrity ??
-              options?.future?.unstable_subResourceIntegrity)
-          ) {
-            const assets =
-              typeof compilation.getAssets === 'function'
-                ? compilation.getAssets()
-                : Object.entries(compilation.assets).map(([name, asset]) => ({
-                    name,
-                    source: asset,
-                  }));
-            sri = {};
-            for (const asset of assets) {
-              if (!asset.name.endsWith('.js')) {
-                continue;
-              }
-              const source = asset.source.source().toString();
-              const hash = createHash('sha384').update(source).digest('base64');
-              sri[combineURLs(assetPrefix, asset.name)] = `sha384-${hash}`;
-            }
-          }
-
-          options?.onManifest?.(manifest, sri);
+          options?.onManifest?.(manifestForBrowser, sri);
           callback();
         }
       );
