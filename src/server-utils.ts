@@ -116,11 +116,12 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 
 function isRouteDiscovery(value: unknown): boolean {
   return (
-    isRecord(value) &&
-    (value.mode === 'initial' ||
-      (value.mode === 'lazy' &&
-        (value.manifestPath === undefined ||
-          typeof value.manifestPath === 'string')))
+    value === undefined ||
+    (isRecord(value) &&
+      (value.mode === 'initial' ||
+        (value.mode === 'lazy' &&
+          (value.manifestPath === undefined ||
+            typeof value.manifestPath === 'string'))))
   );
 }
 

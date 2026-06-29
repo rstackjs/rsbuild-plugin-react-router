@@ -453,6 +453,11 @@ export default defineConfig(() => {
     plugins: [
       pluginReactRouter({
         customServer: true,
+        onRouteTopologyChange() {
+          console.warn('Route topology changed; restart the dev server.');
+          process.exitCode = 75;
+          setTimeout(() => process.exit(75), 0);
+        },
       }),
       pluginReact(),
     ],
@@ -460,17 +465,14 @@ export default defineConfig(() => {
 });
 ```
 
-If the server is created programmatically with `createDevServer()`, pass
-`onRouteTopologyChange` and use it to recreate that server. Rsbuild's
-`reload-server` watcher is owned by the CLI and is not installed by the
-programmatic API. The callback is a notification and is not awaited, so it can
-safely start a serialized replacement task. Always `await` the active server's
-`close()` before calling `createDevServer()` again; the plugin rejects overlapping
-or out-of-order replacement instead of closing one server from inside another
-server's startup hooks. If startup fails before returning a server, or if
-`close()` rejects, restart the process before retrying unless you can externally
-prove and force complete teardown; a fresh Rsbuild instance alone is not
-sufficient. Do not launch concurrent `createDevServer()` calls.
+Rsbuild's `reload-server` watcher is owned by the CLI and is not installed by
+the programmatic `createDevServer()` API. The sample below therefore treats
+route topology changes as a full process restart: do not call `startServer()`
+again inside the same process or mount a second dev server on the same Express
+app. If you implement in-process replacement instead, route requests through
+replaceable middleware and request-handler delegates, always `await` the active
+server's `close()` before calling `createDevServer()` again, and do not launch
+concurrent replacements.
 
 Create one server entry point (`server.js`) and let it own the React Router
 request handler in both development and production. Only the build provider

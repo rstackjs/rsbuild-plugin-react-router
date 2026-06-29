@@ -38,6 +38,16 @@ describe('resolveReactRouterServerBuild', () => {
     });
   });
 
+  it('accepts server builds with omitted route discovery', async () => {
+    const { routeDiscovery: _routeDiscovery, ...build } = createBuild(
+      'no-route-discovery'
+    ) as ServerBuild & { routeDiscovery?: unknown };
+
+    await expect(resolveReactRouterServerBuild(build)).resolves.toMatchObject({
+      assets: { version: 'no-route-discovery' },
+    });
+  });
+
   it('unwraps CommonJS dynamic-import namespaces', async () => {
     const build = createBuild('commonjs');
 

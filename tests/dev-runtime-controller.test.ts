@@ -587,7 +587,7 @@ describe('React Router development runtime controller', () => {
 
     const nodeCompilation = node.compile();
     const webCompilation = web.compile();
-    controller.captureWeb(webCompilation, createManifest('parallel'));
+    controller.captureWeb(webCompilation, createManifestSet('parallel'));
     web.complete(webCompilation);
     await callbacks.after({
       stats: createGraphStats(webCompilation, nodeCompilation),
@@ -618,7 +618,7 @@ describe('React Router development runtime controller', () => {
 
     callbacks.before();
     const baseWeb = web.compile();
-    controller.captureWeb(baseWeb, createManifest('base'));
+    controller.captureWeb(baseWeb, createManifestSet('base'));
     web.complete(baseWeb);
     const baseNode = node.compile();
     await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
@@ -627,7 +627,7 @@ describe('React Router development runtime controller', () => {
     callbacks.before();
     const nodeB = node.compile();
     const webB = web.compile();
-    controller.captureWeb(webB, createManifest('web-b'));
+    controller.captureWeb(webB, createManifestSet('web-b'));
     web.complete(webB);
     await callbacks.after({ stats: createGraphStats(webB, nodeB) });
 
