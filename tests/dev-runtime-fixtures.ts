@@ -62,22 +62,24 @@ export const createBuild = (
 export const createRouteManifest = (
   id: string,
   css: string[],
-  imports: string[] = [],
-  overrides: Partial<ReactRouterDevManifest['routes'][string]> = {}
-): ReactRouterDevManifest['routes'][string] => ({
-  id,
-  module: `/${id}.js`,
-  hasAction: false,
-  hasLoader: false,
-  hasClientAction: false,
-  hasClientLoader: false,
-  hasClientMiddleware: false,
-  hasDefaultExport: true,
-  hasErrorBoundary: false,
-  imports,
-  css,
-  ...overrides,
-});
+  options: Partial<ReactRouterDevManifest['routes'][string]> = {}
+): ReactRouterDevManifest['routes'][string] => {
+  const { imports = [], ...overrides } = options;
+  return {
+    id,
+    module: `/${id}.js`,
+    hasAction: false,
+    hasLoader: false,
+    hasClientAction: false,
+    hasClientLoader: false,
+    hasClientMiddleware: false,
+    hasDefaultExport: true,
+    hasErrorBoundary: false,
+    imports,
+    css,
+    ...overrides,
+  };
+};
 
 export type DevManifestCss = {
   entry?: string[];
@@ -95,7 +97,7 @@ export const createDevManifest = (
   routes: Object.fromEntries(
     Object.entries(css.routes ?? {}).map(([id, routeCss]) => [
       id,
-      createRouteManifest(id, routeCss, css.routeImports?.[id]),
+      createRouteManifest(id, routeCss, { imports: css.routeImports?.[id] }),
     ])
   ),
 });

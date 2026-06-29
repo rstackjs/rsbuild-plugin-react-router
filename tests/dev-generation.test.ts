@@ -133,7 +133,7 @@ describe('React Router development runtime', () => {
       'static/js/app': {
         ...createDevManifest('base'),
         routes: {
-          'routes/about': createRouteManifest('routes/about', [], [], {
+          'routes/about': createRouteManifest('routes/about', [], {
             hasClientLoader: false,
           }),
         },
@@ -152,7 +152,7 @@ describe('React Router development runtime', () => {
       'static/js/app': {
         ...createDevManifest('next'),
         routes: {
-          'routes/about': createRouteManifest('routes/about', [], [], {
+          'routes/about': createRouteManifest('routes/about', [], {
             hasClientLoader: true,
             clientLoaderModule: '/routes/about.clientLoader.js',
           }),

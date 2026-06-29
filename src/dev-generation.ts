@@ -228,7 +228,7 @@ const hasRouteManifestMetadataChanges = (
   if (previousEntryNames.length !== Object.keys(next).length) {
     return true;
   }
-  return previousEntryNames.some(entryName => {
+  for (const entryName of previousEntryNames) {
     const nextManifest = next[entryName];
     if (!nextManifest) {
       return true;
@@ -239,12 +239,15 @@ const hasRouteManifestMetadataChanges = (
     if (previousRouteIds.length !== Object.keys(nextRoutes).length) {
       return true;
     }
-    return previousRouteIds.some(routeId => {
+    for (const routeId of previousRouteIds) {
       const previousRoute = previousRoutes[routeId];
       const nextRoute = nextRoutes[routeId];
-      return !nextRoute || !hasSameRouteMetadata(previousRoute, nextRoute);
-    });
-  });
+      if (!nextRoute || !hasSameRouteMetadata(previousRoute, nextRoute)) {
+        return true;
+      }
+    }
+  }
+  return false;
 };
 
 const createDeferred = <T>(): Deferred<T> => {
