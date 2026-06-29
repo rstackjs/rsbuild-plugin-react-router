@@ -128,7 +128,8 @@ const ensureFederationAsyncStartup = (
 
 const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
-const urlAssetResourceQuery = /(?:\?|&)url(?:&|$)/;
+const urlAssetResourceQuery =
+  /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
