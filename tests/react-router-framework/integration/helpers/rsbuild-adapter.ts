@@ -31,7 +31,7 @@ export const rsbuildConfig = ({ port, base }: RsbuildConfigOptions = {}) =>
     export default defineConfig({
       ${port ? `server: { port: ${port}, host: "localhost" },` : ""}
       ${base ? `output: { assetPrefix: ${JSON.stringify(base)} },` : ""}
-      plugins: [pluginMdx(), pluginReactRouter(), pluginReact()],
+      plugins: [pluginReact(), pluginMdx(), pluginReactRouter()],
     });
   `);
 

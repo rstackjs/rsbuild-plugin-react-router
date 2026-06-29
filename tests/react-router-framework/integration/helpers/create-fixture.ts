@@ -135,7 +135,7 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
   let templateName = init.templateName ?? defaultTemplateName;
   let projectDir = await createFixtureProject(init, mode);
   let buildPath = url.pathToFileURL(
-    path.join(projectDir, "build/server/index.js"),
+    path.join(projectDir, "build/server/static/js/app.js"),
   ).href;
   let reactRouterRuntime = await importFixtureModule<ReactRouterRuntime>(
     projectDir,

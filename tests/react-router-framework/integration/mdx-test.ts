@@ -11,6 +11,7 @@ import { type TemplateName, viteConfig } from "./helpers/vite.js";
 
 const templateNames = [
   "vite-7-template",
+  "vite-8-template",
   "rsc-vite-framework",
 ] as const satisfies TemplateName[];
 

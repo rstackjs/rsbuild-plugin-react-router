@@ -130,7 +130,7 @@ export const EXPRESS_SERVER = (args: {
           "/assets",
           express.static("build/client/assets", { immutable: true, maxAge: "1y" })
         );
-        app.all("*", createRequestListener((await import("./build/server/index.js")).default));
+        app.all("*", createRequestListener((await import("./build/server/static/js/app.js")).default));
       } else {
         throw new Error("Custom RSC dev servers need an Rsbuild dev-server adapter");
       }
@@ -161,7 +161,7 @@ export const EXPRESS_SERVER = (args: {
     app.all(
       "*",
       createRequestHandler({
-        build: await import("./build/index.js"),
+        build: await import("./build/server/static/js/app.js"),
       })
     );
 
@@ -471,12 +471,20 @@ function node(
   options: { cwd: string; env?: Record<string, string> },
 ) {
   let nodeBin = process.argv[0];
+  let nodeOptions = [
+    process.env.NODE_OPTIONS,
+    "--experimental-vm-modules",
+    "--experimental-global-webcrypto",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   let proc = spawn(nodeBin, args, {
     cwd: options.cwd,
     env: {
       ...process.env,
       ...colorEnv,
+      NODE_OPTIONS: nodeOptions,
       ...options.env,
     },
     stdio: "pipe",
@@ -494,7 +502,7 @@ async function waitForServer(
   await waitOn({
     resources: [
       `http://${args.host ?? "localhost"}:${args.port}${
-        args.basename ?? "/favicon.ico"
+        args.basename ?? "/"
       }`,
     ],
     timeout: platform() === "win32" ? 20000 : 10000,

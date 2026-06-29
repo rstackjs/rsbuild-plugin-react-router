@@ -45,6 +45,7 @@ import {
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
 } from './manifest.js';
+import type { RouteModuleAnalysis } from './export-utils.js';
 import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
 import { registerBuildOutputTransforms } from './build-output-transforms.js';
 import {
@@ -466,11 +467,23 @@ export const pluginReactRouter = (
       routeChunkCache,
       splitRouteModules: Boolean(splitRouteModules),
     });
+    const transformedRouteModuleAnalyses = new Map<
+      string,
+      RouteModuleAnalysis
+    >();
+    const rememberRouteModuleAnalysis = (
+      resourcePath: string,
+      analysis: RouteModuleAnalysis
+    ) => {
+      transformedRouteModuleAnalyses.set(resolve(resourcePath), analysis);
+    };
     const routeChunkOptions = {
       splitRouteModules,
       rootRouteFile,
       isBuild,
       cache: routeChunkCache,
+      analyzeRouteModule: async (routeFilePath: string) =>
+        transformedRouteModuleAnalyses.get(resolve(routeFilePath)),
     };
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
@@ -1129,6 +1142,7 @@ export const pluginReactRouter = (
       ssr,
       isSpaMode,
       rootRoutePath,
+      onRouteModuleAnalysis: rememberRouteModuleAnalysis,
     });
   },
 });
