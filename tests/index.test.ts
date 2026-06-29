@@ -5,6 +5,8 @@ import { pluginReactRouter } from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
+  __reactRouterTestJitiCache?: Record<string, unknown>;
+  __reactRouterTestJitiCacheAfterImport?: Record<string, unknown>;
 };
 
 type LazyCompilationTestModule = {
@@ -130,28 +132,6 @@ describe('pluginReactRouter', () => {
   });
 
   it('reloads the dev server when imported config dependencies change', async () => {
-    const readFileSync = rstest
-      .spyOn(fs, 'readFileSync')
-      .mockImplementation(path => {
-        const filePath = String(path);
-        if (filePath.endsWith('react-router.config.ts')) {
-          return "import './config/server-bundles'; export default {};";
-        }
-        if (filePath.endsWith('config/server-bundles.ts')) {
-          return 'export const value = 1;';
-        }
-        return '';
-      });
-    const statSync = rstest.spyOn(fs, 'statSync').mockImplementation(path => {
-      const filePath = String(path);
-      if (
-        filePath.endsWith('react-router.config.ts') ||
-        filePath.endsWith('config/server-bundles.ts')
-      ) {
-        return { isFile: () => true } as fs.Stats;
-      }
-      throw new Error(`Missing test file: ${filePath}`);
-    });
     const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(path => {
       const filePath = String(path);
       if (filePath.includes('react-router.config')) {
@@ -165,6 +145,20 @@ describe('pluginReactRouter', () => {
         filePath.endsWith('app/root.tsx')
       );
     });
+    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache = {
+      '/project/node_modules/jiti/dist/jiti.cjs': {
+        filename: '/project/node_modules/jiti/dist/jiti.cjs',
+      },
+    };
+    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCacheAfterImport =
+      {
+        '/project/react-router.config.ts': {
+          filename: '/project/react-router.config.ts',
+        },
+        '/project/config/server-bundles.ts': {
+          filename: '/project/config/server-bundles.ts',
+        },
+      };
 
     try {
       const rsbuild = await createStubRsbuild({
@@ -184,9 +178,7 @@ describe('pluginReactRouter', () => {
         type: 'reload-server',
       });
     } finally {
-      readFileSync.mockRestore();
-      statSync.mockRestore();
-      existsSync.mockReturnValue(true);
+      existsSync.mockRestore();
     }
   });
 
@@ -218,7 +210,7 @@ describe('pluginReactRouter', () => {
         type: 'reload-server',
       });
     } finally {
-      existsSync.mockReturnValue(true);
+      existsSync.mockRestore();
     }
   });
 

@@ -1,41 +1,52 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
-import { collectConfigDependencyWatchPaths } from '../src/config-dependencies';
+import type { ModuleCache } from 'jiti';
+import {
+  clearConfigModuleCache,
+  collectConfigDependencyWatchPaths,
+} from '../src/config-dependencies';
 
-describe('collectConfigDependencyWatchPaths', () => {
-  it('recursively collects relative config imports and requires', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'rr-config-deps-'));
+const createModuleCache = (paths: string[]): ModuleCache =>
+  Object.fromEntries(
+    paths.map(filePath => [
+      filePath,
+      {
+        filename: filePath,
+      },
+    ])
+  ) as ModuleCache;
 
-    try {
-      const configPath = join(root, 'react-router.config.ts');
-      const serverBundlesPath = join(root, 'config/server-bundles.ts');
-      const sharedPath = join(root, 'config/shared.js');
+describe('config dependency helpers', () => {
+  it('collects non-package modules loaded while importing config', () => {
+    const configPath = '/project/react-router.config.ts';
+    const dependencyPath = '/project/config/server-bundles.ts';
+    const preexistingPath = '/project/build-tool.js';
 
-      mkdirSync(join(root, 'config'));
-      writeFileSync(
+    expect(
+      collectConfigDependencyWatchPaths(
         configPath,
-        [
-          "import { serverBundles } from './config/server-bundles';",
-          "const shared = require('./config/shared.js');",
-          'export default { serverBundles, basename: shared.basename };',
-        ].join('\n')
-      );
-      writeFileSync(
-        serverBundlesPath,
-        [
-          "export { bundleId } from './shared.js';",
-          "export const serverBundles = async () => 'main';",
-        ].join('\n')
-      );
-      writeFileSync(sharedPath, "export const basename = '/app';");
+        createModuleCache([
+          preexistingPath,
+          '/project/node_modules/jiti/dist/jiti.cjs',
+          configPath,
+          dependencyPath,
+        ]),
+        new Set([preexistingPath])
+      )
+    ).toEqual([dependencyPath]);
+  });
 
-      await expect(collectConfigDependencyWatchPaths(configPath)).resolves.toEqual(
-        [serverBundlesPath, sharedPath]
-      );
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  it('clears only config modules loaded while collecting dependencies', () => {
+    const configPath = '/project/react-router.config.ts';
+    const dependencyPath = '/project/config/server-bundles.ts';
+    const buildToolPath = '/project/node_modules/@rspack/core/dist/index.js';
+    const moduleCache = createModuleCache([
+      buildToolPath,
+      configPath,
+      dependencyPath,
+    ]);
+
+    clearConfigModuleCache(moduleCache, [configPath, dependencyPath]);
+
+    expect(moduleCache).toEqual(createModuleCache([buildToolPath]));
   });
 });

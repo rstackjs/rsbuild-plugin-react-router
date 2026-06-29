@@ -82,7 +82,10 @@ import {
 import { mapVirtualModules } from './virtual-modules.js';
 import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
 import { registerReactRouterTypegen } from './typegen.js';
-import { collectConfigDependencyWatchPaths } from './config-dependencies.js';
+import {
+  clearConfigModuleCache,
+  collectConfigDependencyWatchPaths,
+} from './config-dependencies.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -179,24 +182,15 @@ export const pluginReactRouter = (
 
     registerReactRouterTypegen(api);
 
-    const jiti = createJiti(process.cwd(), {
-      moduleCache: false,
-    });
-
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
     let configWatchPaths: string | string[];
-    if (configExists) {
-      const dependencyWatchPaths =
-        await collectConfigDependencyWatchPaths(configPath);
-      configWatchPaths =
-        dependencyWatchPaths.length > 0
-          ? [configPath, ...dependencyWatchPaths]
-          : configPath;
-    } else {
+    if (!configExists) {
       configWatchPaths = JS_EXTENSIONS.map(extension =>
         resolve(`react-router.config${extension}`)
       );
+    } else {
+      configWatchPaths = configPath;
     }
     let reactRouterUserConfig: Config = {};
     if (!configExists) {
@@ -205,10 +199,23 @@ export const pluginReactRouter = (
       );
     } else {
       const displayPath = relative(process.cwd(), configPath);
+      const configJiti = createJiti(process.cwd(), {
+        moduleCache: true,
+      });
+      const cacheKeysBeforeImport = new Set(Object.keys(configJiti.cache));
       try {
-        const imported = await jiti.import<Config>(configPath, {
+        const imported = await configJiti.import<Config>(configPath, {
           default: true,
         });
+        const dependencyWatchPaths = collectConfigDependencyWatchPaths(
+          configPath,
+          configJiti.cache,
+          cacheKeysBeforeImport
+        );
+        configWatchPaths =
+          dependencyWatchPaths.length > 0
+            ? [configPath, ...dependencyWatchPaths]
+            : configPath;
         if (imported === undefined) {
           throw new Error(`${displayPath} must provide a default export`);
         }
@@ -218,8 +225,21 @@ export const pluginReactRouter = (
         reactRouterUserConfig = imported;
       } catch (error) {
         throw new Error(`Error loading ${displayPath}: ${error}`);
+      } finally {
+        clearConfigModuleCache(configJiti.cache, [
+          configPath,
+          ...collectConfigDependencyWatchPaths(
+            configPath,
+            configJiti.cache,
+            cacheKeysBeforeImport
+          ),
+        ]);
       }
     }
+
+    const jiti = createJiti(process.cwd(), {
+      moduleCache: false,
+    });
 
     const {
       resolved: resolvedConfig,
@@ -239,7 +259,6 @@ export const pluginReactRouter = (
       serverBuildFile,
       serverModuleFormat,
       splitRouteModules,
-      subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
 
