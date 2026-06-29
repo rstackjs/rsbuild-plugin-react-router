@@ -81,24 +81,27 @@ type RscRouteTransformResult = {
 };
 
 const hasQuery = (resourceQuery: string | undefined, key: string): boolean =>
-  new URLSearchParams((resourceQuery ?? '').replace(/^\?/, '')).has(key);
+  createResourceQueryParams(resourceQuery).has(key);
 
 const getQueryValue = (
   resourceQuery: string | undefined,
   key: string
-): string | null =>
-  new URLSearchParams((resourceQuery ?? '').replace(/^\?/, '')).get(key);
+): string | null => createResourceQueryParams(resourceQuery).get(key);
 
-const createRouteModuleId = (
+const createResourceQueryParams = (
+  resourceQuery: string | undefined
+): URLSearchParams =>
+  new URLSearchParams((resourceQuery ?? '').replace(/^\?/, ''));
+
+const createClientRouteModuleId = (
   resourcePath: string,
   resourceQuery: string | undefined,
-  type: typeof CLIENT_CHUNK_QUERY,
   value: string
 ): string => {
-  const params = new URLSearchParams((resourceQuery ?? '').replace(/^\?/, ''));
+  const params = createResourceQueryParams(resourceQuery);
   params.delete(CLIENT_CHUNK_QUERY);
   params.delete(SERVER_MODULE_QUERY);
-  params.set(type, value);
+  params.set(CLIENT_CHUNK_QUERY, value);
   return `${resourcePath}?${params.toString()}`;
 };
 
@@ -106,7 +109,7 @@ const createServerRouteModuleId = (
   resourcePath: string,
   resourceQuery: string | undefined
 ): string => {
-  const params = new URLSearchParams((resourceQuery ?? '').replace(/^\?/, ''));
+  const params = createResourceQueryParams(resourceQuery);
   params.delete(CLIENT_CHUNK_QUERY);
   params.delete(SERVER_MODULE_QUERY);
   params.set(SERVER_MODULE_QUERY, '');
@@ -223,10 +226,9 @@ const createClientRouteEntry = async ({
       ]
         ? exportName
         : 'shared';
-      const target = createRouteModuleId(
+      const target = createClientRouteModuleId(
         resourcePath,
         resourceQuery,
-        CLIENT_CHUNK_QUERY,
         chunkName
       );
       if (exportName === 'default') {
@@ -284,10 +286,9 @@ const createServerRouteEntry = async ({
     routeChunkCache,
   });
 
-  const clientTarget = createRouteModuleId(
+  const clientTarget = createClientRouteModuleId(
     resourcePath,
     resourceQuery,
-    CLIENT_CHUNK_QUERY,
     'shared'
   );
   const serverTarget = createServerRouteModuleId(resourcePath, resourceQuery);
@@ -305,10 +306,9 @@ const createServerRouteEntry = async ({
       ]
         ? exportName
         : 'shared';
-      const target = createRouteModuleId(
+      const target = createClientRouteModuleId(
         resourcePath,
         resourceQuery,
-        CLIENT_CHUNK_QUERY,
         chunkName
       );
       lines.push(

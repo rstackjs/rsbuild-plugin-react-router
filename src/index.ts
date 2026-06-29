@@ -232,6 +232,20 @@ const createReactRouterRscVirtualAliases = (
     })
   );
 
+type RscDevServer = {
+  environments: {
+    node: {
+      loadBundle<T>(entryName: string): Promise<T>;
+    };
+  };
+};
+
+type RscServerBuild = {
+  default?: {
+    fetch?: (request: Request) => Promise<Response>;
+  };
+};
+
 export const pluginReactRouter = (options: PluginOptions = {}): RsbuildPlugin =>
   createReactRouterPlugin(options);
 
@@ -1121,19 +1135,12 @@ const createReactRouterPlugin = (
           isRscMode && !pluginOptions.customServer && ssr
             ? {
                 setup: ({ server }) => {
-                  const devServer = server as unknown as {
-                    environments: {
-                      node: {
-                        loadBundle<T>(entryName: string): Promise<T>;
-                      };
-                    };
-                  };
+                  const devServer = server as unknown as RscDevServer;
                   const listener = createRequestListener(async request => {
-                    const build = await devServer.environments.node.loadBundle<{
-                      default?: {
-                        fetch?: (request: Request) => Promise<Response>;
-                      };
-                    }>(rscServerEntryName);
+                    const build =
+                      await devServer.environments.node.loadBundle<RscServerBuild>(
+                        rscServerEntryName
+                      );
                     const handler = build.default?.fetch;
                     if (typeof handler !== 'function') {
                       throw new Error(

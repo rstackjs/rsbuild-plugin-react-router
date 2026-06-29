@@ -15,6 +15,7 @@ import routes from 'virtual/react-router/unstable_rsc/routes';
 import routeDiscovery from 'virtual/react-router/unstable_rsc/route-discovery';
 import basename from 'virtual/react-router/unstable_rsc/basename';
 import unstable_reactRouterServeConfig from 'virtual/react-router/unstable_rsc/react-router-serve-config';
+import bootstrapScripts from 'virtual/react-router/unstable_rsc/bootstrap-scripts';
 import { generateHTML } from './entry.rsc.ssr.js';
 
 export { unstable_reactRouterServeConfig };
@@ -24,12 +25,6 @@ type RscRequestHandler = {
     request: Request,
     requestContext?: RouterContextProvider
   ): Promise<Response>;
-};
-
-const getBootstrapScripts = (): string[] => {
-  const publicPath = unstable_reactRouterServeConfig.publicPath || '/';
-  const base = publicPath.endsWith('/') ? publicPath : `${publicPath}/`;
-  return [`${base}static/js/index.js`];
 };
 
 export function fetchServer(
@@ -66,7 +61,7 @@ const handler: RscRequestHandler = {
     }
 
     return generateHTML(request, await fetchServer(request, requestContext), {
-      bootstrapScripts: getBootstrapScripts(),
+      bootstrapScripts,
     });
   },
 };

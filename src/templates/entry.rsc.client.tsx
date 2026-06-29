@@ -57,14 +57,10 @@ const hydrate = () => {
   );
 };
 
-const startHydration = () => {
-  hydrate();
-};
-
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startHydration, { once: true });
+  document.addEventListener('DOMContentLoaded', hydrate, { once: true });
 } else {
-  startHydration();
+  hydrate();
 }
 
 const hot = (
@@ -78,7 +74,7 @@ const hot = (
 hot?.on('rsc:update', () => {
   requestAnimationFrame(() => {
     (
-      window as unknown as { __reactRouterDataRouter?: DataRouter }
+      window as typeof window & { __reactRouterDataRouter?: DataRouter }
     ).__reactRouterDataRouter?.revalidate();
   });
 });
