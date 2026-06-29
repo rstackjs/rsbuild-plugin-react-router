@@ -2,6 +2,23 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { Cause, Effect, Exit } from 'effect';
+
+const normalizeScriptError = error =>
+  error instanceof Error ? error : new Error(String(error));
+
+const runScriptEffect = async effect => {
+  const exit = await Effect.runPromiseExit(effect);
+  if (Exit.isSuccess(exit)) {
+    return exit.value;
+  }
+  throw normalizeScriptError(Cause.squash(exit.cause));
+};
+const asEffect = evaluate =>
+  Effect.tryPromise({
+    try: evaluate,
+    catch: normalizeScriptError,
+  });
 
 const { values } = parseArgs({
   allowPositionals: false,
@@ -21,11 +38,12 @@ const { values } = parseArgs({
 
 if (!values.base || !values.head) {
   throw new Error(
-    'Usage: node scripts/report-benchmark-ci.mjs --base <base.json> --head <head.json> [--out <dir>]'
+    'Usage: node scripts/report-benchmark-ci.mts --base <base.json> --head <head.json> [--out <dir>]'
   );
 }
 
-const readJson = async file => JSON.parse(await readFile(file, 'utf8'));
+const readJsonEffect = file =>
+  asEffect(async () => JSON.parse(await readFile(file, 'utf8')));
 const formatSeconds = value =>
   typeof value === 'number' ? `${(value / 1000).toFixed(2)}s` : '-';
 const formatPercent = value =>
@@ -65,8 +83,8 @@ const indexBenchmarks = result =>
     (result.benchmarks ?? []).map(benchmark => [benchmark.id, benchmark])
   );
 
-const base = await readJson(values.base);
-const head = await readJson(values.head);
+const base = await runScriptEffect(readJsonEffect(values.base));
+const head = await runScriptEffect(readJsonEffect(values.head));
 const baseMode = base.mode ?? 'build';
 const headMode = head.mode ?? 'build';
 
@@ -200,11 +218,15 @@ const renderComment = () => {
 };
 
 const outDir = path.resolve(values.out);
-await mkdir(outDir, { recursive: true });
-await writeFile(
-  path.join(outDir, 'report.json'),
-  `${JSON.stringify(report, null, 2)}\n`
+await runScriptEffect(
+  asEffect(async () => {
+    await mkdir(outDir, { recursive: true });
+    await writeFile(
+      path.join(outDir, 'report.json'),
+      `${JSON.stringify(report, null, 2)}\n`
+    );
+    await writeFile(path.join(outDir, 'comment.md'), renderComment());
+  })
 );
-await writeFile(path.join(outDir, 'comment.md'), renderComment());
 
 console.log(`Benchmark CI report written to ${outDir}`);

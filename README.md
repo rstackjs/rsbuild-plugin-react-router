@@ -107,7 +107,8 @@ pluginReactRouter({
   /**
    * Run route transforms in a worker-thread pool.
    * Pass `false` to disable or an integer to override the default worker count.
-   * @default true. The default uses available CPU cores minus 2, capped at 4.
+   * @default undefined. The default uses a bounded worker count when spare CPU
+   * cores are available.
    */
   parallelTransforms?: false | number,
 
@@ -315,7 +316,7 @@ If no configuration is provided, the following defaults will be used:
   federation: false,
   lazyCompilation: undefined, // Rsbuild's dev defaults still apply
   logPerformance: false,
-  parallelTransforms: undefined // workers enabled with the default worker count
+  parallelTransforms: undefined // adaptive workers; inline when no spare cores
 }
 
 // Router defaults (react-router.config.ts)
@@ -328,12 +329,10 @@ If no configuration is provided, the following defaults will be used:
 }
 ```
 
-Route transforms use worker threads by default when spare CPU cores are
-available. The automatic worker count uses available CPU cores minus 2, limits
-3-4 core machines to 1 worker, and is capped at 4 workers on larger machines to
-avoid oversubscribing parallel web and node dev compilers. On machines with no
-spare cores, transforms run inline. Pass a positive integer to override that
-count, or `false` to force inline transforms.
+Route transforms use worker threads by default when more than two CPU cores are
+available, with a bounded worker count to avoid oversubscribing parallel web and
+node dev compilers. Otherwise, transforms run inline. Pass a positive integer
+to set the worker count, or `false` to force inline transforms.
 
 For builds with 256+ routes, detailed file-size reporting is compacted to totals
 by default to avoid gzipping and printing thousands of assets. Set

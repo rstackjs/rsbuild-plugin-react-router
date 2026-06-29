@@ -13,7 +13,7 @@ import { describe, expect, it } from '@rstest/core';
 describe('benchmark fixture generator', () => {
   it('creates a deterministic synthetic React Router app', async () => {
     const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mjs'
+      '../scripts/benchmark/fixture.mts'
     );
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
 
@@ -69,7 +69,7 @@ describe('benchmark fixture generator', () => {
 
   it('can point the benchmark config at an explicit built plugin import', async () => {
     const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mjs'
+      '../scripts/benchmark/fixture.mts'
     );
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
 
@@ -93,7 +93,7 @@ describe('benchmark fixture generator', () => {
 
   it('can enable parallel route transforms in benchmark config', async () => {
     const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mjs'
+      '../scripts/benchmark/fixture.mts'
     );
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
 
@@ -115,7 +115,7 @@ describe('benchmark fixture generator', () => {
 
   it('can explicitly disable parallel route transforms in benchmark config', async () => {
     const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mjs'
+      '../scripts/benchmark/fixture.mts'
     );
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
 
@@ -137,7 +137,7 @@ describe('benchmark fixture generator', () => {
 
   it('omits server-only route exports from SPA benchmark fixtures', async () => {
     const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mjs'
+      '../scripts/benchmark/fixture.mts'
     );
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
 
@@ -169,7 +169,7 @@ describe('benchmark fixture generator', () => {
 
   it('generates deterministic named stress fixture shapes', async () => {
     const { benchmarkFixtureNames, generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mjs'
+      '../scripts/benchmark/fixture.mts'
     );
     expect(benchmarkFixtureNames).toEqual([
       'default',
@@ -245,7 +245,7 @@ describe('benchmark fixture generator', () => {
 
   it('generates the large synthetic app shape and statistics', async () => {
     const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mjs'
+      '../scripts/benchmark/fixture.mts'
     );
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-large-'));
 
@@ -332,7 +332,7 @@ describe('benchmark fixture generator', () => {
     const result = spawnSync(
       process.execPath,
       [
-        'scripts/bench-builds.mjs',
+        'scripts/bench-builds.mts',
         '--profile=smoke',
         '--iterations=1',
         '--warmup=0',
@@ -356,7 +356,7 @@ describe('benchmark fixture generator', () => {
     const result = spawnSync(
       process.execPath,
       [
-        'scripts/bench-builds.mjs',
+        'scripts/bench-builds.mts',
         '--profile=large',
         '--iterations=1',
         '--warmup=0',
@@ -392,7 +392,7 @@ describe('benchmark fixture generator', () => {
 
       const result = spawnSync(
         process.execPath,
-        ['scripts/report-benchmark-ci.mjs', '--base', base, '--head', head],
+        ['scripts/report-benchmark-ci.mts', '--base', base, '--head', head],
         {
           cwd: process.cwd(),
           encoding: 'utf8',
