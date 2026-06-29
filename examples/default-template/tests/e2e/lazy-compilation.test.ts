@@ -9,7 +9,7 @@ const aboutRoutePath = join(appDirectory, 'routes/about.tsx');
 const aboutCssPath = join(appDirectory, 'routes/about.css');
 const originalAboutRoute = readFileSync(aboutRoutePath, 'utf8');
 const originalAboutCss = readFileSync(aboutCssPath, 'utf8');
-const aboutRouteWithCssImport = `import './about.css';
+const aboutRouteWithCssImport = (revision: string) => `import './about.css';
 
 export default function About() {
   return (
@@ -21,11 +21,10 @@ export default function About() {
     </main>
   );
 }
+// ${revision}
 `;
-const aboutRouteWithoutCssImport = aboutRouteWithCssImport.replace(
-  "import './about.css';\n\n",
-  ''
-);
+const aboutRouteWithoutCssImport = (revision: string) =>
+  aboutRouteWithCssImport(revision).replace("import './about.css';\n\n", '');
 const aboutCssProbe = `.css-hmr-probe {
   color: rgb(255, 0, 0);
 }
@@ -164,7 +163,7 @@ test.describe('lazy compilation', () => {
   test('full reloads when active lazy route CSS import is removed and re-added', async ({
     page,
   }) => {
-    writeFileSync(aboutRoutePath, aboutRouteWithCssImport);
+    writeFileSync(aboutRoutePath, aboutRouteWithCssImport('with-css-1'));
     writeFileSync(aboutCssPath, aboutCssProbe);
 
     const documentRequests: string[] = [];
@@ -203,7 +202,10 @@ test.describe('lazy compilation', () => {
       .toBe('rgb(255, 0, 0)');
 
     const documentRequestsBeforeRemoval = documentRequests.length;
-    writeFileSync(aboutRoutePath, aboutRouteWithoutCssImport);
+    writeFileSync(
+      aboutRoutePath,
+      aboutRouteWithoutCssImport('without-css-2')
+    );
 
     await expect
       .poll(
@@ -218,10 +220,13 @@ test.describe('lazy compilation', () => {
         { timeout: 60000 }
       )
       .toBe('cleared');
+    // The removal path intentionally hard reloads. Wait for the dev socket to
+    // reconnect before testing the re-add transition.
+    await page.waitForTimeout(1200);
 
     const stylesheetRequestsBeforeReAdd = stylesheetRequests.length;
     const documentRequestsBeforeReAdd = documentRequests.length;
-    writeFileSync(aboutRoutePath, aboutRouteWithCssImport);
+    writeFileSync(aboutRoutePath, aboutRouteWithCssImport('with-css-3'));
 
     await expect
       .poll(

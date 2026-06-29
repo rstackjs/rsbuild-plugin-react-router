@@ -440,6 +440,13 @@ describe('React Router development runtime controller', () => {
     expect(server.sockWrite).toHaveBeenCalledWith('full-reload', {
       path: '*',
     });
+
+    web.invalidate();
+    await expect
+      .poll(() => (server.sockWrite as any).mock.calls.length, {
+        timeout: 2000,
+      })
+      .toBe(2);
   });
 
   it('hard reloads when CSS ownership is restored after a removal', async () => {

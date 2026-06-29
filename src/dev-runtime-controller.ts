@@ -49,6 +49,8 @@ const escapeHtml = (value: string): string =>
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
 
+const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
+
 export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
@@ -68,7 +70,41 @@ export const createReactRouterDevRuntimeController = ({
     };
   }
 
+  let scheduledCssAssetOwnershipReload:
+    | ReturnType<typeof setTimeout>
+    | undefined;
+  let lastCssAssetOwnershipReloadAt = 0;
+  let reloadAfterCssAssetOwnershipRemoval = false;
+
+  const sendCssAssetOwnershipReload = (): void => {
+    const binding = sessions.getActiveBinding();
+    if (!binding) {
+      return;
+    }
+    lastCssAssetOwnershipReloadAt = Date.now();
+    binding.server.sockWrite('full-reload', { path: '*' });
+  };
+
+  const scheduleCssAssetOwnershipReload = (): void => {
+    if (scheduledCssAssetOwnershipReload) {
+      clearTimeout(scheduledCssAssetOwnershipReload);
+    }
+    const scheduledAt = Date.now();
+    scheduledCssAssetOwnershipReload = setTimeout(() => {
+      scheduledCssAssetOwnershipReload = undefined;
+      if (lastCssAssetOwnershipReloadAt > scheduledAt) {
+        return;
+      }
+      sendCssAssetOwnershipReload();
+    }, CSS_SOURCE_RELOAD_DELAY_MS);
+  };
+
   const closeBinding = (binding: RuntimeBinding, error?: Error): void => {
+    if (scheduledCssAssetOwnershipReload) {
+      clearTimeout(scheduledCssAssetOwnershipReload);
+      scheduledCssAssetOwnershipReload = undefined;
+    }
+    reloadAfterCssAssetOwnershipRemoval = false;
     const pair = binding.compilers;
     if (pair) {
       pair.pendingAttempt = undefined;
@@ -170,11 +206,12 @@ export const createReactRouterDevRuntimeController = ({
             html: escapeHtml(error.message),
           });
         },
-        onCssAssetOwnershipChanged() {
+        onCssAssetOwnershipChanged(change) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
           }
-          server.sockWrite('full-reload', { path: '*' });
+          reloadAfterCssAssetOwnershipRemoval = change === 'removed';
+          sendCssAssetOwnershipReload();
         },
         onWarning: message => api.logger.warn(message),
       });
@@ -258,6 +295,10 @@ export const createReactRouterDevRuntimeController = ({
         if (!attemptAlreadyPending) {
           runtime.beginAttempt();
         }
+        if (side === 'latestWebStart' && reloadAfterCssAssetOwnershipRemoval) {
+          reloadAfterCssAssetOwnershipRemoval = false;
+          scheduleCssAssetOwnershipReload();
+        }
       }
     };
     web.hooks.invalid.tap(`${PLUGIN_NAME}:dev-web-invalid`, () =>
@@ -285,6 +326,10 @@ export const createReactRouterDevRuntimeController = ({
             status: 'started',
             identity: getCompilationIdentity(compilation),
           };
+          if (reloadAfterCssAssetOwnershipRemoval) {
+            reloadAfterCssAssetOwnershipRemoval = false;
+            scheduleCssAssetOwnershipReload();
+          }
         }
       }
     );

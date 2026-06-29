@@ -74,7 +74,7 @@ type CreateReactRouterDevRuntimeOptions = {
   server: RsbuildDevServer;
   buildPlan: ReactRouterDevBuildPlan;
   onEvaluationError: (error: Error) => void;
-  onCssAssetOwnershipChanged?: () => void;
+  onCssAssetOwnershipChanged?: (change: 'removed' | 'restored') => void;
   onWarning?: (message: string) => void;
 };
 
@@ -226,9 +226,11 @@ export const createReactRouterDevRuntime = ({
     ReactRouterDevManifestSet
   >();
 
-  const notifyCssAssetOwnershipChanged = (): void => {
+  const notifyCssAssetOwnershipChanged = (
+    change: 'removed' | 'restored'
+  ): void => {
     try {
-      onCssAssetOwnershipChanged();
+      onCssAssetOwnershipChanged(change);
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : String(cause);
       onWarning(
@@ -510,10 +512,10 @@ export const createReactRouterDevRuntime = ({
         }
         if (cssAssetsRemoved) {
           reloadAfterCssRemoval = !cssAssetsAdded;
-          notifyCssAssetOwnershipChanged();
+          notifyCssAssetOwnershipChanged('removed');
         } else if (cssAssetsAdded) {
           if (reloadAfterCssRemoval) {
-            notifyCssAssetOwnershipChanged();
+            notifyCssAssetOwnershipChanged('restored');
           }
           reloadAfterCssRemoval = false;
         }
