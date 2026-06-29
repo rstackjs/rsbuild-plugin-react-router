@@ -195,50 +195,55 @@ const hasOnlyCssAssetOwnershipChanges = (
   });
 };
 
-const normalizeManifestForRouteMetadataCheck = (
-  manifest: ReactRouterDevManifestSet[string]
-) =>
-  Object.fromEntries(
-    Object.entries(manifest.routes ?? {})
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([routeId, route]) => [
-        routeId,
-        {
-          caseSensitive: route.caseSensitive,
-          clientActionModule: route.clientActionModule,
-          clientLoaderModule: route.clientLoaderModule,
-          clientMiddlewareModule: route.clientMiddlewareModule,
-          errorBoundary: route.hasErrorBoundary,
-          hasAction: route.hasAction,
-          hasClientAction: route.hasClientAction,
-          hasClientLoader: route.hasClientLoader,
-          hasClientMiddleware: route.hasClientMiddleware,
-          hasDefaultExport: route.hasDefaultExport,
-          hasLoader: route.hasLoader,
-          hydrateFallbackModule: route.hydrateFallbackModule,
-          id: route.id,
-          index: route.index,
-          parentId: route.parentId,
-          path: route.path,
-        },
-      ])
-  );
+type DevRouteManifestEntry = NonNullable<
+  ReactRouterDevManifestSet[string]['routes']
+>[string];
+
+const hasSameRouteMetadata = (
+  previous: DevRouteManifestEntry,
+  next: DevRouteManifestEntry
+): boolean =>
+  previous.caseSensitive === next.caseSensitive &&
+  previous.clientActionModule === next.clientActionModule &&
+  previous.clientLoaderModule === next.clientLoaderModule &&
+  previous.clientMiddlewareModule === next.clientMiddlewareModule &&
+  previous.hasErrorBoundary === next.hasErrorBoundary &&
+  previous.hasAction === next.hasAction &&
+  previous.hasClientAction === next.hasClientAction &&
+  previous.hasClientLoader === next.hasClientLoader &&
+  previous.hasClientMiddleware === next.hasClientMiddleware &&
+  previous.hasDefaultExport === next.hasDefaultExport &&
+  previous.hasLoader === next.hasLoader &&
+  previous.hydrateFallbackModule === next.hydrateFallbackModule &&
+  previous.id === next.id &&
+  previous.index === next.index &&
+  previous.parentId === next.parentId &&
+  previous.path === next.path;
 
 const hasRouteManifestMetadataChanges = (
   previous: ReactRouterDevManifestSet,
   next: ReactRouterDevManifestSet
 ): boolean => {
-  const previousEntryNames = Object.keys(previous).sort();
-  const nextEntryNames = Object.keys(next).sort();
-  if (previousEntryNames.join('\0') !== nextEntryNames.join('\0')) {
+  const previousEntryNames = Object.keys(previous);
+  if (previousEntryNames.length !== Object.keys(next).length) {
     return true;
   }
   return previousEntryNames.some(entryName => {
-    const previousRoutes = normalizeManifestForRouteMetadataCheck(
-      previous[entryName]
-    );
-    const nextRoutes = normalizeManifestForRouteMetadataCheck(next[entryName]);
-    return JSON.stringify(previousRoutes) !== JSON.stringify(nextRoutes);
+    const nextManifest = next[entryName];
+    if (!nextManifest) {
+      return true;
+    }
+    const previousRoutes = previous[entryName].routes ?? {};
+    const nextRoutes = nextManifest.routes ?? {};
+    const previousRouteIds = Object.keys(previousRoutes);
+    if (previousRouteIds.length !== Object.keys(nextRoutes).length) {
+      return true;
+    }
+    return previousRouteIds.some(routeId => {
+      const previousRoute = previousRoutes[routeId];
+      const nextRoute = nextRoutes[routeId];
+      return !nextRoute || !hasSameRouteMetadata(previousRoute, nextRoute);
+    });
   });
 };
 
