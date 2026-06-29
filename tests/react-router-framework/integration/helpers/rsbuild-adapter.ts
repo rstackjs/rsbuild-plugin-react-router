@@ -35,10 +35,31 @@ export const rsbuildConfig = ({ port, base }: RsbuildConfigOptions = {}) =>
     });
   `);
 
+export const rsbuildRscConfig = ({
+  port,
+  base,
+}: RsbuildConfigOptions = {}) =>
+  stripIndent(`
+    import { defineConfig } from "@rsbuild/core";
+    import { pluginMdx } from "@rsbuild/plugin-mdx";
+    import { pluginReact } from "@rsbuild/plugin-react";
+    import { pluginReactRouterRSC } from "rsbuild-plugin-react-router";
+
+    export default defineConfig({
+      ${port ? `server: { port: ${port}, host: "localhost" },` : ""}
+      ${base ? `output: { assetPrefix: ${JSON.stringify(base)} },` : ""}
+      plugins: [pluginReact(), pluginMdx(), pluginReactRouterRSC()],
+    });
+  `);
+
 export const normalizeFixtureFiles = <T>(
   files: Record<string, T> = {}
 ): Record<string, T> => {
   const normalized: Record<string, T> = {};
+  const isRscConfig = Object.values(files).some(
+    contents =>
+      typeof contents === "string" && contents.includes("reactRouterRSC")
+  );
 
   for (const [filename, contents] of Object.entries(files)) {
     if (/^vite\.config\.[cm]?[jt]s$/.test(filename)) {
@@ -46,7 +67,7 @@ export const normalizeFixtureFiles = <T>(
         typeof contents === "string" &&
         contents.includes("rsbuild-plugin-react-router")
           ? contents
-          : (rsbuildConfig() as T);
+          : ((isRscConfig ? rsbuildRscConfig() : rsbuildConfig()) as T);
       continue;
     }
     normalized[filename] = contents;
@@ -75,7 +96,13 @@ export async function finalizeFixtureProject({
 
   const rsbuildConfigPath = path.join(projectDir, "rsbuild.config.ts");
   if (!existsSync(rsbuildConfigPath)) {
-    await writeFile(rsbuildConfigPath, rsbuildConfig({ port }), "utf8");
+    await writeFile(
+      rsbuildConfigPath,
+      templateName?.includes("rsc")
+        ? rsbuildRscConfig({ port })
+        : rsbuildConfig({ port }),
+      "utf8",
+    );
   }
 }
 
@@ -98,6 +125,7 @@ export function installFixtureProject(projectDir: string) {
 }
 
 async function writePackageJson(projectDir: string, templateName?: TemplateName) {
+  const isRscTemplate = templateName?.includes("rsc") ?? false;
   const source = await readPackageJson(projectDir);
   const packageJson = {
     ...source,
@@ -109,10 +137,13 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       dev:
         'NODE_OPTIONS="--experimental-vm-modules --experimental-global-webcrypto" rsbuild dev --host localhost',
       build: "rsbuild build",
-      start: "HOST=127.0.0.1 react-router-serve ./build/server/static/js/app.js",
+      start: isRscTemplate
+        ? "HOST=127.0.0.1 node start.js"
+        : "HOST=127.0.0.1 react-router-serve ./build/server/static/js/app.js",
       typecheck: "react-router typegen && tsc",
     },
     dependencies: {
+      "@remix-run/node-fetch-server": "^0.13.3",
       "@react-router/express": reactRouterVersion,
       "@react-router/node": reactRouterVersion,
       "@react-router/serve": reactRouterVersion,
@@ -122,6 +153,7 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       react: "^19.2.4",
       "react-dom": "^19.2.4",
       "react-router": reactRouterVersion,
+      ...(isRscTemplate ? { "react-server-dom-rspack": "0.0.2" } : {}),
       "serialize-javascript": "^6.0.1",
     },
     devDependencies: {
@@ -136,6 +168,7 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       "@types/react-dom": "^19.2.3",
       rsbuild: "npm:@rsbuild/core@2.1.0",
       "rsbuild-plugin-react-router": `file:${repoRoot}`,
+      ...(isRscTemplate ? { "rsbuild-plugin-rsc": "^0.1.1" } : {}),
       typescript: "^5.9.3",
       "vite-env-only": "^3.0.3",
     },

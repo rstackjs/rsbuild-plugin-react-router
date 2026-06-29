@@ -37,6 +37,18 @@
       "types": "./dist/templates/entry.server.d.ts",
       "import": "./dist/templates/entry.server.js",
       "require": "./dist/templates/entry.server.cjs"
+    },
+    "./templates/entry.rsc": {
+      "types": "./dist/templates/entry.rsc.d.ts",
+      "import": "./dist/templates/entry.rsc.js"
+    },
+    "./templates/entry.rsc.client": {
+      "types": "./dist/templates/entry.rsc.client.d.ts",
+      "import": "./dist/templates/entry.rsc.client.js"
+    },
+    "./templates/entry.rsc.ssr": {
+      "types": "./dist/templates/entry.rsc.ssr.d.ts",
+      "import": "./dist/templates/entry.rsc.ssr.js"
     }
   },
   "main": "./dist/index.cjs",
@@ -57,7 +69,7 @@
     "bench:baseline": "node scripts/bench-builds.mts --profile default --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/baseline",
     "bench:full": "node scripts/bench-builds.mts --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",
     "bench:large": "node scripts/bench-builds.mts --profile large --iterations 1 --warmup 0 --clean cold --format both --out .benchmark/results/large",
-    "e2e": "pnpm build && pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only,react-router-8}' test:e2e",
+    "e2e": "pnpm build && pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only,react-router-8,rsc-mode}' test:e2e",
     "dev": "rslib build --watch",
     "test": "rstest run",
     "test:watch": "rstest watch",
@@ -113,6 +125,7 @@
     "@types/node": "^25.0.10",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
+    "@types/webpack-env": "^1.18.8",
     "@vanilla-extract/css": "^1.20.1",
     "cheerio": "^1.2.0",
     "cross-spawn": "^7.0.6",
@@ -129,6 +142,8 @@
     "react-dom": "^19.2.4",
     "react-router": "^7.13.0",
     "react-router-dom": "^7.13.0",
+    "react-server-dom-rspack": "0.0.2",
+    "rsbuild-plugin-rsc": "^0.1.1",
     "semver": "^7.8.5",
     "shelljs": "^0.10.0",
     "strip-ansi": "^7.2.0",
@@ -140,7 +155,17 @@
   "peerDependencies": {
     "@react-router/dev": "^7.0.0 || ^8.0.0",
     "@rsbuild/core": "^2.0.0",
-    "react-router": "^7.0.0 || ^8.0.0"
+    "react-router": "^7.0.0 || ^8.0.0",
+    "react-server-dom-rspack": "0.0.2",
+    "rsbuild-plugin-rsc": "^0.1.1"
+  },
+  "peerDependenciesMeta": {
+    "react-server-dom-rspack": {
+      "optional": true
+    },
+    "rsbuild-plugin-rsc": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public",

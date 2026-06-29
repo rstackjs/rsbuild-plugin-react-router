@@ -135,7 +135,12 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
   let templateName = init.templateName ?? defaultTemplateName;
   let projectDir = await createFixtureProject(init, mode);
   let buildPath = url.pathToFileURL(
-    path.join(projectDir, "build/server/static/js/app.js"),
+    path.join(
+      projectDir,
+      templateName === "rsc-vite-framework"
+        ? "build/server/index.js"
+        : "build/server/static/js/app.js",
+    ),
   ).href;
   let reactRouterRuntime = await importFixtureModule<ReactRouterRuntime>(
     projectDir,
@@ -327,12 +332,15 @@ export async function createAppFixture(fixture: Fixture, mode?: ServerMode) {
   }> => {
     if (fixture.useReactRouterServe) {
       let port = await getPort();
+      const serverBuildPath = fixture.templateName.includes("rsc")
+        ? "build/server/index.js"
+        : "build/server/static/js/app.js";
       let { stop } = await spawnTestServer({
         cwd: fixture.projectDir,
         command: [
           process.argv[0],
           reactRouterServeBin,
-          "build/server/static/js/app.js",
+          serverBuildPath,
         ],
         env: {
           NODE_ENV: mode || "production",

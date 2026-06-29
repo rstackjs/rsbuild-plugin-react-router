@@ -2,7 +2,11 @@ import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
-import { pluginReactRouter, shouldParallelizeEnvironmentBuilds } from '../src';
+import {
+  pluginReactRouter,
+  pluginReactRouterRSC,
+  shouldParallelizeEnvironmentBuilds,
+} from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
@@ -337,6 +341,55 @@ describe('pluginReactRouter', () => {
     expect(
       config.environments?.web?.tools?.rspack?.optimization?.avoidEntryIife
     ).toBe(true);
+  });
+
+  it('composes RSC bundler plumbing with the React Router environments', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.tools.swc.rspackExperiments.reactServerComponents).toBe(
+      true
+    );
+    expect(config.environments.node.source.include).toEqual([
+      {
+        not: /[\\/]core-js[\\/]/,
+      },
+    ]);
+    expect(config.environments.node.tools.rspack.dependencies).toBeUndefined();
+    expect(config.environments.web.output.target).toBe('web');
+    expect(
+      config.environments.web.tools.rspack.output.workerChunkLoading
+    ).toBe('import-scripts');
+    expect(config.environments.web.tools.rspack.optimization.usedExports).toBe(
+      false
+    );
+    expect(
+      config.environments.web.tools.rspack.optimization.mangleExports
+    ).toBe(false);
+  });
+
+  it('exposes an explicit RSC plugin helper', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouterRSC()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.environments.web.source.entry).toEqual({
+      index: {
+        import: expect.stringMatching(/entry\.rsc\.client/),
+        html: false,
+      },
+    });
+    expect(config.environments.node.source.entry.index).toMatchObject({
+      import: expect.stringMatching(/entry\.rsc/),
+      layer: 'react-server-components',
+    });
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {

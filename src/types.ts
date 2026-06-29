@@ -1,4 +1,4 @@
-import type { RsbuildConfig } from '@rsbuild/core';
+import type { RsbuildConfig, Rspack } from '@rsbuild/core';
 
 export type Route = {
   id: string;
@@ -31,6 +31,21 @@ export type PluginOptions = {
   federation?: boolean;
 
   /**
+   * Enable experimental React Router RSC framework mode.
+   * This composes `rsbuild-plugin-rsc` with React Router's Rsbuild
+   * environments. Environment names are managed by this plugin.
+   * @default false
+   */
+  rsc?:
+    | boolean
+    | {
+        layers?: {
+          rsc?: Rspack.RuleSetCondition;
+          ssr?: Rspack.RuleSetCondition;
+        };
+      };
+
+  /**
    * Opt in to Rsbuild's dev-only lazy compilation behavior.
    *
    * React Router hydration modules remain eager so initial dev requests can
@@ -61,6 +76,14 @@ export type PluginOptions = {
    * notification is not awaited, so it may safely close the current server.
    */
   onRouteTopologyChange?: () => void | Promise<void>;
+};
+
+export type ReactRouterRSCPluginOptions = Omit<PluginOptions, 'rsc'> & {
+  /**
+   * Optional overrides forwarded to `rsbuild-plugin-rsc`.
+   * Environment names are managed by this plugin.
+   */
+  rsc?: Exclude<NonNullable<PluginOptions['rsc']>, boolean>;
 };
 
 export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {

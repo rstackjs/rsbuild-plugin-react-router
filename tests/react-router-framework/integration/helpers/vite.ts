@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import { sync as spawnSync, spawn } from "cross-spawn";
-import { globSync } from "node:fs";
+import { existsSync, globSync } from "node:fs";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { platform } from "node:os";
@@ -22,6 +22,7 @@ import {
   reactRouterServeBin,
   rsbuildBin,
   rsbuildConfig,
+  rsbuildRscConfig,
 } from "./rsbuild-adapter.js";
 
 const nodeRequire = createRequire(import.meta.url);
@@ -106,7 +107,9 @@ export const viteConfig = {
     `;
   },
   basic: async (args: ViteConfigArgs) => {
-    return rsbuildConfig({ port: args.port, base: args.base });
+    return args.templateName?.includes("rsc")
+      ? rsbuildRscConfig({ port: args.port, base: args.base })
+      : rsbuildConfig({ port: args.port, base: args.base });
   },
 };
 
@@ -257,6 +260,16 @@ export const build = ({
   });
 };
 
+const formatBuildFailure = (result: ReturnType<typeof build>) => {
+  const stdout = result.stdout?.toString("utf8").trim();
+  const stderr = result.stderr?.toString("utf8").trim();
+  return [
+    `Expected Rsbuild build to exit successfully, got status=${result.status} signal=${result.signal}`,
+    stdout ? `stdout:\n${stdout}` : "stdout: <empty>",
+    stderr ? `stderr:\n${stderr}` : "stderr: <empty>",
+  ].join("\n\n");
+};
+
 export const reactRouterServe = async ({
   cwd,
   port,
@@ -269,18 +282,21 @@ export const reactRouterServe = async ({
   basename?: string;
 }) => {
   let nodeBin = process.argv[0];
-  let serveProc = spawn(
-    nodeBin,
-    [
-      reactRouterServeBin,
-      `build/server/${serverBundle ? serverBundle + "/" : ""}static/js/app.js`,
-    ],
-    {
-      cwd,
-      stdio: "pipe",
-      env: { NODE_ENV: "production", PORT: port.toFixed(0) },
-    },
-  );
+  const isRscFixture =
+    !serverBundle &&
+    existsSync(path.join(cwd, "start.js")) &&
+    existsSync(path.join(cwd, "build/server/index.js"));
+  const args = isRscFixture
+    ? ["start.js"]
+    : [
+        reactRouterServeBin,
+        `build/server/${serverBundle ? serverBundle + "/" : ""}static/js/app.js`,
+      ];
+  let serveProc = spawn(nodeBin, args, {
+    cwd,
+    stdio: "pipe",
+    env: { NODE_ENV: "production", PORT: port.toFixed(0) },
+  });
   await waitForServer(serveProc, { port, basename });
   return () => serveProc.kill();
 };
@@ -428,8 +444,8 @@ export const test = base.extend<Fixtures>({
     await use(async (files) => {
       let port = await getPort();
       let cwd = await createProject(await files({ port }));
-      let { status } = build({ cwd });
-      expect(status).toBe(0);
+      let result = build({ cwd });
+      expect(result.status, formatBuildFailure(result)).toBe(0);
       stop = await reactRouterServe({ cwd, port });
       return { port, cwd };
     });
@@ -441,8 +457,8 @@ export const test = base.extend<Fixtures>({
     await use(async (files, template) => {
       let port = await getPort();
       let cwd = await createProject(await files({ port }), template);
-      let { status } = build({ cwd });
-      expect(status).toBe(0);
+      let result = build({ cwd });
+      expect(result.status, formatBuildFailure(result)).toBe(0);
       stop = await vitePreview({ cwd, port });
       return { port, cwd };
     });
@@ -457,8 +473,8 @@ export const test = base.extend<Fixtures>({
         await files({ port }),
         "vite-plugin-cloudflare-template",
       );
-      let { status } = build({ cwd });
-      expect(status).toBe(0);
+      let result = build({ cwd });
+      expect(result.status, formatBuildFailure(result)).toBe(0);
       stop = await wranglerPagesDev({ cwd, port });
       return { port, cwd };
     });
