@@ -20,18 +20,22 @@ rstest.spyOn(fs, 'existsSync').mockReturnValue(true);
 
 // Mock jiti
 rstest.mock('jiti', () => ({
-  createJiti: () => {
-    const cache =
-      (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache ?? {};
+  createJiti: (_cwd: string, options?: { moduleCache?: boolean }) => {
+    const useSharedCache = options?.moduleCache !== false;
+    const cache = useSharedCache
+      ? ((globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache ?? {})
+      : {};
 
     return {
       cache,
       import: rstest.fn().mockImplementation((path) => {
-        Object.assign(
-          cache,
-          (globalThis as ReactRouterTestGlobal)
-            .__reactRouterTestJitiCacheAfterImport
-        );
+        if (useSharedCache) {
+          Object.assign(
+            cache,
+            (globalThis as ReactRouterTestGlobal)
+              .__reactRouterTestJitiCacheAfterImport
+          );
+        }
 
         if (path.includes('routes.ts')) {
           const routeCount = Number(process.env.RR_TEST_ROUTE_COUNT ?? 0);

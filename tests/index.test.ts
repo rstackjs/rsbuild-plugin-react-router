@@ -213,7 +213,7 @@ describe('pluginReactRouter', () => {
         ])
       );
     } finally {
-      existsSync.mockRestore();
+      existsSync.mockReturnValue(true);
     }
   });
 
