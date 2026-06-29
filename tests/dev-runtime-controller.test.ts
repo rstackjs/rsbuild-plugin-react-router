@@ -8,9 +8,13 @@ import type {
   Rspack,
 } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
-import type { ServerBuild } from 'react-router';
-import type { ReactRouterDevManifest } from '../src/dev-generation';
 import { createReactRouterDevRuntimeController } from '../src/dev-runtime-controller';
+import {
+  createBuild,
+  createGraphStats,
+  createManifestSet,
+  createStats,
+} from './dev-runtime-fixtures';
 
 type FailedCallback = (error: Error) => void;
 
@@ -18,75 +22,6 @@ const afterDoneByCompiler = new WeakMap<
   Rspack.Compiler,
   (stats: Rspack.Stats) => void
 >();
-
-type TestServerBuild = ServerBuild & { marker: string };
-
-const createBuild = (
-  marker: string,
-  routeIds = ['routes/about', 'routes/home']
-): TestServerBuild =>
-  ({
-    entry: { module: { default: () => new Response() } },
-    routes: Object.fromEntries(
-      routeIds.map(routeId => [
-        routeId,
-        { module: { default: () => null } },
-      ])
-    ),
-    assets: { routes: {}, version: marker },
-    assetsBuildDirectory: '/app/build/client',
-    basename: '/',
-    future: {},
-    isSpaMode: false,
-    marker,
-    prerender: [],
-    publicPath: '/',
-    routeDiscovery: { mode: 'initial' },
-    ssr: true,
-  }) as unknown as TestServerBuild;
-
-const createRouteManifest = (
-  id: string,
-  css: string[]
-): ReactRouterDevManifest['routes'][string] => ({
-  id,
-  module: `/${id}.js`,
-  hasAction: false,
-  hasLoader: false,
-  hasClientAction: false,
-  hasClientLoader: false,
-  hasClientMiddleware: false,
-  hasDefaultExport: true,
-  hasErrorBoundary: false,
-  imports: [],
-  css,
-});
-
-const createManifest = (
-  version: string,
-  css: { entry?: string[]; routes?: Record<string, string[]> } = {}
-) => ({
-  'static/js/app': {
-    version,
-    url: '/manifest',
-    entry: { module: '/entry.js', imports: [], css: css.entry ?? [] },
-    routes: Object.fromEntries(
-      Object.entries(css.routes ?? {}).map(([id, routeCss]) => [
-        id,
-        createRouteManifest(id, routeCss),
-      ])
-    ),
-  },
-});
-
-const createStats = (compilation: Rspack.Compilation): Rspack.Stats =>
-  ({ compilation, hasErrors: () => false }) as Rspack.Stats;
-
-const createGraphStats = (
-  web: Rspack.Compilation,
-  node: Rspack.Compilation
-): Rspack.MultiStats =>
-  ({ stats: [createStats(web), createStats(node)] }) as Rspack.MultiStats;
 
 const createCompiler = (name: 'web' | 'node') => {
   let failed: FailedCallback | undefined;
@@ -392,7 +327,7 @@ describe('React Router development runtime controller', () => {
     });
     const waiting = controller.createBuildLoader()();
     const webCompilation = web.compile();
-    controller.captureWeb(webCompilation, createManifest('web'));
+    controller.captureWeb(webCompilation, createManifestSet('web'));
 
     await callbacks.after({ stats: createStats(webCompilation) });
 
@@ -419,7 +354,7 @@ describe('React Router development runtime controller', () => {
     loadBundle.mockImplementation(() => createBuild('recovered'));
     callbacks.before();
     const webCompilation = web.compile();
-    controller.captureWeb(webCompilation, createManifest('recovered'));
+    controller.captureWeb(webCompilation, createManifestSet('recovered'));
     web.complete(webCompilation);
     const nodeCompilation = node.compile();
     const recovered = controller.createBuildLoader()();
@@ -444,7 +379,7 @@ describe('React Router development runtime controller', () => {
     });
     callbacks.before();
     const baseWeb = web.compile();
-    controller.captureWeb(baseWeb, createManifest('web-base'));
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
     web.complete(baseWeb);
     const baseNode = node.compile();
     await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
@@ -452,7 +387,7 @@ describe('React Router development runtime controller', () => {
     web.setChanges(['/app/web-only.ts']);
     callbacks.before();
     const nextWeb = web.compile();
-    controller.captureWeb(nextWeb, createManifest('web-next'));
+    controller.captureWeb(nextWeb, createManifestSet('web-next'));
     web.complete(nextWeb);
     await callbacks.after({ stats: createGraphStats(nextWeb, baseNode) });
 
@@ -476,7 +411,7 @@ describe('React Router development runtime controller', () => {
     const baseWeb = web.compile();
     controller.captureWeb(
       baseWeb,
-      createManifest('web-base', {
+      createManifestSet('web-base', {
         entry: ['/assets/entry.css'],
         routes: { 'routes/about': ['/assets/about.css'] },
       })
@@ -491,7 +426,7 @@ describe('React Router development runtime controller', () => {
     const nextWeb = web.compile();
     controller.captureWeb(
       nextWeb,
-      createManifest('web-next', {
+      createManifestSet('web-next', {
         entry: ['/assets/entry.css'],
       })
     );
@@ -520,7 +455,7 @@ describe('React Router development runtime controller', () => {
     const baseWeb = web.compile();
     controller.captureWeb(
       baseWeb,
-      createManifest('web-base', {
+      createManifestSet('web-base', {
         routes: { 'routes/about': ['/assets/about.css'] },
       })
     );
@@ -533,7 +468,7 @@ describe('React Router development runtime controller', () => {
     const removedCssWeb = web.compile();
     controller.captureWeb(
       removedCssWeb,
-      createManifest('without-css', {
+      createManifestSet('without-css', {
         routes: { 'routes/about': [] },
       })
     );
@@ -545,7 +480,7 @@ describe('React Router development runtime controller', () => {
     const readdedCssWeb = web.compile();
     controller.captureWeb(
       readdedCssWeb,
-      createManifest('readded-css', {
+      createManifestSet('readded-css', {
         routes: { 'routes/about': ['/assets/about.css'] },
       })
     );
@@ -577,7 +512,7 @@ describe('React Router development runtime controller', () => {
     });
     callbacks.before();
     const baseWeb = web.compile();
-    controller.captureWeb(baseWeb, createManifest('web-base'));
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
     web.complete(baseWeb);
     const baseNode = node.compile();
     await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
@@ -611,7 +546,7 @@ describe('React Router development runtime controller', () => {
     });
     callbacks.before();
     const baseWeb = web.compile();
-    controller.captureWeb(baseWeb, createManifest('web-base'));
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
     web.complete(baseWeb);
     web.settle(baseWeb);
     const baseNode = node.compile();
@@ -623,7 +558,7 @@ describe('React Router development runtime controller', () => {
     web.setChanges([routePath]);
     callbacks.before();
     const nextWeb = web.compile();
-    controller.captureWeb(nextWeb, createManifest('web-next'));
+    controller.captureWeb(nextWeb, createManifestSet('web-next'));
     web.complete(nextWeb);
     await callbacks.aggregate({ stats: createGraphStats(nextWeb, baseNode) });
     web.settle(nextWeb);
@@ -789,7 +724,7 @@ describe('React Router development runtime controller', () => {
       compiler: { compilers: [newWeb.compiler, newNode.compiler] },
     });
     callbacks.before();
-    controller.captureWeb(oldWebCompilation, createManifest('old'));
+    controller.captureWeb(oldWebCompilation, createManifestSet('old'));
 
     await callbacks.after({
       stats: createGraphStats(oldWebCompilation, oldNodeCompilation),
@@ -822,7 +757,7 @@ describe('React Router development runtime controller', () => {
     });
 
     const newWebCompilation = newWeb.compile();
-    controller.captureWeb(newWebCompilation, createManifest('replacement'));
+    controller.captureWeb(newWebCompilation, createManifestSet('replacement'));
     newWeb.complete(newWebCompilation);
     oldWeb.complete(staleWebCompilation);
     const newNodeCompilation = newNode.compile();
@@ -853,7 +788,7 @@ describe('React Router development runtime controller', () => {
     web.complete(webA);
     const nodeA = node.compile();
     const webB = web.compile();
-    controller.captureWeb(webB, createManifest('web-b'));
+    controller.captureWeb(webB, createManifestSet('web-b'));
     web.complete(webB);
     await callbacks.after({ stats: createGraphStats(webB, nodeA) });
 
@@ -887,14 +822,14 @@ describe('React Router development runtime controller', () => {
     const loadBuild = controller.createBuildLoader();
 
     const baseWeb = web.compile();
-    controller.captureWeb(baseWeb, createManifest('base'));
+    controller.captureWeb(baseWeb, createManifestSet('base'));
     web.complete(baseWeb);
     const baseNode = node.compile();
     await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
 
     callbacks.before();
     const webA = web.compile();
-    controller.captureWeb(webA, createManifest('a'));
+    controller.captureWeb(webA, createManifestSet('a'));
     web.complete(webA);
     const nodeA = node.compile();
     web.invalidate();
@@ -908,7 +843,7 @@ describe('React Router development runtime controller', () => {
     });
 
     const webB = web.compile();
-    controller.captureWeb(webB, createManifest('b'));
+    controller.captureWeb(webB, createManifestSet('b'));
     web.complete(webB);
     const nodeB = node.compile();
     build = createBuild('b');
@@ -939,14 +874,14 @@ describe('React Router development runtime controller', () => {
     const loadBuild = controller.createBuildLoader();
 
     const baseWeb = web.compile();
-    controller.captureWeb(baseWeb, createManifest('base'));
+    controller.captureWeb(baseWeb, createManifestSet('base'));
     web.complete(baseWeb);
     const baseNode = node.compile();
     await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
 
     callbacks.before();
     const webA = web.compile();
-    controller.captureWeb(webA, createManifest('a'));
+    controller.captureWeb(webA, createManifestSet('a'));
     web.complete(webA);
     const nodeA = node.compile();
     const evaluating = callbacks.after({
@@ -978,7 +913,7 @@ describe('React Router development runtime controller', () => {
     const loadBuild = controller.createBuildLoader();
 
     const webBase = web.compile();
-    controller.captureWeb(webBase, createManifest('web-base'));
+    controller.captureWeb(webBase, createManifestSet('web-base'));
     web.complete(webBase);
     const nodeBase = node.compile();
     await callbacks.after({ stats: createGraphStats(webBase, nodeBase) });
@@ -989,14 +924,14 @@ describe('React Router development runtime controller', () => {
 
     callbacks.before();
     const webA = web.compile();
-    controller.captureWeb(webA, createManifest('web-a'));
+    controller.captureWeb(webA, createManifestSet('web-a'));
     web.complete(webA);
     const nodeA = node.compile();
 
     web.invalidate();
     node.invalidate();
     const webB = web.compile();
-    controller.captureWeb(webB, createManifest('web-b'));
+    controller.captureWeb(webB, createManifestSet('web-b'));
     web.complete(webB);
     build = createBuild('node-a');
     await callbacks.after({ stats: createGraphStats(webB, nodeA) });

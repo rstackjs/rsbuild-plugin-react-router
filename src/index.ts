@@ -171,8 +171,6 @@ export const pluginReactRouter = (
       },
     });
 
-    // Warn loudly if client source maps are enabled in production builds.
-    // (Upstream behavior: react-router:warn-on-client-source-maps)
     api.onBeforeBuild(() => {
       const normalized = api.getNormalizedConfig();
       warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
@@ -184,7 +182,6 @@ export const pluginReactRouter = (
       moduleCache: false,
     });
 
-    // Read the react-router.config file first (supports .ts, .js, .mjs, etc.)
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
     const configWatchPaths = configExists
@@ -337,7 +334,6 @@ export const pluginReactRouter = (
       resolve(appDirectory, 'entry.server')
     );
 
-    // Check for server app file
     const serverAppPath = findEntryFile(
       resolve(appDirectory, '../server/index')
     );
@@ -346,12 +342,10 @@ export const pluginReactRouter = (
       ? 'static/js/react-router-server-build'
       : 'static/js/app';
 
-    // Add fallback logic for entry files
     const templateDir = resolve(__dirname, 'templates');
     const templateClientPath = resolve(templateDir, 'entry.client.js');
     const templateServerPath = resolve(templateDir, 'entry.server.js');
 
-    // Use template files if user files don't exist
     const finalEntryClientPath = existsSync(entryClientPath)
       ? entryClientPath
       : templateClientPath;
@@ -632,7 +626,6 @@ export const pluginReactRouter = (
       }
     });
 
-    // Determine prerender paths from config
     const prerenderPaths = await resolvePrerenderPaths(
       prerenderConfig,
       ssr,
@@ -788,8 +781,6 @@ export const pluginReactRouter = (
           writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
-          // Only add SSR middleware if SSR is enabled and not using a custom server
-          // In SPA mode (ssr: false), we just serve static files from the client build
           setupMiddlewares:
             pluginOptions.customServer || !ssr
               ? []
@@ -918,7 +909,6 @@ export const pluginReactRouter = (
       });
     });
 
-    // Add environment-specific modifications
     api.modifyEnvironmentConfig(
       async (config, { name, mergeEnvironmentConfig }) => {
         if (name !== 'web' && name !== 'node') {
