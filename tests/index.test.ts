@@ -5,6 +5,8 @@ import { pluginReactRouter } from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
+  __reactRouterTestJitiCache?: Record<string, unknown>;
+  __reactRouterTestJitiCacheAfterImport?: Record<string, unknown>;
 };
 
 type LazyCompilationTestModule = {
@@ -162,6 +164,56 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       existsSyncMock.mockReturnValue(true);
+    }
+  });
+
+  it('reloads the dev server when imported config helpers change', async () => {
+    const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(path => {
+      const filePath = String(path);
+      if (filePath.includes('react-router.config')) {
+        return filePath.endsWith('react-router.config.ts');
+      }
+      return (
+        filePath.endsWith('app/routes.ts') ||
+        filePath.endsWith('app/root.tsx')
+      );
+    });
+    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache = {
+      '/project/node_modules/jiti/dist/jiti.cjs': {
+        filename: '/project/node_modules/jiti/dist/jiti.cjs',
+      },
+    };
+    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCacheAfterImport =
+      {
+        '/project/react-router.config.ts': {
+          filename: '/project/react-router.config.ts',
+        },
+        '/project/config/server-bundles.ts': {
+          filename: '/project/config/server-bundles.ts',
+        },
+      };
+
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      expect(config.dev.watchFiles).toEqual(
+        expect.arrayContaining([
+          {
+            paths: expect.arrayContaining([
+              expect.stringMatching(/react-router\.config\.ts$/),
+              expect.stringMatching(/config\/server-bundles\.ts$/),
+            ]),
+            type: 'reload-server',
+          },
+        ])
+      );
+    } finally {
+      existsSync.mockRestore();
     }
   });
 
