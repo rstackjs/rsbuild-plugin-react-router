@@ -55,4 +55,60 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain('export function ErrorBoundary()');
     expect(result.code).toContain('"Unexpected Server Error"');
   });
+
+  it('targets client route chunks from the client route module query', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        export async function loader() {
+          return null;
+        }
+        export async function clientLoader() {
+          return null;
+        }
+        export default function Route() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=clientLoader',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: false,
+      isDev: false,
+    });
+
+    expect(result.code).toContain('export async function clientLoader()');
+    expect(result.code).not.toContain('export async function loader()');
+    expect(result.code).not.toContain('export default function Route()');
+  });
+
+  it('targets server route modules from the server route module query', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        export async function loader() {
+          return null;
+        }
+        export async function clientLoader() {
+          return null;
+        }
+        export default function Route() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?server-route-module=',
+      isRootRoute: false,
+      routeId: 'routes/server',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: true,
+      isDev: false,
+    });
+
+    expect(result.code).toContain('export async function loader()');
+    expect(result.code).not.toContain('export async function clientLoader()');
+    expect(result.code).not.toContain('export default function Route()');
+  });
 });

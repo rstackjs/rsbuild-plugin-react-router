@@ -1,47 +1,31 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { createRequestListener } from '@remix-run/node-fetch-server';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import {
-  rspack,
-  type RsbuildEntryDescription,
-  type RsbuildPlugin,
-  type Rspack,
-} from '@rsbuild/core';
-import { Effect } from 'effect';
+import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
-import {
-  BUILD_CLIENT_ROUTE_QUERY_STRING,
-  JS_EXTENSIONS,
-  PLUGIN_NAME,
-} from './constants.js';
+import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 import { createDevServerMiddleware } from './dev-server.js';
-import {
-  generateWithProps,
-  findEntryFile,
-  normalizeAssetPrefix,
-} from './plugin-utils.js';
+import { findEntryFile, normalizeAssetPrefix } from './plugin-utils.js';
+import { resolveReactRouterEntryPaths } from './entry-paths.js';
+import { registerReactRouterEnvironmentOutput } from './environment-output.js';
 import type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
-import {
-  generateServerBuild,
-  resolveReactRouterServerBuild,
-} from './server-utils.js';
-import { resolvePrerenderPaths, validatePrerenderConfig } from './prerender.js';
+import { resolveReactRouterServerBuild } from './server-utils.js';
+import { validatePrerenderConfig } from './prerender.js';
 import { runReactRouterPrerenderBuild } from './prerender-build.js';
 import {
   resolveReactRouterConfig,
+  resolveRouteDiscoveryConfig,
   type ResolvedReactRouterConfig,
 } from './react-router-config.js';
 import {
   getReactRouterManifestForDev,
   configRoutesToRouteManifest,
-  configRoutesToRouteManifestEntries,
   createReactRouterManifestStats,
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
@@ -49,31 +33,14 @@ import {
 import type { RouteModuleAnalysis } from './export-utils.js';
 import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
 import { registerBuildOutputTransforms } from './build-output-transforms.js';
-import {
-  getRouteChunkEntryName,
-  getRouteChunkModuleId,
-  routeChunkExportNames,
-  type RouteChunkCache,
-  type RouteChunkConfig,
-} from './route-chunks.js';
+import { type RouteChunkCache, type RouteChunkConfig } from './route-chunks.js';
 import { createRouteTransformExecutor } from './parallel-route-transforms.js';
 import {
-  createRouteTopologyWatcher,
-  createRouteManifestSnapshot,
-  ensureDevRestartMarker,
-  getRouteRestartMarkerPath,
   mergeWatchFiles,
-  type WatchFileConfig,
+  registerRouteTopologyDevWatch,
 } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
-import {
-  getBuildManifestEffect,
-  getRoutesByServerBundleId,
-} from './build-manifest.js';
-import {
-  createReactRouterNodeEntries,
-  createReactRouterServerBuildPlan,
-} from './server-build-plan.js';
+import { createReactRouterNodeEntries } from './server-build-plan.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
@@ -81,24 +48,23 @@ import {
   createReactRouterPerformanceProfiler,
   roundMs,
 } from './performance.js';
-import {
-  getVirtualModuleFilePath,
-  mapVirtualModules,
-} from './virtual-modules.js';
-import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
-import {
-  createDelayedPluginTask,
-  DEV_BACKGROUND_STARTUP_DELAY_MS,
-  runPluginEffect,
-  tryPluginPromise,
-} from './effect-runtime.js';
+import { mapVirtualModules } from './virtual-modules.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import { importConfigWithWatchPaths } from './config-imports.js';
 import {
-  createRscInternalClientModule,
-  createRscRouteConfig,
-} from './rsc-route-config.js';
-import { transformRscRouteModule } from './rsc-route-transforms.js';
+  createClassicBuildArtifacts,
+  createClassicVirtualModules,
+  createClassicWebRouteEntries,
+} from './classic-mode.js';
+import {
+  assertReactRouterRscSupport,
+  createReactRouterRscDevServerSetup,
+  createReactRouterRscResolveAliases,
+  createReactRouterRscVirtualModules,
+  registerReactRouterRscRouteTransforms,
+  setupReactRouterRscPlugin,
+} from './rsc-support.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -146,105 +112,10 @@ export const shouldParallelizeEnvironmentBuilds = ({
 }): boolean =>
   !isBuild && spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES;
 
-type ModuleFederationPluginLike = {
-  name?: string;
-  _options?: { experiments?: { asyncStartup?: boolean } };
-  options?: { experiments?: { asyncStartup?: boolean } };
-};
-
-const ensureFederationAsyncStartup = (
-  rspackConfig: Rspack.Configuration | undefined
-): void => {
-  if (!rspackConfig?.plugins?.length) {
-    return;
-  }
-
-  for (const plugin of rspackConfig.plugins) {
-    if (!plugin || typeof plugin !== 'object') {
-      continue;
-    }
-    const pluginName = (plugin as ModuleFederationPluginLike).name;
-    if (pluginName !== 'ModuleFederationPlugin') {
-      continue;
-    }
-
-    const pluginOptions =
-      (plugin as ModuleFederationPluginLike)._options ??
-      (plugin as ModuleFederationPluginLike).options;
-    if (!pluginOptions) {
-      continue;
-    }
-
-    pluginOptions.experiments = {
-      ...pluginOptions.experiments,
-      asyncStartup: true,
-    };
-  }
-};
-
 const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
-
-const shouldBypassRscDevRequest = (request: {
-  method?: string;
-  url?: string;
-}): boolean => {
-  if (!request.url) {
-    return true;
-  }
-  if (request.method !== 'GET' && request.method !== 'POST') {
-    return true;
-  }
-
-  const url = new URL(request.url, 'http://localhost');
-  const pathname = url.pathname;
-  if (pathname.startsWith('/__rsbuild_')) {
-    return true;
-  }
-  if (pathname.endsWith('.rsc') || pathname.endsWith('.manifest')) {
-    return false;
-  }
-  return pathname !== '/' && /\.[a-z0-9]+$/i.test(pathname);
-};
-
-const RSC_VIRTUAL_ALIAS_IDS = [
-  'routes',
-  'route-discovery',
-  'inject-hmr-runtime',
-  'basename',
-  'react-router-serve-config',
-  'bootstrap-scripts',
-] as const;
-
-const createReactRouterRscVirtualAliases = (
-  rootPath: string
-): Record<string, string> =>
-  Object.fromEntries(
-    RSC_VIRTUAL_ALIAS_IDS.flatMap(id => {
-      const moduleId = `virtual/react-router/unstable_rsc/${id}`;
-      const modulePath = resolve(rootPath, getVirtualModuleFilePath(moduleId));
-      return [
-        [`virtual:react-router/unstable_rsc/${id}`, modulePath],
-        [moduleId, modulePath],
-      ];
-    })
-  );
-
-type RscDevServer = {
-  environments: {
-    node: {
-      loadBundle<T>(entryName: string): Promise<T>;
-    };
-  };
-};
-
-type RscServerBuild = {
-  default?: {
-    fetch?: (request: Request) => Promise<Response>;
-  };
-};
 
 export const pluginReactRouter = (options: PluginOptions = {}): RsbuildPlugin =>
   createReactRouterPlugin(options);
@@ -396,30 +267,10 @@ const createReactRouterPlugin = (
       throw new Error(prerenderConfigError);
     }
 
-    // React Router defaults to "lazy" route discovery, but "ssr:false" builds
-    // have no runtime server to serve manifest patch requests, so we force
-    // `mode:"initial"` in SPA mode to avoid any `/__manifest` fetches.
-    let routeDiscovery: Config['routeDiscovery'];
-    if (!userRouteDiscovery) {
-      routeDiscovery = ssr
-        ? ({ mode: 'lazy', manifestPath: '/__manifest' } as const)
-        : ({ mode: 'initial' } as const);
-    } else if (userRouteDiscovery.mode === 'initial') {
-      routeDiscovery = userRouteDiscovery;
-    } else if (userRouteDiscovery.mode === 'lazy') {
-      if (!ssr) {
-        throw new Error(
-          'The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`'
-        );
-      }
-      const manifestPath = userRouteDiscovery.manifestPath;
-      if (manifestPath && !manifestPath.startsWith('/')) {
-        throw new Error(
-          'The `routeDiscovery.manifestPath` config must be a root-relative pathname beginning with a slash (i.e., "/__manifest")'
-        );
-      }
-      routeDiscovery = userRouteDiscovery;
-    }
+    const routeDiscovery = resolveRouteDiscoveryConfig({
+      ssr,
+      userRouteDiscovery,
+    });
 
     (globalThis as any).__reactRouterAppDirectory = resolve(appDirectory);
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
@@ -458,73 +309,35 @@ const createReactRouterPlugin = (
     const { value: routeConfig, watchPaths: routeConfigWatchPaths } =
       await importConfigWithWatchPaths(routesPath, importRouteConfig);
 
-    const entryClientPath = findEntryFile(
-      resolve(appDirectory, 'entry.client')
-    );
-    const entryServerPath = findEntryFile(
-      resolve(appDirectory, 'entry.server')
-    );
-    const entryRscClientPath = findEntryFile(
-      resolve(appDirectory, 'entry.rsc.client')
-    );
-    const entryRscPath = findEntryFile(resolve(appDirectory, 'entry.rsc'));
-    const entrySsrPath = findEntryFile(resolve(appDirectory, 'entry.ssr'));
-
-    const serverAppPath = findEntryFile(
-      resolve(appDirectory, '../server/index')
-    );
-    const hasServerApp = existsSync(serverAppPath);
-    const devServerBuildEntryName = hasServerApp
-      ? 'static/js/react-router-server-build'
-      : 'static/js/app';
-
-    const templateDir = resolve(__dirname, 'templates');
-    const templateClientPath = resolve(templateDir, 'entry.client.js');
-    const templateServerPath = resolve(templateDir, 'entry.server.js');
-    const templateRscClientPath = resolve(templateDir, 'entry.rsc.client.js');
-    const templateRscPath = resolve(templateDir, 'entry.rsc.js');
-    const templateRscSsrPath = resolve(templateDir, 'entry.rsc.ssr.js');
-    const finalEntryClientPath = existsSync(entryClientPath)
-      ? entryClientPath
-      : templateClientPath;
-    const finalEntryServerPath = existsSync(entryServerPath)
-      ? entryServerPath
-      : templateServerPath;
-    const finalEntryRscClientPath = existsSync(entryRscClientPath)
-      ? entryRscClientPath
-      : templateRscClientPath;
-    const finalEntryRscPath = existsSync(entryRscPath)
-      ? entryRscPath
-      : templateRscPath;
-    const finalEntryRscSsrPath = existsSync(entrySsrPath)
-      ? entrySsrPath
-      : templateRscSsrPath;
+    const {
+      devServerBuildEntryName,
+      finalEntryClientPath,
+      finalEntryRscClientPath,
+      finalEntryRscPath,
+      finalEntryRscSsrPath,
+      finalEntryServerPath,
+      hasServerApp,
+      serverAppPath,
+    } = resolveReactRouterEntryPaths({
+      appDirectory,
+      templatesDirectory: resolve(__dirname, 'templates'),
+    });
 
     if (isRscMode) {
-      const { PLUGIN_RSC_NAME, pluginRSC } = await import('rsbuild-plugin-rsc');
-      if (api.isPluginExists(PLUGIN_RSC_NAME)) {
-        api.logger.warn(
-          `[${PLUGIN_NAME}] The "${PLUGIN_RSC_NAME}" plugin is already registered. ` +
-            'Skipping built-in RSC setup.'
-        );
-      } else {
-        const userRscOptions =
+      assertReactRouterRscSupport({
+        pluginName: PLUGIN_NAME,
+        resolvePackagePath: resolveAppPackagePath,
+      });
+      await setupReactRouterRscPlugin({
+        api,
+        entryRscPath: finalEntryRscPath,
+        entrySsrPath: finalEntryRscSsrPath,
+        pluginName: PLUGIN_NAME,
+        rsc:
           pluginOptions.rsc && pluginOptions.rsc !== true
             ? pluginOptions.rsc
-            : {};
-        await pluginRSC({
-          ...userRscOptions,
-          environments: {
-            server: 'node',
-            client: 'web',
-          },
-          layers: {
-            rsc: [finalEntryRscPath],
-            ssr: [finalEntryRscSsrPath],
-            ...userRscOptions.layers,
-          },
-        }).setup(api);
-      }
+            : true,
+      });
     }
 
     const getRootRoutePath = () => findEntryFile(resolve(appDirectory, 'root'));
@@ -532,22 +345,6 @@ const createReactRouterPlugin = (
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
-    const createRouteTopologySnapshot = (
-      routeFile: string,
-      routeConfig: RouteConfigEntry[]
-    ) =>
-      createRouteManifestSnapshot([
-        ['root', { path: '', id: 'root', file: routeFile }],
-        ...configRoutesToRouteManifestEntries(appDirectory, routeConfig),
-      ]);
-    const getWatchedRouteTopology = async (): Promise<Set<string>> => {
-      const latestRouteConfig = await loadRouteConfig();
-      const latestRootRouteFile = relative(appDirectory, getRootRoutePath());
-      return createRouteTopologySnapshot(
-        latestRootRouteFile,
-        latestRouteConfig
-      );
-    };
 
     const routes = {
       root: { path: '', id: 'root', file: rootRouteFile },
@@ -588,11 +385,13 @@ const createReactRouterPlugin = (
       rootRouteFile,
     };
     const routeChunkCache: RouteChunkCache = new Map();
-    const routeTransformExecutor = createRouteTransformExecutor({
-      parallelTransforms: pluginOptions.parallelTransforms,
-      routeChunkCache,
-      splitRouteModules: Boolean(splitRouteModules),
-    });
+    const routeTransformExecutor = isRscMode
+      ? undefined
+      : createRouteTransformExecutor({
+          parallelTransforms: pluginOptions.parallelTransforms,
+          routeChunkCache,
+          splitRouteModules: Boolean(splitRouteModules),
+        });
     const transformedRouteModuleAnalyses = new Map<
       string,
       RouteModuleAnalysis
@@ -603,143 +402,41 @@ const createReactRouterPlugin = (
     ) => {
       transformedRouteModuleAnalyses.set(resolve(resourcePath), analysis);
     };
-    const routeChunkOptions = {
-      splitRouteModules,
-      rootRouteFile,
-      isBuild,
-      cache: routeChunkCache,
-      analyzeRouteModule: async (routeFilePath: string) =>
-        transformedRouteModuleAnalyses.get(resolve(routeFilePath)),
-    };
+    const routeChunkOptions = isRscMode
+      ? undefined
+      : {
+          splitRouteModules,
+          rootRouteFile,
+          isBuild,
+          cache: routeChunkCache,
+          analyzeRouteModule: async (routeFilePath: string) =>
+            transformedRouteModuleAnalyses.get(resolve(routeFilePath)),
+        };
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
-    const watchDirectory = resolve(appDirectory);
-    const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
-    const routeTopologyWatchFiles: WatchFileConfig[] =
-      pluginOptions.onRouteTopologyChange
-        ? []
-        : [
-            {
-              paths: routeConfigWatchPaths,
-              type: 'reload-server',
-            },
-            {
-              paths: routeRestartMarkerPath,
-              type: 'reload-server',
-            },
-          ];
-    const routeWatchFiles: WatchFileConfig[] = [
-      {
-        paths: configWatchPaths,
-        type: 'reload-server',
-      },
-      ...routeTopologyWatchFiles,
-    ];
-    let closeRouteTopologyWatcher: (() => Promise<void>) | undefined;
-    let routeTopologyWatcherClosed = false;
-
-    const reportRouteTopologyWatcherError = (error: unknown): void => {
-      api.logger.warn(
-        `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
-      );
-    };
-
-    const routeTopologyWatcherTask = createDelayedPluginTask({
-      delayMs: DEV_BACKGROUND_STARTUP_DELAY_MS,
-      run: () =>
-        Effect.gen(function* () {
-          yield* tryPluginPromise(() =>
-            ensureDevRestartMarker(routeRestartMarkerPath)
-          );
-          const closeWatcher = yield* tryPluginPromise(() =>
-            createRouteTopologyWatcher({
-              watchDirectory,
-              getRouteTopology: getWatchedRouteTopology,
-              initialRouteTopology: createRouteTopologySnapshot(
-                rootRouteFile,
-                routeConfig
-              ),
-              restartMarkerPath: routeRestartMarkerPath,
-              onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-              onError: reportRouteTopologyWatcherError,
-            })
-          );
-          if (routeTopologyWatcherClosed) {
-            yield* tryPluginPromise(() => closeWatcher());
-            return;
-          }
-          closeRouteTopologyWatcher = closeWatcher;
-        }),
-      onError: reportRouteTopologyWatcherError,
+    const routeWatchFiles = registerRouteTopologyDevWatch({
+      api,
+      appDirectory,
+      configWatchPaths,
+      getRootRouteFile: () => relative(appDirectory, getRootRoutePath()),
+      loadRouteConfig,
+      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
+      outputClientPath,
+      pluginName: PLUGIN_NAME,
+      routeConfig,
+      routesPath,
     });
 
-    const scheduleRouteTopologyWatcher = (): void => {
-      if (routeTopologyWatcherClosed || closeRouteTopologyWatcher) {
-        return;
-      }
-      routeTopologyWatcherTask.schedule();
-    };
-
     if (!isBuild) {
-      api.onBeforeStartDevServer(() => {
-        routeTopologyWatcherClosed = false;
-      });
-
-      api.onAfterDevCompile(() => {
-        scheduleRouteTopologyWatcher();
-      });
-
       api.onAfterCreateCompiler(() => {
-        routeTransformExecutor.prewarm();
+        routeTransformExecutor?.prewarm();
       });
     }
 
-    const closeRouteTopologyWatcherEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > =>
-      Effect.gen(function* () {
-        routeTopologyWatcherClosed = true;
-        yield* routeTopologyWatcherTask.cancelEffect();
-        yield* tryPluginPromise(() => closeRouteTopologyWatcher?.());
-        closeRouteTopologyWatcher = undefined;
-      });
-    const closeRouteTransformExecutorEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > => tryPluginPromise(() => routeTransformExecutor.close());
-    const closeDevServerResourcesEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > =>
-      closeRouteTopologyWatcherEffect().pipe(
-        Effect.matchEffect({
-          onFailure: topologyError =>
-            closeRouteTransformExecutorEffect().pipe(
-              Effect.matchEffect({
-                onFailure: executorError =>
-                  Effect.fail(
-                    new AggregateError(
-                      [topologyError, executorError],
-                      '[rsbuild-plugin-react-router] Failed to close dev server resources.'
-                    )
-                  ),
-                onSuccess: () => Effect.fail(topologyError),
-              })
-            ),
-          onSuccess: () => closeRouteTransformExecutorEffect(),
-        })
-      );
-
-    api.onCloseDevServer(() =>
-      runPluginEffect(closeDevServerResourcesEffect())
-    );
-    api.onCloseBuild(() =>
-      runPluginEffect(closeRouteTransformExecutorEffect())
-    );
+    const closeRouteTransformExecutor = () =>
+      runPluginEffect(tryPluginPromise(() => routeTransformExecutor?.close()));
+    api.onCloseBuild(closeRouteTransformExecutor);
+    api.onCloseDevServer(closeRouteTransformExecutor);
 
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
@@ -772,8 +469,16 @@ const createReactRouterPlugin = (
             [devServerBuildEntryName]: baseServerManifest,
           };
 
-          for (const { bundleId, entryName } of serverBundleEntries) {
-            const bundleRoutes = routesByServerBundleId[bundleId];
+          if (!classicBuildArtifacts) {
+            return;
+          }
+
+          for (const {
+            bundleId,
+            entryName,
+          } of classicBuildArtifacts.serverBundleEntries) {
+            const bundleRoutes =
+              classicBuildArtifacts.routesByServerBundleId[bundleId];
             if (!bundleRoutes) {
               continue;
             }
@@ -793,7 +498,10 @@ const createReactRouterPlugin = (
           }
 
           if (!isBuild) {
-            devRuntime.captureWeb(compilation, manifestsByEntryName);
+            classicBuildArtifacts.devRuntime.captureWeb(
+              compilation,
+              manifestsByEntryName
+            );
           }
         }
       );
@@ -806,83 +514,29 @@ const createReactRouterPlugin = (
       ])
     );
 
-    const manifestChunkNames = new Set<string>([
-      isRscMode ? 'index' : 'entry.client',
-    ]);
-    const webRouteEntries = isRscMode
-      ? {}
-      : Object.values(routes).reduce(
-          (acc, route) => {
-            const entryName = route.file.slice(0, route.file.lastIndexOf('.'));
-            const routeFilePath = resolve(appDirectory, route.file);
-            manifestChunkNames.add(entryName);
-            acc[entryName] = {
-              import: `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`,
-              html: false,
-            };
-
-            if (isBuild && splitRouteModules && route.id !== 'root') {
-              let source: string;
-              try {
-                source = readFileSync(routeFilePath, 'utf8');
-              } catch (error) {
-                if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-                  return acc;
-                }
-                throw error;
-              }
-              for (const exportName of routeChunkExportNames) {
-                if (!source.includes(exportName)) {
-                  continue;
-                }
-                const chunkEntryName = getRouteChunkEntryName(
-                  route.id,
-                  exportName
-                );
-                manifestChunkNames.add(chunkEntryName);
-                acc[chunkEntryName] = {
-                  import: getRouteChunkModuleId(routeFilePath, exportName),
-                  html: false,
-                };
-              }
-            }
-
-            return acc;
-          },
-          {} as Record<string, RsbuildEntryDescription>
-        );
-    const buildManifest = await runPluginEffect(
-      getBuildManifestEffect({
-        reactRouterConfig: resolvedConfigWithRoutes,
-        routes,
-        rootDirectory: process.cwd(),
-      })
-    );
-    const routesByServerBundleId = getRoutesByServerBundleId(
-      buildManifest,
-      routes
-    );
-    const serverBuildPlan = createReactRouterServerBuildPlan({
-      routesByServerBundleId,
-      serverBuildFile,
-      defaultEntryName: devServerBuildEntryName,
-    });
-    const { serverBundleEntries } = serverBuildPlan;
-    const devRuntime = isRscMode
-      ? {
-          captureWeb() {},
-          createBuildLoader() {
-            return async () => {
-              throw new Error(
-                `[${PLUGIN_NAME}] React Router RSC mode uses the RSC request handler, not the standard ServerBuild loader.`
-              );
-            };
-          },
-        }
-      : createReactRouterDevRuntimeController({
-          api,
+    const classicWebRouteEntries = isRscMode
+      ? undefined
+      : createClassicWebRouteEntries({
+          appDirectory,
           isBuild,
-          buildPlan: serverBuildPlan,
+          routes,
+          splitRouteModules: Boolean(splitRouteModules),
+        });
+    const manifestChunkNames =
+      classicWebRouteEntries?.manifestChunkNames ?? new Set<string>(['index']);
+    const webRouteEntries = classicWebRouteEntries?.webRouteEntries ?? {};
+    const classicBuildArtifacts = isRscMode
+      ? undefined
+      : await createClassicBuildArtifacts({
+          api,
+          defaultEntryName: devServerBuildEntryName,
+          isBuild,
+          prerenderConfig,
+          reactRouterConfig: resolvedConfigWithRoutes,
+          routeConfig,
+          routes,
+          rootDirectory: process.cwd(),
+          ssr,
         });
     const rscServerEntryName = (serverBuildFile || 'index.js').replace(
       /\.js$/,
@@ -912,149 +566,78 @@ const createReactRouterPlugin = (
       }
     });
 
-    const prerenderPaths = await resolvePrerenderPaths(
-      prerenderConfig,
-      ssr,
-      routeConfig,
-      {
-        logWarning: true,
-        warn: message => api.logger.warn(message),
-      }
-    );
-
-    api.onAfterBuild(({ environments }) =>
-      runPluginEffect(
-        tryPluginPromise(() =>
-          isRscMode
-            ? undefined
-            : runReactRouterPrerenderBuild({
-                api,
-                hasWebEnvironment: Boolean(environments.web),
-                buildDirectory,
-                serverBuildFile,
-                ssr,
-                isPrerenderEnabled,
-                prerenderConfig,
-                prerenderPaths,
-                basename,
-                future,
-                routes,
-                latestBrowserManifest,
-                latestBrowserManifestModuleExports,
-                clientStats,
-                pluginOptions,
-                appDirectory,
-                assetPrefix,
-                routeChunkOptions,
-                buildManifest,
-                resolvedConfigWithRoutes,
-                buildEnd,
-              })
+    if (classicBuildArtifacts && routeChunkOptions) {
+      api.onAfterBuild(({ environments }) =>
+        runPluginEffect(
+          tryPluginPromise(() =>
+            runReactRouterPrerenderBuild({
+              api,
+              hasWebEnvironment: Boolean(environments.web),
+              buildDirectory,
+              serverBuildFile,
+              ssr,
+              isPrerenderEnabled,
+              prerenderConfig,
+              prerenderPaths: classicBuildArtifacts.prerenderPaths,
+              basename,
+              future,
+              routes,
+              latestBrowserManifest,
+              latestBrowserManifestModuleExports,
+              clientStats,
+              pluginOptions,
+              appDirectory,
+              assetPrefix,
+              routeChunkOptions,
+              buildManifest: classicBuildArtifacts.buildManifest,
+              resolvedConfigWithRoutes,
+              buildEnd,
+            })
+          )
         )
-      )
-    );
+      );
+    }
 
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
 
     // Public requests stay bare while Rspack resolves seeded virtual files.
     const createVirtualModulePlugin = (publicPath: string) => {
-      const rscAssetsBuildDirectory = relative(
-        resolve(buildDirectory, 'server'),
-        outputClientPath
-      );
       const rscVirtualModules: Record<string, string> = isRscMode
-        ? {
-            'virtual/react-router/unstable_rsc/routes': createRscRouteConfig({
-              appDirectory,
-              routes,
-            }),
-            'virtual/react-router/unstable_rsc/route-discovery': `export default ${JSON.stringify(
-              ssr === false
-                ? { mode: 'initial' }
-                : (routeDiscovery ?? { mode: 'lazy' })
-            )};`,
-            'virtual/react-router/unstable_rsc/inject-hmr-runtime': !isBuild
-              ? `if (import.meta.webpackHot) {
-  import.meta.webpackHot.accept();
-  import.meta.webpackHot.on("rsc:update", () => {
-    requestAnimationFrame(() => {
-      globalThis.__reactRouterDataRouter?.revalidate?.();
-    });
-  });
-}`
-              : '',
-            'virtual/react-router/unstable_rsc/basename': `export default ${JSON.stringify(
-              basename
-            )};`,
-            'virtual/react-router/unstable_rsc/react-router-serve-config': `export default ${JSON.stringify(
-              {
-                assetsBuildDirectory: rscAssetsBuildDirectory,
-                publicPath,
-              }
-            )};`,
-            'virtual/react-router/unstable_rsc/bootstrap-scripts': `export default ${JSON.stringify(
-              [
-                `${publicPath.endsWith('/') ? publicPath : `${publicPath}/`}static/js/index.js`,
-              ]
-            )};`,
-            'virtual/react-router/rsc-internal-client':
-              createRscInternalClientModule(),
-          }
+        ? createReactRouterRscVirtualModules({
+            appDirectory,
+            basename,
+            buildDirectory,
+            isBuild,
+            outputClientPath,
+            publicPath,
+            routeDiscovery,
+            routes,
+            ssr,
+          })
         : {};
-      const bundleVirtualModules = Object.fromEntries(
-        Object.entries(routesByServerBundleId).map(
-          ([bundleId, bundleRoutes]) => [
-            `virtual/react-router/server-build-${bundleId}`,
-            generateServerBuild(bundleRoutes, {
-              entryServerPath: finalEntryServerPath,
-              assetsBuildDirectory,
-              basename,
-              appDirectory,
-              ssr,
-              federation: options.federation,
-              future,
-              allowedActionOrigins: allowedActionOriginsForBuild,
-              prerender: prerenderPaths,
-              routeDiscovery,
-              publicPath,
-              serverManifestId: `virtual/react-router/server-manifest-${bundleId}`,
-            }),
-          ]
-        )
-      );
-      const bundleManifestModules = Object.fromEntries(
-        Object.entries(routesByServerBundleId)
-          .filter(
-            ([, bundleRoutes]) =>
-              bundleRoutes && Object.keys(bundleRoutes).length > 0
-          )
-          .map(([bundleId]) => [
-            `virtual/react-router/server-manifest-${bundleId}`,
-            'export default {};',
-          ])
-      );
+      const classicVirtualModules = classicBuildArtifacts
+        ? createClassicVirtualModules({
+            allowedActionOrigins: allowedActionOriginsForBuild,
+            appDirectory,
+            assetsBuildDirectory,
+            basename,
+            entryServerPath: finalEntryServerPath,
+            federation: options.federation,
+            future,
+            prerenderPaths: classicBuildArtifacts.prerenderPaths,
+            publicPath,
+            routeDiscovery,
+            routes,
+            routesByServerBundleId:
+              classicBuildArtifacts.routesByServerBundleId,
+            ssr,
+          })
+        : {};
 
       return new rspack.experiments.VirtualModulesPlugin(
         mapVirtualModules({
-          'virtual/react-router/browser-manifest': 'export default {};',
-          'virtual/react-router/server-manifest': 'export default {};',
-          'virtual/react-router/server-build': generateServerBuild(routes, {
-            entryServerPath: finalEntryServerPath,
-            assetsBuildDirectory,
-            basename,
-            appDirectory,
-            ssr,
-            federation: options.federation,
-            future,
-            allowedActionOrigins: allowedActionOriginsForBuild,
-            prerender: prerenderPaths,
-            routeDiscovery,
-            publicPath,
-          }),
-          ...bundleVirtualModules,
-          ...bundleManifestModules,
-          'virtual/react-router/with-props': generateWithProps(),
+          ...classicVirtualModules,
           ...rscVirtualModules,
         })
       );
@@ -1071,14 +654,16 @@ const createReactRouterPlugin = (
       } else if (useAsyncNodeChunkLoading) {
         nodeChunkLoading = 'async-node';
       }
-      const nodeEntries = createReactRouterNodeEntries({
-        hasServerApp,
-        isBuild,
-        serverAppPath,
-        entryServerPath: finalEntryServerPath,
-        defaultEntryName: devServerBuildEntryName,
-        serverBundleEntries,
-      });
+      const nodeEntries = classicBuildArtifacts
+        ? createReactRouterNodeEntries({
+            hasServerApp,
+            isBuild,
+            serverAppPath,
+            entryServerPath: finalEntryServerPath,
+            defaultEntryName: devServerBuildEntryName,
+            serverBundleEntries: classicBuildArtifacts.serverBundleEntries,
+          })
+        : {};
 
       const configuredLazyCompilation =
         pluginOptions.lazyCompilation === undefined
@@ -1101,15 +686,7 @@ const createReactRouterPlugin = (
         ? {}
         : createReactRouterPackageAliases();
       const reactRouterRscAliases: Record<string, string> = isRscMode
-        ? {
-            ...createReactRouterRscVirtualAliases(api.context.rootPath),
-            'react-router/internal/react-server-client': resolve(
-              api.context.rootPath,
-              getVirtualModuleFilePath(
-                'virtual/react-router/rsc-internal-client'
-              )
-            ),
-          }
+        ? createReactRouterRscResolveAliases(api.context.rootPath)
         : {};
       const resolveAliases: Record<string, string> = {
         ...reactRouterAliases,
@@ -1134,30 +711,10 @@ const createReactRouterPlugin = (
         server:
           isRscMode && !pluginOptions.customServer && ssr
             ? {
-                setup: ({ server }) => {
-                  const devServer = server as unknown as RscDevServer;
-                  const listener = createRequestListener(async request => {
-                    const build =
-                      await devServer.environments.node.loadBundle<RscServerBuild>(
-                        rscServerEntryName
-                      );
-                    const handler = build.default?.fetch;
-                    if (typeof handler !== 'function') {
-                      throw new Error(
-                        `[${PLUGIN_NAME}] RSC server build must default-export an object with a fetch function.`
-                      );
-                    }
-                    return handler(request);
-                  });
-
-                  server.middlewares.use((req, res, next) => {
-                    if (shouldBypassRscDevRequest(req)) {
-                      next();
-                      return;
-                    }
-                    Promise.resolve(listener(req, res)).catch(next);
-                  });
-                },
+                setup: createReactRouterRscDevServerSetup({
+                  entryName: rscServerEntryName,
+                  pluginName: PLUGIN_NAME,
+                }),
               }
             : undefined,
         dev: {
@@ -1165,13 +722,14 @@ const createReactRouterPlugin = (
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
           setupMiddlewares:
-            isRscMode || pluginOptions.customServer || !ssr
+            !classicBuildArtifacts || pluginOptions.customServer || !ssr
               ? []
               : [
                   middlewares => {
                     middlewares.push(
                       createDevServerMiddleware({
-                        loadBuild: devRuntime.createBuildLoader(),
+                        loadBuild:
+                          classicBuildArtifacts.devRuntime.createBuildLoader(),
                       })
                     );
                   },
@@ -1338,81 +896,28 @@ const createReactRouterPlugin = (
       });
     });
 
-    api.modifyEnvironmentConfig(
-      async (config, { name, mergeEnvironmentConfig }) => {
-        if (name !== 'web' && name !== 'node') {
-          return config;
-        }
-
-        return mergeEnvironmentConfig(config, {
-          tools: {
-            rspack: rspackConfig => {
-              if (pluginOptions.federation) {
-                ensureFederationAsyncStartup(rspackConfig);
-              }
-
-              if (name === 'node') {
-                const output = rspackConfig.output;
-                if (output) {
-                  const library = output.library;
-                  const libraryOptions =
-                    library &&
-                    typeof library === 'object' &&
-                    !Array.isArray(library)
-                      ? library
-                      : {};
-                  rspackConfig.output = {
-                    ...output,
-                    library: {
-                      ...libraryOptions,
-                      type:
-                        resolvedServerOutput === 'module'
-                          ? 'module'
-                          : 'commonjs2',
-                    },
-                  };
-                }
-              }
-
-              return rspackConfig;
-            },
-          },
-        });
-      }
-    );
+    registerReactRouterEnvironmentOutput({
+      api,
+      federation: pluginOptions.federation,
+      resolvedServerOutput,
+    });
 
     if (isRscMode) {
-      api.transform(
-        {
-          test: path => routeByFilePath.has(resolve(path)),
-          order: 'pre',
-        },
-        async args => {
-          const route = routeByFilePath.get(resolve(args.resourcePath));
-          if (!route) {
-            return { code: args.code };
-          }
-
-          return performanceProfiler.record(
-            args.environment?.name,
-            'rsc:route',
-            args.resource,
-            () =>
-              transformRscRouteModule({
-                code: args.code,
-                resourcePath: args.resourcePath,
-                resourceQuery: args.resourceQuery,
-                isRootRoute: route.id === 'root',
-                routeId: route.id,
-                routeChunkCache,
-                routeChunkConfig,
-                isServerEnvironment: args.environment.name === 'node',
-                isDev: !isBuild,
-              })
-          );
-        }
-      );
+      registerReactRouterRscRouteTransforms({
+        api,
+        isBuild,
+        performanceProfiler,
+        routeByFilePath,
+        routeChunkCache,
+        routeChunkConfig,
+      });
     } else {
+      if (!routeChunkOptions || !routeTransformExecutor) {
+        throw new Error(
+          `[${PLUGIN_NAME}] Classic React Router mode was initialized without route transform support.`
+        );
+      }
+
       registerModifyBrowserManifestAssets(
         api,
         routes,

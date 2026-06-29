@@ -80,6 +80,12 @@ type RscRouteTransformResult = {
   map: null | ReturnType<typeof generate>['map'];
 };
 
+type RscRouteTransformTarget =
+  | { kind: 'client-route-module'; chunk: string }
+  | { kind: 'server-route-module' }
+  | { kind: 'server-route-entry' }
+  | { kind: 'client-route-entry' };
+
 const hasQuery = (resourceQuery: string | undefined, key: string): boolean =>
   createResourceQueryParams(resourceQuery).has(key);
 
@@ -132,6 +138,30 @@ const shouldSplitRouteModules = ({
   RscRouteTransformOptions,
   'isRootRoute' | 'routeChunkConfig'
 >): boolean => routeChunkConfig.splitRouteModules === 'enforce' && !isRootRoute;
+
+const resolveRscRouteTransformTarget = ({
+  resourceQuery,
+  isServerEnvironment,
+}: Pick<
+  RscRouteTransformOptions,
+  'resourceQuery' | 'isServerEnvironment'
+>): RscRouteTransformTarget => {
+  const clientRouteChunk = getQueryValue(resourceQuery, CLIENT_CHUNK_QUERY);
+  if (clientRouteChunk) {
+    return {
+      kind: 'client-route-module',
+      chunk: clientRouteChunk,
+    };
+  }
+
+  if (hasQuery(resourceQuery, SERVER_MODULE_QUERY)) {
+    return { kind: 'server-route-module' };
+  }
+
+  return {
+    kind: isServerEnvironment ? 'server-route-entry' : 'client-route-entry',
+  };
+};
 
 const getRouteChunks = ({
   code,
@@ -376,12 +406,9 @@ const createServerRouteEntry = async ({
 const createClientRouteModule = async (
   code: string,
   sourceFileName: string,
+  clientRouteChunk: string,
   options: RscRouteTransformOptions
 ): Promise<RscRouteTransformResult> => {
-  const clientRouteChunk = getQueryValue(
-    options.resourceQuery,
-    CLIENT_CHUNK_QUERY
-  );
   const ast = parse(code, { sourceType: 'module' });
   const exportNames = new Set(await getExportNames(code));
   const routeChunks = getRouteChunks(options);
@@ -457,21 +484,20 @@ const createServerRouteModule = (
 export const transformRscRouteModule = async (
   options: RscRouteTransformOptions
 ): Promise<RscRouteTransformResult> => {
-  const clientRouteChunk = getQueryValue(
-    options.resourceQuery,
-    CLIENT_CHUNK_QUERY
-  );
-  if (clientRouteChunk) {
-    return createClientRouteModule(options.code, options.resourcePath, options);
+  const target = resolveRscRouteTransformTarget(options);
+  switch (target.kind) {
+    case 'client-route-module':
+      return createClientRouteModule(
+        options.code,
+        options.resourcePath,
+        target.chunk,
+        options
+      );
+    case 'server-route-module':
+      return createServerRouteModule(options.code, options.resourcePath);
+    case 'server-route-entry':
+      return createServerRouteEntry(options);
+    case 'client-route-entry':
+      return createClientRouteEntry(options);
   }
-
-  if (hasQuery(options.resourceQuery, SERVER_MODULE_QUERY)) {
-    return createServerRouteModule(options.code, options.resourcePath);
-  }
-
-  if (options.isServerEnvironment) {
-    return createServerRouteEntry(options);
-  }
-
-  return createClientRouteEntry(options);
 };

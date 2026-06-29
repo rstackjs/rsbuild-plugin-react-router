@@ -86,6 +86,36 @@ export const getDefaultTrailingSlashAwareDataRequests = (
   return Number.isInteger(major) && major >= 8;
 };
 
+export const resolveRouteDiscoveryConfig = ({
+  ssr,
+  userRouteDiscovery,
+}: {
+  ssr: boolean;
+  userRouteDiscovery: Config['routeDiscovery'];
+}): Config['routeDiscovery'] => {
+  if (!userRouteDiscovery) {
+    return ssr
+      ? ({ mode: 'lazy', manifestPath: '/__manifest' } as const)
+      : ({ mode: 'initial' } as const);
+  }
+  if (userRouteDiscovery.mode === 'initial') {
+    return userRouteDiscovery;
+  }
+
+  if (!ssr) {
+    throw new Error(
+      'The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`'
+    );
+  }
+  const manifestPath = userRouteDiscovery.manifestPath;
+  if (manifestPath && !manifestPath.startsWith('/')) {
+    throw new Error(
+      'The `routeDiscovery.manifestPath` config must be a root-relative pathname beginning with a slash (i.e., "/__manifest")'
+    );
+  }
+  return userRouteDiscovery;
+};
+
 export type ResolvedReactRouterConfig = Readonly<{
   appDirectory: string;
   basename: string;

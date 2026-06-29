@@ -129,11 +129,9 @@ export const EXPRESS_SERVER = (args: {
       ${args?.customLogic || ""}
 
       if (process.env.NODE_ENV === "production") {
-        app.use(
-          "/assets",
-          express.static("build/client/assets", { immutable: true, maxAge: "1y" })
-        );
-        app.all("*", createRequestListener((await import("./build/server/static/js/app.js")).default));
+        app.use(${JSON.stringify(args.base || "/")}, express.static("build/client", { index: false }));
+        let build = (await import("./build/server/index.js")).default;
+        app.all("*", createRequestListener(build.fetch));
       } else {
         throw new Error("Custom RSC dev servers need an Rsbuild dev-server adapter");
       }

@@ -34,6 +34,8 @@ export type PluginOptions = {
    * Enable experimental React Router RSC framework mode.
    * This composes `rsbuild-plugin-rsc` with React Router's Rsbuild
    * environments. Environment names are managed by this plugin.
+   * Requires `react-router >=7.18.0 || >=8.0.0`, `rsbuild-plugin-rsc`,
+   * and `react-server-dom-rspack`.
    * @default false
    */
   rsc?:
