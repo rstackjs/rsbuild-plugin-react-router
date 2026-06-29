@@ -70,7 +70,7 @@ describe('resolveReactRouterConfig', () => {
   });
 
   it('lets user SRI config override preset aliases', async () => {
-    const disabledByFuture = await resolveReactRouterConfig({
+    const disablesPresetSriWithFuture = {
       presets: [
         {
           name: 'sri-preset',
@@ -80,8 +80,8 @@ describe('resolveReactRouterConfig', () => {
         },
       ],
       future: { unstable_subResourceIntegrity: false },
-    } as Config);
-    const disabledByTopLevel = await resolveReactRouterConfig({
+    } satisfies Config;
+    const disablesPresetSriWithTopLevel = {
       presets: [
         {
           name: 'sri-preset',
@@ -91,8 +91,14 @@ describe('resolveReactRouterConfig', () => {
         },
       ],
       subResourceIntegrity: false,
-    } as Config);
+    } satisfies Config;
 
+    const disabledByFuture = await resolveReactRouterConfig(
+      disablesPresetSriWithFuture
+    );
+    const disabledByTopLevel = await resolveReactRouterConfig(
+      disablesPresetSriWithTopLevel
+    );
     expect(disabledByFuture.resolved.subResourceIntegrity).toBe(false);
     expect(
       disabledByFuture.resolved.future.unstable_subResourceIntegrity

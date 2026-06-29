@@ -24,6 +24,12 @@ type CompilationAssetWithIntegrity = {
   };
 };
 
+type CompilationWithIntegrityAssets =
+  | {
+      getAssets?: () => readonly CompilationAssetWithIntegrity[];
+    }
+  | Pick<Rspack.Compilation, 'getAssets'>;
+
 const ABSOLUTE_URL_RE = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 
 const toManifestAssetUrl = (assetPrefix: string, assetName: string) => {
@@ -51,10 +57,7 @@ const addIntegrity = (
 
 export const collectSubresourceIntegrity = (
   stats: StatsWithIntegrity | undefined,
-  compilation:
-    | Pick<Rspack.Compilation, 'getAssets'>
-    | { getAssets?: () => CompilationAssetWithIntegrity[] }
-    | undefined,
+  compilation: CompilationWithIntegrityAssets | undefined,
   assetPrefix = '/'
 ): Record<string, string> | undefined => {
   const sri: Record<string, string> = {};
@@ -64,13 +67,21 @@ export const collectSubresourceIntegrity = (
   }
 
   if (typeof compilation?.getAssets === 'function') {
-    for (const asset of compilation.getAssets()) {
+    const assets =
+      compilation.getAssets() as readonly CompilationAssetWithIntegrity[];
+    for (const asset of assets) {
       addIntegrity(sri, assetPrefix, asset.name, asset.info?.integrity);
     }
   }
 
   return Object.keys(sri).length > 0 ? sri : undefined;
 };
+
+const getManifestStats = (compilation: Rspack.Compilation) =>
+  compilation.getStats().toJson({
+    all: false,
+    assets: true,
+  });
 
 /**
  * Creates a Webpack/Rspack plugin that modifies the browser manifest
@@ -99,7 +110,7 @@ export function createModifyBrowserManifestPlugin(
       compiler.hooks.emit.tapAsync(
         'ModifyBrowserManifest',
         async (compilation: Rspack.Compilation, callback) => {
-          const stats = compilation.getStats().toJson();
+          const stats = getManifestStats(compilation);
           const manifest = await getReactRouterManifestForDev(
             routes,
             pluginOptions,
@@ -108,10 +119,11 @@ export function createModifyBrowserManifestPlugin(
             assetPrefix,
             routeChunkOptions
           );
-          const shouldUseSri =
+          const shouldUseSri = Boolean(
             routeChunkOptions?.isBuild &&
             (options?.subResourceIntegrity ??
-              options?.future?.unstable_subResourceIntegrity);
+              options?.future?.unstable_subResourceIntegrity)
+          );
           const manifestForBrowser = shouldUseSri
             ? { ...manifest, sri: true as const }
             : manifest;

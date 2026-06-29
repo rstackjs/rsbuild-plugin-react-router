@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from '@rstest/core';
+import { describe, expect, it, rstest } from '@rstest/core';
 import {
   collectSubresourceIntegrity,
   createModifyBrowserManifestPlugin,
@@ -13,12 +13,18 @@ const BROWSER_MANIFEST_PATH =
 type ManifestAsset = {
   source: () => string;
 };
+type StatsJsonOptions = {
+  all: false;
+  assets: true;
+};
+type TestStats = {
+  assets?: Array<{ name?: string; integrity?: unknown }>;
+  assetsByChunkName: Record<string, string[]>;
+};
 type TestCompilation = {
   assets: Record<string, ManifestAsset>;
   getStats: () => {
-    toJson: () => {
-      assetsByChunkName: Record<string, string[]>;
-    };
+    toJson: (options: StatsJsonOptions) => TestStats;
   };
 };
 type EmitHandler = (
@@ -32,6 +38,20 @@ type TestCompiler = {
     };
   };
 };
+
+const runEmit = (
+  emit: EmitHandler,
+  compilation: TestCompilation
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    emit(compilation, error => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    }).catch(reject);
+  });
 
 describe('collectSubresourceIntegrity', () => {
   it('uses official integrity metadata from stats and compilation assets', () => {
@@ -112,6 +132,12 @@ describe('collectSubresourceIntegrity', () => {
     try {
       let emit: EmitHandler | undefined;
       let callbackSri: Record<string, string> | true | undefined;
+      const toJson = rstest.fn((_options: StatsJsonOptions) => ({
+        assetsByChunkName: {
+          'entry.client': ['static/js/entry.client.js'],
+          root: ['static/js/root.js'],
+        },
+      }));
       const plugin = createModifyBrowserManifestPlugin(
         {
           root: {
@@ -155,12 +181,7 @@ describe('collectSubresourceIntegrity', () => {
           },
         },
         getStats: () => ({
-          toJson: () => ({
-            assetsByChunkName: {
-              'entry.client': ['static/js/entry.client.js'],
-              root: ['static/js/root.js'],
-            },
-          }),
+          toJson,
         }),
       };
 
@@ -168,14 +189,11 @@ describe('collectSubresourceIntegrity', () => {
         throw new Error('Expected manifest plugin to register an emit hook.');
       }
 
-      await new Promise<void>((resolve, reject) => {
-        emit(compilation, error => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        }).catch(reject);
+      await runEmit(emit, compilation);
+
+      expect(toJson).toHaveBeenCalledWith({
+        all: false,
+        assets: true,
       });
 
       expect(compilation.assets[BROWSER_MANIFEST_PATH].source()).toContain(
