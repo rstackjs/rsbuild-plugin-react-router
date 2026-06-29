@@ -12,9 +12,8 @@ import { createReactRouterDevRuntimeController } from '../src/dev-runtime-contro
 import {
   createBuild,
   createGraphStats,
-  createDevManifest,
   createManifestSet,
-  createRouteManifest,
+  createManifestSetWithRoute,
   createStats,
 } from './dev-runtime-fixtures';
 
@@ -518,42 +517,30 @@ describe('React Router development runtime controller', () => {
     callbacks.created({
       compiler: { compilers: [web.compiler, node.compiler] },
     });
-    callbacks.before();
-    const baseWeb = web.compile();
-    controller.captureWeb(baseWeb, {
-      'static/js/app': {
-        ...createDevManifest('web-base'),
-        routes: {
-          'routes/about': createRouteManifest('routes/about', [], {
-            hasClientLoader: false,
-          }),
-        },
-      },
-    });
-    web.complete(baseWeb);
-    const baseNode = node.compile();
-    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+    const finishCompile = async (
+      version: string,
+      route: Parameters<typeof createManifestSetWithRoute>[2]
+    ) => {
+      callbacks.before();
+      const webCompilation = web.compile();
+      controller.captureWeb(
+        webCompilation,
+        createManifestSetWithRoute(version, 'routes/about', route)
+      );
+      web.complete(webCompilation);
+      const nodeCompilation = node.compile();
+      await callbacks.after({
+        stats: createGraphStats(webCompilation, nodeCompilation),
+      });
+    };
 
-    callbacks.before();
-    const nextWeb = web.compile();
-    controller.captureWeb(nextWeb, {
-      'static/js/app': {
-        ...createDevManifest('web-next'),
-        routes: {
-          'routes/about': createRouteManifest('routes/about', [], {
-            hasClientLoader: true,
-            clientLoaderModule: '/routes/about.clientLoader.js',
-          }),
-        },
-      },
+    await finishCompile('web-base', { hasClientLoader: false });
+    await finishCompile('web-next', {
+      hasClientLoader: true,
+      clientLoaderModule: '/routes/about.clientLoader.js',
     });
-    web.complete(nextWeb);
-    const nextNode = node.compile();
-    await callbacks.after({ stats: createGraphStats(nextWeb, nextNode) });
 
-    expect(server.sockWrite).toHaveBeenCalledWith('full-reload', {
-      path: '*',
-    });
+    expect(server.sockWrite).toHaveBeenCalledWith('full-reload', { path: '*' });
   });
 
   it('publishes a safe node-only compile after the aggregate pre-hook', async () => {

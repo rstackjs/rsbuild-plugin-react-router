@@ -14,9 +14,7 @@ import {
 import {
   createBuild,
   createCompilation,
-  createDevManifest,
   createGraphStats,
-  createRouteManifest,
   graphIdentity,
   noKnownChanges,
 } from './dev-runtime-fixtures';
@@ -118,54 +116,6 @@ describe('React Router development runtime', () => {
     await expect(runtime.load()).resolves.toMatchObject({
       assets: { version: 'same-css' },
     });
-  });
-
-  it('notifies when route export metadata changes', async () => {
-    const onRouteManifestChanged = rstest.fn();
-    const { runtime } = createHarness(() => createBuild('build'), {
-      onRouteManifestChanged,
-    });
-    const firstWeb = createCompilation('web');
-    const firstNode = createCompilation('node');
-
-    runtime.beginAttempt();
-    runtime.captureWeb(firstWeb, {
-      'static/js/app': {
-        ...createDevManifest('base'),
-        routes: {
-          'routes/about': createRouteManifest('routes/about', [], {
-            hasClientLoader: false,
-          }),
-        },
-      },
-    });
-    await runtime.finishAttempt(
-      createGraphStats(firstWeb, firstNode),
-      noKnownChanges,
-      graphIdentity(firstWeb, firstNode)
-    );
-
-    const nextWeb = createCompilation('web');
-    const nextNode = createCompilation('node');
-    runtime.beginAttempt();
-    runtime.captureWeb(nextWeb, {
-      'static/js/app': {
-        ...createDevManifest('next'),
-        routes: {
-          'routes/about': createRouteManifest('routes/about', [], {
-            hasClientLoader: true,
-            clientLoaderModule: '/routes/about.clientLoader.js',
-          }),
-        },
-      },
-    });
-    await runtime.finishAttempt(
-      createGraphStats(nextWeb, nextNode),
-      noKnownChanges,
-      graphIdentity(nextWeb, nextNode)
-    );
-
-    expect(onRouteManifestChanged).toHaveBeenCalledOnce();
   });
 
   it('notifies when css ownership is re-added after a removal', async () => {

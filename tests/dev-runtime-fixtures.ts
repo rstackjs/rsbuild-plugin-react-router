@@ -59,13 +59,18 @@ export const createBuild = (
     ssr: true,
   }) as unknown as TestServerBuild;
 
+type RouteManifestOptions = Partial<
+  Omit<
+    ReactRouterDevManifest['routes'][string],
+    'css' | 'id' | 'imports' | 'module'
+  >
+> & { imports?: string[] };
+
 export const createRouteManifest = (
   id: string,
   css: string[],
-  options: Partial<ReactRouterDevManifest['routes'][string]> = {}
-): ReactRouterDevManifest['routes'][string] => {
-  const { imports = [], ...overrides } = options;
-  return {
+  { imports = [], ...overrides }: RouteManifestOptions = {}
+): ReactRouterDevManifest['routes'][string] => ({
     id,
     module: `/${id}.js`,
     hasAction: false,
@@ -78,8 +83,7 @@ export const createRouteManifest = (
     imports,
     css,
     ...overrides,
-  };
-};
+  });
 
 export type DevManifestCss = {
   entry?: string[];
@@ -107,6 +111,19 @@ export const createManifestSet = (
   css: DevManifestCss = {}
 ) => ({
   'static/js/app': createDevManifest(version, css),
+});
+
+export const createManifestSetWithRoute = (
+  version: string,
+  routeId: string,
+  route: RouteManifestOptions
+) => ({
+  'static/js/app': {
+    ...createDevManifest(version),
+    routes: {
+      [routeId]: createRouteManifest(routeId, [], route),
+    },
+  },
 });
 
 export const createCompilation = (
