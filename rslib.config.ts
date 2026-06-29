@@ -13,6 +13,7 @@ const config = defineConfig({
           index: './src/index.ts',
           'parallel-route-transform-worker':
             './src/parallel-route-transform-worker.ts',
+          'rsc-route-transform-loader': './src/rsc-route-transform-loader.ts',
           'templates/entry.server': './src/templates/entry.server.tsx',
           'templates/entry.client': './src/templates/entry.client.tsx',
           'templates/entry.rsc': './src/templates/entry.rsc.tsx',
@@ -26,6 +27,7 @@ const config = defineConfig({
       source: {
         entry: {
           index: './src/index.ts',
+          'rsc-route-transform-loader': './src/rsc-route-transform-loader.ts',
           'templates/entry.server': './src/templates/entry.server.tsx',
           'templates/entry.client': './src/templates/entry.client.tsx',
         },

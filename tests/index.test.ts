@@ -1,7 +1,10 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   pluginReactRouter,
   pluginReactRouterRSC,
@@ -390,6 +393,41 @@ describe('pluginReactRouter', () => {
       import: expect.stringMatching(/entry\.rsc/),
       layer: 'react-server-components',
     });
+  });
+
+  it('publishes option types from the package root declarations', () => {
+    const outDir = fs.mkdtempSync(join(tmpdir(), 'rr-plugin-dts-'));
+
+    try {
+      execFileSync(
+        'pnpm',
+        [
+          'exec',
+          'tsc',
+          '-p',
+          'tsconfig.json',
+          '--emitDeclarationOnly',
+          '--outDir',
+          outDir,
+          '--tsBuildInfoFile',
+          join(outDir, 'tsconfig.tsbuildinfo'),
+          '--isolatedDeclarations',
+          'false',
+        ],
+        { cwd: process.cwd(), stdio: 'pipe' }
+      );
+
+      const rootDeclarations = fs.readFileSync(
+        join(outDir, 'index.d.ts'),
+        'utf8'
+      );
+
+      expect(rootDeclarations).toContain(
+        "export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';"
+      );
+    } finally {
+      fs.rmSync(outDir, { force: true, recursive: true });
+    }
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {

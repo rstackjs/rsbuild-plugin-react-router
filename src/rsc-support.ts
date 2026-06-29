@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequestListener } from '@remix-run/node-fetch-server';
 import type { RsbuildConfig, RsbuildPlugin } from '@rsbuild/core';
 import { relative, resolve } from 'pathe';
@@ -63,6 +65,15 @@ type RscRouteTransformProfiler = {
 };
 
 const mdxRoutePattern = /\.mdx?$/i;
+const RSC_ROUTE_TRANSFORM_LOADER = 'react-router-rsc-route-transform';
+
+const getRscRouteTransformLoaderPath = (): string =>
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    import.meta.url.endsWith('.cjs')
+      ? 'rsc-route-transform-loader.cjs'
+      : 'rsc-route-transform-loader.js'
+  );
 
 const getPackageVersion = (
   packageName: string,
@@ -336,12 +347,75 @@ export const registerReactRouterRscRouteTransforms = ({
     transformRoute
   );
 
-  api.transform(
-    {
-      test: path =>
-        routeByFilePath.has(resolve(path)) && mdxRoutePattern.test(path),
-      order: 'post',
-    },
-    transformRoute
-  );
+  api.modifyBundlerChain((chain, { CHAIN_ID, environment }) => {
+    if (!chain.module.rules.has('mdx')) {
+      return;
+    }
+
+    const pluginName = 'react-router-rsc-route-transform';
+    chain.plugin(`${pluginName}-${environment.name}`).use(
+      class ReactRouterRscRouteTransformPlugin {
+        apply(compiler: {
+          __reactRouterRscRouteTransform?: typeof transformRoute;
+          hooks: {
+            thisCompilation: {
+              tap(
+                name: string,
+                handler: (compilation: {
+                  hooks: {
+                    childCompiler: {
+                      tap(
+                        name: string,
+                        handler: (childCompiler: {
+                          __reactRouterRscRouteTransform?: typeof transformRoute;
+                        }) => void
+                      ): void;
+                    };
+                  };
+                }) => void
+              ): void;
+            };
+          };
+        }) {
+          compiler.__reactRouterRscRouteTransform = transformRoute;
+          compiler.hooks.thisCompilation.tap(pluginName, compilation => {
+            compilation.hooks.childCompiler.tap(pluginName, childCompiler => {
+              childCompiler.__reactRouterRscRouteTransform = transformRoute;
+            });
+          });
+        }
+      }
+    );
+
+    const mdxRule = chain.module.rules.get('mdx');
+    const rscRouteTransformLoaderPath = getRscRouteTransformLoaderPath();
+    const use = mdxRule
+      .use(RSC_ROUTE_TRANSFORM_LOADER)
+      .loader(rscRouteTransformLoaderPath)
+      .options({
+        getEnvironment: () => environment,
+      });
+
+    if (mdxRule.uses.has('mdx')) {
+      use.before('mdx');
+    }
+
+    if (!mdxRule.uses.has(CHAIN_ID.USE.SWC)) {
+      const jsRule = chain.module.rules.get(CHAIN_ID.RULE.JS);
+      const jsMainRule = jsRule?.oneOfs.get(CHAIN_ID.ONE_OF.JS_MAIN);
+      const jsSwcUse = jsMainRule?.uses.get(CHAIN_ID.USE.SWC);
+      if (jsSwcUse) {
+        const mdxSwcUse = mdxRule.use(CHAIN_ID.USE.SWC);
+        const swcLoader = jsSwcUse.get('loader');
+        const swcOptions = jsSwcUse.get('options');
+        if (swcLoader) {
+          mdxSwcUse.loader(swcLoader);
+        }
+        if (swcOptions) {
+          mdxSwcUse.options(swcOptions);
+        }
+        mdxSwcUse.before(RSC_ROUTE_TRANSFORM_LOADER);
+      }
+    }
+  });
 };
