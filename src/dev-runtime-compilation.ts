@@ -2,6 +2,7 @@ import type { Rspack } from '@rsbuild/core';
 import type {
   DevCompileAttemptIdentity,
   DevCompilationIdentity,
+  DevRuntimeStats,
   DevGraphChanges,
   DevGraphIdentity,
 } from './dev-runtime-artifacts.js';
@@ -20,7 +21,7 @@ export type DevCompilerPair = {
 };
 
 export type PendingDevCompilation = {
-  stats: Rspack.Stats | Rspack.MultiStats;
+  stats: DevRuntimeStats;
   changes: DevGraphChanges;
   identity: DevGraphIdentity;
   webCompilation: Rspack.Compilation;

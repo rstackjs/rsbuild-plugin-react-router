@@ -1,8 +1,6 @@
 import { Worker } from 'node:worker_threads';
-import { Effect } from 'effect';
 import { setBoundedCacheEntry } from './bounded-cache.js';
 import { getAvailableCpuCount, getDefaultConcurrency } from './concurrency.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import {
   executeRouteTransformTask,
   type RouteTransformResult,
@@ -156,25 +154,15 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     this.#closed = true;
     const workers = this.#workers ?? [];
     this.#workers = [];
-    this.#closePromise = runPluginEffect(
-      Effect.forEach(
-        workers,
-        state =>
-          Effect.sync(() => {
-            for (const pending of state.pending.values()) {
-              pending.reject(new Error('Route transform worker closed.'));
-            }
-            state.pending.clear();
-          }).pipe(
-            Effect.zipRight(
-              tryPluginPromise(() => state.worker.terminate()).pipe(
-                Effect.asVoid
-              )
-            )
-          ),
-        { concurrency: 'unbounded', discard: true }
-      )
-    );
+    this.#closePromise = Promise.all(
+      workers.map(async state => {
+        for (const pending of state.pending.values()) {
+          pending.reject(new Error('Route transform worker closed.'));
+        }
+        state.pending.clear();
+        await state.worker.terminate();
+      })
+    ).then(() => undefined);
     return this.#closePromise;
   }
 

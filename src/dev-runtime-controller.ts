@@ -17,6 +17,7 @@ import {
 import {
   getEnvironmentStats,
   snapshotDevChangedFiles,
+  type DevRuntimeStats,
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
@@ -131,15 +132,26 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
+  const toRspackRuntimeStats = (
+    stats: DevRuntimeStats
+  ): Rspack.Stats | Rspack.MultiStats =>
+    'web' in stats && 'node' in stats
+      ? ({ stats: [stats.web, stats.node] } as Rspack.MultiStats)
+      : stats;
+
   const finishRuntimeAttemptEffect = (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
-    stats: Rspack.Stats | Rspack.MultiStats,
+    stats: DevRuntimeStats,
     changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
     identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
   ): Effect.Effect<void, Error, never> =>
     tryPluginPromise(() =>
-      binding.runtime.finishAttempt(stats, changes, identity)
+      binding.runtime.finishAttempt(
+        toRspackRuntimeStats(stats),
+        changes,
+        identity
+      )
     ).pipe(
       Effect.flatMap(result =>
         tryPluginSync(() => {
@@ -156,7 +168,7 @@ export const createReactRouterDevRuntimeController = ({
   const finishRuntimeAttempt = (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
-    stats: Rspack.Stats | Rspack.MultiStats,
+    stats: DevRuntimeStats,
     changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
     identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
   ): Promise<void> =>
@@ -505,12 +517,8 @@ export const createReactRouterDevRuntimeController = ({
           )
         : undefined,
     };
-    const finishStats =
-      webStats && nodeStats
-        ? ({
-            stats: [webStats, nodeStats],
-          } as Rspack.MultiStats)
-        : stats;
+    const finishStats: DevRuntimeStats =
+      webStats && nodeStats ? { web: webStats, node: nodeStats } : stats;
     if (!webStats || !nodeStats) {
       await finishRuntimeAttempt(binding, pair, finishStats, changes, identity);
       return;

@@ -23,6 +23,13 @@ export type ReactRouterDevManifestSet = Readonly<
 
 export type ReactRouterServerBuilds = Readonly<Record<string, ServerBuild>>;
 
+export type PairedDevStats = {
+  web: Rspack.Stats;
+  node: Rspack.Stats;
+};
+
+export type DevRuntimeStats = Rspack.Stats | Rspack.MultiStats | PairedDevStats;
+
 export type DependencySnapshot = {
   files: ReadonlySet<string>;
   contexts: ReadonlySet<string>;
@@ -112,9 +119,12 @@ export const isSafeOneSidedChange = (
 };
 
 export const getEnvironmentStats = (
-  stats: Rspack.Stats | Rspack.MultiStats,
+  stats: DevRuntimeStats,
   name: 'web' | 'node'
 ): Rspack.Stats | undefined => {
+  if ('web' in stats && 'node' in stats) {
+    return stats[name];
+  }
   const children = Array.isArray((stats as Rspack.MultiStats).stats)
     ? (stats as Rspack.MultiStats).stats
     : [stats as Rspack.Stats];

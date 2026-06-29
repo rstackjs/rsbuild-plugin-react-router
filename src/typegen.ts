@@ -4,9 +4,7 @@ import { Effect } from 'effect';
 import {
   createDelayedPluginTask,
   DEV_BACKGROUND_STARTUP_DELAY_MS,
-  runPluginEffect,
   tryPluginPromise,
-  tryPluginSync,
 } from './effect-runtime.js';
 
 type Execa = typeof import('execa').execa;
@@ -29,93 +27,51 @@ export const createReactRouterTypegenRunner = (
   let typegenProcess: ResultPromise | undefined;
 
   const observeWatchExit = (process: ResultPromise): void => {
-    void runPluginEffect(
-      tryPluginPromise(() => process).pipe(
-        Effect.catchAll(() => Effect.void),
-        Effect.zipRight(
-          tryPluginSync(() => {
-            if (typegenProcess === process) {
-              typegenProcess = undefined;
-            }
-          })
-        )
-      )
-    );
+    void process
+      .catch(() => undefined)
+      .finally(() => {
+        if (typegenProcess === process) {
+          typegenProcess = undefined;
+        }
+      });
   };
 
   return {
-    startWatch(): Promise<void> {
-      return runPluginEffect(
-        tryPluginSync(() => typegenProcess).pipe(
-          Effect.flatMap(activeProcess => {
-            if (activeProcess) {
-              return Effect.void;
-            }
-            return tryPluginPromise(loadExeca).pipe(
-              Effect.flatMap(execa =>
-                tryPluginSync(() =>
-                  execa(
-                    'npx',
-                    ['--yes', 'react-router', 'typegen', '--watch'],
-                    {
-                      stdio: 'inherit',
-                      detached: false,
-                      cleanup: true,
-                    }
-                  )
-                )
-              ),
-              Effect.flatMap(process =>
-                tryPluginSync(() => {
-                  typegenProcess = process;
-                  observeWatchExit(process);
-                })
-              )
-            );
-          })
-        )
+    async startWatch(): Promise<void> {
+      if (typegenProcess) {
+        return;
+      }
+
+      const execa = await loadExeca();
+      const process = execa(
+        'npx',
+        ['--yes', 'react-router', 'typegen', '--watch'],
+        {
+          stdio: 'inherit',
+          detached: false,
+          cleanup: true,
+        }
       );
+      typegenProcess = process;
+      observeWatchExit(process);
     },
 
-    closeWatch(): Promise<void> {
-      return runPluginEffect(
-        tryPluginSync(() => {
-          const process = typegenProcess;
-          typegenProcess = undefined;
-          return process;
-        }).pipe(
-          Effect.flatMap(process => {
-            if (!process) {
-              return Effect.void;
-            }
-            return tryPluginSync(() => {
-              process.kill('SIGTERM');
-            }).pipe(
-              Effect.zipRight(
-                tryPluginPromise(() => process).pipe(
-                  Effect.catchAll(() => Effect.void),
-                  Effect.asVoid
-                )
-              )
-            );
-          })
-        )
-      );
+    async closeWatch(): Promise<void> {
+      const process = typegenProcess;
+      typegenProcess = undefined;
+      if (!process) {
+        return;
+      }
+
+      process.kill('SIGTERM');
+      await process.catch(() => undefined);
     },
 
-    runBuild(): Promise<void> {
-      return runPluginEffect(
-        tryPluginPromise(loadExeca).pipe(
-          Effect.flatMap(execa =>
-            tryPluginPromise(() =>
-              execa('npx', ['--yes', 'react-router', 'typegen'], {
-                stdio: 'inherit',
-              })
-            )
-          ),
-          Effect.asVoid
-        )
-      );
+    async runBuild(): Promise<void> {
+      const execa = await loadExeca();
+      await execa('npx', ['--yes', 'react-router', 'typegen'], {
+        stdio: 'inherit',
+      });
     },
   };
 };
@@ -146,17 +102,10 @@ export const registerReactRouterTypegen = (
     });
   }
 
-  api.onCloseDevServer(() =>
-    runPluginEffect(
-      devWatchTask
-        .cancelEffect()
-        .pipe(
-          Effect.zipRight(
-            tryPluginPromise(() => runner.closeWatch()).pipe(Effect.asVoid)
-          )
-        )
-    )
-  );
+  api.onCloseDevServer(async () => {
+    await devWatchTask.cancel();
+    await runner.closeWatch();
+  });
 
   api.onBeforeBuild(() => runner.runBuild());
 };

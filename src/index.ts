@@ -87,10 +87,7 @@ import {
   tryPluginPromise,
 } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
-import {
-  clearConfigImportCache,
-  collectConfigImportWatchPaths,
-} from './config-imports.js';
+import { importConfigWithWatchPaths } from './config-imports.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -213,22 +210,10 @@ export const pluginReactRouter = (
       );
     } else {
       const displayPath = relative(process.cwd(), configPath);
-      const configJiti = createJiti(process.cwd(), {
-        moduleCache: true,
-      });
-      const cacheKeysBeforeImport = new Set(Object.keys(configJiti.cache));
       try {
-        const imported = await configJiti.import<Config>(configPath, {
-          default: true,
-        });
-        const importedConfigPaths = collectConfigImportWatchPaths(
-          configPath,
-          configJiti.cache,
-          cacheKeysBeforeImport
-        );
-        if (importedConfigPaths.length > 0) {
-          configWatchPaths = [configPath, ...importedConfigPaths];
-        }
+        const { value: imported, watchPaths } =
+          await importConfigWithWatchPaths<Config>(configPath);
+        configWatchPaths = watchPaths;
         if (imported === undefined) {
           throw new Error(`${displayPath} must provide a default export`);
         }
@@ -238,15 +223,6 @@ export const pluginReactRouter = (
         reactRouterUserConfig = imported;
       } catch (error) {
         throw new Error(`Error loading ${displayPath}: ${error}`);
-      } finally {
-        clearConfigImportCache(configJiti.cache, [
-          configPath,
-          ...collectConfigImportWatchPaths(
-            configPath,
-            configJiti.cache,
-            cacheKeysBeforeImport
-          ),
-        ]);
       }
     }
 
@@ -369,31 +345,8 @@ export const pluginReactRouter = (
       return validation.routeConfig;
     };
     const loadRouteConfig = () => importRouteConfig(jiti);
-    const routeConfigJiti = createJiti(process.cwd(), {
-      moduleCache: true,
-    });
-    const routeConfigCacheKeysBeforeImport = new Set(
-      Object.keys(routeConfigJiti.cache)
-    );
-    let routeConfigWatchPaths: string | string[] = routesPath;
-    let importedRouteConfigPaths: string[] = [];
-    let routeConfig: RouteConfigEntry[];
-    try {
-      routeConfig = await importRouteConfig(routeConfigJiti);
-    } finally {
-      importedRouteConfigPaths = collectConfigImportWatchPaths(
-        routesPath,
-        routeConfigJiti.cache,
-        routeConfigCacheKeysBeforeImport
-      );
-      clearConfigImportCache(routeConfigJiti.cache, [
-        routesPath,
-        ...importedRouteConfigPaths,
-      ]);
-    }
-    if (importedRouteConfigPaths.length > 0) {
-      routeConfigWatchPaths = [routesPath, ...importedRouteConfigPaths];
-    }
+    const { value: routeConfig, watchPaths: routeConfigWatchPaths } =
+      await importConfigWithWatchPaths(routesPath, importRouteConfig);
 
     const entryClientPath = findEntryFile(
       resolve(appDirectory, 'entry.client')
