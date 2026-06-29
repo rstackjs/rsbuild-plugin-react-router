@@ -2,6 +2,28 @@ import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it } from '@rstest/core';
 import { pluginReactRouter } from '../src';
 
+type LazyCompilationTestModule = {
+  resource?: string;
+  nameForCondition?: () => string | null;
+};
+
+type LazyCompilationConfig = {
+  test?: (module: LazyCompilationTestModule) => boolean;
+};
+
+const getLazyCompilationTest = (
+  lazyCompilation: boolean | LazyCompilationConfig | undefined
+) => {
+  if (
+    !lazyCompilation ||
+    typeof lazyCompilation === 'boolean' ||
+    typeof lazyCompilation.test !== 'function'
+  ) {
+    throw new Error('Expected lazy compilation to install a test function.');
+  }
+  return lazyCompilation.test;
+};
+
 describe('pluginReactRouter', () => {
   it('should configure basic plugin options', async () => {
     const rsbuild = await createStubRsbuild({
@@ -29,6 +51,110 @@ describe('pluginReactRouter', () => {
     expect(nodeConfig.output.chunkFormat).toBe('commonjs');
     expect(nodeConfig.output.chunkLoading).toBe('require');
     expect(nodeConfig.output.module).toBe(false);
+  });
+
+  it('should forward lazy compilation when explicitly configured', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([
+      pluginReactRouter({
+        lazyCompilation: {
+          entries: true,
+          imports: true,
+        },
+      }),
+    ]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
+    expect(
+      test({
+        resource: '/project/app/root.tsx?__react-router-build-client-route',
+      })
+    ).toBe(false);
+    expect(
+      test({
+        resource: '/project/app/components/card.tsx',
+        nameForCondition: () => '/project/app/components/card.tsx',
+      })
+    ).toBe(true);
+  });
+
+  it('should allow lazy compilation to be enabled with a boolean', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ lazyCompilation: true })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
+    expect(
+      test({
+        resource: `${process.cwd()}/app/entry.client.tsx`,
+      })
+    ).toBe(false);
+  });
+
+  it('guards direct Rsbuild lazy compilation config for React Router hydration entries', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: {
+          lazyCompilation: {
+            entries: true,
+            imports: false,
+            test: /app/,
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: false,
+    });
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
+    expect(
+      test({
+        resource: '/project/app/routes/home.tsx?__react-router-build-client-route',
+      })
+    ).toBe(false);
+    expect(
+      test({
+        resource: '/project/app/components/card.tsx',
+        nameForCondition: () => '/project/app/components/card.tsx',
+      })
+    ).toBe(true);
+    expect(
+      test({
+        resource: '/project/vendor/react.tsx',
+        nameForCondition: () => '/project/vendor/react.tsx',
+      })
+    ).toBe(false);
+  });
+
+  it('should allow lazy compilation to be disabled', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ lazyCompilation: false })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.lazyCompilation).toBe(false);
   });
 
   it('should configure web environment correctly', async () => {
