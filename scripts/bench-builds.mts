@@ -14,9 +14,14 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from 'node:util';
-import { Cause, Effect, Exit } from 'effect';
+import { Effect } from 'effect';
 import { execa } from 'execa';
 import { generateSyntheticFixture } from './benchmark/fixture.mts';
+import {
+  runScriptEffect,
+  tryScriptPromise,
+  tryScriptSync,
+} from './script-effect.mts';
 
 const rootDir = process.cwd();
 const benchmarkRoot = path.join(rootDir, '.benchmark');
@@ -28,27 +33,6 @@ const rsbuildBin = path.join(
   'bin',
   'rsbuild.js'
 );
-
-const normalizeScriptError = error =>
-  error instanceof Error ? error : new Error(String(error));
-
-const runScriptEffect = async effect => {
-  const exit = await Effect.runPromiseExit(effect);
-  if (Exit.isSuccess(exit)) {
-    return exit.value;
-  }
-  throw normalizeScriptError(Cause.squash(exit.cause));
-};
-const syncEffect = evaluate =>
-  Effect.try({
-    try: evaluate,
-    catch: normalizeScriptError,
-  });
-const asEffect = evaluate =>
-  Effect.tryPromise({
-    try: evaluate,
-    catch: normalizeScriptError,
-  });
 
 const profiles = {
   smoke: [{ id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' }],
@@ -280,7 +264,7 @@ const parseArgs = argv => {
 };
 
 const hasGnuTimeEffect = () =>
-  asEffect(async () => {
+  tryScriptPromise(async () => {
     try {
       await access('/usr/bin/time');
       const probe = await execa(
@@ -295,7 +279,7 @@ const hasGnuTimeEffect = () =>
   });
 
 const runCommandEffect = ({ command, args, cwd, env = {}, useTime = false }) =>
-  asEffect(async () => {
+  tryScriptPromise(async () => {
     const startedAt = performance.now();
     const childCommand = useTime ? '/usr/bin/time' : command;
     const childArgs = useTime ? ['-v', command, ...args] : args;
@@ -381,7 +365,7 @@ const fetchDevRouteEffect = ({ origin, routePath, timeoutMs }) => {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   timeout.unref?.();
 
-  return asEffect(async () => {
+  return tryScriptPromise(async () => {
     const response = await fetch(new URL(routePath, origin), {
       signal: controller.signal,
     });
@@ -887,7 +871,7 @@ const resolveOutputPaths = args => {
 };
 
 const writeOutputsEffect = (result, outputPaths) =>
-  asEffect(async () => {
+  tryScriptPromise(async () => {
     const { jsonPath, mdPath, outPath, writeJson, writeMd } = outputPaths;
 
     if (writeJson && writeMd) {
@@ -940,10 +924,10 @@ const pnpmVersionEffect = () =>
 const cleanBuildOutputsEffect = fixtureRoot =>
   Effect.all(
     [
-      asEffect(() =>
+      tryScriptPromise(() =>
         rm(path.join(fixtureRoot, 'build'), { recursive: true, force: true })
       ),
-      asEffect(() =>
+      tryScriptPromise(() =>
         rm(path.join(fixtureRoot, '.react-router'), {
           recursive: true,
           force: true,
@@ -954,7 +938,7 @@ const cleanBuildOutputsEffect = fixtureRoot =>
   );
 
 const listRspackProfileDirsEffect = cwd =>
-  asEffect(async () => {
+  tryScriptPromise(async () => {
     const entries = await readdir(cwd, { withFileTypes: true });
     return entries
       .filter(
@@ -966,7 +950,7 @@ const listRspackProfileDirsEffect = cwd =>
   });
 
 const moveDirectoryEffect = (source, destination) =>
-  asEffect(async () => {
+  tryScriptPromise(async () => {
     await rm(destination, { recursive: true, force: true });
     await mkdir(path.dirname(destination), { recursive: true });
     try {
@@ -1021,7 +1005,9 @@ const resolveRspackTraceOutputEffect = ({
       benchmarkId,
       `${runLabel}.log`
     );
-    yield* asEffect(() => mkdir(path.dirname(tracePath), { recursive: true }));
+    yield* tryScriptPromise(() =>
+      mkdir(path.dirname(tracePath), { recursive: true })
+    );
     return tracePath;
   });
 
@@ -1041,7 +1027,7 @@ const runBenchmarkIterationEffect = ({
       yield* cleanBuildOutputsEffect(fixtureRoot);
     }
     if (args.clean === 'cold') {
-      yield* asEffect(() =>
+      yield* tryScriptPromise(() =>
         rm(path.join(fixtureRoot, 'node_modules'), {
           recursive: true,
           force: true,
@@ -1186,7 +1172,7 @@ const runBenchmarkEffect = ({
       args.mode === 'dev'
         ? resolveDevRoutePaths(args.devRoutes, benchmark)
         : [];
-    const fixtureResult = yield* asEffect(() =>
+    const fixtureResult = yield* tryScriptPromise(() =>
       generateSyntheticFixture({
         root: fixtureRoot,
         routeCount: benchmark.routeCount,
@@ -1237,7 +1223,7 @@ const runBenchmarkEffect = ({
   });
 
 const mainEffect = Effect.gen(function* () {
-  const args = yield* syncEffect(() => parseArgs(process.argv.slice(2)));
+  const args = yield* tryScriptSync(() => parseArgs(process.argv.slice(2)));
   const concurrency = resolveConcurrency(args.parallelTransforms);
   const useTime = yield* hasGnuTimeEffect();
   const outputPaths = resolveOutputPaths(args);

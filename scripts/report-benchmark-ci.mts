@@ -2,48 +2,16 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { Cause, Effect, Exit } from 'effect';
-
-const normalizeScriptError = error =>
-  error instanceof Error ? error : new Error(String(error));
-
-const runScriptEffect = async effect => {
-  const exit = await Effect.runPromiseExit(effect);
-  if (Exit.isSuccess(exit)) {
-    return exit.value;
-  }
-  throw normalizeScriptError(Cause.squash(exit.cause));
-};
-const asEffect = evaluate =>
-  Effect.tryPromise({
-    try: evaluate,
-    catch: normalizeScriptError,
-  });
-
-const { values } = parseArgs({
-  allowPositionals: false,
-  strict: true,
-  options: {
-    base: { type: 'string' },
-    head: { type: 'string' },
-    out: { type: 'string', default: '.benchmark/ci-report' },
-    pr: { type: 'string' },
-    'base-ref': { type: 'string' },
-    'base-sha': { type: 'string' },
-    'head-ref': { type: 'string' },
-    'head-sha': { type: 'string' },
-    'run-url': { type: 'string' },
-  },
-});
-
-if (!values.base || !values.head) {
-  throw new Error(
-    'Usage: node scripts/report-benchmark-ci.mts --base <base.json> --head <head.json> [--out <dir>]'
-  );
-}
+import { Effect } from 'effect';
+import {
+  runScriptEffect,
+  tryScriptPromise,
+  tryScriptSync,
+} from './script-effect.mts';
 
 const readJsonEffect = file =>
-  asEffect(async () => JSON.parse(await readFile(file, 'utf8')));
+  tryScriptPromise(async () => JSON.parse(await readFile(file, 'utf8')));
+
 const formatSeconds = value =>
   typeof value === 'number' ? `${(value / 1000).toFixed(2)}s` : '-';
 const formatPercent = value =>
@@ -83,51 +51,6 @@ const indexBenchmarks = result =>
     (result.benchmarks ?? []).map(benchmark => [benchmark.id, benchmark])
   );
 
-const base = await runScriptEffect(readJsonEffect(values.base));
-const head = await runScriptEffect(readJsonEffect(values.head));
-const baseMode = base.mode ?? 'build';
-const headMode = head.mode ?? 'build';
-
-if (baseMode !== headMode) {
-  throw new Error(
-    `Cannot compare benchmark results with different modes: base=${baseMode}, head=${headMode}.`
-  );
-}
-
-const baseBenchmarks = indexBenchmarks(base);
-const headBenchmarks = indexBenchmarks(head);
-const benchmarkIds = [
-  ...new Set([...baseBenchmarks.keys(), ...headBenchmarks.keys()]),
-].sort();
-
-const benchmarks = benchmarkIds.map(id => {
-  const baseBenchmark = baseBenchmarks.get(id);
-  const headBenchmark = headBenchmarks.get(id);
-  const baseWallMs = medianWall(baseBenchmark);
-  const headWallMs = medianWall(headBenchmark);
-  const baseReadyMs = medianReady(baseBenchmark);
-  const headReadyMs = medianReady(headBenchmark);
-  const baseRouteTotalMs = medianRouteTotal(baseBenchmark);
-  const headRouteTotalMs = medianRouteTotal(headBenchmark);
-  return {
-    id,
-    routeCount: headBenchmark?.routeCount ?? baseBenchmark?.routeCount ?? null,
-    variant: headBenchmark?.variant ?? baseBenchmark?.variant ?? null,
-    baseWallMs,
-    headWallMs,
-    baseReadyMs,
-    headReadyMs,
-    baseRouteTotalMs,
-    headRouteTotalMs,
-    wallDeltaPercent: percentDelta(baseWallMs, headWallMs),
-    wallSpeedup: speedup(baseWallMs, headWallMs),
-    baseCpuMs: cpuMedian(baseBenchmark),
-    headCpuMs: cpuMedian(headBenchmark),
-    baseRssKb: p95Rss(baseBenchmark),
-    headRssKb: p95Rss(headBenchmark),
-  };
-});
-
 const sumMetric = (benchmarks, key) => {
   const values = benchmarks
     .map(benchmark => benchmark[key])
@@ -137,52 +60,97 @@ const sumMetric = (benchmarks, key) => {
     : values.reduce((sum, value) => sum + value, 0);
 };
 
-const totalBaseWallMs = sumMetric(benchmarks, 'baseWallMs');
-const totalHeadWallMs = sumMetric(benchmarks, 'headWallMs');
-const totalBaseReadyMs = sumMetric(benchmarks, 'baseReadyMs');
-const totalHeadReadyMs = sumMetric(benchmarks, 'headReadyMs');
-const totalBaseRouteTotalMs = sumMetric(benchmarks, 'baseRouteTotalMs');
-const totalHeadRouteTotalMs = sumMetric(benchmarks, 'headRouteTotalMs');
+const buildReport = ({ values, base, head }) => {
+  const baseMode = base.mode ?? 'build';
+  const headMode = head.mode ?? 'build';
 
-const summary = {
-  baseWallMs: totalBaseWallMs,
-  headWallMs: totalHeadWallMs,
-  baseReadyMs: totalBaseReadyMs,
-  headReadyMs: totalHeadReadyMs,
-  baseRouteTotalMs: totalBaseRouteTotalMs,
-  headRouteTotalMs: totalHeadRouteTotalMs,
-  wallDeltaPercent: percentDelta(totalBaseWallMs, totalHeadWallMs),
-  wallSpeedup: speedup(totalBaseWallMs, totalHeadWallMs),
-  readyDeltaPercent: percentDelta(totalBaseReadyMs, totalHeadReadyMs),
-  routeTotalDeltaPercent: percentDelta(
-    totalBaseRouteTotalMs,
-    totalHeadRouteTotalMs
-  ),
+  if (baseMode !== headMode) {
+    throw new Error(
+      `Cannot compare benchmark results with different modes: base=${baseMode}, head=${headMode}.`
+    );
+  }
+
+  const baseBenchmarks = indexBenchmarks(base);
+  const headBenchmarks = indexBenchmarks(head);
+  const benchmarkIds = [
+    ...new Set([...baseBenchmarks.keys(), ...headBenchmarks.keys()]),
+  ].sort();
+
+  const benchmarks = benchmarkIds.map(id => {
+    const baseBenchmark = baseBenchmarks.get(id);
+    const headBenchmark = headBenchmarks.get(id);
+    const baseWallMs = medianWall(baseBenchmark);
+    const headWallMs = medianWall(headBenchmark);
+    const baseReadyMs = medianReady(baseBenchmark);
+    const headReadyMs = medianReady(headBenchmark);
+    const baseRouteTotalMs = medianRouteTotal(baseBenchmark);
+    const headRouteTotalMs = medianRouteTotal(headBenchmark);
+    return {
+      id,
+      routeCount:
+        headBenchmark?.routeCount ?? baseBenchmark?.routeCount ?? null,
+      variant: headBenchmark?.variant ?? baseBenchmark?.variant ?? null,
+      baseWallMs,
+      headWallMs,
+      baseReadyMs,
+      headReadyMs,
+      baseRouteTotalMs,
+      headRouteTotalMs,
+      wallDeltaPercent: percentDelta(baseWallMs, headWallMs),
+      wallSpeedup: speedup(baseWallMs, headWallMs),
+      baseCpuMs: cpuMedian(baseBenchmark),
+      headCpuMs: cpuMedian(headBenchmark),
+      baseRssKb: p95Rss(baseBenchmark),
+      headRssKb: p95Rss(headBenchmark),
+    };
+  });
+
+  const totalBaseWallMs = sumMetric(benchmarks, 'baseWallMs');
+  const totalHeadWallMs = sumMetric(benchmarks, 'headWallMs');
+  const totalBaseReadyMs = sumMetric(benchmarks, 'baseReadyMs');
+  const totalHeadReadyMs = sumMetric(benchmarks, 'headReadyMs');
+  const totalBaseRouteTotalMs = sumMetric(benchmarks, 'baseRouteTotalMs');
+  const totalHeadRouteTotalMs = sumMetric(benchmarks, 'headRouteTotalMs');
+
+  return {
+    generatedAt: new Date().toISOString(),
+    pullRequest: values.pr ?? null,
+    base: {
+      ref: values['base-ref'] ?? null,
+      sha: values['base-sha'] ?? base.commit ?? null,
+      benchmarkCommit: base.commit ?? null,
+    },
+    head: {
+      ref: values['head-ref'] ?? null,
+      sha: values['head-sha'] ?? head.commit ?? null,
+      benchmarkCommit: head.commit ?? null,
+    },
+    runUrl: values['run-url'] ?? null,
+    profile: head.profile ?? base.profile ?? null,
+    mode: headMode,
+    iterations: head.iterations ?? base.iterations ?? null,
+    warmup: head.warmup ?? base.warmup ?? null,
+    summary: {
+      baseWallMs: totalBaseWallMs,
+      headWallMs: totalHeadWallMs,
+      baseReadyMs: totalBaseReadyMs,
+      headReadyMs: totalHeadReadyMs,
+      baseRouteTotalMs: totalBaseRouteTotalMs,
+      headRouteTotalMs: totalHeadRouteTotalMs,
+      wallDeltaPercent: percentDelta(totalBaseWallMs, totalHeadWallMs),
+      wallSpeedup: speedup(totalBaseWallMs, totalHeadWallMs),
+      readyDeltaPercent: percentDelta(totalBaseReadyMs, totalHeadReadyMs),
+      routeTotalDeltaPercent: percentDelta(
+        totalBaseRouteTotalMs,
+        totalHeadRouteTotalMs
+      ),
+    },
+    benchmarks,
+  };
 };
 
-const report = {
-  generatedAt: new Date().toISOString(),
-  pullRequest: values.pr ?? null,
-  base: {
-    ref: values['base-ref'] ?? null,
-    sha: values['base-sha'] ?? base.commit ?? null,
-    benchmarkCommit: base.commit ?? null,
-  },
-  head: {
-    ref: values['head-ref'] ?? null,
-    sha: values['head-sha'] ?? head.commit ?? null,
-    benchmarkCommit: head.commit ?? null,
-  },
-  runUrl: values['run-url'] ?? null,
-  profile: head.profile ?? base.profile ?? null,
-  mode: headMode,
-  iterations: head.iterations ?? base.iterations ?? null,
-  warmup: head.warmup ?? base.warmup ?? null,
-  summary,
-  benchmarks,
-};
-
-const renderComment = () => {
+const renderComment = report => {
+  const { benchmarks, summary } = report;
   const lines = [
     '<!-- react-router-benchmark-ci -->',
     '## Benchmark Results',
@@ -217,16 +185,55 @@ const renderComment = () => {
   return `${lines.join('\n')}\n`;
 };
 
-const outDir = path.resolve(values.out);
-await runScriptEffect(
-  asEffect(async () => {
+const parseCliArgs = () => {
+  const { values } = parseArgs({
+    allowPositionals: false,
+    strict: true,
+    options: {
+      base: { type: 'string' },
+      head: { type: 'string' },
+      out: { type: 'string', default: '.benchmark/ci-report' },
+      pr: { type: 'string' },
+      'base-ref': { type: 'string' },
+      'base-sha': { type: 'string' },
+      'head-ref': { type: 'string' },
+      'head-sha': { type: 'string' },
+      'run-url': { type: 'string' },
+    },
+  });
+
+  if (!values.base || !values.head) {
+    throw new Error(
+      'Usage: node scripts/report-benchmark-ci.mts --base <base.json> --head <head.json> [--out <dir>]'
+    );
+  }
+  return values;
+};
+
+const writeReportEffect = ({ outDir, report }) =>
+  tryScriptPromise(async () => {
     await mkdir(outDir, { recursive: true });
     await writeFile(
       path.join(outDir, 'report.json'),
       `${JSON.stringify(report, null, 2)}\n`
     );
-    await writeFile(path.join(outDir, 'comment.md'), renderComment());
-  })
-);
+    await writeFile(path.join(outDir, 'comment.md'), renderComment(report));
+  });
 
-console.log(`Benchmark CI report written to ${outDir}`);
+const mainEffect = Effect.gen(function* () {
+  const values = yield* tryScriptSync(parseCliArgs);
+  const base = yield* readJsonEffect(values.base);
+  const head = yield* readJsonEffect(values.head);
+  const report = yield* tryScriptSync(() =>
+    buildReport({ values, base, head })
+  );
+  const outDir = path.resolve(values.out);
+
+  yield* writeReportEffect({ outDir, report });
+  console.log(`Benchmark CI report written to ${outDir}`);
+});
+
+runScriptEffect(mainEffect).catch(error => {
+  console.error(error);
+  process.exit(1);
+});
