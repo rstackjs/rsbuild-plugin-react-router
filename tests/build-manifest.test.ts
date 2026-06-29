@@ -96,7 +96,7 @@ describe('build manifest', () => {
     expect(bundleRoutes['routes/about'].file).toBe('routes/about.tsx');
   });
 
-  it('validates server bundle IDs based on vite environment API flag', async () => {
+  it('allows hyphenated server bundle IDs', async () => {
     const routes = {
       root: { id: 'root', file: 'root.tsx', path: '' },
       'routes/about': {
@@ -107,7 +107,29 @@ describe('build manifest', () => {
       },
     };
 
-    const serverBundles: Config['serverBundles'] = async () => 'bad-id';
+    const serverBundles: Config['serverBundles'] = async () => 'good-id';
+
+    const result = await getBuildManifest({
+      reactRouterConfig: {
+        appDirectory: 'app',
+        buildDirectory: 'build',
+        serverBuildFile: 'index.js',
+        future: {},
+        serverBundles,
+      },
+      routes,
+      rootDirectory: process.cwd(),
+    });
+
+    expect(result?.routeIdToServerBundleId.root).toBe('good-id');
+  });
+
+  it('rejects invalid server bundle IDs', async () => {
+    const routes = {
+      root: { id: 'root', file: 'root.tsx', path: '' },
+    };
+
+    const serverBundles: Config['serverBundles'] = async () => 'bad/id';
 
     await expect(
       getBuildManifest({
@@ -115,12 +137,12 @@ describe('build manifest', () => {
           appDirectory: 'app',
           buildDirectory: 'build',
           serverBuildFile: 'index.js',
-          future: { v8_viteEnvironmentApi: true },
+          future: {},
           serverBundles,
         },
         routes,
         rootDirectory: process.cwd(),
       })
-    ).rejects.toThrow('underscores');
+    ).rejects.toThrow('hyphens and underscores');
   });
 });

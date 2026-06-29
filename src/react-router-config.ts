@@ -33,7 +33,6 @@ type FutureConfig = {
   unstable_trailingSlashAwareDataRequests: boolean;
   v8_middleware: boolean;
   v8_splitRouteModules: boolean | 'enforce';
-  v8_viteEnvironmentApi: boolean;
 };
 
 type RouteManifestEntry = {
@@ -87,7 +86,6 @@ const DEFAULT_CONFIG = {
     unstable_trailingSlashAwareDataRequests: false,
     v8_middleware: false,
     v8_splitRouteModules: false,
-    v8_viteEnvironmentApi: false,
   } satisfies FutureConfig,
   routeDiscovery: undefined,
   prerender: undefined,

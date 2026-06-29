@@ -81,13 +81,8 @@ export const getBuildManifestEffect = ({
   never
 > =>
   Effect.gen(function* () {
-    const {
-      serverBundles,
-      appDirectory,
-      buildDirectory,
-      serverBuildFile,
-      future,
-    } = reactRouterConfig;
+    const { serverBundles, appDirectory, buildDirectory, serverBuildFile } =
+      reactRouterConfig;
 
     if (!serverBundles) {
       return { routes };
@@ -133,15 +128,7 @@ export const getBuildManifestEffect = ({
             );
           }
 
-          if (future?.v8_viteEnvironmentApi) {
-            if (!/^[a-zA-Z0-9_]+$/.test(serverBundleId)) {
-              return yield* Effect.fail(
-                new Error(
-                  'The "serverBundles" function must only return strings containing alphanumeric characters and underscores.'
-                )
-              );
-            }
-          } else if (!/^[a-zA-Z0-9-_]+$/.test(serverBundleId)) {
+          if (!/^[a-zA-Z0-9-_]+$/.test(serverBundleId)) {
             return yield* Effect.fail(
               new Error(
                 'The "serverBundles" function must only return strings containing alphanumeric characters, hyphens and underscores.'
