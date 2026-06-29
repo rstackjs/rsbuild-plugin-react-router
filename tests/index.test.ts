@@ -9,6 +9,8 @@ type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestJitiCacheAfterImport?: Record<string, unknown>;
 };
 
+const testGlobal = globalThis as ReactRouterTestGlobal;
+
 type LazyCompilationTestModule = {
   resource?: string;
   nameForCondition?: () => string | null;
@@ -178,20 +180,19 @@ describe('pluginReactRouter', () => {
         filePath.endsWith('app/root.tsx')
       );
     });
-    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache = {
+    testGlobal.__reactRouterTestJitiCache = {
       '/project/node_modules/jiti/dist/jiti.cjs': {
         filename: '/project/node_modules/jiti/dist/jiti.cjs',
       },
     };
-    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCacheAfterImport =
-      {
-        '/project/react-router.config.ts': {
-          filename: '/project/react-router.config.ts',
-        },
-        '/project/config/server-bundles.ts': {
-          filename: '/project/config/server-bundles.ts',
-        },
-      };
+    testGlobal.__reactRouterTestJitiCacheAfterImport = {
+      '/project/react-router.config.ts': {
+        filename: '/project/react-router.config.ts',
+      },
+      '/project/config/server-bundles.ts': {
+        filename: '/project/config/server-bundles.ts',
+      },
+    };
 
     try {
       const rsbuild = await createStubRsbuild({
@@ -510,7 +511,7 @@ describe('pluginReactRouter', () => {
   });
 
   it('should enable Rsbuild SRI for the web environment when configured', async () => {
-    (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig = {
+    testGlobal.__reactRouterTestConfig = {
       subResourceIntegrity: true,
     };
     const rsbuild = await createStubRsbuild({

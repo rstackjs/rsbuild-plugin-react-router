@@ -184,14 +184,11 @@ export const pluginReactRouter = (
 
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
-    let configWatchPaths: string | string[];
-    if (configExists) {
-      configWatchPaths = configPath;
-    } else {
-      configWatchPaths = JS_EXTENSIONS.map(extension =>
-        resolve(`react-router.config${extension}`)
-      );
-    }
+    let configWatchPaths: string | string[] = configExists
+      ? configPath
+      : JS_EXTENSIONS.map(extension =>
+          resolve(`react-router.config${extension}`)
+        );
     let reactRouterUserConfig: Config = {};
     if (!configExists) {
       console.warn(

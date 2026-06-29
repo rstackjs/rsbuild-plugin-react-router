@@ -7,11 +7,12 @@ type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestJitiCacheAfterImport?: Record<string, unknown>;
 };
 
+const testGlobal = globalThis as ReactRouterTestGlobal;
+
 afterEach(() => {
-  delete (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig;
-  delete (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache;
-  delete (globalThis as ReactRouterTestGlobal)
-    .__reactRouterTestJitiCacheAfterImport;
+  delete testGlobal.__reactRouterTestConfig;
+  delete testGlobal.__reactRouterTestJitiCache;
+  delete testGlobal.__reactRouterTestJitiCacheAfterImport;
 });
 
 // Mock the file system
@@ -23,18 +24,15 @@ rstest.mock('jiti', () => ({
   createJiti: (_cwd: string, options?: { moduleCache?: boolean }) => {
     const useSharedCache = options?.moduleCache !== false;
     const cache = useSharedCache
-      ? ((globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache ?? {})
+      ? (testGlobal.__reactRouterTestJitiCache ?? {})
       : {};
 
     return {
       cache,
       import: rstest.fn().mockImplementation((path) => {
-        if (useSharedCache) {
-          Object.assign(
-            cache,
-            (globalThis as ReactRouterTestGlobal)
-              .__reactRouterTestJitiCacheAfterImport
-          );
+        const cacheAfterImport = testGlobal.__reactRouterTestJitiCacheAfterImport;
+        if (useSharedCache && cacheAfterImport) {
+          Object.assign(cache, cacheAfterImport);
         }
 
         if (path.includes('routes.ts')) {
@@ -59,13 +57,12 @@ rstest.mock('jiti', () => ({
         }
         if (process.env.RR_TEST_SPLIT_ROUTE_MODULES === 'true') {
           return Promise.resolve({
-            ...((globalThis as ReactRouterTestGlobal)
-              .__reactRouterTestConfig as object | undefined),
+            ...(testGlobal.__reactRouterTestConfig as object | undefined),
             splitRouteModules: true,
           });
         }
         return Promise.resolve(
-          (globalThis as ReactRouterTestGlobal).__reactRouterTestConfig ?? {}
+          testGlobal.__reactRouterTestConfig ?? {}
         );
       }),
     };
