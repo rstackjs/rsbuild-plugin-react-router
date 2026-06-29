@@ -352,8 +352,7 @@ export const registerReactRouterRscRouteTransforms = ({
       return;
     }
 
-    const pluginName = 'react-router-rsc-route-transform';
-    chain.plugin(`${pluginName}-${environment.name}`).use(
+    chain.plugin(`${RSC_ROUTE_TRANSFORM_LOADER}-${environment.name}`).use(
       class ReactRouterRscRouteTransformPlugin {
         apply(compiler: {
           __reactRouterRscRouteTransform?: typeof transformRoute;
@@ -378,11 +377,17 @@ export const registerReactRouterRscRouteTransforms = ({
           };
         }) {
           compiler.__reactRouterRscRouteTransform = transformRoute;
-          compiler.hooks.thisCompilation.tap(pluginName, compilation => {
-            compilation.hooks.childCompiler.tap(pluginName, childCompiler => {
-              childCompiler.__reactRouterRscRouteTransform = transformRoute;
-            });
-          });
+          compiler.hooks.thisCompilation.tap(
+            RSC_ROUTE_TRANSFORM_LOADER,
+            compilation => {
+              compilation.hooks.childCompiler.tap(
+                RSC_ROUTE_TRANSFORM_LOADER,
+                childCompiler => {
+                  childCompiler.__reactRouterRscRouteTransform = transformRoute;
+                }
+              );
+            }
+          );
         }
       }
     );
@@ -393,7 +398,7 @@ export const registerReactRouterRscRouteTransforms = ({
       .use(RSC_ROUTE_TRANSFORM_LOADER)
       .loader(rscRouteTransformLoaderPath)
       .options({
-        getEnvironment: () => environment,
+        environmentName: environment.name,
       });
 
     if (mdxRule.uses.has('mdx')) {

@@ -29,7 +29,7 @@ type RscRouteTransformLoaderContext = {
   _compiler?: LoaderCompiler;
   async(): LoaderCallback;
   getOptions(): {
-    getEnvironment(): { name: string };
+    environmentName: string;
   };
   resource: string;
   resourcePath: string;
@@ -54,7 +54,7 @@ export default function rscRouteTransformLoader(
     resource: this.resource,
     resourcePath: this.resourcePath,
     resourceQuery: this.resourceQuery,
-    environment: this.getOptions().getEnvironment(),
+    environment: { name: this.getOptions().environmentName },
   })
     .then(result => {
       callback(null, result.code, result.map ?? map);
