@@ -226,7 +226,6 @@ const createReactRouterPlugin = (
       serverModuleFormat,
       splitRouteModules,
       buildEnd,
-      subResourceIntegrity,
     } = resolvedConfig;
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(

@@ -35,7 +35,6 @@ type CompilationWithIntegrityAssets =
 type ModifyBrowserManifestOptions = {
   subResourceIntegrity?: boolean;
   future?: { unstable_subResourceIntegrity?: boolean };
-  subResourceIntegrity?: boolean;
   manifestChunkNames?: ReadonlySet<string>;
   onManifest?: (
     manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,

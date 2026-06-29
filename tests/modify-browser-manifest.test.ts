@@ -334,7 +334,10 @@ describe('modify browser manifest plugin', () => {
     const optimizedEntrySource = 'console.log("stable sri");';
     const assets = {
       ...createBrowserManifestAssets(),
-      'static/js/entry.client.js': createAsset(optimizedEntrySource),
+      'static/js/entry.client.js': createAsset(
+        optimizedEntrySource,
+        'sha384-stable-entry'
+      ),
     };
     const compilation = createCompilation(
       [['entry.client', { files: new Set(['static/js/entry.client.js']) }]],
@@ -367,7 +370,7 @@ describe('modify browser manifest plugin', () => {
       await harness.runStage('report', { assets, compilation });
 
       expect(reportedSri?.['/static/js/entry.client.js']).toBe(
-        createSriHash(optimizedEntrySource)
+        'sha384-stable-entry'
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
