@@ -1,6 +1,7 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { pluginReactRouter, shouldParallelizeEnvironmentBuilds } from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
@@ -33,6 +34,8 @@ const getLazyCompilationTest = (
   return lazyCompilation.test;
 };
 
+const requireFromHere = createRequire(import.meta.url);
+
 const captureEnv = (keys: string[]) => {
   const previousValues = new Map(
     keys.map(key => [key, process.env[key]] as const)
@@ -62,6 +65,20 @@ describe('pluginReactRouter', () => {
     expect(config.dev.liveReload).toBe(true);
     expect(config.dev.writeToDisk).toBe(true);
     expect(config.dev.lazyCompilation).toBeUndefined();
+  });
+
+  it('aliases React Router packages to the app install', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.tools.rspack.resolve.alias).toMatchObject({
+      'react-router$': requireFromHere.resolve('react-router'),
+      'react-router/dom$': requireFromHere.resolve('react-router/dom'),
+    });
   });
 
   it('adds the committed custom-server build entry only in development', async () => {

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
@@ -93,6 +94,24 @@ export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
 
 const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
+const requireFromApp = createRequire(resolve(process.cwd(), 'package.json'));
+
+const resolveAppPackagePath = (specifier: string): string | undefined => {
+  try {
+    return requireFromApp.resolve(specifier);
+  } catch {
+    return undefined;
+  }
+};
+
+const createReactRouterPackageAliases = () => {
+  const reactRouterPath = resolveAppPackagePath('react-router');
+  const reactRouterDomPath = resolveAppPackagePath('react-router/dom');
+  return {
+    ...(reactRouterPath ? { 'react-router$': reactRouterPath } : {}),
+    ...(reactRouterDomPath ? { 'react-router/dom$': reactRouterDomPath } : {}),
+  };
+};
 
 type ReactRouterPresetResolvedConfig = Parameters<
   NonNullable<
@@ -871,6 +890,7 @@ export const pluginReactRouter = (
         routeCount >= 256 &&
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
+      const reactRouterAliases = createReactRouterPackageAliases();
 
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
@@ -906,6 +926,10 @@ export const pluginReactRouter = (
         },
         tools: {
           rspack: {
+            resolve:
+              Object.keys(reactRouterAliases).length > 0
+                ? { alias: reactRouterAliases }
+                : undefined,
             plugins: [vmodPlugin],
           },
         },
