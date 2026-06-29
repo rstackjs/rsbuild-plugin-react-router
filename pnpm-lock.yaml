@@ -68,7 +68,7 @@ importers:
         version: 2.1.0(@rsbuild/core@2.1.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0))(@rspack/core@2.1.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23))
       '@rslib/core':
         specifier: ^0.22.1
-        version: 0.22.1(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)(typescript@5.9.3)
+        version: 0.22.1(@module-federation/runtime-tools@2.5.1)(core-js@3.47.0)(typescript@5.9.3)
       '@rspack/core':
         specifier: 2.1.0
         version: 2.1.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23)
@@ -96,6 +96,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.10)
+      es-module-lexer:
+        specifier: 1.7.0
+        version: 1.7.0
       kill-port:
         specifier: ^2.0.1
         version: 2.0.1
@@ -9865,7 +9868,7 @@ snapshots:
       '@csstools/css-color-parser': 4.1.9(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-tokenizer': 4.0.0
-      lru-cache: 11.5.1
+      lru-cache: 11.2.5
 
   '@asamuzakjp/dom-selector@6.8.1':
     dependencies:
@@ -12437,15 +12440,6 @@ snapshots:
       core-js: 3.47.0
       jiti: 2.7.0
 
-  '@rsbuild/core@2.0.15(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)':
-    dependencies:
-      '@rspack/core': 2.0.8(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23)
-      '@swc/helpers': 0.5.23
-    optionalDependencies:
-      core-js: 3.47.0
-    transitivePeerDependencies:
-      - '@module-federation/runtime-tools'
-
   '@rsbuild/core@2.0.15(@module-federation/runtime-tools@2.5.1)(core-js@3.47.0)':
     dependencies:
       '@rspack/core': 2.0.8(@module-federation/runtime-tools@2.5.1)(@swc/helpers@0.5.23)
@@ -12607,17 +12601,6 @@ snapshots:
     transitivePeerDependencies:
       - '@rspack/core'
       - webpack
-
-  '@rslib/core@0.22.1(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)(typescript@5.9.3)':
-    dependencies:
-      '@rsbuild/core': 2.0.15(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
-      rsbuild-plugin-dts: 0.22.1(@rsbuild/core@2.0.15(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0))(typescript@5.9.3)
-    optionalDependencies:
-      typescript: 5.9.3
-    transitivePeerDependencies:
-      - '@module-federation/runtime-tools'
-      - '@typescript/native-preview'
-      - core-js
 
   '@rslib/core@0.22.1(@module-federation/runtime-tools@2.5.1)(core-js@3.47.0)(typescript@5.9.3)':
     dependencies:
@@ -12783,13 +12766,6 @@ snapshots:
       '@rspack/binding': 1.7.12
       '@rspack/lite-tapable': 1.1.0
     optionalDependencies:
-      '@swc/helpers': 0.5.23
-
-  '@rspack/core@2.0.8(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23)':
-    dependencies:
-      '@rspack/binding': 2.0.8
-    optionalDependencies:
-      '@module-federation/runtime-tools': 2.5.1(node-fetch@2.7.0(encoding@0.1.13))
       '@swc/helpers': 0.5.23
 
   '@rspack/core@2.0.8(@module-federation/runtime-tools@2.5.1)(@swc/helpers@0.5.23)':
@@ -14495,7 +14471,7 @@ snapshots:
       '@asamuzakjp/css-color': 4.1.2
       '@csstools/css-syntax-patches-for-csstree': 1.1.6(css-tree@3.2.1)
       css-tree: 3.2.1
-      lru-cache: 11.5.1
+      lru-cache: 11.2.5
 
   csstype@3.2.3: {}
 
@@ -17140,13 +17116,6 @@ snapshots:
       path-to-regexp: 8.4.2
     transitivePeerDependencies:
       - supports-color
-
-  rsbuild-plugin-dts@0.22.1(@rsbuild/core@2.0.15(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0))(typescript@5.9.3):
-    dependencies:
-      '@ast-grep/napi': 0.37.0
-      '@rsbuild/core': 2.0.15(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
-    optionalDependencies:
-      typescript: 5.9.3
 
   rsbuild-plugin-dts@0.22.1(@rsbuild/core@2.0.15(@module-federation/runtime-tools@2.5.1)(core-js@3.47.0))(typescript@5.9.3):
     dependencies:

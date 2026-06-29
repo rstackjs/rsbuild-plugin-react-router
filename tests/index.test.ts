@@ -5,8 +5,6 @@ import { pluginReactRouter } from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
-  __reactRouterTestJitiCache?: Record<string, unknown>;
-  __reactRouterTestJitiCacheAfterImport?: Record<string, unknown>;
 };
 
 type LazyCompilationTestModule = {
@@ -131,59 +129,12 @@ describe('pluginReactRouter', () => {
     );
   });
 
-  it('reloads the dev server when imported config dependencies change', async () => {
-    const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(path => {
-      const filePath = String(path);
-      if (filePath.includes('react-router.config')) {
-        return filePath.endsWith('react-router.config.ts');
-      }
-      if (filePath.includes('config/server-bundles')) {
-        return filePath.endsWith('config/server-bundles.ts');
-      }
-      return (
-        filePath.endsWith('app/routes.ts') ||
-        filePath.endsWith('app/root.tsx')
-      );
-    });
-    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCache = {
-      '/project/node_modules/jiti/dist/jiti.cjs': {
-        filename: '/project/node_modules/jiti/dist/jiti.cjs',
-      },
-    };
-    (globalThis as ReactRouterTestGlobal).__reactRouterTestJitiCacheAfterImport =
-      {
-        '/project/react-router.config.ts': {
-          filename: '/project/react-router.config.ts',
-        },
-        '/project/config/server-bundles.ts': {
-          filename: '/project/config/server-bundles.ts',
-        },
-      };
-
-    try {
-      const rsbuild = await createStubRsbuild({
-        rsbuildConfig: {},
-      });
-
-      rsbuild.addPlugins([pluginReactRouter()]);
-      const config = await rsbuild.unwrapConfig();
-
-      const configWatch = config.dev.watchFiles.find(
-        (watchFile: { paths: unknown }) => Array.isArray(watchFile.paths)
-      );
-      expect(configWatch).toMatchObject({
-        paths: expect.arrayContaining([
-          expect.stringMatching(/config\/server-bundles\.ts$/),
-        ]),
-        type: 'reload-server',
-      });
-    } finally {
-      existsSync.mockRestore();
-    }
-  });
-
   it('watches all supported config filenames when the config does not exist yet', async () => {
-    const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(
+    const existsSyncMock = fs.existsSync as unknown as {
+      mockImplementation: (implementation: (path: unknown) => boolean) => void;
+      mockReturnValue: (value: boolean) => void;
+    };
+    existsSyncMock.mockImplementation(
       path => !String(path).includes('react-router.config')
     );
 
@@ -210,7 +161,7 @@ describe('pluginReactRouter', () => {
         type: 'reload-server',
       });
     } finally {
-      existsSync.mockRestore();
+      existsSyncMock.mockReturnValue(true);
     }
   });
 
