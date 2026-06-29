@@ -237,7 +237,7 @@ describe('pluginReactRouter', () => {
       const config = await rsbuild.unwrapConfig();
       const getRules = (name: 'web' | 'node') =>
         config.environments?.[name]?.tools?.rspack?.module?.rules ?? [];
-      const includedQueries = ['?url', '?foo=bar&url'];
+      const includedQueries = ['?url', '?url&foo=bar', '?foo=bar&url'];
       const excludedQueries = [
         '?raw',
         '?inline',
@@ -246,12 +246,22 @@ describe('pluginReactRouter', () => {
         '?url&inline',
         '?inline&url',
       ];
-      const hasUrlAssetRule = (rule: any) =>
-        rule.resourceQuery?.toString().includes('url') &&
-        rule.exclude?.test('app/styles.css') &&
-        includedQueries.every(query => rule.resourceQuery?.test(query)) &&
-        excludedQueries.every(query => !rule.resourceQuery?.test(query)) &&
-        rule.type === 'asset/resource';
+      const hasUrlAssetRule = (rule: {
+        resourceQuery?: RegExp;
+        exclude?: RegExp;
+        type?: string;
+      }) => {
+        const { resourceQuery, exclude, type } = rule;
+        return (
+          resourceQuery instanceof RegExp &&
+          exclude instanceof RegExp &&
+          resourceQuery.toString().includes('url') &&
+          exclude.test('app/styles.css') &&
+          includedQueries.every(query => resourceQuery.test(query)) &&
+          excludedQueries.every(query => !resourceQuery.test(query)) &&
+          type === 'asset/resource'
+        );
+      };
 
       expect(getRules('web').some(hasUrlAssetRule)).toBe(true);
       expect(getRules('node').some(hasUrlAssetRule)).toBe(true);
