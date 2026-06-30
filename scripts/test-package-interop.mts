@@ -138,9 +138,16 @@ const verifyRscPublicSurfaceEffect = (esm, commonjs) =>
       );
       assert.throws(
         () => require.resolve(specifier),
-        error =>
-          error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED' ||
-          error?.code === 'ERR_PACKAGE_IMPORT_NOT_DEFINED'
+        error => {
+          const code =
+            error && typeof error === 'object' && 'code' in error
+              ? error.code
+              : undefined;
+          return (
+            code === 'ERR_PACKAGE_PATH_NOT_EXPORTED' ||
+            code === 'ERR_PACKAGE_IMPORT_NOT_DEFINED'
+          );
+        }
       );
     }
   });

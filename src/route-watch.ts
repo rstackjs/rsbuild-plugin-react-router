@@ -416,7 +416,7 @@ export const registerRouteTopologyDevWatch = ({
   outputClientPath,
   pluginName,
   routeConfig,
-  routesPath,
+  routeConfigWatchPaths,
 }: {
   api: RsbuildPluginAPI;
   appDirectory: string;
@@ -427,7 +427,7 @@ export const registerRouteTopologyDevWatch = ({
   outputClientPath: string;
   pluginName: string;
   routeConfig: RouteConfigEntry[];
-  routesPath: string;
+  routeConfigWatchPaths: string | string[];
 }): WatchFileConfig[] => {
   const watchDirectory = resolve(appDirectory);
   const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
@@ -441,7 +441,7 @@ export const registerRouteTopologyDevWatch = ({
     ? []
     : [
         {
-          paths: routesPath,
+          paths: routeConfigWatchPaths,
           type: 'reload-server',
         },
         {

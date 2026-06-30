@@ -414,18 +414,20 @@ const createReactRouterPlugin = (
         };
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
-    const routeWatchFiles = registerRouteTopologyDevWatch({
-      api,
-      appDirectory,
-      configWatchPaths,
-      getRootRouteFile: () => relative(appDirectory, getRootRoutePath()),
-      loadRouteConfig,
-      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-      outputClientPath,
-      pluginName: PLUGIN_NAME,
-      routeConfig,
-      routesPath,
-    });
+    const routeWatchFiles = isBuild
+      ? []
+      : registerRouteTopologyDevWatch({
+          api,
+          appDirectory,
+          configWatchPaths,
+          getRootRouteFile: () => relative(appDirectory, getRootRoutePath()),
+          loadRouteConfig,
+          onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
+          outputClientPath,
+          pluginName: PLUGIN_NAME,
+          routeConfig,
+          routeConfigWatchPaths,
+        });
 
     if (!isBuild) {
       api.onAfterCreateCompiler(() => {
