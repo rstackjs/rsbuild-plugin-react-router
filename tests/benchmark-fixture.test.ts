@@ -1,6 +1,8 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -9,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from '@rstest/core';
+import { Effect } from 'effect';
 
 describe('benchmark fixture generator', () => {
   it('creates a deterministic synthetic React Router app', async () => {
@@ -372,6 +375,105 @@ describe('benchmark fixture generator', () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('No benchmarks matched filter "missing".');
     expect(result.stderr).not.toContain('Unknown profile "large"');
+  });
+
+  it('parses support reproduction benchmark defaults', async () => {
+    const { parseSupportReproArgs } = await import(
+      '../scripts/bench-support-repro.mts'
+    );
+    const options = await Effect.runPromise(parseSupportReproArgs([]));
+
+    expect(options.repo).toBe(
+      '/home/zack/Downloads/openai-support/synthetic-build-repro/synthetic-web-bundler-benchmark'
+    );
+    expect(options.runs).toBe(3);
+    expect(options.profile).toBe('cold');
+    expect(options.modes).toBe('rsbuild-fast');
+    expect(options.packageSpec).toBe('local');
+    expect(options.workdir).toBe('.benchmark/support-repro/workdir');
+  });
+
+  it('accepts support reproduction benchmark overrides', async () => {
+    const { parseSupportReproArgs } = await import(
+      '../scripts/bench-support-repro.mts'
+    );
+    const options = await Effect.runPromise(
+      parseSupportReproArgs([
+        '--repo=/tmp/synthetic-web-bundler-benchmark',
+        '--runs=5',
+        '--profile=both',
+        '--modes=rsbuild-fast,rsbuild-no-tailwind',
+        '--package=installed',
+        '--skip-build',
+        '--rspack-profile=OVERVIEW',
+        '--out=.benchmark/results/support',
+        '--workdir=.benchmark/support/workdir',
+        '--dry-run',
+      ])
+    );
+
+    expect(options.repo).toBe('/tmp/synthetic-web-bundler-benchmark');
+    expect(options.runs).toBe(5);
+    expect(options.profile).toBe('both');
+    expect(options.modes).toBe('rsbuild-fast,rsbuild-no-tailwind');
+    expect(options.packageSpec).toBe('installed');
+    expect(options.skipBuild).toBe(true);
+    expect(options.rspackProfile).toBe('OVERVIEW');
+    expect(options.out).toBe('.benchmark/results/support');
+    expect(options.workdir).toBe('.benchmark/support/workdir');
+    expect(options.dryRun).toBe(true);
+  });
+
+  it('materializes the support reproduction benchmark without copied build outputs', async () => {
+    const { isCopiedSupportEntry, materializeSupportBenchmarkRepo } =
+      await import('../scripts/bench-support-repro.mts');
+    expect(isCopiedSupportEntry('node_modules')).toBe(false);
+    expect(isCopiedSupportEntry('benchmark-results')).toBe(false);
+    expect(isCopiedSupportEntry('app')).toBe(true);
+    const sourceRoot = mkdtempSync(join(tmpdir(), 'rr-support-source-'));
+    const workdir = mkdtempSync(join(tmpdir(), 'rr-support-workdir-'));
+
+    try {
+      writeFileSync(
+        join(sourceRoot, 'package.json'),
+        JSON.stringify({
+          scripts: { 'benchmark:rsbuild-modes': 'node scripts/bench.mjs' },
+          devDependencies: { 'rsbuild-plugin-react-router': 'file:plugin.tgz' },
+        })
+      );
+      mkdirSync(join(sourceRoot, 'scripts'), { recursive: true });
+      writeFileSync(join(sourceRoot, 'scripts/bench.mjs'), '');
+      mkdirSync(join(sourceRoot, 'app'), { recursive: true });
+      writeFileSync(join(sourceRoot, 'app/root.tsx'), 'export default null;');
+      mkdirSync(join(sourceRoot, 'node_modules'), { recursive: true });
+      writeFileSync(join(sourceRoot, 'node_modules/ignored.txt'), '');
+      mkdirSync(join(sourceRoot, 'benchmark-results'), { recursive: true });
+      writeFileSync(join(sourceRoot, 'benchmark-results/ignored.json'), '{}');
+
+      await Effect.runPromise(
+        materializeSupportBenchmarkRepo({ sourceRepo: sourceRoot, workdir })
+      );
+
+      expect(existsSync(join(workdir, 'package.json'))).toBe(true);
+      expect(existsSync(join(workdir, 'scripts/bench.mjs'))).toBe(true);
+      expect(existsSync(join(workdir, 'app/root.tsx'))).toBe(true);
+      const workdirEntries = readdirSync(workdir).sort();
+      expect(workdirEntries).not.toContain('node_modules');
+      expect(workdirEntries).not.toContain('benchmark-results');
+    } finally {
+      rmSync(sourceRoot, { recursive: true, force: true });
+      rmSync(workdir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects invalid support reproduction run counts', async () => {
+    const { parseSupportReproArgs } = await import(
+      '../scripts/bench-support-repro.mts'
+    );
+
+    await expect(
+      Effect.runPromise(parseSupportReproArgs(['--runs=0']))
+    ).rejects.toThrow('--runs must be a positive integer.');
   });
 
   it('rejects mixed benchmark modes in CI reports', () => {
