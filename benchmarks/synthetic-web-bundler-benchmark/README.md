@@ -37,12 +37,5 @@ realistic expensive work directly: React Router Framework Mode, React Compiler,
 Babel app transforms, Tailwind, SVGR, CSS modules, worker imports, dynamic
 imports, and large public JSON payloads.
 
-The plugin under test can be selected without editing this fixture:
-
-```sh
-SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT=file:///path/to/plugin/dist/index.js \
-  pnpm benchmark:rsbuild -- --runs=1
-```
-
-Root CI uses that environment variable to benchmark the PR base plugin and PR
-head plugin against the same embedded app.
+Root CI benchmarks the PR base plugin and PR head plugin against the same
+embedded app by staging each built plugin package into this workspace fixture.

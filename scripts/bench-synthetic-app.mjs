@@ -63,7 +63,6 @@ const benchmarkCommand = {
   args: ['benchmark:rsbuild', '--', ...benchmarkArgs],
   env: {
     SYNTHETIC_REACT_ROUTER_LOG_PERFORMANCE: '1',
-    SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT: pluginImport,
   },
 };
 const commands = [...prepareCommands, benchmarkCommand];

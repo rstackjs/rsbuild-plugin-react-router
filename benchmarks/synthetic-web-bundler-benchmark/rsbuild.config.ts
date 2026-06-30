@@ -3,12 +3,8 @@ import { pluginBabel } from '@rsbuild/plugin-babel';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { pluginSvgr } from '@rsbuild/plugin-svgr';
 import { pluginTailwindcss } from '@rsbuild/plugin-tailwindcss';
+import { pluginReactRouter } from 'rsbuild-plugin-react-router';
 import { createBabelPlugins } from './build/babel-options';
-
-const reactRouterPluginImport =
-  process.env.SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT ??
-  'rsbuild-plugin-react-router';
-const { pluginReactRouter } = await import(reactRouterPluginImport);
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 const reactRouterLogPerformance =
