@@ -14,13 +14,13 @@ import type {
   WorkerResponse,
 } from './parallel-route-transform-protocol.js';
 
-export type ParallelTransformsConfig =
-  NonNullable<PluginOptions['parallelTransforms']> extends infer Config
+export type ParallelRouteTransformConfig =
+  NonNullable<PluginOptions['parallelRouteTransform']> extends infer Config
     ? Exclude<Config, false>
     : never;
 
 export type RouteTransformExecutorOptions = RouteTransformTaskOptions & {
-  parallelTransforms?: PluginOptions['parallelTransforms'];
+  parallelRouteTransform?: PluginOptions['parallelRouteTransform'];
   splitRouteModules?: boolean;
 };
 
@@ -57,22 +57,18 @@ export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
   routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
 
 const getConfiguredWorkerCount = (
-  parallelTransforms: ParallelTransformsConfig
+  parallelRouteTransform: ParallelRouteTransformConfig
 ): number => {
-  if (parallelTransforms === true) {
+  if (parallelRouteTransform === true) {
     return getDefaultWorkerCount();
   }
 
-  const configured = parallelTransforms.maxWorkers;
-  if (configured === undefined) {
-    return getDefaultWorkerCount();
-  }
-  if (!Number.isInteger(configured) || configured < 1) {
+  if (!Number.isInteger(parallelRouteTransform) || parallelRouteTransform < 1) {
     throw new Error(
-      '[react-router] parallelTransforms.maxWorkers must be a positive integer.'
+      '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
     );
   }
-  return configured;
+  return parallelRouteTransform;
 };
 
 const hashString = (value: string): number => {
@@ -305,20 +301,22 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
 }
 
 export const createRouteTransformExecutor = ({
-  parallelTransforms,
+  parallelRouteTransform,
   routeChunkCache,
   splitRouteModules,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
   const options = { routeChunkCache };
-  const effectiveParallelTransforms = parallelTransforms ?? false;
-  if (!effectiveParallelTransforms) {
+  if (
+    parallelRouteTransform === undefined ||
+    parallelRouteTransform === false
+  ) {
     return {
       run: task => executeRouteTransformTask(task, options),
       close: async () => {},
     };
   }
 
-  const workerCount = getConfiguredWorkerCount(effectiveParallelTransforms);
+  const workerCount = getConfiguredWorkerCount(parallelRouteTransform);
   if (workerCount < 1) {
     return {
       run: task => executeRouteTransformTask(task, options),

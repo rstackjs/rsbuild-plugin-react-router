@@ -83,17 +83,50 @@ describe('parallel route transforms', () => {
     expect(maxActive).toBeLessThanOrEqual(2);
   });
 
-  it('rejects invalid explicit worker counts', () => {
-    expect(() =>
-      createRouteTransformExecutor({
-        parallelTransforms: { maxWorkers: 1.5 },
-      })
-    ).toThrow('must be a positive integer');
+  it.each([0, Number.NaN, 1.5])(
+    'rejects invalid explicit worker count %s',
+    workerCount => {
+      expect(() =>
+        createRouteTransformExecutor({
+          parallelRouteTransform: workerCount,
+        })
+      ).toThrow('must be true, false, or a positive integer');
+    }
+  );
+
+  it('allows one explicit worker', async () => {
+    const executor = createRouteTransformExecutor({
+      parallelRouteTransform: 1,
+    });
+
+    try {
+      const result = await executor.run(createRouteModuleTask());
+
+      expect(result.code).toContain('export default _withComponentProps');
+      expect(result.code).not.toContain('loader');
+    } finally {
+      await executor.close();
+    }
   });
 
-  it('honors explicit maxWorkers', async () => {
+  it('honors an explicit worker count', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelRouteTransform: 2,
+    });
+
+    try {
+      const result = await executor.run(createRouteModuleTask());
+
+      expect(result.code).toContain('export default _withComponentProps');
+      expect(result.code).not.toContain('loader');
+    } finally {
+      await executor.close();
+    }
+  });
+
+  it('forces the default worker count with true', async () => {
+    const executor = createRouteTransformExecutor({
+      parallelRouteTransform: true,
     });
 
     try {
@@ -108,7 +141,7 @@ describe('parallel route transforms', () => {
 
   it('runs route builds inline when parallel transforms are disabled', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: false,
+      parallelRouteTransform: false,
     });
 
     try {
@@ -142,7 +175,7 @@ describe('parallel route transforms', () => {
 
   it('can execute route module tasks through worker-backed parallelism', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelRouteTransform: 2,
     });
 
     try {
@@ -157,7 +190,7 @@ describe('parallel route transforms', () => {
 
   it('produces identical build route modules when environments need the same output', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelRouteTransform: 2,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({
@@ -184,7 +217,7 @@ describe('parallel route transforms', () => {
 
   it('keeps environment-specific build route module output isolated', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelRouteTransform: 2,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({
@@ -212,7 +245,7 @@ describe('parallel route transforms', () => {
 
   it('isolates escaped server exports across build environments', async () => {
     const executor = createRouteTransformExecutor({
-      parallelTransforms: { maxWorkers: 2 },
+      parallelRouteTransform: 2,
       splitRouteModules: true,
     });
     const task = createRouteModuleTask({
@@ -232,8 +265,12 @@ describe('parallel route transforms', () => {
         environmentName: 'web',
       });
 
-      expect(nodeResult.code).toContain('loader');
-      expect(webResult.code).not.toContain('loader');
+      await expect(getExportNames(nodeResult.code)).resolves.toContain(
+        'loader'
+      );
+      await expect(getExportNames(webResult.code)).resolves.not.toContain(
+        'loader'
+      );
     } finally {
       await executor.close();
     }
