@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createReadyLogObserver } from '../../../scripts/benchmark/dev-server.mjs';
 import {
-  createReadyLogObserver,
   formatMarkdown,
   parseArgs,
   parseReactRouterPerformanceLogs,

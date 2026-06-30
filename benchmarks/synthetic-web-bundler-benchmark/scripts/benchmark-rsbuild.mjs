@@ -4,7 +4,11 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import {
-  createReadyLogObserver,
+  appendNodeOption,
+  createOutputTail,
+  runDevServerBenchmark,
+} from '../../../scripts/benchmark/dev-server.mjs';
+import {
   formatMarkdown,
   isReactRouterPerformanceLoggingEnabled,
   parseArgs,
@@ -12,7 +16,6 @@ import {
   summarizeResults,
 } from './benchmark-rsbuild-utils.mjs';
 
-const MAX_CAPTURED_OUTPUT_CHARS = 128 * 1024;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { out, profile, runs } = parseArgs(process.argv.slice(2));
 const logReactRouterPerformance = isReactRouterPerformanceLoggingEnabled();
@@ -153,11 +156,8 @@ async function dev(label, { port, run: runIndex }) {
 }
 
 async function runDevServer({ port, routePaths, updateFile }) {
-  const started = performance.now();
   const origin = `http://localhost:${port}`;
-  const originalSource = await fs.readFile(updateFile, 'utf8');
   const benchmarkEnv = {
-    ...process.env,
     NODE_ENV: 'development',
     NODE_OPTIONS: appendNodeOption(
       process.env.NODE_OPTIONS,
@@ -167,188 +167,47 @@ async function runDevServer({ port, routePaths, updateFile }) {
   if (logReactRouterPerformance) {
     benchmarkEnv.SYNTHETIC_REACT_ROUTER_LOG_PERFORMANCE = '1';
   }
-  const child = spawn(
-    rsbuildBinary(),
-    ['dev', '--config', 'rsbuild.config.ts', '--port', String(port)],
-    {
-      cwd: root,
-      detached: process.platform !== 'win32',
-      env: benchmarkEnv,
-      shell: process.platform === 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  );
-  const output = createOutputTail();
-  const readyCounts = new Map([
-    ['web', 0],
-    ['node', 0],
-  ]);
-  let exitStatus = null;
-  const waiters = new Set();
-  const readyObserver = createReadyLogObserver(environment => {
-    readyCounts.set(environment, (readyCounts.get(environment) ?? 0) + 1);
+
+  const benchmark = await runDevServerBenchmark({
+    command: rsbuildBinary(),
+    args: ['dev', '--config', 'rsbuild.config.ts', '--port', String(port)],
+    cwd: root,
+    env: benchmarkEnv,
+    readyEnvironments: ['web', 'node'],
+    origin,
+    routePaths,
+    routeTimeoutMs: devRouteTimeoutMs,
+    routeRetryDelayMs: 250,
+    updateFile,
+    updateMarker: '__syntheticBenchmarkHmrProbe',
+    updateRoutePaths: ['/feature/0000'],
+    timeoutMs: devTimeoutMs,
   });
 
-  const observe = stream => chunk => {
-    const text = chunk.toString();
-    output.append(text);
-    process.stdout.write(text);
-    readyObserver.observe(stream, text);
-    for (const waiter of waiters) {
-      waiter.check();
-    }
-  };
-
-  child.stdout.on('data', observe('stdout'));
-  child.stderr.on('data', observe('stderr'));
-  child.on('exit', (code, signal) => {
-    exitStatus = code ?? signal;
-    for (const waiter of waiters) {
-      waiter.check();
-    }
-  });
-
-  try {
-    await waitForReady({
-      readyCounts,
-      waiters,
-      getExitStatus: () => exitStatus,
-    });
-    const readyMs = performance.now() - started;
-    const routeStarted = performance.now();
-    const routeRequests = await fetchRoutes({ origin, routePaths });
-    const routeTotalMs = performance.now() - routeStarted;
-
-    const updateStarted = performance.now();
-    await fs.writeFile(
-      updateFile,
-      `${originalSource}\nexport const __syntheticBenchmarkHmrProbe = ${Date.now()};\n`
-    );
-    await waitForReady({
-      readyCounts,
-      waiters,
-      getExitStatus: () => exitStatus,
-    });
-    const updateMs = performance.now() - updateStarted;
-    const updateRouteRequests = await fetchRoutes({
-      origin,
-      routePaths: ['/feature/0000'],
-    });
-
-    return {
-      wallMs: performance.now() - started,
-      readyMs,
-      routeTotalMs,
-      updateMs,
-      routeRequests,
-      updateRouteRequests,
-    };
-  } catch (error) {
-    const details = output.read().trim().split(/\r?\n/).slice(-120).join('\n');
+  if (benchmark.status !== 0) {
+    const details = benchmark.output
+      .trim()
+      .split(/\r?\n/)
+      .slice(-120)
+      .join('\n');
     throw new Error(
-      [`rsbuild dev failed with ${exitStatus ?? error.message}`, details]
+      [
+        `rsbuild dev failed with ${benchmark.status ?? benchmark.signal}`,
+        details,
+      ]
         .filter(Boolean)
-        .join('\n\n'),
-      { cause: error }
+        .join('\n\n')
     );
-  } finally {
-    await fs.writeFile(updateFile, originalSource);
-    await stopChild(child);
-  }
-}
-
-function waitForReady({ readyCounts, waiters, getExitStatus }) {
-  const baseline = new Map(readyCounts);
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      waiters.delete(waiter);
-      reject(new Error(`Timed out after ${devTimeoutMs} ms`));
-    }, devTimeoutMs);
-    timeout.unref?.();
-
-    const waiter = {
-      check() {
-        const exitStatus = getExitStatus();
-        if (exitStatus !== null) {
-          clearTimeout(timeout);
-          waiters.delete(waiter);
-          reject(new Error(`Dev server exited with ${exitStatus}`));
-          return;
-        }
-        if (
-          (readyCounts.get('web') ?? 0) > (baseline.get('web') ?? 0) &&
-          (readyCounts.get('node') ?? 0) > (baseline.get('node') ?? 0)
-        ) {
-          clearTimeout(timeout);
-          waiters.delete(waiter);
-          resolve();
-        }
-      },
-    };
-    waiters.add(waiter);
-    waiter.check();
-  });
-}
-
-async function fetchRoutes({ origin, routePaths }) {
-  const requests = [];
-  for (const routePath of routePaths) {
-    requests.push(await fetchRoute({ origin, routePath }));
-  }
-  if (requests.some(request => !request.ok)) {
-    throw new Error(
-      `Dev route request failed: ${requests
-        .filter(request => !request.ok)
-        .map(request => `${request.path} -> ${request.status}`)
-        .join(', ')}`
-    );
-  }
-  return requests;
-}
-
-async function fetchRoute({ origin, routePath }) {
-  const started = performance.now();
-  let lastError = null;
-
-  while (performance.now() - started < devRouteTimeoutMs) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), devRouteTimeoutMs);
-    timeout.unref?.();
-    try {
-      const response = await fetch(new URL(routePath, origin), {
-        signal: controller.signal,
-      });
-      const body = await response.arrayBuffer();
-      return {
-        path: routePath,
-        status: response.status,
-        ok: response.ok,
-        ms: performance.now() - started,
-        bytes: body.byteLength,
-      };
-    } catch (error) {
-      lastError = error;
-      await new Promise(resolve => setTimeout(resolve, 250));
-    } finally {
-      clearTimeout(timeout);
-    }
   }
 
   return {
-    path: routePath,
-    status: null,
-    ok: false,
-    ms: performance.now() - started,
-    bytes: null,
-    error: lastError?.message ?? String(lastError),
+    wallMs: benchmark.wallMs,
+    readyMs: benchmark.readyMs,
+    routeTotalMs: benchmark.routeTotalMs,
+    updateMs: benchmark.updateMs,
+    routeRequests: benchmark.routeRequests,
+    updateRouteRequests: benchmark.updateRouteRequests,
   };
-}
-
-function appendNodeOption(value, option) {
-  const options = (value ?? '').split(/\s+/).filter(Boolean);
-  return options.includes(option)
-    ? options.join(' ')
-    : [...options, option].join(' ');
 }
 
 function readPositiveIntegerEnv(name, fallback) {
@@ -361,38 +220,6 @@ function readPositiveIntegerEnv(name, fallback) {
     throw new Error(`${name} must be a positive integer`);
   }
   return parsed;
-}
-
-function stopChild(child) {
-  return new Promise(resolve => {
-    if (child.exitCode !== null) {
-      resolve();
-      return;
-    }
-    const signalChild = signal => {
-      try {
-        if (process.platform === 'win32' || !child.pid) {
-          child.kill(signal);
-        } else {
-          process.kill(-child.pid, signal);
-        }
-      } catch (error) {
-        if (error?.code !== 'ESRCH') {
-          throw error;
-        }
-      }
-    };
-    const timeout = setTimeout(() => {
-      signalChild('SIGKILL');
-      resolve();
-    }, 5_000);
-    timeout.unref?.();
-    child.once('exit', () => {
-      clearTimeout(timeout);
-      resolve();
-    });
-    signalChild('SIGTERM');
-  });
 }
 
 function rsbuildBinary() {
@@ -436,20 +263,4 @@ function run(command, args, env = process.env, quiet = false) {
           )
     );
   });
-}
-
-function createOutputTail() {
-  let output = '';
-
-  return {
-    append(chunk) {
-      output += chunk.toString();
-      if (output.length > MAX_CAPTURED_OUTPUT_CHARS) {
-        output = output.slice(-MAX_CAPTURED_OUTPUT_CHARS);
-      }
-    },
-    read() {
-      return output;
-    },
-  };
 }

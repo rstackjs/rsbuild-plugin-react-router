@@ -4,19 +4,22 @@ import {
   cp,
   mkdir,
   readdir,
-  readFile,
   rename,
   rm,
   writeFile,
 } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from 'node:util';
 import { execa } from 'execa';
+import {
+  appendNodeOption,
+  runDevServerBenchmark,
+} from './benchmark/dev-server.mjs';
 import { generateSyntheticFixture } from './benchmark/fixture.mjs';
+import { profiles } from './benchmark/profiles.mjs';
 
 const rootDir = process.cwd();
 const benchmarkRoot = path.join(rootDir, '.benchmark');
@@ -28,70 +31,6 @@ const rsbuildBin = path.join(
   'bin',
   'rsbuild.js'
 );
-
-const profiles = {
-  smoke: [{ id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' }],
-  default: [
-    { id: 'synthetic-256-ssr-esm', routeCount: 256, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-256-ssr-esm-split',
-      routeCount: 256,
-      variant: 'ssr-esm-split',
-    },
-    { id: 'synthetic-256-spa', routeCount: 256, variant: 'spa' },
-    {
-      id: 'synthetic-256-sourcemaps',
-      routeCount: 256,
-      variant: 'ssr-esm',
-      sourceMap: true,
-    },
-  ],
-  ci: [
-    { id: 'synthetic-1024-ssr-esm', routeCount: 1024, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-1024-ssr-esm-split',
-      routeCount: 1024,
-      variant: 'ssr-esm-split',
-    },
-  ],
-  full: [
-    { id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' },
-    { id: 'synthetic-256-ssr-esm', routeCount: 256, variant: 'ssr-esm' },
-    { id: 'synthetic-1024-ssr-esm', routeCount: 1024, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-256-ssr-esm-split',
-      routeCount: 256,
-      variant: 'ssr-esm-split',
-    },
-    {
-      id: 'synthetic-1024-ssr-esm-split',
-      routeCount: 1024,
-      variant: 'ssr-esm-split',
-    },
-    {
-      id: 'synthetic-256-sourcemaps',
-      routeCount: 256,
-      variant: 'ssr-esm',
-      sourceMap: true,
-    },
-    {
-      id: 'large-355-ssr-esm',
-      routeCount: 355,
-      variant: 'ssr-esm',
-      fixture: 'large',
-      devRoutePathOffset: 0,
-    },
-  ],
-  large: [
-    {
-      id: 'large-355-ssr-esm',
-      routeCount: 355,
-      variant: 'ssr-esm',
-      fixture: 'large',
-      devRoutePathOffset: 0,
-    },
-  ],
-};
 
 const parseArgs = argv => {
   const { values } = parseCliArgs({
@@ -287,8 +226,6 @@ const runCommand = async ({
   };
 };
 
-const stripAnsi = value => value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
-
 const defaultDevRouteIndexes = [0, 1, 2, 10, 50, 100, 200];
 
 const routePathForIndex = (index, { devRoutePathOffset = 1 }) => {
@@ -336,321 +273,6 @@ const resolveDevRoutePaths = (value, benchmark) => {
   }
   return routePaths;
 };
-
-const appendNodeOption = (value, option) => {
-  const options = (value ?? '').split(/\s+/).filter(Boolean);
-  return options.includes(option)
-    ? options.join(' ')
-    : [...options, option].join(' ');
-};
-
-const fetchDevRoute = async ({ origin, routePath, timeoutMs }) => {
-  const startedAt = performance.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  timeout.unref?.();
-
-  try {
-    const response = await fetch(new URL(routePath, origin), {
-      signal: controller.signal,
-    });
-    const body = await response.arrayBuffer();
-    return {
-      path: routePath,
-      status: response.status,
-      ok: response.ok,
-      ms: performance.now() - startedAt,
-      bytes: body.byteLength,
-    };
-  } catch (error) {
-    return {
-      path: routePath,
-      status: null,
-      ok: false,
-      ms: performance.now() - startedAt,
-      bytes: null,
-      error:
-        error?.name === 'AbortError'
-          ? `Timed out after ${timeoutMs} ms`
-          : (error?.stack ?? error?.message ?? String(error)),
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
-const fetchDevRoutes = async ({ origin, routePaths, timeoutMs }) => {
-  const requests = [];
-  for (const routePath of routePaths) {
-    requests.push(await fetchDevRoute({ origin, routePath, timeoutMs }));
-  }
-  return requests;
-};
-
-const applyDevUpdate = async file => {
-  const source = await readFile(file, 'utf8');
-  const marker = `\nexport const __benchmarkUpdateMarker = ${Date.now()};\n`;
-  await writeFile(
-    file,
-    `${source.replace(/\nexport const __benchmarkUpdateMarker = \d+;\n$/, '')}${marker}`
-  );
-  return () => writeFile(file, source);
-};
-
-const runDevServerUntilReady = async ({
-  command,
-  args,
-  cwd,
-  env = {},
-  readyEnvironments,
-  devRouteOrigin,
-  devRoutePaths = [],
-  devRouteTimeoutMs,
-  updateFile,
-  updateRoutePaths = [],
-  timeoutMs,
-}) =>
-  new Promise(resolve => {
-    const startedAt = performance.now();
-    const requiredReady = new Set(readyEnvironments);
-    const readyCounts = new Map();
-    let stdout = '';
-    let stderr = '';
-    let ready = false;
-    let readyMs = null;
-    let routePhasePending = false;
-    let routeTotalMs = null;
-    let routeRequests = [];
-    let updatePending = false;
-    let updateMs = null;
-    let updateRouteTotalMs = null;
-    let updateRouteRequests = [];
-    let stdoutReadyBuffer = '';
-    let stderrReadyBuffer = '';
-    let readyTask = null;
-    let readyStatus = 0;
-    let timedOut = false;
-    let settled = false;
-    let stopping = false;
-    let killTimer = null;
-
-    const child = spawn(command, args, {
-      cwd,
-      detached: process.platform !== 'win32',
-      env: { ...process.env, ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const finish = (status, signal) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeoutTimer);
-      clearTimeout(killTimer);
-      resolve({
-        status,
-        signal,
-        stdout,
-        stderr,
-        wallMs: performance.now() - startedAt,
-        readyMs,
-        routeTotalMs,
-        routeRequests,
-        updateMs,
-        updateRouteTotalMs,
-        updateRouteRequests,
-        timedOut,
-      });
-    };
-
-    const signalChild = signal => {
-      if (child.exitCode !== null) {
-        return;
-      }
-      try {
-        if (process.platform === 'win32' || !child.pid) {
-          child.kill(signal);
-        } else {
-          process.kill(-child.pid, signal);
-        }
-      } catch (error) {
-        if (error?.code !== 'ESRCH') {
-          stderr += `${error.stack ?? error.message}\n`;
-        }
-      }
-    };
-
-    const stopChild = () => {
-      if (child.exitCode !== null || stopping) {
-        return;
-      }
-      stopping = true;
-      signalChild('SIGTERM');
-      killTimer = setTimeout(() => {
-        signalChild('SIGKILL');
-      }, 5_000);
-      killTimer.unref?.();
-    };
-
-    const waitForNextReady = baselineCounts =>
-      new Promise((resolveReady, rejectReady) => {
-        const check = () => {
-          if (
-            [...requiredReady].every(
-              environment =>
-                (readyCounts.get(environment) ?? 0) >
-                (baselineCounts.get(environment) ?? 0)
-            )
-          ) {
-            resolveReady();
-            return true;
-          }
-          return false;
-        };
-        if (check()) {
-          return;
-        }
-        const interval = setInterval(() => {
-          if (settled || child.exitCode !== null) {
-            clearInterval(interval);
-            rejectReady(
-              new Error('Dev server exited before update rebuild completed.')
-            );
-            return;
-          }
-          if (check()) {
-            clearInterval(interval);
-          }
-        }, 25);
-        interval.unref?.();
-      });
-
-    const handleReady = async () => {
-      readyMs = performance.now() - startedAt;
-      if (devRoutePaths.length > 0) {
-        routePhasePending = true;
-        const routeStartedAt = performance.now();
-        routeRequests = await fetchDevRoutes({
-          origin: devRouteOrigin,
-          routePaths: devRoutePaths,
-          timeoutMs: devRouteTimeoutMs,
-        });
-        routeTotalMs = performance.now() - routeStartedAt;
-        routePhasePending = false;
-        if (routeRequests.some(request => !request.ok)) {
-          readyStatus = 1;
-        }
-      }
-      if (updateFile && updateRoutePaths.length > 0) {
-        updatePending = true;
-        let restoreUpdateFile = null;
-        const updateStartedAt = performance.now();
-        const baselineCounts = new Map(readyCounts);
-        try {
-          restoreUpdateFile = await applyDevUpdate(updateFile);
-          await waitForNextReady(baselineCounts);
-          updateMs = performance.now() - updateStartedAt;
-          const updateRouteStartedAt = performance.now();
-          updateRouteRequests = await fetchDevRoutes({
-            origin: devRouteOrigin,
-            routePaths: updateRoutePaths,
-            timeoutMs: devRouteTimeoutMs,
-          });
-          updateRouteTotalMs = performance.now() - updateRouteStartedAt;
-          if (updateRouteRequests.some(request => !request.ok)) {
-            readyStatus = 1;
-          }
-        } catch (error) {
-          readyStatus = 1;
-          stderr += `${error.stack ?? error.message}\n`;
-        } finally {
-          if (restoreUpdateFile) {
-            await restoreUpdateFile();
-          }
-          updatePending = false;
-        }
-      }
-      stopChild();
-    };
-
-    const scanReady = (stream, chunkText) => {
-      if (stream === 'stdout') {
-        stdoutReadyBuffer += chunkText;
-      } else {
-        stderrReadyBuffer += chunkText;
-      }
-
-      const buffer =
-        stream === 'stdout' ? stdoutReadyBuffer : stderrReadyBuffer;
-      const lines = buffer.split(/\r?\n/);
-      const partialLine = lines.pop() ?? '';
-      const output = stripAnsi(lines.join('\n'));
-
-      if (stream === 'stdout') {
-        stdoutReadyBuffer = partialLine;
-      } else {
-        stderrReadyBuffer = partialLine;
-      }
-
-      for (const match of output.matchAll(
-        /ready\s+built in .*?\((web|node)\)/gi
-      )) {
-        const environment = match[1].toLowerCase();
-        readyCounts.set(environment, (readyCounts.get(environment) ?? 0) + 1);
-      }
-      if (
-        !ready &&
-        [...requiredReady].every(environment => readyCounts.has(environment))
-      ) {
-        ready = true;
-        readyTask = handleReady();
-      }
-    };
-
-    child.stdout?.on('data', chunk => {
-      const text = String(chunk);
-      stdout += text;
-      process.stdout.write(text);
-      scanReady('stdout', text);
-    });
-    child.stderr?.on('data', chunk => {
-      const text = String(chunk);
-      stderr += text;
-      process.stderr.write(text);
-      scanReady('stderr', text);
-    });
-
-    const timeoutTimer = setTimeout(() => {
-      timedOut = true;
-      stopChild();
-    }, timeoutMs);
-    timeoutTimer.unref?.();
-
-    child.on('error', error => {
-      stderr += `${error.stack ?? error.message}\n`;
-      finish(1, null);
-    });
-    child.on('exit', (code, signal) => {
-      if (ready) {
-        if (routePhasePending || updatePending || readyTask) {
-          readyTask?.then(
-            () => {
-              finish(readyStatus, signal);
-            },
-            error => {
-              stderr += `${error.stack ?? error.message}\n`;
-              finish(1, signal);
-            }
-          );
-        } else {
-          finish(readyStatus, signal);
-        }
-        return;
-      }
-      finish(code ?? 1, signal);
-    });
-  });
 
 const parseTimeStats = stderr => {
   const user = stderr.match(/User time \(seconds\):\s*([\d.]+)/);
@@ -1193,7 +815,7 @@ const main = async () => {
         args.mode === 'dev'
           ? await (() => {
               const devPort = args.devPortBase + benchmarkIndex * 100 + index;
-              return runDevServerUntilReady({
+              return runDevServerBenchmark({
                 command: process.execPath,
                 args: [
                   rsbuildBin,
@@ -1217,9 +839,9 @@ const main = async () => {
                 },
                 readyEnvironments:
                   benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
-                devRouteOrigin: `http://localhost:${devPort}`,
-                devRoutePaths,
-                devRouteTimeoutMs: args.devRouteTimeoutMs,
+                origin: `http://localhost:${devPort}`,
+                routePaths: devRoutePaths,
+                routeTimeoutMs: args.devRouteTimeoutMs,
                 updateFile: fixtureResult.updateFile,
                 updateRoutePaths: fixtureResult.updateRoutePaths ?? ['/'],
                 timeoutMs: args.devTimeoutMs,
