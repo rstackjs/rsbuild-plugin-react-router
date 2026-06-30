@@ -138,10 +138,11 @@ console.log(
 
 function run(command, args, cwd, env = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const executable =
+      process.platform === 'win32' ? `${command}.cmd` : command;
+    const child = spawn(executable, args, {
       cwd,
       env: { ...process.env, ...env },
-      shell: process.platform === 'win32',
       stdio: 'inherit',
     });
     child.on('error', reject);
@@ -152,7 +153,7 @@ function run(command, args, cwd, env = {}) {
       }
       reject(
         new Error(
-          `${command} ${args.join(' ')} failed with ${code ?? signal} in ${cwd}`
+          `${executable} ${args.join(' ')} failed with ${code ?? signal} in ${cwd}`
         )
       );
     });
