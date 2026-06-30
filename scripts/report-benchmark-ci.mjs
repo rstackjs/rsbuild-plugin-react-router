@@ -167,6 +167,7 @@ const compareBenchmarks = (baseResult, headResult) => {
     const headUpdateMs = medianUpdate(headBenchmark);
     return {
       id,
+      fixture: headBenchmark?.fixture ?? baseBenchmark?.fixture ?? null,
       routeCount:
         headBenchmark?.routeCount ?? baseBenchmark?.routeCount ?? null,
       variant: headBenchmark?.variant ?? baseBenchmark?.variant ?? null,
@@ -308,33 +309,54 @@ const sumMetric = (benchmarks, key) => {
     : values.reduce((sum, value) => sum + value, 0);
 };
 
-const totalBaseWallMs = sumMetric(benchmarks, 'baseWallMs');
-const totalHeadWallMs = sumMetric(benchmarks, 'headWallMs');
-const totalBaseReadyMs = sumMetric(benchmarks, 'baseReadyMs');
-const totalHeadReadyMs = sumMetric(benchmarks, 'headReadyMs');
-const totalBaseRouteTotalMs = sumMetric(benchmarks, 'baseRouteTotalMs');
-const totalHeadRouteTotalMs = sumMetric(benchmarks, 'headRouteTotalMs');
-const totalBaseUpdateMs = sumMetric(benchmarks, 'baseUpdateMs');
-const totalHeadUpdateMs = sumMetric(benchmarks, 'headUpdateMs');
+const summarizeBenchmarkGroup = groupBenchmarks => {
+  const baseWallMs = sumMetric(groupBenchmarks, 'baseWallMs');
+  const headWallMs = sumMetric(groupBenchmarks, 'headWallMs');
+  const baseReadyMs = sumMetric(groupBenchmarks, 'baseReadyMs');
+  const headReadyMs = sumMetric(groupBenchmarks, 'headReadyMs');
+  const baseRouteTotalMs = sumMetric(groupBenchmarks, 'baseRouteTotalMs');
+  const headRouteTotalMs = sumMetric(groupBenchmarks, 'headRouteTotalMs');
+  const baseUpdateMs = sumMetric(groupBenchmarks, 'baseUpdateMs');
+  const headUpdateMs = sumMetric(groupBenchmarks, 'headUpdateMs');
 
-const summary = {
-  baseWallMs: totalBaseWallMs,
-  headWallMs: totalHeadWallMs,
-  baseReadyMs: totalBaseReadyMs,
-  headReadyMs: totalHeadReadyMs,
-  baseRouteTotalMs: totalBaseRouteTotalMs,
-  headRouteTotalMs: totalHeadRouteTotalMs,
-  baseUpdateMs: totalBaseUpdateMs,
-  headUpdateMs: totalHeadUpdateMs,
-  wallDeltaPercent: percentDelta(totalBaseWallMs, totalHeadWallMs),
-  wallSpeedup: speedup(totalBaseWallMs, totalHeadWallMs),
-  readyDeltaPercent: percentDelta(totalBaseReadyMs, totalHeadReadyMs),
-  routeTotalDeltaPercent: percentDelta(
-    totalBaseRouteTotalMs,
-    totalHeadRouteTotalMs
-  ),
-  updateDeltaPercent: percentDelta(totalBaseUpdateMs, totalHeadUpdateMs),
+  return {
+    count: groupBenchmarks.length,
+    baseWallMs,
+    headWallMs,
+    baseReadyMs,
+    headReadyMs,
+    baseRouteTotalMs,
+    headRouteTotalMs,
+    baseUpdateMs,
+    headUpdateMs,
+    wallDeltaPercent: percentDelta(baseWallMs, headWallMs),
+    wallSpeedup: speedup(baseWallMs, headWallMs),
+    readyDeltaPercent: percentDelta(baseReadyMs, headReadyMs),
+    routeTotalDeltaPercent: percentDelta(baseRouteTotalMs, headRouteTotalMs),
+    updateDeltaPercent: percentDelta(baseUpdateMs, headUpdateMs),
+  };
 };
+
+const isLargeAppBenchmark = benchmark =>
+  benchmark.fixture === 'large' || benchmark.id.startsWith('large-');
+
+const summary = summarizeBenchmarkGroup(benchmarks);
+const summaryGroups = [
+  { label: 'All dev fixtures', benchmarks },
+  {
+    label: 'Large app',
+    benchmarks: benchmarks.filter(isLargeAppBenchmark),
+  },
+  {
+    label: 'Standard fixtures',
+    benchmarks: benchmarks.filter(benchmark => !isLargeAppBenchmark(benchmark)),
+  },
+]
+  .filter(group => group.benchmarks.length > 0)
+  .map(group => ({
+    label: group.label,
+    ...summarizeBenchmarkGroup(group.benchmarks),
+  }));
 
 const report = {
   generatedAt: new Date().toISOString(),
@@ -355,6 +377,7 @@ const report = {
   iterations: head.iterations ?? base.iterations ?? null,
   warmup: head.warmup ?? base.warmup ?? null,
   summary,
+  summaryGroups,
   buildBenchmarks,
   benchmarks,
   syntheticBenchmark: syntheticBenchmarks[0] ?? null,
@@ -368,16 +391,27 @@ const renderComment = () => {
     '',
     `Compared PR head \`${report.head.sha?.slice(0, 7) ?? 'unknown'}\` against base \`${report.base.sha?.slice(0, 7) ?? 'unknown'}\`.`,
     '',
-    `**Total median wall time:** ${formatSeconds(summary.baseWallMs)} -> ${formatSeconds(summary.headWallMs)} (${formatPercent(summary.wallDeltaPercent)}, ${formatSpeedup(summary.wallSpeedup)} speedup)`,
-    ...(report.mode === 'dev'
-      ? [
-          `**Compiler ready median:** ${formatSeconds(summary.baseReadyMs)} -> ${formatSeconds(summary.headReadyMs)} (${formatPercent(summary.readyDeltaPercent)})`,
-          `**Route load median:** ${formatSeconds(summary.baseRouteTotalMs)} -> ${formatSeconds(summary.headRouteTotalMs)} (${formatPercent(summary.routeTotalDeltaPercent)})`,
-          `**Update/HMR median:** ${formatSeconds(summary.baseUpdateMs)} -> ${formatSeconds(summary.headUpdateMs)} (${formatPercent(summary.updateDeltaPercent)})`,
-        ]
-      : []),
-    '',
   ];
+
+  if (report.mode === 'dev') {
+    lines.push(
+      '### Dev Rollup',
+      '',
+      '| Group | Fixtures | Base total | Head total | Delta | Base ready | Head ready | Ready delta | Base routes | Head routes | Route delta | Base update/HMR | Head update/HMR | Update delta | Speedup |',
+      '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
+    );
+    for (const group of report.summaryGroups) {
+      lines.push(
+        `| ${group.label} | ${formatCount(group.count)} | ${formatSeconds(group.baseWallMs)} | ${formatSeconds(group.headWallMs)} | ${formatPercent(group.wallDeltaPercent)} | ${formatSeconds(group.baseReadyMs)} | ${formatSeconds(group.headReadyMs)} | ${formatPercent(group.readyDeltaPercent)} | ${formatSeconds(group.baseRouteTotalMs)} | ${formatSeconds(group.headRouteTotalMs)} | ${formatPercent(group.routeTotalDeltaPercent)} | ${formatSeconds(group.baseUpdateMs)} | ${formatSeconds(group.headUpdateMs)} | ${formatPercent(group.updateDeltaPercent)} | ${formatSpeedup(group.wallSpeedup)} |`
+      );
+    }
+    lines.push('');
+  } else {
+    lines.push(
+      `**Total median wall time:** ${formatSeconds(summary.baseWallMs)} -> ${formatSeconds(summary.headWallMs)} (${formatPercent(summary.wallDeltaPercent)}, ${formatSpeedup(summary.wallSpeedup)} speedup)`,
+      ''
+    );
+  }
 
   if (buildBenchmarks.length > 0) {
     lines.push(

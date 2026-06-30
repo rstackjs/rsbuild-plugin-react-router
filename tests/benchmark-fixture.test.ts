@@ -393,8 +393,9 @@ describe('benchmark fixture generator', () => {
         warmup: 0,
         benchmarks: [
           {
-            id: 'synthetic-256-ssr-esm',
-            routeCount: 256,
+            id: 'large-355-ssr-esm',
+            fixture: 'large',
+            routeCount: 355,
             variant: 'ssr-esm',
             summary: {
               wallMs: { median: 1000, mean: 1020, p95: 1100 },
@@ -680,10 +681,19 @@ describe('benchmark fixture generator', () => {
       );
       expect(comment).toContain('### Production Build Benchmarks');
       expect(comment).toContain('Rendered 2 production build benchmarks.');
+      expect(comment).toContain('### Dev Rollup');
+      expect(comment).toContain(
+        '| All dev fixtures | 2 | 1.80s | 1.66s | -7.8% | 1.20s | 1.11s | -7.5% | 0.55s | 0.48s | -12.7% | 0.38s | 0.34s | -10.5% | 1.08x |'
+      );
+      expect(comment).toContain(
+        '| Large app | 1 | 1.00s | 0.90s | -10.0% | 0.70s | 0.65s | -7.1% | 0.30s | 0.25s | -16.7% | 0.22s | 0.20s | -9.1% | 1.11x |'
+      );
+      expect(comment).toContain(
+        '| Standard fixtures | 1 | 0.80s | 0.76s | -5.0% | 0.50s | 0.46s | -8.0% | 0.25s | 0.23s | -8.0% | 0.16s | 0.14s | -12.5% | 1.05x |'
+      );
       expect(comment).toContain('Rendered 2 dev benchmark fixtures');
-      expect(comment).toContain('`synthetic-256-ssr-esm`');
+      expect(comment).toContain('`large-355-ssr-esm`');
       expect(comment).toContain('`synthetic-256-spa`');
-      expect(comment).toContain('**Update/HMR median:** 0.38s -> 0.34s (-10.5%)');
       expect(comment).not.toContain('Dev Route Requests');
       expect(comment).not.toContain('Dev Update Route Requests');
       expect(comment).toContain('#### synthetic-256-spa Plugin Operations');
@@ -697,12 +707,17 @@ describe('benchmark fixture generator', () => {
       expect(comment).toContain('| complex app | 1 | 12.00s | 11.00s | -8.3% | 9.00s | 8.50s | 2.20s | 2.00s | 0.80s | 0.70s | -12.5% | 11.00s | - | 1.09x | - |');
       expect(report.benchmarks).toHaveLength(2);
       expect(report.benchmarks.map((benchmark: { id: string }) => benchmark.id)).toEqual([
+        'large-355-ssr-esm',
         'synthetic-256-spa',
-        'synthetic-256-ssr-esm',
       ]);
+      expect(report.summaryGroups).toHaveLength(3);
       expect(report.summary.headWallMs).toBe(1660);
       expect(report.benchmarks[0].devRouteSummaries).toHaveLength(1);
-      expect(report.benchmarks[0].pluginOperations).toHaveLength(1);
+      expect(
+        report.benchmarks.find(
+          (benchmark: { id: string }) => benchmark.id === 'synthetic-256-spa'
+        ).pluginOperations
+      ).toHaveLength(1);
       expect(report.syntheticBenchmark).toMatchObject({
         profile: 'cold',
         baseMedianSeconds: 40,
