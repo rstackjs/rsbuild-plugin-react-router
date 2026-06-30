@@ -52,6 +52,8 @@ const formatRss = value =>
   typeof value === 'number' ? `${Math.round(value / 1024)} MB` : '-';
 const formatDurationSeconds = value =>
   typeof value === 'number' ? `${value.toFixed(2)}s` : '-';
+const formatMilliseconds = value =>
+  typeof value === 'number' ? `${value.toFixed(1)}ms` : '-';
 const formatCount = value => (typeof value === 'number' ? String(value) : '-');
 const formatBytes = value =>
   typeof value === 'number' ? String(Math.round(value)) : '-';
@@ -106,6 +108,32 @@ const indexBenchmarks = result =>
   new Map(
     (result.benchmarks ?? []).map(benchmark => [benchmark.id, benchmark])
   );
+
+const compareRouteSummaries = (baseRoutes = [], headRoutes = []) =>
+  [
+    ...new Set([
+      ...baseRoutes.map(route => route.path),
+      ...headRoutes.map(route => route.path),
+    ]),
+  ].map(routePath => {
+    const baseRoute = baseRoutes.find(route => route.path === routePath);
+    const headRoute = headRoutes.find(route => route.path === routePath);
+    const baseMedianMs = baseRoute?.ms?.median ?? null;
+    const headMedianMs = headRoute?.ms?.median ?? null;
+
+    return {
+      path: routePath,
+      count: headRoute?.count ?? baseRoute?.count ?? null,
+      baseMedianMs,
+      headMedianMs,
+      deltaPercent: percentDelta(baseMedianMs, headMedianMs),
+      headMeanMs: headRoute?.ms?.mean ?? null,
+      headP95Ms: headRoute?.ms?.p95 ?? null,
+      headMedianBytes: headRoute?.bytes?.median ?? null,
+      statuses: headRoute?.statuses ?? baseRoute?.statuses ?? [],
+      failures: headRoute?.failures ?? baseRoute?.failures ?? null,
+    };
+  });
 
 const base = await readJson(values.base);
 const head = await readJson(values.head);
@@ -163,64 +191,14 @@ const compareBenchmarks = (baseResult, headResult) => {
       headRunCount: headBenchmark?.runs?.length ?? null,
       headWallMeanMs: headBenchmark?.summary?.wallMs?.mean ?? null,
       headWallP95Ms: headBenchmark?.summary?.wallMs?.p95 ?? null,
-      devRouteSummaries: [
-        ...new Set([
-          ...(baseBenchmark?.devRouteSummary ?? []).map(route => route.path),
-          ...(headBenchmark?.devRouteSummary ?? []).map(route => route.path),
-        ]),
-      ].map(routePath => {
-        const baseRoute = baseBenchmark?.devRouteSummary?.find(
-          route => route.path === routePath
-        );
-        const headRoute = headBenchmark?.devRouteSummary?.find(
-          route => route.path === routePath
-        );
-        const baseMedianMs = baseRoute?.ms?.median ?? null;
-        const headMedianMs = headRoute?.ms?.median ?? null;
-        return {
-          path: routePath,
-          count: headRoute?.count ?? baseRoute?.count ?? null,
-          baseMedianMs,
-          headMedianMs,
-          deltaPercent: percentDelta(baseMedianMs, headMedianMs),
-          headMeanMs: headRoute?.ms?.mean ?? null,
-          headP95Ms: headRoute?.ms?.p95 ?? null,
-          headMedianBytes: headRoute?.bytes?.median ?? null,
-          statuses: headRoute?.statuses ?? baseRoute?.statuses ?? [],
-          failures: headRoute?.failures ?? baseRoute?.failures ?? null,
-        };
-      }),
-      devUpdateRouteSummaries: [
-        ...new Set([
-          ...(baseBenchmark?.devUpdateRouteSummary ?? []).map(
-            route => route.path
-          ),
-          ...(headBenchmark?.devUpdateRouteSummary ?? []).map(
-            route => route.path
-          ),
-        ]),
-      ].map(routePath => {
-        const baseRoute = baseBenchmark?.devUpdateRouteSummary?.find(
-          route => route.path === routePath
-        );
-        const headRoute = headBenchmark?.devUpdateRouteSummary?.find(
-          route => route.path === routePath
-        );
-        const baseMedianMs = baseRoute?.ms?.median ?? null;
-        const headMedianMs = headRoute?.ms?.median ?? null;
-        return {
-          path: routePath,
-          count: headRoute?.count ?? baseRoute?.count ?? null,
-          baseMedianMs,
-          headMedianMs,
-          deltaPercent: percentDelta(baseMedianMs, headMedianMs),
-          headMeanMs: headRoute?.ms?.mean ?? null,
-          headP95Ms: headRoute?.ms?.p95 ?? null,
-          headMedianBytes: headRoute?.bytes?.median ?? null,
-          statuses: headRoute?.statuses ?? baseRoute?.statuses ?? [],
-          failures: headRoute?.failures ?? baseRoute?.failures ?? null,
-        };
-      }),
+      devRouteSummaries: compareRouteSummaries(
+        baseBenchmark?.devRouteSummary,
+        headBenchmark?.devRouteSummary
+      ),
+      devUpdateRouteSummaries: compareRouteSummaries(
+        baseBenchmark?.devUpdateRouteSummary,
+        headBenchmark?.devUpdateRouteSummary
+      ),
       pluginOperations: [
         ...new Set([
           ...(baseBenchmark?.pluginOperations ?? []).map(
@@ -399,7 +377,7 @@ const renderComment = () => {
     lines.push(
       '### Production Build Benchmarks',
       '',
-      `Rendered ${buildBenchmarks.length} cold production build benchmark${buildBenchmarks.length === 1 ? '' : 's'}.`,
+      `Rendered ${buildBenchmarks.length} production build benchmark${buildBenchmarks.length === 1 ? '' : 's'}.`,
       '',
       '| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
       '|---|---:|---:|---:|---:|---:|---:|---:|---:|'
@@ -476,7 +454,7 @@ const renderComment = () => {
     );
     for (const operation of benchmark.pluginOperations.slice(0, 12)) {
       lines.push(
-        `| ${operation.environment} | \`${operation.operation}\` | ${formatCount(operation.count)} | ${formatSeconds(operation.baseTotalMs)} | ${formatSeconds(operation.headTotalMs)} | ${formatPercent(operation.deltaPercent)} | ${formatSeconds(operation.headWallMs)} | ${formatSeconds(operation.headMaxMs)} | ${formatCount(operation.reports)} |`
+        `| ${operation.environment} | \`${operation.operation}\` | ${formatCount(operation.count)} | ${formatMilliseconds(operation.baseTotalMs)} | ${formatMilliseconds(operation.headTotalMs)} | ${formatPercent(operation.deltaPercent)} | ${formatMilliseconds(operation.headWallMs)} | ${formatMilliseconds(operation.headMaxMs)} | ${formatCount(operation.reports)} |`
       );
     }
   }

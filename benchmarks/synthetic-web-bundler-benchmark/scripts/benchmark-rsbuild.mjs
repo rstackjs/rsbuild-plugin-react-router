@@ -4,6 +4,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import {
+  createReadyLogObserver,
   formatMarkdown,
   isReactRouterPerformanceLoggingEnabled,
   parseArgs,
@@ -17,8 +18,14 @@ const { out, profile, runs } = parseArgs(process.argv.slice(2));
 const logReactRouterPerformance = isReactRouterPerformanceLoggingEnabled();
 const devRoutePaths = ['/', '/feature/0000', '/feature/0010', '/feature/0100'];
 const devPortBase = 44000;
-const devTimeoutMs = 180_000;
-const devRouteTimeoutMs = 30_000;
+const devTimeoutMs = readPositiveIntegerEnv(
+  'SYNTHETIC_DEV_TIMEOUT_MS',
+  300_000
+);
+const devRouteTimeoutMs = readPositiveIntegerEnv(
+  'SYNTHETIC_DEV_ROUTE_TIMEOUT_MS',
+  30_000
+);
 
 await run(process.execPath, [path.join(root, 'scripts/generate-app.mjs')]);
 
@@ -47,9 +54,9 @@ for (const selectedProfile of selectedProfiles) {
       });
       results.push(result);
       console.log(
-        `rsbuild dev ${index}/${runs}: ready ${(
-          result.readyMs / 1000
-        ).toFixed(2)}s, routes ${(result.routeTotalMs / 1000).toFixed(
+        `rsbuild dev ${index}/${runs}: ready ${(result.readyMs / 1000).toFixed(
+          2
+        )}s, routes ${(result.routeTotalMs / 1000).toFixed(
           2
         )}s, update ${(result.updateMs / 1000).toFixed(2)}s`
       );
@@ -178,24 +185,22 @@ async function runDevServer({ port, routePaths, updateFile }) {
   ]);
   let exitStatus = null;
   const waiters = new Set();
+  const readyObserver = createReadyLogObserver(environment => {
+    readyCounts.set(environment, (readyCounts.get(environment) ?? 0) + 1);
+  });
 
-  const observe = chunk => {
+  const observe = stream => chunk => {
     const text = chunk.toString();
     output.append(text);
     process.stdout.write(text);
-    for (const match of stripAnsi(text).matchAll(
-      /ready\s+built in .*?\((web|node)\)/gi
-    )) {
-      const environment = match[1].toLowerCase();
-      readyCounts.set(environment, (readyCounts.get(environment) ?? 0) + 1);
-    }
+    readyObserver.observe(stream, text);
     for (const waiter of waiters) {
       waiter.check();
     }
   };
 
-  child.stdout.on('data', observe);
-  child.stderr.on('data', observe);
+  child.stdout.on('data', observe('stdout'));
+  child.stderr.on('data', observe('stderr'));
   child.on('exit', (code, signal) => {
     exitStatus = code ?? signal;
     for (const waiter of waiters) {
@@ -204,7 +209,11 @@ async function runDevServer({ port, routePaths, updateFile }) {
   });
 
   try {
-    await waitForReady({ readyCounts, waiters, getExitStatus: () => exitStatus });
+    await waitForReady({
+      readyCounts,
+      waiters,
+      getExitStatus: () => exitStatus,
+    });
     const readyMs = performance.now() - started;
     const routeStarted = performance.now();
     const routeRequests = await fetchRoutes({ origin, routePaths });
@@ -215,7 +224,11 @@ async function runDevServer({ port, routePaths, updateFile }) {
       updateFile,
       `${originalSource}\nexport const __syntheticBenchmarkHmrProbe = ${Date.now()};\n`
     );
-    await waitForReady({ readyCounts, waiters, getExitStatus: () => exitStatus });
+    await waitForReady({
+      readyCounts,
+      waiters,
+      getExitStatus: () => exitStatus,
+    });
     const updateMs = performance.now() - updateStarted;
     const updateRouteRequests = await fetchRoutes({
       origin,
@@ -338,8 +351,16 @@ function appendNodeOption(value, option) {
     : [...options, option].join(' ');
 }
 
-function stripAnsi(value) {
-  return value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+function readPositiveIntegerEnv(name, fallback) {
+  const value = process.env[name];
+  if (value == null || value === '') {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
 }
 
 function stopChild(child) {

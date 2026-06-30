@@ -41,3 +41,6 @@ Root CI benchmarks the PR base plugin and PR head plugin against the same
 embedded app by staging each built plugin package into this workspace fixture.
 It records a cold build plus a dev server pass with readiness, route-load, and
 generated route-module update rebuild timings.
+
+Set `SYNTHETIC_DEV_TIMEOUT_MS` or `SYNTHETIC_DEV_ROUTE_TIMEOUT_MS` to tune dev
+server readiness and route-fetch timeouts for slower CI runners.

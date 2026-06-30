@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  createReadyLogObserver,
   formatMarkdown,
   parseArgs,
   parseReactRouterPerformanceLogs,
@@ -114,6 +115,22 @@ test('parseReactRouterPerformanceLogs extracts JSON payloads from benchmark logs
       operations: {},
     },
   ]);
+});
+
+test('createReadyLogObserver handles ready lines split across chunks', () => {
+  const environments = [];
+  const observer = createReadyLogObserver(environment => {
+    environments.push(environment);
+  });
+
+  observer.observe('stdout', 'ready   built in 1.');
+  observer.observe('stdout', '23s (web)\nrea');
+  observer.observe('stderr', 'ready   built in 0.');
+  observer.observe('stderr', '45s ');
+  observer.observe('stdout', 'dy   built in 2.34s (node)\n');
+  observer.observe('stderr', '(node)\n');
+
+  assert.deepEqual(environments, ['web', 'node', 'node']);
 });
 
 test('parseReactRouterPerformanceLogs rejects malformed prefixed JSON', () => {

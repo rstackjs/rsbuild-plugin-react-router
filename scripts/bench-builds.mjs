@@ -406,7 +406,9 @@ const runDevServerUntilReady = async ({
     let updateMs = null;
     let updateRouteTotalMs = null;
     let updateRouteRequests = [];
-    let readyBuffer = '';
+    let stdoutReadyBuffer = '';
+    let stderrReadyBuffer = '';
+    let readyTask = null;
     let readyStatus = 0;
     let timedOut = false;
     let settled = false;
@@ -553,11 +555,25 @@ const runDevServerUntilReady = async ({
       stopChild();
     };
 
-    const scanReady = chunkText => {
-      readyBuffer += stripAnsi(chunkText);
-      const lines = readyBuffer.split(/\r?\n/);
-      readyBuffer = lines.pop() ?? '';
-      const output = lines.join('\n');
+    const scanReady = (stream, chunkText) => {
+      if (stream === 'stdout') {
+        stdoutReadyBuffer += chunkText;
+      } else {
+        stderrReadyBuffer += chunkText;
+      }
+
+      const buffer =
+        stream === 'stdout' ? stdoutReadyBuffer : stderrReadyBuffer;
+      const lines = buffer.split(/\r?\n/);
+      const partialLine = lines.pop() ?? '';
+      const output = stripAnsi(lines.join('\n'));
+
+      if (stream === 'stdout') {
+        stdoutReadyBuffer = partialLine;
+      } else {
+        stderrReadyBuffer = partialLine;
+      }
+
       for (const match of output.matchAll(
         /ready\s+built in .*?\((web|node)\)/gi
       )) {
@@ -569,7 +585,7 @@ const runDevServerUntilReady = async ({
         [...requiredReady].every(environment => readyCounts.has(environment))
       ) {
         ready = true;
-        void handleReady();
+        readyTask = handleReady();
       }
     };
 
@@ -577,13 +593,13 @@ const runDevServerUntilReady = async ({
       const text = String(chunk);
       stdout += text;
       process.stdout.write(text);
-      scanReady(text);
+      scanReady('stdout', text);
     });
     child.stderr?.on('data', chunk => {
       const text = String(chunk);
       stderr += text;
       process.stderr.write(text);
-      scanReady(text);
+      scanReady('stderr', text);
     });
 
     const timeoutTimer = setTimeout(() => {
@@ -598,11 +614,19 @@ const runDevServerUntilReady = async ({
     });
     child.on('exit', (code, signal) => {
       if (ready) {
-        if (routePhasePending || updatePending) {
-          finish(1, signal);
-          return;
+        if (routePhasePending || updatePending || readyTask) {
+          readyTask?.then(
+            () => {
+              finish(readyStatus, signal);
+            },
+            error => {
+              stderr += `${error.stack ?? error.message}\n`;
+              finish(1, signal);
+            }
+          );
+        } else {
+          finish(readyStatus, signal);
         }
-        finish(readyStatus, signal);
         return;
       }
       finish(code ?? 1, signal);
@@ -766,6 +790,40 @@ const formatReportMs = value => (value == null ? '-' : `${value.toFixed(1)}ms`);
 const formatRss = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
 
+const appendDevRequestSummary = (lines, benchmark, key, title) => {
+  const requests = benchmark[key];
+  if (!requests?.length) {
+    return;
+  }
+
+  lines.push(
+    '',
+    `## ${benchmark.id} ${title}`,
+    '',
+    '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
+    '|---|---:|---:|---:|---:|---|---:|'
+  );
+
+  for (const request of requests) {
+    lines.push(
+      [
+        `\`${request.path}\``,
+        formatMs(request.ms.median),
+        formatMs(request.ms.mean),
+        formatMs(request.ms.p95),
+        request.bytes.median == null
+          ? '-'
+          : String(Math.round(request.bytes.median)),
+        request.statuses.join(', '),
+        request.failures,
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |')
+    );
+  }
+};
+
 const renderMarkdown = result => {
   const lines = [
     '# Rsbuild React Router Benchmark Baseline',
@@ -818,65 +876,18 @@ const renderMarkdown = result => {
   }
 
   for (const benchmark of result.benchmarks) {
-    if (!benchmark.devRouteSummary?.length) {
-      continue;
-    }
-    lines.push(
-      '',
-      `## ${benchmark.id} Dev Route Requests`,
-      '',
-      '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
-      '|---|---:|---:|---:|---:|---|---:|'
+    appendDevRequestSummary(
+      lines,
+      benchmark,
+      'devRouteSummary',
+      'Dev Route Requests'
     );
-    for (const request of benchmark.devRouteSummary) {
-      lines.push(
-        [
-          `\`${request.path}\``,
-          formatMs(request.ms.median),
-          formatMs(request.ms.mean),
-          formatMs(request.ms.p95),
-          request.bytes.median == null
-            ? '-'
-            : String(Math.round(request.bytes.median)),
-          request.statuses.join(', '),
-          request.failures,
-        ]
-          .join(' | ')
-          .replace(/^/, '| ')
-          .replace(/$/, ' |')
-      );
-    }
-  }
-
-  for (const benchmark of result.benchmarks) {
-    if (!benchmark.devUpdateRouteSummary?.length) {
-      continue;
-    }
-    lines.push(
-      '',
-      `## ${benchmark.id} Dev Update Route Requests`,
-      '',
-      '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
-      '|---|---:|---:|---:|---:|---|---:|'
+    appendDevRequestSummary(
+      lines,
+      benchmark,
+      'devUpdateRouteSummary',
+      'Dev Update Route Requests'
     );
-    for (const request of benchmark.devUpdateRouteSummary) {
-      lines.push(
-        [
-          `\`${request.path}\``,
-          formatMs(request.ms.median),
-          formatMs(request.ms.mean),
-          formatMs(request.ms.p95),
-          request.bytes.median == null
-            ? '-'
-            : String(Math.round(request.bytes.median)),
-          request.statuses.join(', '),
-          request.failures,
-        ]
-          .join(' | ')
-          .replace(/^/, '| ')
-          .replace(/$/, ' |')
-      );
-    }
   }
 
   for (const benchmark of result.benchmarks) {

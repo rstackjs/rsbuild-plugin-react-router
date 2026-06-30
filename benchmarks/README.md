@@ -11,22 +11,25 @@ pnpm bench:smoke
 pnpm bench:baseline
 pnpm bench:full
 pnpm bench:large
-pnpm bench:synthetic-app -- --runs=1
+pnpm bench:synthetic-app -- --runs=5
 ```
 
 `bench:smoke` is a one-iteration sanity check. `bench:baseline` is the default
-comparison point for plugin performance work. CI compares the `large` profile in
-dev mode, which measures both compiler readiness and representative route loads
-after the dev server is ready. `bench:full` adds larger route counts.
+comparison point for plugin performance work. CI compares the `full` profile in
+production build mode and dev mode. The dev pass measures compiler readiness,
+representative route loads, and route-module update rebuilds as an HMR proxy.
+`bench:full` includes SSR, split-route, SPA, sourcemap, and large source-graph
+fixtures.
 `bench:large` runs a 355-route synthetic app with a broad source graph:
 generated modules, dynamic imports, workers, SVG assets, CSS modules, and large
 public locale payloads.
 `bench:synthetic-app` runs the large Rsbuild app workspace package in
 `benchmarks/synthetic-web-bundler-benchmark/`. That fixture keeps the larger
 10k-module app/config shape used to diagnose real-world Rsbuild transform
-contention. CI runs it against the PR base plugin build and PR head plugin build
-using whichever PR checkout contains the workspace fixture, so older PR branches
-that do not contain the fixture can still use the base checkout copy.
+contention. CI runs it against the PR base plugin build and PR head plugin build.
+The fixture and wrapper are loaded from the PR head checkout when available,
+falling back to the base checkout only for older PR branches that do not contain
+the embedded benchmark.
 
 All benchmark profiles generate deterministic synthetic React Router apps under
 `.benchmark/fixtures/`, build the current plugin package once, then run Rsbuild
@@ -42,10 +45,11 @@ node scripts/bench-builds.mjs --profile=large --mode=dev --iterations=5 --warmup
 ```
 
 Dev mode starts `rsbuild dev`, waits for the required compilers to print ready
-messages, then fetches representative routes before terminating the server. The
-JSON and markdown reports separate compiler `readyMs`, post-ready
-`routeTotalMs`, and total wall time. GNU time CPU/RSS collection and Rspack
-profile capture are build-mode features.
+messages, fetches representative routes, edits a generated route module, waits
+for the update rebuild, fetches the update route, and then terminates the
+server. The JSON and markdown reports separate compiler `readyMs`, post-ready
+`routeTotalMs`, update/HMR `updateMs`, and total wall time. GNU time CPU/RSS
+collection and Rspack profile capture are build-mode features.
 
 By default, dev mode requests `/`, a stable sample of generated route paths, and
 the last route in the fixture. Use `--dev-routes=none` for readiness-only

@@ -1,6 +1,9 @@
 const VALID_PROFILES = new Set(['cold', 'warm', 'both', 'dev', 'all']);
 const REACT_ROUTER_PERFORMANCE_LOG_PREFIX = '[react-router:performance]';
 const REACT_ROUTER_PERFORMANCE_ENV = 'SYNTHETIC_REACT_ROUTER_LOG_PERFORMANCE';
+const READY_LOG_PATTERN = /ready\s+built in .*?\((web|node)\)/gi;
+
+const stripAnsi = value => value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
 
 export function isReactRouterPerformanceLoggingEnabled(env = process.env) {
   const value = env[REACT_ROUTER_PERFORMANCE_ENV];
@@ -26,6 +29,27 @@ export function parseReactRouterPerformanceLogs(logs) {
     }
   }
   return entries;
+}
+
+export function createReadyLogObserver(onReady) {
+  const buffers = new Map([
+    ['stdout', ''],
+    ['stderr', ''],
+  ]);
+
+  return {
+    observe(stream, chunk) {
+      const text = `${buffers.get(stream) ?? ''}${chunk}`;
+      const lines = text.split(/\r?\n/);
+      buffers.set(stream, lines.pop() ?? '');
+
+      for (const match of stripAnsi(lines.join('\n')).matchAll(
+        READY_LOG_PATTERN
+      )) {
+        onReady(match[1].toLowerCase());
+      }
+    },
+  };
 }
 
 export function parseArgs(argv) {
@@ -60,8 +84,7 @@ export function summarizeMetric(values) {
     sorted.length % 2
       ? sorted[middle]
       : (sorted[middle - 1] + sorted[middle]) / 2;
-  const mean =
-    samples.reduce((sum, value) => sum + value, 0) / samples.length;
+  const mean = samples.reduce((sum, value) => sum + value, 0) / samples.length;
   return { samples, median, mean };
 }
 

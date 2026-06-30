@@ -673,7 +673,7 @@ describe('benchmark fixture generator', () => {
         readFileSync(join(root, 'report/report.json'), 'utf8')
       );
       expect(comment).toContain('### Production Build Benchmarks');
-      expect(comment).toContain('Rendered 2 cold production build benchmarks.');
+      expect(comment).toContain('Rendered 2 production build benchmarks.');
       expect(comment).toContain('Rendered 2 dev benchmark fixtures');
       expect(comment).toContain('`synthetic-256-ssr-esm`');
       expect(comment).toContain('`synthetic-256-spa`');
@@ -683,6 +683,7 @@ describe('benchmark fixture generator', () => {
       expect(comment).toContain('| `/route-0001` | 1 | 0.09s | 0.08s | -11.1% |');
       expect(comment).toContain('#### synthetic-256-spa Plugin Operations');
       expect(comment).toContain('`route:module`');
+      expect(comment).toContain('| web | `route:module` | 256 | 600.0ms | 500.0ms | -16.7% | 350.0ms | 18.0ms | 1 |');
       expect(comment).toContain('### Synthetic Rsbuild App');
       expect(comment).toContain('complex app');
       expect(comment).toContain('`cold`');

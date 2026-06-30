@@ -22,12 +22,12 @@ jobs:
       BENCHMARK_PROFILE: full
       BENCHMARK_BUILD_ITERATIONS: '1'
       BENCHMARK_MODE: dev
-      BENCHMARK_ITERATIONS: '5'
+      BENCHMARK_ITERATIONS: '1'
       BENCHMARK_WARMUP: '0'
       BENCHMARK_DEV_ROUTES: auto
       BENCHMARK_HISTORY_BRANCH: benchmark-results
       SYNTHETIC_BENCHMARK_PROFILE: all
-      SYNTHETIC_BENCHMARK_RUNS: '1'
+      SYNTHETIC_BENCHMARK_RUNS: '5'
 
     steps:
       - name: Checkout PR head
@@ -87,7 +87,7 @@ jobs:
           app_root=""
           tool_root=""
 
-          for checkout in "$GITHUB_WORKSPACE/base" "$GITHUB_WORKSPACE/head"; do
+          for checkout in "$GITHUB_WORKSPACE/head" "$GITHUB_WORKSPACE/base"; do
             if [ -z "$app_root" ] && [ -f "$checkout/$fixture/package.json" ]; then
               app_root="$checkout/$fixture"
             fi
