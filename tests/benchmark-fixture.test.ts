@@ -28,6 +28,8 @@ describe('benchmark fixture generator', () => {
 
       expect(result.routeCount).toBe(8);
       expect(result.variant).toBe('ssr-esm-split');
+      expect(result.updateFile).toBe(join(root, 'app/routes/route-0001.tsx'));
+      expect(result.updateRoutePaths).toEqual(['/']);
       expect(existsSync(join(root, 'app/routes.ts'))).toBe(true);
       expect(existsSync(join(root, 'rsbuild.config.mjs'))).toBe(true);
 
@@ -276,6 +278,10 @@ describe('benchmark fixture generator', () => {
 
       expect(result.fixture).toBe('large');
       expect(result.routeCount).toBe(2);
+      expect(result.updateFile).toBe(
+        join(root, 'app/generated/routes/route-0000.tsx')
+      );
+      expect(result.updateRoutePaths).toEqual(['/']);
       expect(result.stats).toEqual({
         codeModules: 19,
         dynamicImports: 2,
@@ -381,18 +387,90 @@ describe('benchmark fixture generator', () => {
     try {
       const baseBenchmark = {
         commit: 'base-sha',
-        profile: 'large',
+        profile: 'full',
         mode: 'dev',
         iterations: 1,
         warmup: 0,
         benchmarks: [
           {
-            id: 'synthetic-large',
+            id: 'synthetic-256-ssr-esm',
+            routeCount: 256,
+            variant: 'ssr-esm',
             summary: {
-              wallMs: { median: 1000 },
+              wallMs: { median: 1000, mean: 1020, p95: 1100 },
               readyMs: { median: 700 },
               routeTotalMs: { median: 300 },
+              updateMs: { median: 220 },
+              updateRouteTotalMs: { median: 180 },
+              maxRssKb: { p95: 512000 },
             },
+            runs: [{ wallMs: 1000 }],
+            devRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 240, mean: 240, p95: 240 },
+                bytes: { median: 4096 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 180, mean: 180, p95: 180 },
+                bytes: { median: 4096 },
+              },
+            ],
+            pluginOperations: [],
+          },
+          {
+            id: 'synthetic-256-spa',
+            routeCount: 256,
+            variant: 'spa',
+            summary: {
+              wallMs: { median: 800, mean: 810, p95: 900 },
+              readyMs: { median: 500 },
+              routeTotalMs: { median: 250 },
+              updateMs: { median: 160 },
+              updateRouteTotalMs: { median: 90 },
+              maxRssKb: { p95: 256000 },
+            },
+            runs: [{ wallMs: 800 }],
+            devRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 120, mean: 125, p95: 150 },
+                bytes: { median: 2048 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 90, mean: 95, p95: 110 },
+                bytes: { median: 2048 },
+              },
+            ],
+            pluginOperations: [
+              {
+                environment: 'web',
+                operation: 'route:module',
+                count: 256,
+                totalMs: 600,
+                wallMs: 400,
+                maxMs: 20,
+                reports: 1,
+              },
+            ],
           },
         ],
       };
@@ -401,14 +479,111 @@ describe('benchmark fixture generator', () => {
         commit: 'head-sha',
         benchmarks: [
           {
-            id: 'synthetic-large',
+            ...baseBenchmark.benchmarks[0],
             summary: {
-              wallMs: { median: 900 },
+              wallMs: { median: 900, mean: 920, p95: 1000 },
               readyMs: { median: 650 },
               routeTotalMs: { median: 250 },
+              updateMs: { median: 200 },
+              updateRouteTotalMs: { median: 150 },
+              maxRssKb: { p95: 500000 },
             },
+            runs: [{ wallMs: 900 }],
+            devRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 200, mean: 200, p95: 200 },
+                bytes: { median: 4096 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 150, mean: 150, p95: 150 },
+                bytes: { median: 4096 },
+              },
+            ],
+          },
+          {
+            ...baseBenchmark.benchmarks[1],
+            summary: {
+              wallMs: { median: 760, mean: 780, p95: 840 },
+              readyMs: { median: 460 },
+              routeTotalMs: { median: 230 },
+              updateMs: { median: 140 },
+              updateRouteTotalMs: { median: 80 },
+              maxRssKb: { p95: 250000 },
+            },
+            runs: [{ wallMs: 760 }],
+            devRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 100, mean: 105, p95: 130 },
+                bytes: { median: 2048 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 80, mean: 85, p95: 100 },
+                bytes: { median: 2048 },
+              },
+            ],
+            pluginOperations: [
+              {
+                environment: 'web',
+                operation: 'route:module',
+                count: 256,
+                totalMs: 500,
+                wallMs: 350,
+                maxMs: 18,
+                reports: 1,
+              },
+            ],
           },
         ],
+      };
+      const baseBuildBenchmark = {
+        ...baseBenchmark,
+        mode: 'build',
+        benchmarks: baseBenchmark.benchmarks.map(benchmark => ({
+          ...benchmark,
+          summary: {
+            wallMs: benchmark.summary.wallMs,
+            userMs: { median: 700 },
+            sysMs: { median: 100 },
+            maxRssKb: benchmark.summary.maxRssKb,
+          },
+          devRouteSummary: [],
+          devUpdateRouteSummary: [],
+        })),
+      };
+      const headBuildBenchmark = {
+        ...headBenchmark,
+        mode: 'build',
+        benchmarks: headBenchmark.benchmarks.map(benchmark => ({
+          ...benchmark,
+          summary: {
+            wallMs: benchmark.summary.wallMs,
+            userMs: { median: 650 },
+            sysMs: { median: 90 },
+            maxRssKb: benchmark.summary.maxRssKb,
+          },
+          devRouteSummary: [],
+          devUpdateRouteSummary: [],
+        })),
       };
       const baseSynthetic = {
         generatedAt: '2026-06-15T00:00:00.000Z',
@@ -454,6 +629,8 @@ describe('benchmark fixture generator', () => {
       mkdirSync(join(root, 'head-synthetic'), { recursive: true });
       writeJson(join(root, 'base.json'), baseBenchmark);
       writeJson(join(root, 'head.json'), headBenchmark);
+      writeJson(join(root, 'base-build.json'), baseBuildBenchmark);
+      writeJson(join(root, 'head-build.json'), headBuildBenchmark);
       writeJson(join(root, 'base-synthetic/result-rsbuild.json'), baseSynthetic);
       writeJson(join(root, 'head-synthetic/result-rsbuild.json'), headSynthetic);
       writeJson(join(root, 'base-synthetic/latest.json'), {
@@ -473,6 +650,10 @@ describe('benchmark fixture generator', () => {
           join(root, 'base.json'),
           '--head',
           join(root, 'head.json'),
+          '--build-base',
+          join(root, 'base-build.json'),
+          '--build-head',
+          join(root, 'head-build.json'),
           '--synthetic-base',
           join(root, 'base-synthetic/latest.json'),
           '--synthetic-head',
@@ -491,6 +672,17 @@ describe('benchmark fixture generator', () => {
       const report = JSON.parse(
         readFileSync(join(root, 'report/report.json'), 'utf8')
       );
+      expect(comment).toContain('### Production Build Benchmarks');
+      expect(comment).toContain('Rendered 2 cold production build benchmarks.');
+      expect(comment).toContain('Rendered 2 dev benchmark fixtures');
+      expect(comment).toContain('`synthetic-256-ssr-esm`');
+      expect(comment).toContain('`synthetic-256-spa`');
+      expect(comment).toContain('**Update/HMR median:** 0.38s -> 0.34s (-10.5%)');
+      expect(comment).toContain('| `/route-0001` | 1 | 0.12s | 0.10s | -16.7% |');
+      expect(comment).toContain('#### synthetic-256-spa Dev Update Route Requests');
+      expect(comment).toContain('| `/route-0001` | 1 | 0.09s | 0.08s | -11.1% |');
+      expect(comment).toContain('#### synthetic-256-spa Plugin Operations');
+      expect(comment).toContain('`route:module`');
       expect(comment).toContain('### Synthetic Rsbuild App');
       expect(comment).toContain('complex app');
       expect(comment).toContain('`cold`');
@@ -501,6 +693,14 @@ describe('benchmark fixture generator', () => {
       expect(comment).toContain('2.00s');
       expect(comment).toContain('0.70s');
       expect(comment).toContain('-10.0%');
+      expect(report.benchmarks).toHaveLength(2);
+      expect(report.benchmarks.map((benchmark: { id: string }) => benchmark.id)).toEqual([
+        'synthetic-256-spa',
+        'synthetic-256-ssr-esm',
+      ]);
+      expect(report.summary.headWallMs).toBe(1660);
+      expect(report.benchmarks[0].devRouteSummaries).toHaveLength(1);
+      expect(report.benchmarks[0].pluginOperations).toHaveLength(1);
       expect(report.syntheticBenchmark).toMatchObject({
         profile: 'cold',
         baseMedianSeconds: 40,

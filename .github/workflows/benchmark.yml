@@ -14,12 +14,13 @@ concurrency:
 
 jobs:
   benchmark:
-    name: Compare large dev benchmark
+    name: Compare full build and dev benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     env:
-      BENCHMARK_PROFILE: large
+      BENCHMARK_PROFILE: full
+      BENCHMARK_BUILD_ITERATIONS: '1'
       BENCHMARK_MODE: dev
       BENCHMARK_ITERATIONS: '5'
       BENCHMARK_WARMUP: '0'
@@ -112,7 +113,33 @@ jobs:
           node -e "const { pathToFileURL } = require('node:url'); console.log('PLUGIN_REACT_IMPORT=' + pathToFileURL(process.argv[1]).href)" \
             "$GITHUB_WORKSPACE/head/node_modules/@rsbuild/plugin-react/dist/index.js" >> "$GITHUB_OUTPUT"
 
-      - name: Benchmark base
+      - name: Benchmark base production build
+        working-directory: base
+        env:
+          REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
+        run: |
+          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mjs" \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode build \
+            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --clean build \
+            --format both \
+            --out "$GITHUB_WORKSPACE/benchmark-output/build/base"
+
+      - name: Benchmark head production build
+        working-directory: head
+        run: |
+          node scripts/bench-builds.mjs \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode build \
+            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --clean build \
+            --format both \
+            --out "$GITHUB_WORKSPACE/benchmark-output/build/head"
+
+      - name: Benchmark base dev
         working-directory: base
         env:
           REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
@@ -125,9 +152,9 @@ jobs:
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
-            --out "$GITHUB_WORKSPACE/benchmark-output/base"
+            --out "$GITHUB_WORKSPACE/benchmark-output/dev/base"
 
-      - name: Benchmark head
+      - name: Benchmark head dev
         working-directory: head
         run: |
           node scripts/bench-builds.mjs \
@@ -138,7 +165,7 @@ jobs:
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
-            --out "$GITHUB_WORKSPACE/benchmark-output/head"
+            --out "$GITHUB_WORKSPACE/benchmark-output/dev/head"
 
       - name: Benchmark embedded synthetic app with base plugin
         if: steps.synthetic-benchmark.outputs.SKIP == 'false'
@@ -175,8 +202,10 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/report-benchmark-ci.mjs \
-            --base "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" \
-            --head "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" \
+            --base "$GITHUB_WORKSPACE/benchmark-output/dev/base/baseline.json" \
+            --head "$GITHUB_WORKSPACE/benchmark-output/dev/head/baseline.json" \
+            --build-base "$GITHUB_WORKSPACE/benchmark-output/build/base/baseline.json" \
+            --build-head "$GITHUB_WORKSPACE/benchmark-output/build/head/baseline.json" \
             --out "$GITHUB_WORKSPACE/benchmark-output/report" \
             --pr "$PR_NUMBER" \
             --base-ref "$BASE_REF" \
@@ -255,8 +284,10 @@ jobs:
           result_dir="pull-requests/${PR_NUMBER}/${HEAD_SHA}"
           latest_dir="pull-requests/${PR_NUMBER}/latest"
           mkdir -p "$result_dir" "$latest_dir"
-          cp "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" "$result_dir/base.json"
-          cp "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" "$result_dir/head.json"
+          cp "$GITHUB_WORKSPACE/benchmark-output/dev/base/baseline.json" "$result_dir/base.json"
+          cp "$GITHUB_WORKSPACE/benchmark-output/dev/head/baseline.json" "$result_dir/head.json"
+          cp "$GITHUB_WORKSPACE/benchmark-output/build/base/baseline.json" "$result_dir/build-base.json"
+          cp "$GITHUB_WORKSPACE/benchmark-output/build/head/baseline.json" "$result_dir/build-head.json"
           if [ -d "$GITHUB_WORKSPACE/benchmark-output/synthetic" ]; then
             cp -R "$GITHUB_WORKSPACE/benchmark-output/synthetic" "$result_dir/synthetic"
           fi

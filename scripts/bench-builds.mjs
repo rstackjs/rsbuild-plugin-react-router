@@ -4,6 +4,7 @@ import {
   cp,
   mkdir,
   readdir,
+  readFile,
   rename,
   rm,
   writeFile,
@@ -72,6 +73,13 @@ const profiles = {
       routeCount: 256,
       variant: 'ssr-esm',
       sourceMap: true,
+    },
+    {
+      id: 'large-355-ssr-esm',
+      routeCount: 355,
+      variant: 'ssr-esm',
+      fixture: 'large',
+      devRoutePathOffset: 0,
     },
   ],
   large: [
@@ -360,6 +368,16 @@ const fetchDevRoutes = async ({ origin, routePaths, timeoutMs }) => {
   return requests;
 };
 
+const applyDevUpdate = async file => {
+  const source = await readFile(file, 'utf8');
+  const marker = `\nexport const __benchmarkUpdateMarker = ${Date.now()};\n`;
+  await writeFile(
+    file,
+    `${source.replace(/\nexport const __benchmarkUpdateMarker = \d+;\n$/, '')}${marker}`
+  );
+  return () => writeFile(file, source);
+};
+
 const runDevServerUntilReady = async ({
   command,
   args,
@@ -369,12 +387,14 @@ const runDevServerUntilReady = async ({
   devRouteOrigin,
   devRoutePaths = [],
   devRouteTimeoutMs,
+  updateFile,
+  updateRoutePaths = [],
   timeoutMs,
 }) =>
   new Promise(resolve => {
     const startedAt = performance.now();
     const requiredReady = new Set(readyEnvironments);
-    const seenReady = new Set();
+    const readyCounts = new Map();
     let stdout = '';
     let stderr = '';
     let ready = false;
@@ -382,6 +402,11 @@ const runDevServerUntilReady = async ({
     let routePhasePending = false;
     let routeTotalMs = null;
     let routeRequests = [];
+    let updatePending = false;
+    let updateMs = null;
+    let updateRouteTotalMs = null;
+    let updateRouteRequests = [];
+    let readyBuffer = '';
     let readyStatus = 0;
     let timedOut = false;
     let settled = false;
@@ -411,6 +436,9 @@ const runDevServerUntilReady = async ({
         readyMs,
         routeTotalMs,
         routeRequests,
+        updateMs,
+        updateRouteTotalMs,
+        updateRouteRequests,
         timedOut,
       });
     };
@@ -444,6 +472,39 @@ const runDevServerUntilReady = async ({
       killTimer.unref?.();
     };
 
+    const waitForNextReady = baselineCounts =>
+      new Promise((resolveReady, rejectReady) => {
+        const check = () => {
+          if (
+            [...requiredReady].every(
+              environment =>
+                (readyCounts.get(environment) ?? 0) >
+                (baselineCounts.get(environment) ?? 0)
+            )
+          ) {
+            resolveReady();
+            return true;
+          }
+          return false;
+        };
+        if (check()) {
+          return;
+        }
+        const interval = setInterval(() => {
+          if (settled || child.exitCode !== null) {
+            clearInterval(interval);
+            rejectReady(
+              new Error('Dev server exited before update rebuild completed.')
+            );
+            return;
+          }
+          if (check()) {
+            clearInterval(interval);
+          }
+        }, 25);
+        interval.unref?.();
+      });
+
     const handleReady = async () => {
       readyMs = performance.now() - startedAt;
       if (devRoutePaths.length > 0) {
@@ -460,20 +521,53 @@ const runDevServerUntilReady = async ({
           readyStatus = 1;
         }
       }
+      if (updateFile && updateRoutePaths.length > 0) {
+        updatePending = true;
+        let restoreUpdateFile = null;
+        const updateStartedAt = performance.now();
+        const baselineCounts = new Map(readyCounts);
+        try {
+          restoreUpdateFile = await applyDevUpdate(updateFile);
+          await waitForNextReady(baselineCounts);
+          updateMs = performance.now() - updateStartedAt;
+          const updateRouteStartedAt = performance.now();
+          updateRouteRequests = await fetchDevRoutes({
+            origin: devRouteOrigin,
+            routePaths: updateRoutePaths,
+            timeoutMs: devRouteTimeoutMs,
+          });
+          updateRouteTotalMs = performance.now() - updateRouteStartedAt;
+          if (updateRouteRequests.some(request => !request.ok)) {
+            readyStatus = 1;
+          }
+        } catch (error) {
+          readyStatus = 1;
+          stderr += `${error.stack ?? error.message}\n`;
+        } finally {
+          if (restoreUpdateFile) {
+            await restoreUpdateFile();
+          }
+          updatePending = false;
+        }
+      }
       stopChild();
     };
 
-    const scanReady = () => {
-      if (ready) {
-        return;
-      }
-      const output = stripAnsi(`${stdout}\n${stderr}`);
+    const scanReady = chunkText => {
+      readyBuffer += stripAnsi(chunkText);
+      const lines = readyBuffer.split(/\r?\n/);
+      readyBuffer = lines.pop() ?? '';
+      const output = lines.join('\n');
       for (const match of output.matchAll(
         /ready\s+built in .*?\((web|node)\)/gi
       )) {
-        seenReady.add(match[1].toLowerCase());
+        const environment = match[1].toLowerCase();
+        readyCounts.set(environment, (readyCounts.get(environment) ?? 0) + 1);
       }
-      if ([...requiredReady].every(environment => seenReady.has(environment))) {
+      if (
+        !ready &&
+        [...requiredReady].every(environment => readyCounts.has(environment))
+      ) {
         ready = true;
         void handleReady();
       }
@@ -483,13 +577,13 @@ const runDevServerUntilReady = async ({
       const text = String(chunk);
       stdout += text;
       process.stdout.write(text);
-      scanReady();
+      scanReady(text);
     });
     child.stderr?.on('data', chunk => {
       const text = String(chunk);
       stderr += text;
       process.stderr.write(text);
-      scanReady();
+      scanReady(text);
     });
 
     const timeoutTimer = setTimeout(() => {
@@ -504,7 +598,7 @@ const runDevServerUntilReady = async ({
     });
     child.on('exit', (code, signal) => {
       if (ready) {
-        if (routePhasePending) {
+        if (routePhasePending || updatePending) {
           finish(1, signal);
           return;
         }
@@ -573,15 +667,17 @@ const summarizeRuns = runs => ({
   wallMs: summarizeMetric(runs.map(run => run.wallMs)),
   readyMs: summarizeMetric(runs.map(run => run.readyMs)),
   routeTotalMs: summarizeMetric(runs.map(run => run.routeTotalMs)),
+  updateMs: summarizeMetric(runs.map(run => run.updateMs)),
+  updateRouteTotalMs: summarizeMetric(runs.map(run => run.updateRouteTotalMs)),
   userMs: summarizeMetric(runs.map(run => run.userMs)),
   sysMs: summarizeMetric(runs.map(run => run.sysMs)),
   maxRssKb: summarizeMetric(runs.map(run => run.maxRssKb)),
 });
 
-const summarizeDevRouteRequests = runs => {
+const summarizeDevRequests = (runs, key) => {
   const requestsByPath = new Map();
   for (const run of runs) {
-    for (const request of run.routeRequests ?? []) {
+    for (const request of run[key] ?? []) {
       const requests = requestsByPath.get(request.path) ?? [];
       requests.push(request);
       requestsByPath.set(request.path, requests);
@@ -606,6 +702,12 @@ const summarizeDevRouteRequests = runs => {
     };
   });
 };
+
+const summarizeDevRouteRequests = runs =>
+  summarizeDevRequests(runs, 'routeRequests');
+
+const summarizeDevUpdateRouteRequests = runs =>
+  summarizeDevRequests(runs, 'updateRouteRequests');
 
 const summarizePluginOperations = runs => {
   const operations = new Map();
@@ -690,8 +792,8 @@ const renderMarkdown = result => {
       ? [`- Rspack trace output: ${result.rspackTraceOutput}`]
       : []),
     '',
-    '| Benchmark | Routes | Variant | Median ready | Median route load | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
-    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|',
+    '| Benchmark | Routes | Variant | Median ready | Median route load | Median update/HMR | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
+    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|',
   ];
 
   for (const benchmark of result.benchmarks) {
@@ -702,6 +804,7 @@ const renderMarkdown = result => {
         benchmark.variant,
         formatMs(benchmark.summary.readyMs.median),
         formatMs(benchmark.summary.routeTotalMs.median),
+        formatMs(benchmark.summary.updateMs.median),
         formatMs(benchmark.summary.wallMs.median),
         formatMs(benchmark.summary.wallMs.mean),
         formatMs(benchmark.summary.wallMs.p95),
@@ -726,6 +829,37 @@ const renderMarkdown = result => {
       '|---|---:|---:|---:|---:|---|---:|'
     );
     for (const request of benchmark.devRouteSummary) {
+      lines.push(
+        [
+          `\`${request.path}\``,
+          formatMs(request.ms.median),
+          formatMs(request.ms.mean),
+          formatMs(request.ms.p95),
+          request.bytes.median == null
+            ? '-'
+            : String(Math.round(request.bytes.median)),
+          request.statuses.join(', '),
+          request.failures,
+        ]
+          .join(' | ')
+          .replace(/^/, '| ')
+          .replace(/$/, ' |')
+      );
+    }
+  }
+
+  for (const benchmark of result.benchmarks) {
+    if (!benchmark.devUpdateRouteSummary?.length) {
+      continue;
+    }
+    lines.push(
+      '',
+      `## ${benchmark.id} Dev Update Route Requests`,
+      '',
+      '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
+      '|---|---:|---:|---:|---:|---|---:|'
+    );
+    for (const request of benchmark.devUpdateRouteSummary) {
       lines.push(
         [
           `\`${request.path}\``,
@@ -1055,6 +1189,8 @@ const main = async () => {
                 devRouteOrigin: `http://localhost:${devPort}`,
                 devRoutePaths,
                 devRouteTimeoutMs: args.devRouteTimeoutMs,
+                updateFile: fixtureResult.updateFile,
+                updateRoutePaths: fixtureResult.updateRoutePaths ?? ['/'],
                 timeoutMs: args.devTimeoutMs,
               });
             })()
@@ -1104,6 +1240,9 @@ const main = async () => {
           readyMs: commandResult.readyMs ?? null,
           routeTotalMs: commandResult.routeTotalMs ?? null,
           routeRequests: commandResult.routeRequests ?? [],
+          updateMs: commandResult.updateMs ?? null,
+          updateRouteTotalMs: commandResult.updateRouteTotalMs ?? null,
+          updateRouteRequests: commandResult.updateRouteRequests ?? [],
           userMs: timeStats.userMs ?? null,
           sysMs: timeStats.sysMs ?? null,
           maxRssKb: timeStats.maxRssKb ?? null,
@@ -1131,6 +1270,7 @@ const main = async () => {
       runs,
       summary: summarizeRuns(runs),
       devRouteSummary: summarizeDevRouteRequests(runs),
+      devUpdateRouteSummary: summarizeDevUpdateRouteRequests(runs),
       pluginOperations: summarizePluginOperations(runs),
     });
   }
