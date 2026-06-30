@@ -14,7 +14,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from 'node:util';
-import { Effect } from 'effect';
+import { Effect, Fiber } from 'effect';
 import { execa } from 'execa';
 import { generateSyntheticFixture } from './benchmark/fixture.mts';
 import {
@@ -33,6 +33,16 @@ const rsbuildBin = path.join(
   'bin',
   'rsbuild.js'
 );
+
+class ScriptExitError extends Error {
+  readonly exitCode: number;
+
+  constructor(message: string, exitCode: number) {
+    super(message);
+    this.name = 'ScriptExitError';
+    this.exitCode = exitCode;
+  }
+}
 
 const profiles = {
   smoke: [{ id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' }],
@@ -420,16 +430,17 @@ const runDevServerUntilReadyEffect = ({
     let stdout = '';
     let stderr = '';
     let ready = false;
-    let readyWallMs = null;
-    let readyMs = null;
+    let readyWallMs: number | null = null;
+    let readyMs: number | null = null;
     let routePhasePending = false;
-    let routeTotalMs = null;
-    let routeRequests = [];
+    let routeTotalMs: number | null = null;
+    let routeRequests: any[] = [];
     let readyStatus = 0;
     let timedOut = false;
     let settled = false;
     let stopping = false;
-    let killTimer = null;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    let readyFiber: ReturnType<typeof Effect.runFork> | undefined;
 
     const child = spawn(command, args, {
       cwd,
@@ -460,7 +471,7 @@ const runDevServerUntilReadyEffect = ({
       );
     };
 
-    const signalChild = signal => {
+    const signalChild = (signal: NodeJS.Signals) => {
       if (child.exitCode !== null) {
         return;
       }
@@ -471,8 +482,9 @@ const runDevServerUntilReadyEffect = ({
           process.kill(-child.pid, signal);
         }
       } catch (error) {
-        if (error?.code !== 'ESRCH') {
-          stderr += `${error.stack ?? error.message}\n`;
+        const systemError = error as NodeJS.ErrnoException;
+        if (systemError.code !== 'ESRCH') {
+          stderr += `${systemError.stack ?? systemError.message}\n`;
         }
       }
     };
@@ -489,18 +501,16 @@ const runDevServerUntilReadyEffect = ({
       killTimer.unref?.();
     };
 
-    const handleReady = async () => {
+    const handleReadyEffect = Effect.gen(function* () {
       readyMs = readyWallMs ?? performance.now() - startedAt;
       if (devRoutePaths.length > 0) {
         routePhasePending = true;
         const routeStartedAt = performance.now();
-        routeRequests = await runScriptEffect(
-          fetchDevRoutesEffect({
-            origin: devRouteOrigin,
-            routePaths: devRoutePaths,
-            timeoutMs: devRouteTimeoutMs,
-          })
-        );
+        routeRequests = yield* fetchDevRoutesEffect({
+          origin: devRouteOrigin,
+          routePaths: devRoutePaths,
+          timeoutMs: devRouteTimeoutMs,
+        });
         routeTotalMs = performance.now() - routeStartedAt;
         routePhasePending = false;
         if (routeRequests.some(request => !request.ok)) {
@@ -508,6 +518,10 @@ const runDevServerUntilReadyEffect = ({
         }
       }
       stopChild();
+    });
+
+    const handleReady = () => {
+      readyFiber = Effect.runFork(handleReadyEffect);
     };
 
     const scanReady = () => {
@@ -523,7 +537,7 @@ const runDevServerUntilReadyEffect = ({
       if ([...requiredReady].every(environment => seenReady.has(environment))) {
         ready = true;
         readyWallMs = performance.now() - startedAt;
-        void handleReady();
+        handleReady();
       }
     };
 
@@ -562,10 +576,13 @@ const runDevServerUntilReadyEffect = ({
       finish(code ?? 1, signal);
     });
 
-    return Effect.sync(() => {
+    return Effect.gen(function* () {
       clearTimeout(timeoutTimer);
       clearTimeout(killTimer);
       stopChild();
+      if (readyFiber) {
+        yield* Fiber.interrupt(readyFiber).pipe(Effect.asVoid);
+      }
     });
   });
 
@@ -662,7 +679,7 @@ const summarizeDevRouteRequests = runs => {
 };
 
 const summarizePluginOperations = runs => {
-  const operations = new Map();
+  const operations = new Map<string, any>();
 
   for (const run of runs) {
     for (const report of run.pluginReports) {
@@ -673,12 +690,23 @@ const summarizePluginOperations = runs => {
           continue;
         }
 
-        const count = typeof metrics.count === 'number' ? metrics.count : 0;
+        const operationMetrics = metrics as Record<string, unknown>;
+        const count =
+          typeof operationMetrics.count === 'number'
+            ? operationMetrics.count
+            : 0;
         const totalMs =
-          typeof metrics.totalMs === 'number' ? metrics.totalMs : 0;
+          typeof operationMetrics.totalMs === 'number'
+            ? operationMetrics.totalMs
+            : 0;
         const wallMs =
-          typeof metrics.wallMs === 'number' ? metrics.wallMs : null;
-        const maxMs = typeof metrics.maxMs === 'number' ? metrics.maxMs : 0;
+          typeof operationMetrics.wallMs === 'number'
+            ? operationMetrics.wallMs
+            : null;
+        const maxMs =
+          typeof operationMetrics.maxMs === 'number'
+            ? operationMetrics.maxMs
+            : 0;
 
         const key = `${report.environment}:${operation}`;
         const current = operations.get(key) ?? {
@@ -1109,7 +1137,7 @@ const runBenchmarkIterationEffect = ({
             },
             useTime,
           });
-    const commandResult = yield* commandEffect;
+    const commandResult = (yield* commandEffect) as any;
     const rspackProfiles = rspackProfileEnabled
       ? yield* collectRspackProfilesEffect({
           fixtureRoot,
@@ -1122,7 +1150,7 @@ const runBenchmarkIterationEffect = ({
           ),
         })
       : [];
-    const timeStats =
+    const timeStats: any =
       args.mode === 'build' && useTime
         ? parseTimeStats(commandResult.stderr)
         : {};
@@ -1131,7 +1159,12 @@ const runBenchmarkIterationEffect = ({
     );
 
     if (commandResult.status !== 0 && args.failFast) {
-      yield* Effect.sync(() => process.exit(commandResult.status ?? 1));
+      return yield* Effect.fail(
+        new ScriptExitError(
+          `Benchmark command failed with status ${commandResult.status ?? 1}.`,
+          commandResult.status ?? 1
+        )
+      );
     }
 
     if (!measured) {
@@ -1172,7 +1205,7 @@ const runBenchmarkEffect = ({
       args.mode === 'dev'
         ? resolveDevRoutePaths(args.devRoutes, benchmark)
         : [];
-    const fixtureResult = yield* tryScriptPromise(() =>
+    const fixtureResult = (yield* tryScriptPromise(() =>
       generateSyntheticFixture({
         root: fixtureRoot,
         routeCount: benchmark.routeCount,
@@ -1182,10 +1215,11 @@ const runBenchmarkEffect = ({
         pluginImportPath,
         pluginReactImportPath,
         parallelTransforms: args.parallelTransforms,
+        largeConfig: undefined,
       })
-    );
+    )) as any;
 
-    const runs = [];
+    const runs: any[] = [];
     const totalRuns = args.warmup + args.iterations;
     for (let index = 0; index < totalRuns; index += 1) {
       const run = yield* runBenchmarkIterationEffect({
@@ -1251,11 +1285,16 @@ const mainEffect = Effect.gen(function* () {
       cwd: rootDir,
     });
     if (buildResult.status !== 0) {
-      yield* Effect.sync(() => process.exit(buildResult.status ?? 1));
+      return yield* Effect.fail(
+        new ScriptExitError(
+          `Package build failed with status ${buildResult.status ?? 1}.`,
+          buildResult.status ?? 1
+        )
+      );
     }
   }
 
-  const benchmarks = [];
+  const benchmarks: any[] = [];
   for (const [benchmarkIndex, benchmark] of selectedBenchmarks.entries()) {
     benchmarks.push(
       yield* runBenchmarkEffect({
@@ -1308,5 +1347,5 @@ const mainEffect = Effect.gen(function* () {
 
 runScriptEffect(mainEffect).catch(error => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = error instanceof ScriptExitError ? error.exitCode : 1;
 });

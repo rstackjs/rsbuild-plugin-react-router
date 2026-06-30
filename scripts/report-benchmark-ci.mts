@@ -103,8 +103,8 @@ const createReport = (values, base, head) => {
   ].sort();
 
   const benchmarks = benchmarkIds.map(id => {
-    const baseBenchmark = baseBenchmarks.get(id);
-    const headBenchmark = headBenchmarks.get(id);
+    const baseBenchmark = baseBenchmarks.get(id) as any;
+    const headBenchmark = headBenchmarks.get(id) as any;
     const baseWallMs = medianWall(baseBenchmark);
     const headWallMs = medianWall(headBenchmark);
     const baseReadyMs = medianReady(baseBenchmark);

@@ -3,11 +3,7 @@ import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import { Effect } from 'effect';
 import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
-import {
-  normalizeEffectError,
-  runPluginEffect,
-  tryPluginPromise,
-} from './effect-runtime.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { resolveServerBuildModuleEffect } from './server-utils.js';
 
 export type ReactRouterDevManifest = ReactRouterManifestForDev;
@@ -141,15 +137,8 @@ export const getEnvironmentStats = (
 const startServerBuildEvaluationEffect = (
   server: RsbuildDevServer,
   entryName: string
-): Effect.Effect<ServerBuild, Error, never> => {
-  let loaded: PromiseLike<unknown> | unknown;
-  try {
-    loaded = server.environments.node.loadBundle(entryName);
-  } catch (cause) {
-    return Effect.fail(normalizeEffectError(cause));
-  }
-
-  return tryPluginPromise(() => loaded).pipe(
+): Effect.Effect<ServerBuild, Error, never> =>
+  tryPluginPromise(() => server.environments.node.loadBundle(entryName)).pipe(
     Effect.flatMap(buildModule =>
       resolveServerBuildModuleEffect(
         buildModule,
@@ -157,7 +146,6 @@ const startServerBuildEvaluationEffect = (
       )
     )
   );
-};
 
 export const evaluateServerBuildsEffect = (
   server: RsbuildDevServer,

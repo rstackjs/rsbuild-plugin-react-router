@@ -575,6 +575,9 @@ describe('React Router development runtime', () => {
       noKnownChanges,
       graphIdentity(firstWeb, firstNode)
     );
+    await expect
+      .poll(() => typeof resolveEvaluation, { timeout: 1000 })
+      .toBe('function');
     resolveEvaluation?.(nextBuild);
     await firstFinish;
     const committed = await runtime.load();
@@ -588,6 +591,9 @@ describe('React Router development runtime', () => {
       noKnownChanges,
       graphIdentity(staleWeb, staleNode)
     );
+    await expect
+      .poll(() => typeof rejectEvaluation, { timeout: 1000 })
+      .toBe('function');
 
     runtime.beginAttempt();
     rejectEvaluation?.(new Error('stale rejection'));
@@ -1072,6 +1078,9 @@ describe('React Router development runtime', () => {
       noKnownChanges,
       graphIdentity(web, node)
     );
+    await expect
+      .poll(() => typeof resolveEvaluation, { timeout: 1000 })
+      .toBe('function');
 
     runtime.close();
     resolveEvaluation?.(createBuild('late'));

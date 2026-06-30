@@ -540,13 +540,32 @@ export const pluginReactRouter = (
       Error,
       never
     > => tryPluginPromise(() => routeTransformExecutor.close());
+    const closeDevServerResourcesEffect = (): Effect.Effect<
+      void,
+      Error,
+      never
+    > =>
+      closeRouteTopologyWatcherEffect().pipe(
+        Effect.matchEffect({
+          onFailure: topologyError =>
+            closeRouteTransformExecutorEffect().pipe(
+              Effect.matchEffect({
+                onFailure: executorError =>
+                  Effect.fail(
+                    new AggregateError(
+                      [topologyError, executorError],
+                      '[rsbuild-plugin-react-router] Failed to close dev server resources.'
+                    )
+                  ),
+                onSuccess: () => Effect.fail(topologyError),
+              })
+            ),
+          onSuccess: () => closeRouteTransformExecutorEffect(),
+        })
+      );
 
     api.onCloseDevServer(() =>
-      runPluginEffect(
-        closeRouteTopologyWatcherEffect().pipe(
-          Effect.zipRight(closeRouteTransformExecutorEffect())
-        )
-      )
+      runPluginEffect(closeDevServerResourcesEffect())
     );
     api.onCloseBuild(() =>
       runPluginEffect(closeRouteTransformExecutorEffect())

@@ -1025,8 +1025,9 @@ describe('React Router development runtime controller', () => {
     const evaluating = callbacks.after({
       stats: createGraphStats(webA, nodeA),
     });
-    await Promise.resolve();
-    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect
+      .poll(() => loadBundle.mock.calls.length, { timeout: 1000 })
+      .toBe(2);
 
     web.invalidate();
     resolveCandidate(createBuild('a'));

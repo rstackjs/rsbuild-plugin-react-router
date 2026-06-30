@@ -371,7 +371,7 @@ const writeFanoutFixtures = async root => {
 const largeId = index => String(index).padStart(4, '0');
 const largePairId = index => String(index).padStart(2, '0');
 
-const normalizeLargeConfig = (routeCount, largeConfig = {}) => ({
+const normalizeLargeConfig = (routeCount, largeConfig: any = {}) => ({
   ...largeFixtureConfig,
   ...largeConfig,
   routes: largeConfig.routes ?? routeCount ?? largeFixtureConfig.routes,
@@ -416,7 +416,7 @@ const writeInBatches = async (items, writer, batchSize = 128) => {
 
 const range = length => Array.from({ length }, (_, index) => index);
 
-const writeFiles = (files, batchSize) =>
+const writeFiles = (files, batchSize = 128) =>
   writeInBatches(
     files,
     ([filePath, contents]) => writeFile(filePath, contents),
