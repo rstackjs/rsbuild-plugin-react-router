@@ -613,10 +613,16 @@ describe('benchmark fixture generator', () => {
       const headSynthetic = {
         ...baseSynthetic,
         summaries: [
-          { ...baseSynthetic.summaries[0], median: 36, samples: [36] },
+          {
+            ...baseSynthetic.summaries[0],
+            median: 36,
+            mean: 36,
+            samples: [36],
+          },
           {
             ...baseSynthetic.summaries[1],
             median: 11,
+            mean: 11,
             samples: [11],
             readyMs: { median: 8500 },
             routeTotalMs: { median: 2000 },
@@ -678,22 +684,17 @@ describe('benchmark fixture generator', () => {
       expect(comment).toContain('`synthetic-256-ssr-esm`');
       expect(comment).toContain('`synthetic-256-spa`');
       expect(comment).toContain('**Update/HMR median:** 0.38s -> 0.34s (-10.5%)');
-      expect(comment).toContain('| `/route-0001` | 1 | 0.12s | 0.10s | -16.7% |');
-      expect(comment).toContain('#### synthetic-256-spa Dev Update Route Requests');
-      expect(comment).toContain('| `/route-0001` | 1 | 0.09s | 0.08s | -11.1% |');
+      expect(comment).not.toContain('Dev Route Requests');
+      expect(comment).not.toContain('Dev Update Route Requests');
       expect(comment).toContain('#### synthetic-256-spa Plugin Operations');
       expect(comment).toContain('`route:module`');
       expect(comment).toContain('| web | `route:module` | 256 | 600.0ms | 500.0ms | -16.7% | 350.0ms | 18.0ms | 1 |');
       expect(comment).toContain('### Synthetic Rsbuild App');
+      expect(comment).toContain('Rendered 1 production build benchmark.');
+      expect(comment).toContain('Rendered 1 dev benchmark fixture from the embedded complex app.');
       expect(comment).toContain('complex app');
-      expect(comment).toContain('`cold`');
-      expect(comment).toContain('`dev`');
-      expect(comment).toContain('40.00s');
-      expect(comment).toContain('36.00s');
-      expect(comment).toContain('8.50s');
-      expect(comment).toContain('2.00s');
-      expect(comment).toContain('0.70s');
-      expect(comment).toContain('-10.0%');
+      expect(comment).toContain('| complex app | 1 | 40.00s | 36.00s | -10.0% | 36.00s | - | 1.11x | - |');
+      expect(comment).toContain('| complex app | 1 | 12.00s | 11.00s | -8.3% | 9.00s | 8.50s | 2.20s | 2.00s | 0.80s | 0.70s | -12.5% | 11.00s | - | 1.09x | - |');
       expect(report.benchmarks).toHaveLength(2);
       expect(report.benchmarks.map((benchmark: { id: string }) => benchmark.id)).toEqual([
         'synthetic-256-spa',

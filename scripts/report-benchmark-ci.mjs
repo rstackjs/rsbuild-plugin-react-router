@@ -55,8 +55,6 @@ const formatDurationSeconds = value =>
 const formatMilliseconds = value =>
   typeof value === 'number' ? `${value.toFixed(1)}ms` : '-';
 const formatCount = value => (typeof value === 'number' ? String(value) : '-');
-const formatBytes = value =>
-  typeof value === 'number' ? String(Math.round(value)) : '-';
 
 const percentDelta = (base, head) =>
   typeof base === 'number' && typeof head === 'number' && base !== 0
@@ -276,6 +274,8 @@ const syntheticBenchmarks = syntheticProfiles.map(profile => {
     profile,
     baseMedianSeconds,
     headMedianSeconds,
+    headMeanSeconds: headSummary?.mean ?? null,
+    headP95Seconds: headSummary?.p95 ?? null,
     deltaPercent: percentDelta(baseMedianSeconds, headMedianSeconds),
     speedup: speedup(baseMedianSeconds, headMedianSeconds),
     baseReadyMs,
@@ -292,6 +292,12 @@ const syntheticBenchmarks = syntheticProfiles.map(profile => {
     platform: headSummary?.platform ?? baseSummary?.platform ?? null,
   };
 });
+const syntheticBuildBenchmarks = syntheticBenchmarks.filter(
+  benchmark => benchmark.profile !== 'dev'
+);
+const syntheticDevBenchmarks = syntheticBenchmarks.filter(
+  benchmark => benchmark.profile === 'dev'
+);
 
 const sumMetric = (benchmarks, key) => {
   const values = benchmarks
@@ -406,42 +412,6 @@ const renderComment = () => {
   }
 
   for (const benchmark of benchmarks) {
-    if (benchmark.devRouteSummaries.length === 0) {
-      continue;
-    }
-    lines.push(
-      '',
-      `#### ${benchmark.id} Dev Route Requests`,
-      '',
-      '| Route | Runs | Base median | Head median | Delta | Head mean | Head p95 | Head bytes | Statuses | Failures |',
-      '|---|---:|---:|---:|---:|---:|---:|---:|---|---:|'
-    );
-    for (const route of benchmark.devRouteSummaries) {
-      lines.push(
-        `| \`${route.path}\` | ${formatCount(route.count)} | ${formatSeconds(route.baseMedianMs)} | ${formatSeconds(route.headMedianMs)} | ${formatPercent(route.deltaPercent)} | ${formatSeconds(route.headMeanMs)} | ${formatSeconds(route.headP95Ms)} | ${formatBytes(route.headMedianBytes)} | ${route.statuses.join(', ') || '-'} | ${formatCount(route.failures)} |`
-      );
-    }
-  }
-
-  for (const benchmark of benchmarks) {
-    if (benchmark.devUpdateRouteSummaries.length === 0) {
-      continue;
-    }
-    lines.push(
-      '',
-      `#### ${benchmark.id} Dev Update Route Requests`,
-      '',
-      '| Route | Runs | Base median | Head median | Delta | Head mean | Head p95 | Head bytes | Statuses | Failures |',
-      '|---|---:|---:|---:|---:|---:|---:|---:|---|---:|'
-    );
-    for (const route of benchmark.devUpdateRouteSummaries) {
-      lines.push(
-        `| \`${route.path}\` | ${formatCount(route.count)} | ${formatSeconds(route.baseMedianMs)} | ${formatSeconds(route.headMedianMs)} | ${formatPercent(route.deltaPercent)} | ${formatSeconds(route.headMeanMs)} | ${formatSeconds(route.headP95Ms)} | ${formatBytes(route.headMedianBytes)} | ${route.statuses.join(', ') || '-'} | ${formatCount(route.failures)} |`
-      );
-    }
-  }
-
-  for (const benchmark of benchmarks) {
     if (benchmark.pluginOperations.length === 0) {
       continue;
     }
@@ -459,18 +429,38 @@ const renderComment = () => {
     }
   }
 
-  if (syntheticBenchmarks.length > 0) {
-    lines.push(
-      '',
-      '### Synthetic Rsbuild App',
-      '',
-      '| Benchmark | Profile | Base total | Head total | Delta | Base ready | Head ready | Ready delta | Base routes | Head routes | Route delta | Base update/HMR | Head update/HMR | Update delta | Speedup | Runs |',
-      '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
-    );
+  if (
+    syntheticBuildBenchmarks.length > 0 ||
+    syntheticDevBenchmarks.length > 0
+  ) {
+    lines.push('', '### Synthetic Rsbuild App', '');
+  }
 
-    for (const syntheticBenchmark of syntheticBenchmarks) {
+  if (syntheticBuildBenchmarks.length > 0) {
+    lines.push(
+      `Rendered ${syntheticBuildBenchmarks.length} production build benchmark${syntheticBuildBenchmarks.length === 1 ? '' : 's'}.`,
+      '',
+      '| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
+      '|---|---:|---:|---:|---:|---:|---:|---:|---:|'
+    );
+    for (const syntheticBenchmark of syntheticBuildBenchmarks) {
       lines.push(
-        `| complex app | \`${syntheticBenchmark.profile ?? 'unknown'}\` | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatSeconds(syntheticBenchmark.baseReadyMs)} | ${formatSeconds(syntheticBenchmark.headReadyMs)} | ${formatPercent(syntheticBenchmark.readyDeltaPercent)} | ${formatSeconds(syntheticBenchmark.baseRouteTotalMs)} | ${formatSeconds(syntheticBenchmark.headRouteTotalMs)} | ${formatPercent(syntheticBenchmark.routeTotalDeltaPercent)} | ${formatSeconds(syntheticBenchmark.baseUpdateMs)} | ${formatSeconds(syntheticBenchmark.headUpdateMs)} | ${formatPercent(syntheticBenchmark.updateDeltaPercent)} | ${formatSpeedup(syntheticBenchmark.speedup)} | ${syntheticBenchmark.runs ?? '-'} |`
+        `| complex app | ${formatCount(syntheticBenchmark.runs)} | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatDurationSeconds(syntheticBenchmark.headMeanSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headP95Seconds)} | ${formatSpeedup(syntheticBenchmark.speedup)} | - |`
+      );
+    }
+    lines.push('');
+  }
+
+  if (syntheticDevBenchmarks.length > 0) {
+    lines.push(
+      `Rendered ${syntheticDevBenchmarks.length} dev benchmark fixture${syntheticDevBenchmarks.length === 1 ? '' : 's'} from the embedded complex app.`,
+      '',
+      '| Benchmark | Runs | Base total | Head total | Delta | Base ready | Head ready | Base routes | Head routes | Base update/HMR | Head update/HMR | Update delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
+      '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
+    );
+    for (const syntheticBenchmark of syntheticDevBenchmarks) {
+      lines.push(
+        `| complex app | ${formatCount(syntheticBenchmark.runs)} | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatSeconds(syntheticBenchmark.baseReadyMs)} | ${formatSeconds(syntheticBenchmark.headReadyMs)} | ${formatSeconds(syntheticBenchmark.baseRouteTotalMs)} | ${formatSeconds(syntheticBenchmark.headRouteTotalMs)} | ${formatSeconds(syntheticBenchmark.baseUpdateMs)} | ${formatSeconds(syntheticBenchmark.headUpdateMs)} | ${formatPercent(syntheticBenchmark.updateDeltaPercent)} | ${formatDurationSeconds(syntheticBenchmark.headMeanSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headP95Seconds)} | ${formatSpeedup(syntheticBenchmark.speedup)} | - |`
       );
     }
   }
