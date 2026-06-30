@@ -388,7 +388,7 @@ describe('benchmark fixture generator', () => {
     );
     expect(options.runs).toBe(3);
     expect(options.profile).toBe('cold');
-    expect(options.modes).toBe('rsbuild-fast');
+    expect(options.modes).toBe('rsbuild-optimized');
     expect(options.packageSpec).toBe('local');
     expect(options.workdir).toBe('.benchmark/support-repro/workdir');
   });
@@ -402,7 +402,7 @@ describe('benchmark fixture generator', () => {
         '--repo=/tmp/synthetic-web-bundler-benchmark',
         '--runs=5',
         '--profile=both',
-        '--modes=rsbuild-fast,rsbuild-no-tailwind',
+        '--modes=rsbuild-optimized,rsbuild-no-tailwind',
         '--package=installed',
         '--skip-build',
         '--rspack-profile=OVERVIEW',
@@ -415,13 +415,25 @@ describe('benchmark fixture generator', () => {
     expect(options.repo).toBe('/tmp/synthetic-web-bundler-benchmark');
     expect(options.runs).toBe(5);
     expect(options.profile).toBe('both');
-    expect(options.modes).toBe('rsbuild-fast,rsbuild-no-tailwind');
+    expect(options.modes).toBe('rsbuild-optimized,rsbuild-no-tailwind');
     expect(options.packageSpec).toBe('installed');
     expect(options.skipBuild).toBe(true);
     expect(options.rspackProfile).toBe('OVERVIEW');
     expect(options.out).toBe('.benchmark/results/support');
     expect(options.workdir).toBe('.benchmark/support/workdir');
     expect(options.dryRun).toBe(true);
+  });
+
+  it('accepts a leading separator in support reproduction benchmark args', async () => {
+    const { parseSupportReproArgs } = await import(
+      '../scripts/bench-support-repro.mts'
+    );
+    const options = await Effect.runPromise(
+      parseSupportReproArgs(['--', '--dry-run', '--runs=1'])
+    );
+
+    expect(options.dryRun).toBe(true);
+    expect(options.runs).toBe(1);
   });
 
   it('materializes the support reproduction benchmark without copied build outputs', async () => {
@@ -546,10 +558,16 @@ describe('benchmark fixture generator', () => {
           runs: 1,
           summaries: [
             {
-              mode: 'rsbuild-fast',
+              mode: 'rsbuild-optimized',
               samples: [70],
               median: 70,
               mean: 70,
+            },
+            {
+              mode: 'rsbuild-js-transform-contention',
+              samples: [95],
+              median: 95,
+              mean: 95,
             },
           ],
         }),
@@ -565,10 +583,16 @@ describe('benchmark fixture generator', () => {
           runs: 1,
           summaries: [
             {
-              mode: 'rsbuild-fast',
+              mode: 'rsbuild-optimized',
               samples: [63],
               median: 63,
               mean: 63,
+            },
+            {
+              mode: 'rsbuild-js-transform-contention',
+              samples: [76],
+              median: 76,
+              mean: 76,
             },
           ],
         }),
@@ -620,8 +644,9 @@ describe('benchmark fixture generator', () => {
 
       expect(result.status).toBe(0);
       const comment = readFileSync(join(outDir, 'comment.md'), 'utf8');
-      expect(comment).toContain('### Support Repo Benchmark');
-      expect(comment).toContain('| `rsbuild-fast` | 70.00s | 63.00s | -10.0% | 1.11x | `1` | `cold` |');
+      expect(comment).toContain('### Support Repo Benchmarks');
+      expect(comment).toContain('| `rsbuild-optimized` | 70.00s | 63.00s | -10.0% | 1.11x | `1` | `cold` |');
+      expect(comment).toContain('| `rsbuild-js-transform-contention` | 95.00s | 76.00s | -20.0% | 1.25x | `1` | `cold` |');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

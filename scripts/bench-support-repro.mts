@@ -15,6 +15,7 @@ const DEFAULT_SUPPORT_REPO =
   '/home/zack/Downloads/openai-support/synthetic-build-repro/synthetic-web-bundler-benchmark';
 const DEFAULT_RESULT_DIR = '.benchmark/results/support-repro';
 const DEFAULT_WORKDIR = '.benchmark/support-repro/workdir';
+const DEFAULT_SUPPORT_MODES = 'rsbuild-optimized';
 const PLUGIN_PACKAGE_NAME = 'rsbuild-plugin-react-router';
 
 type PackageJson = {
@@ -63,7 +64,7 @@ Options:
   --workdir=<path>         Disposable local copy to run. Default: ${DEFAULT_WORKDIR}
   --runs=<count>           Number of support benchmark runs. Default: 3
   --profile=<name>         Support benchmark profile: cold, warm, or both. Default: cold
-  --modes=<list>           Support benchmark modes. Default: rsbuild-fast
+  --modes=<list>           Support benchmark modes. Default: ${DEFAULT_SUPPORT_MODES}
   --package=<spec>         local, installed, or a package spec. Default: local
   --skip-build             Skip building this plugin before packing --package=local
   --rspack-profile=<name>  Pass RSPACK_PROFILE to the support benchmark
@@ -77,14 +78,15 @@ export const parseSupportReproArgs = (
   env: NodeJS.ProcessEnv = process.env
 ): Effect.Effect<SupportReproCliOptions, Error, never> =>
   tryScriptSync(() => {
+    const args = argv[0] === '--' ? argv.slice(1) : argv;
     const { values } = parseCliArgs({
-      args: [...argv],
+      args: [...args],
       allowPositionals: false,
       options: {
         'dry-run': { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
         'log-performance': { type: 'boolean', default: true },
-        modes: { type: 'string', default: 'rsbuild-fast' },
+        modes: { type: 'string', default: DEFAULT_SUPPORT_MODES },
         out: { type: 'string', default: DEFAULT_RESULT_DIR },
         package: { type: 'string', default: 'local' },
         profile: { type: 'string', default: 'cold' },
@@ -110,7 +112,7 @@ export const parseSupportReproArgs = (
       dryRun: values['dry-run'] ?? false,
       help: values.help ?? false,
       logPerformance: values['log-performance'] ?? true,
-      modes: values.modes ?? 'rsbuild-fast',
+      modes: values.modes ?? DEFAULT_SUPPORT_MODES,
       out: values.out ?? DEFAULT_RESULT_DIR,
       packageSpec: values.package ?? 'local',
       profile: values.profile ?? 'cold',
@@ -173,6 +175,16 @@ export const isCopiedSupportEntry = (entryName: string): boolean => {
   return true;
 };
 
+const removeTree = (target: string): Effect.Effect<void, Error, never> =>
+  tryScriptPromise(() =>
+    rm(target, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    })
+  );
+
 export const materializeSupportBenchmarkRepo = ({
   sourceRepo,
   workdir,
@@ -182,9 +194,7 @@ export const materializeSupportBenchmarkRepo = ({
 }): Effect.Effect<void, Error, never> =>
   Effect.gen(function* () {
     yield* validateSupportRepo(sourceRepo);
-    yield* tryScriptPromise(() =>
-      rm(workdir, { recursive: true, force: true })
-    );
+    yield* removeTree(workdir);
     yield* tryScriptPromise(() => mkdir(workdir, { recursive: true }));
     const entries = yield* tryScriptPromise(() =>
       readdir(sourceRepo, { withFileTypes: true })
@@ -263,9 +273,7 @@ const packLocalPlugin = ({
       'support-repro',
       `package-${Date.now()}`
     );
-    yield* tryScriptPromise(() =>
-      rm(packDir, { recursive: true, force: true })
-    );
+    yield* removeTree(packDir);
     yield* tryScriptPromise(() => mkdir(packDir, { recursive: true }));
     yield* runCommand({
       command: 'pnpm',

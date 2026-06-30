@@ -645,12 +645,16 @@ pnpm bench:support-repro
 ```
 
 That command runs the support repo's `benchmark:rsbuild-modes` script with the
-`rsbuild-fast` mode, `cold` profile, 3 runs, and React Router performance logs.
+`rsbuild-optimized` mode, `cold` profile, 3 runs, and React Router performance
+logs.
 By default it copies the support repo into `.benchmark/support-repro/workdir`,
 packs the current plugin branch, installs that tarball into the copied app, and
 runs the copied benchmark scripts there. Use `--package=installed` to benchmark
 the support repo's existing package spec, or `--package=<specifier>` to
 benchmark a canary such as `pkg.pr.new`.
+The PR benchmark workflow reports both `rsbuild-optimized` and
+`rsbuild-js-transform-contention` so transform-heavy regressions are visible in
+the same comment as the large local fixture.
 
 ## React Router Framework Mode
 

@@ -14,7 +14,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from 'node:util';
-import { Effect, Fiber } from 'effect';
+import { Effect } from 'effect';
 import { execa } from 'execa';
 import { generateSyntheticFixture } from './benchmark/fixture.mts';
 import {
@@ -447,7 +447,6 @@ const runDevServerUntilReadyEffect = ({
     let settled = false;
     let stopping = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
-    let readyFiber: ReturnType<typeof Effect.runFork> | undefined;
 
     const child = spawn(command, args, {
       cwd,
@@ -508,7 +507,7 @@ const runDevServerUntilReadyEffect = ({
       killTimer.unref?.();
     };
 
-    const handleReadyEffect = Effect.gen(function* () {
+    const runReadyRouteChecksEffect = Effect.gen(function* () {
       readyMs = readyWallMs ?? performance.now() - startedAt;
       if (devRoutePaths.length > 0) {
         routePhasePending = true;
@@ -527,8 +526,16 @@ const runDevServerUntilReadyEffect = ({
       stopChild();
     });
 
-    const handleReady = () => {
-      readyFiber = Effect.runFork(handleReadyEffect);
+    const handleReady = async () => {
+      try {
+        await runScriptEffect(runReadyRouteChecksEffect);
+      } catch (error) {
+        const readyError = error as Error;
+        stderr += `${readyError.stack ?? readyError.message}\n`;
+        readyStatus = 1;
+        routePhasePending = false;
+        stopChild();
+      }
     };
 
     const scanReady = () => {
@@ -544,7 +551,7 @@ const runDevServerUntilReadyEffect = ({
       if ([...requiredReady].every(environment => seenReady.has(environment))) {
         ready = true;
         readyWallMs = performance.now() - startedAt;
-        handleReady();
+        void handleReady();
       }
     };
 
@@ -583,13 +590,10 @@ const runDevServerUntilReadyEffect = ({
       finish(code ?? 1, signal);
     });
 
-    return Effect.gen(function* () {
+    return Effect.sync(() => {
       clearTimeout(timeoutTimer);
       clearTimeout(killTimer);
       stopChild();
-      if (readyFiber) {
-        yield* Fiber.interrupt(readyFiber).pipe(Effect.asVoid);
-      }
     });
   });
 

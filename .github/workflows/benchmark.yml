@@ -28,6 +28,7 @@ jobs:
       SUPPORT_BENCHMARK_REPOSITORY: ScriptedAlchemy/synthetic-web-bundler-benchmark
       SUPPORT_BENCHMARK_REF: codex/add-rsbuild-mode-benchmarks
       SUPPORT_BENCHMARK_RUNS: '1'
+      SUPPORT_BENCHMARK_MODES: rsbuild-optimized,rsbuild-js-transform-contention
 
     steps:
       - name: Checkout PR head
@@ -130,7 +131,7 @@ jobs:
             --out "$GITHUB_WORKSPACE/benchmark-output/support/base" \
             --runs "$SUPPORT_BENCHMARK_RUNS" \
             --profile cold \
-            --modes rsbuild-fast
+            --modes "$SUPPORT_BENCHMARK_MODES"
 
       - name: Benchmark support repo with head plugin
         working-directory: head
@@ -141,7 +142,7 @@ jobs:
             --out "$GITHUB_WORKSPACE/benchmark-output/support/head" \
             --runs "$SUPPORT_BENCHMARK_RUNS" \
             --profile cold \
-            --modes rsbuild-fast
+            --modes "$SUPPORT_BENCHMARK_MODES"
 
       - name: Generate benchmark report
         working-directory: head

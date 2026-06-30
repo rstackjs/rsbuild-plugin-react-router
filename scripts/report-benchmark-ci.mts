@@ -63,6 +63,37 @@ const speedup = (base, head) =>
     ? base / head
     : null;
 
+const SUPPORT_BENCHMARK_ORDER = [
+  'rsbuild-optimized',
+  'rsbuild-js-transform-contention',
+  'rsbuild-fast',
+];
+
+const supportBenchmarkOrder = (mode: string) => {
+  const index = SUPPORT_BENCHMARK_ORDER.indexOf(mode);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+};
+
+type SupportBenchmark = {
+  mode: string;
+  profile: string | null;
+  samples: number[];
+  medianSeconds: number | null;
+  meanSeconds: number | null;
+  runs: number | null;
+  generatedAt: string | null;
+  packageSpec: string | null;
+  resultPath: string;
+};
+
+type SupportBenchmarkReport = {
+  mode: string;
+  base: SupportBenchmark | null;
+  head: SupportBenchmark | null;
+  deltaPercent: number | null;
+  speedup: number | null;
+};
+
 const findSupportResultPath = wrapper => {
   const resultFile = wrapper?.generatedFiles?.find(file =>
     file.endsWith('-rsbuild-modes.json')
@@ -72,7 +103,7 @@ const findSupportResultPath = wrapper => {
     : null;
 };
 
-const readSupportBenchmarkEffect = file =>
+const readSupportBenchmarksEffect = file =>
   Effect.gen(function* () {
     const wrapper = yield* readJsonEffect(file);
     const resultPath = findSupportResultPath(wrapper);
@@ -82,37 +113,74 @@ const readSupportBenchmarkEffect = file =>
       );
     }
     const result = yield* readJsonEffect(resultPath);
-    const summary =
-      result.summaries?.find(summary => summary.mode === 'rsbuild-fast') ??
-      result.summaries?.[0];
-    if (!summary) {
+    const summaries = result.summaries ?? [];
+    if (summaries.length === 0) {
       return yield* Effect.fail(
         new Error(`${resultPath} does not contain benchmark summaries.`)
       );
     }
-    return {
-      mode: summary.mode,
-      profile: summary.profile ?? result.profile ?? null,
-      samples: summary.samples ?? [],
-      medianSeconds: summary.median ?? null,
-      meanSeconds: summary.mean ?? null,
-      runs: result.runs ?? null,
-      generatedAt: result.generatedAt ?? wrapper.generatedAt ?? null,
-      packageSpec: wrapper.packageSpec ?? null,
-      resultPath,
-    };
+    return summaries.map(
+      (summary): SupportBenchmark => ({
+        mode: summary.mode,
+        profile: summary.profile ?? result.profile ?? null,
+        samples: summary.samples ?? [],
+        medianSeconds: summary.median ?? null,
+        meanSeconds: summary.mean ?? null,
+        runs: result.runs ?? null,
+        generatedAt: result.generatedAt ?? wrapper.generatedAt ?? null,
+        packageSpec: wrapper.packageSpec ?? null,
+        resultPath,
+      })
+    );
   });
 
-const createSupportReport = (base, head) => {
-  if (!base || !head) {
-    return null;
+const supportBenchmarkSort = (left, right) => {
+  const orderDelta = supportBenchmarkOrder(left) - supportBenchmarkOrder(right);
+  if (orderDelta !== 0) {
+    return orderDelta;
   }
-  return {
-    base,
-    head,
-    deltaPercent: percentDelta(base.medianSeconds, head.medianSeconds),
-    speedup: speedup(base.medianSeconds, head.medianSeconds),
-  };
+  return left.localeCompare(right);
+};
+
+const createSupportReports = (
+  baseBenchmarks: SupportBenchmark[],
+  headBenchmarks: SupportBenchmark[]
+): SupportBenchmarkReport[] => {
+  const baseByMode = new Map(
+    baseBenchmarks.map(benchmark => [benchmark.mode, benchmark] as const)
+  );
+  const headByMode = new Map(
+    headBenchmarks.map(benchmark => [benchmark.mode, benchmark] as const)
+  );
+  return [...new Set([...baseByMode.keys(), ...headByMode.keys()])]
+    .sort(supportBenchmarkSort)
+    .map(mode => {
+      const base = baseByMode.get(mode) ?? null;
+      const head = headByMode.get(mode) ?? null;
+      return {
+        mode,
+        base,
+        head,
+        deltaPercent:
+          base && head
+            ? percentDelta(base.medianSeconds, head.medianSeconds)
+            : null,
+        speedup:
+          base && head ? speedup(base.medianSeconds, head.medianSeconds) : null,
+      };
+    });
+};
+
+const renderSupportBenchmarkRow = ({
+  mode,
+  base,
+  head,
+  deltaPercent,
+  speedup,
+}: SupportBenchmarkReport) => {
+  const runs = head?.runs ?? base?.runs ?? 'unknown';
+  const profile = head?.profile ?? base?.profile ?? 'unknown';
+  return `| \`${mode}\` | ${formatSecondsFromSeconds(base?.medianSeconds)} | ${formatSecondsFromSeconds(head?.medianSeconds)} | ${formatPercent(deltaPercent)} | ${formatSpeedup(speedup)} | \`${runs}\` | \`${profile}\` |`;
 };
 
 const medianWall = benchmark => benchmark?.summary?.wallMs?.median ?? null;
@@ -142,7 +210,7 @@ const sumMetric = (benchmarks, key) => {
     : values.reduce((sum, value) => sum + value, 0);
 };
 
-const createReport = (values, base, head, supportBenchmark = null) => {
+const createReport = (values, base, head, supportBenchmarks = []) => {
   const baseMode = base.mode ?? 'build';
   const headMode = head.mode ?? 'build';
 
@@ -230,12 +298,12 @@ const createReport = (values, base, head, supportBenchmark = null) => {
     warmup: head.warmup ?? base.warmup ?? null,
     summary,
     benchmarks,
-    supportBenchmark,
+    supportBenchmarks,
   };
 };
 
 const renderComment = report => {
-  const { benchmarks, summary, supportBenchmark } = report;
+  const { benchmarks, summary, supportBenchmarks = [] } = report;
   const lines = [
     '<!-- react-router-benchmark-ci -->',
     '## Benchmark Results',
@@ -250,13 +318,13 @@ const renderComment = report => {
         ]
       : []),
     '',
-    ...(supportBenchmark
+    ...(supportBenchmarks.length > 0
       ? [
-          '### Support Repo Benchmark',
+          '### Support Repo Benchmarks',
           '',
           '| Benchmark | Base median | Head median | Delta | Speedup | Runs | Profile |',
           '|---|---:|---:|---:|---:|---:|---|',
-          `| \`${supportBenchmark.head.mode ?? 'support-rsbuild-modes'}\` | ${formatSecondsFromSeconds(supportBenchmark.base.medianSeconds)} | ${formatSecondsFromSeconds(supportBenchmark.head.medianSeconds)} | ${formatPercent(supportBenchmark.deltaPercent)} | ${formatSpeedup(supportBenchmark.speedup)} | \`${supportBenchmark.head.runs ?? 'unknown'}\` | \`${supportBenchmark.head.profile ?? 'unknown'}\` |`,
+          ...supportBenchmarks.map(renderSupportBenchmarkRow),
           '',
         ]
       : []),
@@ -296,15 +364,15 @@ const mainEffect = Effect.gen(function* () {
     readJsonEffect(values.base),
     readJsonEffect(values.head),
   ]);
-  const supportBenchmark =
+  const supportBenchmarks =
     values['support-base'] && values['support-head']
-      ? createSupportReport(
-          yield* readSupportBenchmarkEffect(values['support-base']),
-          yield* readSupportBenchmarkEffect(values['support-head'])
+      ? createSupportReports(
+          yield* readSupportBenchmarksEffect(values['support-base']),
+          yield* readSupportBenchmarksEffect(values['support-head'])
         )
-      : null;
+      : [];
   const report = yield* tryScriptSync(() =>
-    createReport(values, base, head, supportBenchmark)
+    createReport(values, base, head, supportBenchmarks)
   );
   const outDir = path.resolve(values.out);
   yield* writeReportEffect(outDir, report);
