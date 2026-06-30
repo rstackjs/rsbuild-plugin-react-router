@@ -127,7 +127,7 @@ const getDefaultRouteTransformWorkerCount = cpuCount => {
   return Math.min(workerCount, workerLimit);
 };
 
-const resolveConcurrency = parallelTransforms => {
+const resolveConcurrency = parallelRouteTransform => {
   const availableCpuCount = getAvailableCpuCount();
   const spareCoreCount = getDefaultConcurrency(availableCpuCount);
   return {
@@ -139,10 +139,12 @@ const resolveConcurrency = parallelTransforms => {
     parallelEnvironmentBuilds:
       spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES,
     routeTransformWorkers:
-      parallelTransforms === false
+      parallelRouteTransform === false
         ? 0
-        : (parallelTransforms ??
-          getDefaultRouteTransformWorkerCount(availableCpuCount)),
+        : parallelRouteTransform === true ||
+            parallelRouteTransform === undefined
+          ? getDefaultRouteTransformWorkerCount(availableCpuCount)
+          : parallelRouteTransform,
   };
 };
 
@@ -163,7 +165,7 @@ const parseArgs = argv => {
       },
       clean: { type: 'string', default: 'build' },
       filter: { type: 'string' },
-      'parallel-transforms': { type: 'string' },
+      'parallel-route-transform': { type: 'string' },
       'rspack-profile': { type: 'string' },
       'rspack-trace-output': { type: 'string' },
       'fail-fast': { type: 'boolean', default: false },
@@ -176,7 +178,7 @@ const parseArgs = argv => {
     },
   });
 
-  const parseParallelTransforms = value => {
+  const parseParallelRouteTransform = value => {
     if (value === undefined) {
       return undefined;
     }
@@ -186,10 +188,13 @@ const parseArgs = argv => {
     if (value === 'auto') {
       return undefined;
     }
+    if (value === 'true') {
+      return true;
+    }
     const workerCount = Number(value);
     if (!Number.isInteger(workerCount) || workerCount < 1) {
       throw new Error(
-        '--parallel-transforms must be false, auto, or a positive integer.'
+        '--parallel-route-transform must be true, false, auto, or a positive integer.'
       );
     }
     return workerCount;
@@ -204,7 +209,9 @@ const parseArgs = argv => {
     out: values.out,
     clean: values.clean,
     filter: values.filter ?? null,
-    parallelTransforms: parseParallelTransforms(values['parallel-transforms']),
+    parallelRouteTransform: parseParallelRouteTransform(
+      values['parallel-route-transform']
+    ),
     rspackProfile: values['rspack-profile'] ?? null,
     rspackTraceOutput: values['rspack-trace-output'] ?? null,
     failFast: values['fail-fast'],
@@ -769,7 +776,7 @@ const renderMarkdown = result => {
           `- Dev route timeout: ${result.devRouteTimeoutMs} ms`,
         ]
       : []),
-    `- Parallel transforms: ${formatParallelTransforms(result.parallelTransforms)}`,
+    `- Parallel route transform: ${formatParallelRouteTransform(result.parallelRouteTransform)}`,
     `- Resolved route transform workers: ${concurrency.routeTransformWorkers}`,
     `- Plugin performance logging: ${String(result.logPerformance)}`,
     `- Rspack profile: ${result.rspackProfile ?? 'false'}`,
@@ -917,14 +924,17 @@ const writeOutputsEffect = (result, outputPaths) =>
     }
   });
 
-const formatParallelTransforms = parallelTransforms => {
-  if (parallelTransforms === undefined) {
+const formatParallelRouteTransform = parallelRouteTransform => {
+  if (parallelRouteTransform === undefined) {
     return 'adaptive';
   }
-  if (!parallelTransforms) {
+  if (!parallelRouteTransform) {
     return 'false';
   }
-  return `workers=${parallelTransforms}`;
+  if (parallelRouteTransform === true) {
+    return 'true';
+  }
+  return `workers=${parallelRouteTransform}`;
 };
 
 const gitEffect = args =>
@@ -1214,7 +1224,7 @@ const runBenchmarkEffect = ({
         fixture: benchmark.fixture ?? 'default',
         pluginImportPath,
         pluginReactImportPath,
-        parallelTransforms: args.parallelTransforms,
+        parallelRouteTransform: args.parallelRouteTransform,
         largeConfig: undefined,
       })
     )) as any;
@@ -1241,7 +1251,7 @@ const runBenchmarkEffect = ({
       ...benchmark,
       fixture: fixtureResult.fixture,
       fixtureStats: fixtureResult.stats ?? null,
-      parallelTransforms: args.parallelTransforms,
+      parallelRouteTransform: args.parallelRouteTransform,
       resolvedRouteTransformWorkers: concurrency.routeTransformWorkers,
       devRoutePaths,
       cwd: path.relative(rootDir, fixtureRoot),
@@ -1258,7 +1268,7 @@ const runBenchmarkEffect = ({
 
 const mainEffect = Effect.gen(function* () {
   const args = yield* tryScriptSync(() => parseArgs(process.argv.slice(2)));
-  const concurrency = resolveConcurrency(args.parallelTransforms);
+  const concurrency = resolveConcurrency(args.parallelRouteTransform);
   const useTime = yield* hasGnuTimeEffect();
   const outputPaths = resolveOutputPaths(args);
   const pluginImportPath = pathToFileURL(
@@ -1329,7 +1339,7 @@ const mainEffect = Effect.gen(function* () {
     concurrency,
     devRoutes: args.mode === 'dev' ? args.devRoutes : null,
     devRouteTimeoutMs: args.mode === 'dev' ? args.devRouteTimeoutMs : null,
-    parallelTransforms: args.parallelTransforms,
+    parallelRouteTransform: args.parallelRouteTransform,
     rspackProfile: args.rspackProfile,
     rspackTraceOutput: args.rspackTraceOutput,
     failed,

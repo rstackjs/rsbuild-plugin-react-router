@@ -237,14 +237,17 @@ const createRoutesConfig = routeCount => {
   ].join('\n');
 };
 
-const renderParallelTransformsOption = parallelTransforms => {
-  if (parallelTransforms === undefined) {
+const renderParallelRouteTransformOption = parallelRouteTransform => {
+  if (parallelRouteTransform === undefined) {
     return [];
   }
-  if (parallelTransforms === false) {
-    return [`      parallelTransforms: false,`];
+  if (parallelRouteTransform === false) {
+    return [`      parallelRouteTransform: false,`];
   }
-  return [`      parallelTransforms: ${parallelTransforms},`];
+  if (parallelRouteTransform === true) {
+    return [`      parallelRouteTransform: true,`];
+  }
+  return [`      parallelRouteTransform: ${parallelRouteTransform},`];
 };
 
 const createRsbuildConfig = ({
@@ -252,7 +255,7 @@ const createRsbuildConfig = ({
   sourceMap,
   pluginImportPath,
   pluginReactImportPath,
-  parallelTransforms,
+  parallelRouteTransform,
 }) => {
   const ssr = variant !== 'spa';
   const lazyCompilationOption =
@@ -271,7 +274,7 @@ const createRsbuildConfig = ({
     '    pluginReact(),',
     '    pluginReactRouter({',
     ...(ssr ? [`      serverOutput: 'module',`] : []),
-    ...renderParallelTransformsOption(parallelTransforms),
+    ...renderParallelRouteTransformOption(parallelRouteTransform),
     lazyCompilationOption,
     `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
     '    }),',
@@ -650,7 +653,7 @@ const generateLargeFixture = async ({
   sourceMap,
   pluginImportPath,
   pluginReactImportPath,
-  parallelTransforms,
+  parallelRouteTransform,
   largeConfig,
 }) => {
   const config = normalizeLargeConfig(routeCount, largeConfig);
@@ -683,7 +686,7 @@ const generateLargeFixture = async ({
         sourceMap,
         pluginImportPath,
         pluginReactImportPath,
-        parallelTransforms,
+        parallelRouteTransform,
       }),
     ],
     [
@@ -795,7 +798,7 @@ const generateLargeFixture = async ({
     variant,
     sourceMap,
     fixture: 'large',
-    parallelTransforms,
+    parallelRouteTransform,
     stats: createLargeStats(config),
   };
 };
@@ -808,7 +811,7 @@ export async function generateSyntheticFixture({
   pluginImportPath = 'rsbuild-plugin-react-router',
   pluginReactImportPath = '@rsbuild/plugin-react',
   fixture = 'default',
-  parallelTransforms,
+  parallelRouteTransform,
   largeConfig,
 }) {
   if (!stressFixtureNames.has(fixture)) {
@@ -825,7 +828,7 @@ export async function generateSyntheticFixture({
       sourceMap,
       pluginImportPath,
       pluginReactImportPath,
-      parallelTransforms,
+      parallelRouteTransform,
       largeConfig,
     });
   }
@@ -846,7 +849,7 @@ export async function generateSyntheticFixture({
       sourceMap,
       pluginImportPath,
       pluginReactImportPath,
-      parallelTransforms,
+      parallelRouteTransform,
     })
   );
   await writeFile(
@@ -907,6 +910,6 @@ export async function generateSyntheticFixture({
     variant,
     sourceMap,
     fixture,
-    parallelTransforms,
+    parallelRouteTransform,
   };
 }

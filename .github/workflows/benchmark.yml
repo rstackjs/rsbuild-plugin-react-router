@@ -28,26 +28,27 @@ jobs:
 
     steps:
       - name: Checkout PR head
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           path: head
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Checkout PR base
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           path: base
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version-file: head/.nvmrc
+          package-manager-cache: false
 
       - name: Setup PNPM
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         with:
           package_json_file: head/package.json
 
@@ -58,7 +59,7 @@ jobs:
           echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
           key: ${{ runner.os }}-benchmark-pnpm-${{ hashFiles('head/pnpm-lock.yaml', 'base/pnpm-lock.yaml') }}
@@ -131,7 +132,7 @@ jobs:
             --run-url "$RUN_URL"
 
       - name: Upload benchmark artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: benchmark-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: benchmark-output
