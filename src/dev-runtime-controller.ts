@@ -16,6 +16,7 @@ import {
 } from './dev-generation.js';
 import {
   getEnvironmentStats,
+  isPairedDevStats,
   snapshotDevChangedFiles,
   type DevRuntimeStats,
   type ReactRouterDevBuildPlan,
@@ -135,7 +136,7 @@ export const createReactRouterDevRuntimeController = ({
   const toRspackRuntimeStats = (
     stats: DevRuntimeStats
   ): Rspack.Stats | Rspack.MultiStats =>
-    'web' in stats && 'node' in stats
+    isPairedDevStats(stats)
       ? ({ stats: [stats.web, stats.node] } as Rspack.MultiStats)
       : stats;
 
@@ -203,22 +204,12 @@ export const createReactRouterDevRuntimeController = ({
     ) {
       return;
     }
-    void runPluginEffect(
-      finishRuntimeAttemptEffect(
-        binding,
-        pair,
-        pending.stats,
-        pending.changes,
-        pending.identity
-      ).pipe(
-        Effect.catchAll(cause =>
-          tryPluginSync(() => {
-            if (sessions.getActiveBinding()?.id === binding.id) {
-              binding.runtime.failAttempt(normalizeEffectError(cause));
-            }
-          })
-        )
-      )
+    void finishRuntimeAttempt(
+      binding,
+      pair,
+      pending.stats,
+      pending.changes,
+      pending.identity
     );
   };
 

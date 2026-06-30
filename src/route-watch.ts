@@ -3,17 +3,14 @@ import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { RsbuildConfig } from '@rsbuild/core';
 import { Duration, Effect, Fiber } from 'effect';
 import { dirname, resolve } from 'pathe';
-import { getDefaultConcurrency } from './concurrency.js';
+import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import type { Route } from './types.js';
 
 const ROUTE_RESTART_MARKER_ASSET = '.react-router/route-watch';
 const INITIAL_RESTART_MARKER_CONTENT = 'react-router-route-watch';
 const ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS = 100;
-const ROUTE_DIRECTORY_SCAN_CONCURRENCY = Math.max(
-  1,
-  Math.min(16, getDefaultConcurrency() || 1)
-);
+const ROUTE_DIRECTORY_SCAN_CONCURRENCY = getCappedPluginConcurrency();
 
 type RouteManifestSnapshotEntry = Pick<
   Route,

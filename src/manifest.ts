@@ -16,13 +16,10 @@ import {
   type RouteChunkConfig,
 } from './route-chunks.js';
 import { getRouteModuleAnalysis } from './export-utils.js';
-import { getDefaultConcurrency } from './concurrency.js';
+import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
-const ROUTE_ANALYSIS_CONCURRENCY = Math.max(
-  1,
-  Math.min(16, getDefaultConcurrency() || 1)
-);
+const ROUTE_ANALYSIS_CONCURRENCY = getCappedPluginConcurrency();
 
 export function configRoutesToRouteManifest(
   appDirectory: string,

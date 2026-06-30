@@ -118,11 +118,15 @@ export const isSafeOneSidedChange = (
   return true;
 };
 
+export const isPairedDevStats = (
+  stats: DevRuntimeStats
+): stats is PairedDevStats => 'web' in stats && 'node' in stats;
+
 export const getEnvironmentStats = (
   stats: DevRuntimeStats,
   name: 'web' | 'node'
 ): Rspack.Stats | undefined => {
-  if ('web' in stats && 'node' in stats) {
+  if (isPairedDevStats(stats)) {
     return stats[name];
   }
   const children = Array.isArray((stats as Rspack.MultiStats).stats)

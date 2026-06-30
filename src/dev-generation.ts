@@ -16,7 +16,7 @@ import {
   type ReactRouterServerBuilds,
   type WebArtifact,
 } from './dev-runtime-artifacts.js';
-import { runPluginEffect } from './effect-runtime.js';
+import { normalizeEffectError, runPluginEffect } from './effect-runtime.js';
 
 export { snapshotDevChangedFiles } from './dev-runtime-artifacts.js';
 export type {
@@ -597,11 +597,7 @@ export const createReactRouterDevRuntime = ({
         }
         return 'committed';
       } catch (cause) {
-        rejectAttempt(
-          attemptId,
-          cause instanceof Error ? cause : new Error(String(cause)),
-          true
-        );
+        rejectAttempt(attemptId, normalizeEffectError(cause), true);
         return 'ignored';
       }
     },

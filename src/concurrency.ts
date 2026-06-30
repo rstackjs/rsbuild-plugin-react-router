@@ -13,6 +13,9 @@ export const getDefaultConcurrency = (
   cpuCount: number = getAvailableCpuCount()
 ): number => Math.max(0, Math.floor(cpuCount) - DEFAULT_RESERVED_CORES);
 
+export const getCappedPluginConcurrency = (cap = 16): number =>
+  Math.max(1, Math.min(cap, getDefaultConcurrency() || 1));
+
 export const mapWithConcurrency = async <Item, Result>(
   items: readonly Item[],
   concurrency: number,
