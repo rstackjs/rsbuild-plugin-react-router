@@ -16,7 +16,7 @@ jobs:
   benchmark:
     name: Compare large dev benchmark
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     env:
       BENCHMARK_PROFILE: large
@@ -25,6 +25,9 @@ jobs:
       BENCHMARK_WARMUP: '0'
       BENCHMARK_DEV_ROUTES: auto
       BENCHMARK_HISTORY_BRANCH: benchmark-results
+      SYNTHETIC_BENCHMARK_MODES: rsbuild-optimized,rsbuild-js-transform-contention
+      SYNTHETIC_BENCHMARK_PROFILE: cold
+      SYNTHETIC_BENCHMARK_RUNS: '1'
 
     steps:
       - name: Checkout PR head
@@ -62,7 +65,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-benchmark-pnpm-${{ hashFiles('head/pnpm-lock.yaml', 'base/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-benchmark-pnpm-${{ hashFiles('head/pnpm-lock.yaml', 'base/pnpm-lock.yaml', 'head/benchmarks/synthetic-web-bundler-benchmark/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-benchmark-pnpm-
             ${{ runner.os }}-pnpm-store-
@@ -73,6 +76,10 @@ jobs:
 
       - name: Install base dependencies
         working-directory: base
+        run: pnpm install --frozen-lockfile
+
+      - name: Install embedded synthetic benchmark dependencies
+        working-directory: head/benchmarks/synthetic-web-bundler-benchmark
         run: pnpm install --frozen-lockfile
 
       - name: Resolve benchmark-only React plugin
@@ -110,6 +117,30 @@ jobs:
             --format both \
             --out "$GITHUB_WORKSPACE/benchmark-output/head"
 
+      - name: Benchmark embedded synthetic app with base plugin
+        working-directory: head
+        run: |
+          node scripts/bench-synthetic-app.mjs \
+            --app "$GITHUB_WORKSPACE/head/benchmarks/synthetic-web-bundler-benchmark" \
+            --plugin-root "$GITHUB_WORKSPACE/base" \
+            --skip-install \
+            --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/base" \
+            --runs "$SYNTHETIC_BENCHMARK_RUNS" \
+            --profile "$SYNTHETIC_BENCHMARK_PROFILE" \
+            --modes "$SYNTHETIC_BENCHMARK_MODES"
+
+      - name: Benchmark embedded synthetic app with head plugin
+        working-directory: head
+        run: |
+          node scripts/bench-synthetic-app.mjs \
+            --app "$GITHUB_WORKSPACE/head/benchmarks/synthetic-web-bundler-benchmark" \
+            --plugin-root "$GITHUB_WORKSPACE/head" \
+            --skip-install \
+            --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/head" \
+            --runs "$SYNTHETIC_BENCHMARK_RUNS" \
+            --profile "$SYNTHETIC_BENCHMARK_PROFILE" \
+            --modes "$SYNTHETIC_BENCHMARK_MODES"
+
       - name: Generate benchmark report
         working-directory: head
         env:
@@ -123,6 +154,8 @@ jobs:
           node scripts/report-benchmark-ci.mjs \
             --base "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" \
             --head "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" \
+            --synthetic-base "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json" \
+            --synthetic-head "$GITHUB_WORKSPACE/benchmark-output/synthetic/head/latest.json" \
             --out "$GITHUB_WORKSPACE/benchmark-output/report" \
             --pr "$PR_NUMBER" \
             --base-ref "$BASE_REF" \
@@ -198,6 +231,7 @@ jobs:
           mkdir -p "$result_dir" "$latest_dir"
           cp "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" "$result_dir/base.json"
           cp "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" "$result_dir/head.json"
+          cp -R "$GITHUB_WORKSPACE/benchmark-output/synthetic" "$result_dir/synthetic"
           cp "$GITHUB_WORKSPACE/benchmark-output/report/report.json" "$result_dir/report.json"
           cp "$GITHUB_WORKSPACE/benchmark-output/report/comment.md" "$result_dir/comment.md"
           cp "$result_dir/report.json" "$latest_dir/report.json"

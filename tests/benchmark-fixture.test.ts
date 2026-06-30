@@ -1,4 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -367,4 +374,112 @@ describe('benchmark fixture generator', () => {
     expect(result.stderr).toContain('No benchmarks matched filter "missing".');
     expect(result.stderr).not.toContain('Unknown profile "large"');
   });
+
+  it('renders embedded synthetic app benchmark rows in CI reports', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
+
+    try {
+      const baseBenchmark = {
+        commit: 'base-sha',
+        profile: 'large',
+        mode: 'dev',
+        iterations: 1,
+        warmup: 0,
+        benchmarks: [
+          {
+            id: 'synthetic-large',
+            summary: {
+              wallMs: { median: 1000 },
+              readyMs: { median: 700 },
+              routeTotalMs: { median: 300 },
+            },
+          },
+        ],
+      };
+      const headBenchmark = {
+        ...baseBenchmark,
+        commit: 'head-sha',
+        benchmarks: [
+          {
+            id: 'synthetic-large',
+            summary: {
+              wallMs: { median: 900 },
+              readyMs: { median: 650 },
+              routeTotalMs: { median: 250 },
+            },
+          },
+        ],
+      };
+      const baseSynthetic = {
+        generatedAt: '2026-06-15T00:00:00.000Z',
+        node: 'v22.22.2',
+        platform: 'linux-x64',
+        runs: 1,
+        summaries: [
+          {
+            mode: 'rsbuild-optimized',
+            profile: 'cold',
+            median: 40,
+            mean: 40,
+            samples: [40],
+            fastest: true,
+          },
+        ],
+      };
+      const headSynthetic = {
+        ...baseSynthetic,
+        summaries: [{ ...baseSynthetic.summaries[0], median: 36, samples: [36] }],
+      };
+
+      mkdirSync(join(root, 'base-synthetic'), { recursive: true });
+      mkdirSync(join(root, 'head-synthetic'), { recursive: true });
+      writeJson(join(root, 'base.json'), baseBenchmark);
+      writeJson(join(root, 'head.json'), headBenchmark);
+      writeJson(join(root, 'base-synthetic/result-rsbuild-modes.json'), baseSynthetic);
+      writeJson(join(root, 'head-synthetic/result-rsbuild-modes.json'), headSynthetic);
+      writeJson(join(root, 'base-synthetic/latest.json'), {
+        outputDirectory: join(root, 'base-synthetic'),
+        generatedFiles: ['result-rsbuild-modes.json'],
+      });
+      writeJson(join(root, 'head-synthetic/latest.json'), {
+        outputDirectory: join(root, 'head-synthetic'),
+        generatedFiles: ['result-rsbuild-modes.json'],
+      });
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          'scripts/report-benchmark-ci.mjs',
+          '--base',
+          join(root, 'base.json'),
+          '--head',
+          join(root, 'head.json'),
+          '--synthetic-base',
+          join(root, 'base-synthetic/latest.json'),
+          '--synthetic-head',
+          join(root, 'head-synthetic/latest.json'),
+          '--out',
+          join(root, 'report'),
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status).toBe(0);
+      const comment = readFileSync(join(root, 'report/comment.md'), 'utf8');
+      expect(comment).toContain('### Embedded Synthetic App');
+      expect(comment).toContain('`rsbuild-optimized`');
+      expect(comment).toContain('40.00s');
+      expect(comment).toContain('36.00s');
+      expect(comment).toContain('-10.0%');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
+
+function writeJson(file: string, value: unknown) {
+  writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+}

@@ -1,0 +1,62 @@
+{
+  "name": "synthetic-web-bundler-benchmark",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.3",
+  "engines": {
+    "node": ">=22.22.2 <23"
+  },
+  "scripts": {
+    "generate": "node scripts/generate-app.mjs",
+    "generate:force": "node scripts/generate-app.mjs --force",
+    "shape": "node scripts/report-shape.mjs",
+    "build:rsbuild": "cross-env SYNTHETIC_BUILD_DIR=dist/rsbuild NODE_ENV=production rsbuild build --config rsbuild.fast.config.ts",
+    "benchmark:rsbuild-modes": "node scripts/benchmark-rsbuild-modes.mjs",
+    "test:benchmark-modes": "node --test scripts/benchmark-rsbuild-modes.test.mjs"
+  },
+  "dependencies": {
+    "@react-router/node": "7.14.0",
+    "@react-router/serve": "7.14.0",
+    "echarts": "6.1.0",
+    "fast-xml-parser": "5.8.0",
+    "isbot": "5.1.34",
+    "leaflet": "1.9.4",
+    "mammoth": "1.12.0",
+    "markdown-it": "14.2.0",
+    "monaco-editor": "0.55.1",
+    "pdf-lib": "1.17.1",
+    "prismjs": "1.30.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-intl": "10.1.2",
+    "react-router": "7.14.0",
+    "tailwindcss": "4.3.1",
+    "valtio": "2.3.2"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.0",
+    "@react-router/dev": "7.14.0",
+    "@rsbuild/core": "2.1.0",
+    "@rsbuild/plugin-babel": "2.0.0",
+    "@rsbuild/plugin-react": "2.1.0",
+    "@rsbuild/plugin-svgr": "2.0.4",
+    "@rsbuild/plugin-tailwindcss": "2.0.3",
+    "@types/babel__core": "7.20.5",
+    "@types/node": "22.15.31",
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "babel-plugin-formatjs": "10.5.41",
+    "babel-plugin-react-compiler": "1.0.0",
+    "cross-env": "10.1.0",
+    "typescript": "6.0.1-rc"
+  },
+  "pnpm": {
+    "overrides": {
+      "@rspack/core": "2.1.0"
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
