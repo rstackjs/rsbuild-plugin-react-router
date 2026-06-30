@@ -24,6 +24,8 @@ const parseInputEffect = () =>
         'head-ref': { type: 'string' },
         'head-sha': { type: 'string' },
         'run-url': { type: 'string' },
+        'support-base': { type: 'string' },
+        'support-head': { type: 'string' },
       },
     });
 
@@ -40,6 +42,8 @@ const readJsonEffect = file =>
   tryScriptPromise(async () => JSON.parse(await readFile(file, 'utf8')));
 const formatSeconds = value =>
   typeof value === 'number' ? `${(value / 1000).toFixed(2)}s` : '-';
+const formatSecondsFromSeconds = value =>
+  typeof value === 'number' ? `${value.toFixed(2)}s` : '-';
 const formatPercent = value =>
   typeof value === 'number'
     ? `${value > 0 ? '+' : ''}${value.toFixed(1)}%`
@@ -58,6 +62,58 @@ const speedup = (base, head) =>
   typeof base === 'number' && typeof head === 'number' && head !== 0
     ? base / head
     : null;
+
+const findSupportResultPath = wrapper => {
+  const resultFile = wrapper?.generatedFiles?.find(file =>
+    file.endsWith('-rsbuild-modes.json')
+  );
+  return resultFile && wrapper.workdir
+    ? path.resolve(wrapper.workdir, resultFile)
+    : null;
+};
+
+const readSupportBenchmarkEffect = file =>
+  Effect.gen(function* () {
+    const wrapper = yield* readJsonEffect(file);
+    const resultPath = findSupportResultPath(wrapper);
+    if (!resultPath) {
+      return yield* Effect.fail(
+        new Error(`${file} does not reference an rsbuild-modes result JSON.`)
+      );
+    }
+    const result = yield* readJsonEffect(resultPath);
+    const summary =
+      result.summaries?.find(summary => summary.mode === 'rsbuild-fast') ??
+      result.summaries?.[0];
+    if (!summary) {
+      return yield* Effect.fail(
+        new Error(`${resultPath} does not contain benchmark summaries.`)
+      );
+    }
+    return {
+      mode: summary.mode,
+      profile: summary.profile ?? result.profile ?? null,
+      samples: summary.samples ?? [],
+      medianSeconds: summary.median ?? null,
+      meanSeconds: summary.mean ?? null,
+      runs: result.runs ?? null,
+      generatedAt: result.generatedAt ?? wrapper.generatedAt ?? null,
+      packageSpec: wrapper.packageSpec ?? null,
+      resultPath,
+    };
+  });
+
+const createSupportReport = (base, head) => {
+  if (!base || !head) {
+    return null;
+  }
+  return {
+    base,
+    head,
+    deltaPercent: percentDelta(base.medianSeconds, head.medianSeconds),
+    speedup: speedup(base.medianSeconds, head.medianSeconds),
+  };
+};
 
 const medianWall = benchmark => benchmark?.summary?.wallMs?.median ?? null;
 const medianReady = benchmark => benchmark?.summary?.readyMs?.median ?? null;
@@ -86,7 +142,7 @@ const sumMetric = (benchmarks, key) => {
     : values.reduce((sum, value) => sum + value, 0);
 };
 
-const createReport = (values, base, head) => {
+const createReport = (values, base, head, supportBenchmark = null) => {
   const baseMode = base.mode ?? 'build';
   const headMode = head.mode ?? 'build';
 
@@ -174,11 +230,12 @@ const createReport = (values, base, head) => {
     warmup: head.warmup ?? base.warmup ?? null,
     summary,
     benchmarks,
+    supportBenchmark,
   };
 };
 
 const renderComment = report => {
-  const { benchmarks, summary } = report;
+  const { benchmarks, summary, supportBenchmark } = report;
   const lines = [
     '<!-- react-router-benchmark-ci -->',
     '## Benchmark Results',
@@ -193,6 +250,16 @@ const renderComment = report => {
         ]
       : []),
     '',
+    ...(supportBenchmark
+      ? [
+          '### Support Repo Benchmark',
+          '',
+          '| Benchmark | Base median | Head median | Delta | Speedup | Runs | Profile |',
+          '|---|---:|---:|---:|---:|---:|---|',
+          `| \`${supportBenchmark.head.mode ?? 'support-rsbuild-modes'}\` | ${formatSecondsFromSeconds(supportBenchmark.base.medianSeconds)} | ${formatSecondsFromSeconds(supportBenchmark.head.medianSeconds)} | ${formatPercent(supportBenchmark.deltaPercent)} | ${formatSpeedup(supportBenchmark.speedup)} | \`${supportBenchmark.head.runs ?? 'unknown'}\` | \`${supportBenchmark.head.profile ?? 'unknown'}\` |`,
+          '',
+        ]
+      : []),
     '| Benchmark | Base total | Head total | Delta | Head ready | Head routes | Speedup | Head RSS p95 |',
     '|---|---:|---:|---:|---:|---:|---:|---:|',
   ];
@@ -229,7 +296,16 @@ const mainEffect = Effect.gen(function* () {
     readJsonEffect(values.base),
     readJsonEffect(values.head),
   ]);
-  const report = yield* tryScriptSync(() => createReport(values, base, head));
+  const supportBenchmark =
+    values['support-base'] && values['support-head']
+      ? createSupportReport(
+          yield* readSupportBenchmarkEffect(values['support-base']),
+          yield* readSupportBenchmarkEffect(values['support-head'])
+        )
+      : null;
+  const report = yield* tryScriptSync(() =>
+    createReport(values, base, head, supportBenchmark)
+  );
   const outDir = path.resolve(values.out);
   yield* writeReportEffect(outDir, report);
   console.log(`Benchmark CI report written to ${outDir}`);

@@ -509,4 +509,121 @@ describe('benchmark fixture generator', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('includes support reproduction benchmarks in CI reports', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
+    try {
+      const base = join(root, 'base.json');
+      const head = join(root, 'head.json');
+      const supportBase = join(root, 'support-base.json');
+      const supportHead = join(root, 'support-head.json');
+      const supportBaseWorkdir = join(root, 'support-base-workdir');
+      const supportHeadWorkdir = join(root, 'support-head-workdir');
+      const outDir = join(root, 'report');
+      mkdirSync(join(supportBaseWorkdir, 'benchmark-results'), {
+        recursive: true,
+      });
+      mkdirSync(join(supportHeadWorkdir, 'benchmark-results'), {
+        recursive: true,
+      });
+      writeFileSync(
+        base,
+        JSON.stringify({ mode: 'dev', benchmarks: [] }),
+        'utf8'
+      );
+      writeFileSync(
+        head,
+        JSON.stringify({ mode: 'dev', benchmarks: [] }),
+        'utf8'
+      );
+      writeFileSync(
+        join(
+          supportBaseWorkdir,
+          'benchmark-results/2026-06-30T00-00-00Z-rsbuild-modes.json'
+        ),
+        JSON.stringify({
+          profile: 'cold',
+          runs: 1,
+          summaries: [
+            {
+              mode: 'rsbuild-fast',
+              samples: [70],
+              median: 70,
+              mean: 70,
+            },
+          ],
+        }),
+        'utf8'
+      );
+      writeFileSync(
+        join(
+          supportHeadWorkdir,
+          'benchmark-results/2026-06-30T00-00-01Z-rsbuild-modes.json'
+        ),
+        JSON.stringify({
+          profile: 'cold',
+          runs: 1,
+          summaries: [
+            {
+              mode: 'rsbuild-fast',
+              samples: [63],
+              median: 63,
+              mean: 63,
+            },
+          ],
+        }),
+        'utf8'
+      );
+      writeFileSync(
+        supportBase,
+        JSON.stringify({
+          generatedFiles: [
+            'benchmark-results/2026-06-30T00-00-00Z-rsbuild-modes.json',
+          ],
+          packageSpec: 'base.tgz',
+          workdir: supportBaseWorkdir,
+        }),
+        'utf8'
+      );
+      writeFileSync(
+        supportHead,
+        JSON.stringify({
+          generatedFiles: [
+            'benchmark-results/2026-06-30T00-00-01Z-rsbuild-modes.json',
+          ],
+          packageSpec: 'head.tgz',
+          workdir: supportHeadWorkdir,
+        }),
+        'utf8'
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          'scripts/report-benchmark-ci.mts',
+          '--base',
+          base,
+          '--head',
+          head,
+          '--support-base',
+          supportBase,
+          '--support-head',
+          supportHead,
+          '--out',
+          outDir,
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status).toBe(0);
+      const comment = readFileSync(join(outDir, 'comment.md'), 'utf8');
+      expect(comment).toContain('### Support Repo Benchmark');
+      expect(comment).toContain('| `rsbuild-fast` | 70.00s | 63.00s | -10.0% | 1.11x | `1` | `cold` |');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

@@ -25,6 +25,9 @@ jobs:
       BENCHMARK_WARMUP: '0'
       BENCHMARK_DEV_ROUTES: auto
       BENCHMARK_HISTORY_BRANCH: benchmark-results
+      SUPPORT_BENCHMARK_REPOSITORY: ScriptedAlchemy/synthetic-web-bundler-benchmark
+      SUPPORT_BENCHMARK_REF: codex/add-rsbuild-mode-benchmarks
+      SUPPORT_BENCHMARK_RUNS: '1'
 
     steps:
       - name: Checkout PR head
@@ -39,6 +42,14 @@ jobs:
         with:
           path: base
           ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Checkout support benchmark
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: ${{ env.SUPPORT_BENCHMARK_REPOSITORY }}
+          ref: ${{ env.SUPPORT_BENCHMARK_REF }}
+          path: support-source
           persist-credentials: false
 
       - name: Setup Node.js
@@ -110,6 +121,28 @@ jobs:
             --format both \
             --out "$GITHUB_WORKSPACE/benchmark-output/head"
 
+      - name: Benchmark support repo with base plugin
+        working-directory: base
+        run: |
+          node "$GITHUB_WORKSPACE/head/scripts/bench-support-repro.mts" \
+            --repo "$GITHUB_WORKSPACE/support-source" \
+            --workdir "$GITHUB_WORKSPACE/benchmark-output/support/base/workdir" \
+            --out "$GITHUB_WORKSPACE/benchmark-output/support/base" \
+            --runs "$SUPPORT_BENCHMARK_RUNS" \
+            --profile cold \
+            --modes rsbuild-fast
+
+      - name: Benchmark support repo with head plugin
+        working-directory: head
+        run: |
+          node scripts/bench-support-repro.mts \
+            --repo "$GITHUB_WORKSPACE/support-source" \
+            --workdir "$GITHUB_WORKSPACE/benchmark-output/support/head/workdir" \
+            --out "$GITHUB_WORKSPACE/benchmark-output/support/head" \
+            --runs "$SUPPORT_BENCHMARK_RUNS" \
+            --profile cold \
+            --modes rsbuild-fast
+
       - name: Generate benchmark report
         working-directory: head
         env:
@@ -123,6 +156,8 @@ jobs:
           node scripts/report-benchmark-ci.mts \
             --base "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" \
             --head "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" \
+            --support-base "$GITHUB_WORKSPACE/benchmark-output/support/base/latest.json" \
+            --support-head "$GITHUB_WORKSPACE/benchmark-output/support/head/latest.json" \
             --out "$GITHUB_WORKSPACE/benchmark-output/report" \
             --pr "$PR_NUMBER" \
             --base-ref "$BASE_REF" \
@@ -200,8 +235,11 @@ jobs:
           cp "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" "$result_dir/head.json"
           cp "$GITHUB_WORKSPACE/benchmark-output/report/report.json" "$result_dir/report.json"
           cp "$GITHUB_WORKSPACE/benchmark-output/report/comment.md" "$result_dir/comment.md"
+          cp -R "$GITHUB_WORKSPACE/benchmark-output/support" "$result_dir/support"
           cp "$result_dir/report.json" "$latest_dir/report.json"
           cp "$result_dir/comment.md" "$latest_dir/comment.md"
+          rm -rf "$latest_dir/support"
+          cp -R "$result_dir/support" "$latest_dir/support"
 
           git add pull-requests
           if git diff --cached --quiet; then
