@@ -102,6 +102,7 @@ const parseArgs = argv => {
       profile: { type: 'string', default: 'default' },
       mode: { type: 'string', default: 'build' },
       iterations: { type: 'string', default: '5' },
+      'large-iterations': { type: 'string' },
       warmup: { type: 'string', default: '1' },
       format: { type: 'string', default: 'both' },
       out: {
@@ -149,6 +150,10 @@ const parseArgs = argv => {
     profile: values.profile,
     mode: values.mode,
     iterations: Number(values.iterations),
+    largeIterations:
+      values['large-iterations'] === undefined
+        ? null
+        : Number(values['large-iterations']),
     warmup: Number(values.warmup),
     format: values.format,
     out: values.out,
@@ -178,6 +183,12 @@ const parseArgs = argv => {
   }
   if (!Number.isInteger(args.iterations) || args.iterations < 1) {
     throw new Error('--iterations must be a positive integer.');
+  }
+  if (
+    args.largeIterations !== null &&
+    (!Number.isInteger(args.largeIterations) || args.largeIterations < 1)
+  ) {
+    throw new Error('--large-iterations must be a positive integer.');
   }
   if (!Number.isInteger(args.warmup) || args.warmup < 0) {
     throw new Error('--warmup must be a non-negative integer.');
@@ -224,6 +235,14 @@ const parseArgs = argv => {
 
   return args;
 };
+
+const isLargeBenchmark = benchmark =>
+  benchmark.fixture === 'large' || benchmark.routeCount >= 1024;
+
+const getMeasuredIterationCount = (benchmark, args) =>
+  args.largeIterations !== null && isLargeBenchmark(benchmark)
+    ? Math.min(args.iterations, args.largeIterations)
+    : args.iterations;
 
 const hasGnuTime = async () => {
   try {
@@ -1114,6 +1133,7 @@ const main = async () => {
 
   const benchmarks = [];
   for (const [benchmarkIndex, benchmark] of selectedBenchmarks.entries()) {
+    const measuredIterations = getMeasuredIterationCount(benchmark, args);
     const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
     const devRoutePaths =
       args.mode === 'dev'
@@ -1131,7 +1151,7 @@ const main = async () => {
     });
 
     const runs = [];
-    const totalRuns = args.warmup + args.iterations;
+    const totalRuns = args.warmup + measuredIterations;
     for (let index = 0; index < totalRuns; index += 1) {
       const measured = index >= args.warmup;
       if (args.clean !== 'none') {
@@ -1271,6 +1291,7 @@ const main = async () => {
       ...benchmark,
       fixture: fixtureResult.fixture,
       fixtureStats: fixtureResult.stats ?? null,
+      iterations: measuredIterations,
       parallelRouteTransform: args.parallelRouteTransform,
       devRoutePaths,
       cwd: path.relative(rootDir, fixtureRoot),
@@ -1299,6 +1320,7 @@ const main = async () => {
     profile: args.profile,
     mode: args.mode,
     iterations: args.iterations,
+    largeIterations: args.largeIterations,
     warmup: args.warmup,
     clean: args.clean,
     logPerformance: args.logPerformance,

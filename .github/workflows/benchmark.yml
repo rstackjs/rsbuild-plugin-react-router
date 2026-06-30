@@ -21,6 +21,7 @@ jobs:
     env:
       BENCHMARK_PROFILE: full
       BENCHMARK_BUILD_ITERATIONS: '10'
+      BENCHMARK_LARGE_ITERATIONS: '5'
       BENCHMARK_MODE: dev
       BENCHMARK_ITERATIONS: '10'
       BENCHMARK_WARMUP: '0'
@@ -122,6 +123,7 @@ jobs:
             --profile "$BENCHMARK_PROFILE" \
             --mode build \
             --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
             --clean build \
             --format both \
@@ -134,6 +136,7 @@ jobs:
             --profile "$BENCHMARK_PROFILE" \
             --mode build \
             --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
             --clean build \
             --format both \
@@ -148,6 +151,7 @@ jobs:
             --profile "$BENCHMARK_PROFILE" \
             --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
@@ -161,6 +165,7 @@ jobs:
             --profile "$BENCHMARK_PROFILE" \
             --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \

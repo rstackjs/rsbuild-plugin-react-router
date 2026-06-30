@@ -342,6 +342,7 @@ describe('benchmark fixture generator', () => {
         'scripts/bench-builds.mjs',
         '--profile=smoke',
         '--iterations=1',
+        '--large-iterations=1',
         '--warmup=0',
         '--filter=missing',
         '--rspack-profile=ALL',
