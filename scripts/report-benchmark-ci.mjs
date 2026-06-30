@@ -384,6 +384,31 @@ const report = {
   syntheticBenchmarks,
 };
 
+const productionBenchmarkTableHeader = [
+  '| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
+  '|---|---:|---:|---:|---:|---:|---:|---:|---:|',
+];
+
+const devBenchmarkTableHeader = [
+  '| Benchmark | Runs | Base total | Head total | Delta | Base ready | Head ready | Base routes | Head routes | Base update/HMR | Head update/HMR | Update delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
+  '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
+];
+
+const benchmarkRunCount = benchmark =>
+  benchmark.headRunCount ?? benchmark.baseRunCount;
+
+const renderBuildBenchmarkRow = benchmark =>
+  `| \`${benchmark.id}\` | ${formatCount(benchmarkRunCount(benchmark))} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`;
+
+const renderDevBenchmarkRow = benchmark =>
+  `| \`${benchmark.id}\` | ${formatCount(benchmarkRunCount(benchmark))} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.baseReadyMs)} | ${formatSeconds(benchmark.headReadyMs)} | ${formatSeconds(benchmark.baseRouteTotalMs)} | ${formatSeconds(benchmark.headRouteTotalMs)} | ${formatSeconds(benchmark.baseUpdateMs)} | ${formatSeconds(benchmark.headUpdateMs)} | ${formatPercent(benchmark.updateDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`;
+
+const renderSyntheticBuildBenchmarkRow = benchmark =>
+  `| complex app | ${formatCount(benchmark.runs)} | ${formatDurationSeconds(benchmark.baseMedianSeconds)} | ${formatDurationSeconds(benchmark.headMedianSeconds)} | ${formatPercent(benchmark.deltaPercent)} | ${formatDurationSeconds(benchmark.headMeanSeconds)} | ${formatDurationSeconds(benchmark.headP95Seconds)} | ${formatSpeedup(benchmark.speedup)} | - |`;
+
+const renderSyntheticDevBenchmarkRow = benchmark =>
+  `| complex app | ${formatCount(benchmark.runs)} | ${formatDurationSeconds(benchmark.baseMedianSeconds)} | ${formatDurationSeconds(benchmark.headMedianSeconds)} | ${formatPercent(benchmark.deltaPercent)} | ${formatSeconds(benchmark.baseReadyMs)} | ${formatSeconds(benchmark.headReadyMs)} | ${formatSeconds(benchmark.baseRouteTotalMs)} | ${formatSeconds(benchmark.headRouteTotalMs)} | ${formatSeconds(benchmark.baseUpdateMs)} | ${formatSeconds(benchmark.headUpdateMs)} | ${formatPercent(benchmark.updateDeltaPercent)} | ${formatDurationSeconds(benchmark.headMeanSeconds)} | ${formatDurationSeconds(benchmark.headP95Seconds)} | ${formatSpeedup(benchmark.speedup)} | - |`;
+
 const renderComment = () => {
   const lines = [
     '<!-- react-router-benchmark-ci -->',
@@ -419,13 +444,10 @@ const renderComment = () => {
       '',
       `Rendered ${buildBenchmarks.length} production build benchmark${buildBenchmarks.length === 1 ? '' : 's'}.`,
       '',
-      '| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
-      '|---|---:|---:|---:|---:|---:|---:|---:|---:|'
+      ...productionBenchmarkTableHeader
     );
     for (const benchmark of buildBenchmarks) {
-      lines.push(
-        `| \`${benchmark.id}\` | ${formatCount(benchmark.headRunCount ?? benchmark.baseRunCount)} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`
-      );
+      lines.push(renderBuildBenchmarkRow(benchmark));
     }
     lines.push('');
   }
@@ -435,14 +457,11 @@ const renderComment = () => {
     '',
     `Rendered ${benchmarks.length} dev benchmark fixture${benchmarks.length === 1 ? '' : 's'} from the \`${report.profile ?? 'unknown'}\` profile.`,
     '',
-    '| Benchmark | Runs | Base total | Head total | Delta | Base ready | Head ready | Base routes | Head routes | Base update/HMR | Head update/HMR | Update delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
-    '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
+    ...devBenchmarkTableHeader
   );
 
   for (const benchmark of benchmarks) {
-    lines.push(
-      `| \`${benchmark.id}\` | ${formatCount(benchmark.headRunCount ?? benchmark.baseRunCount)} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.baseReadyMs)} | ${formatSeconds(benchmark.headReadyMs)} | ${formatSeconds(benchmark.baseRouteTotalMs)} | ${formatSeconds(benchmark.headRouteTotalMs)} | ${formatSeconds(benchmark.baseUpdateMs)} | ${formatSeconds(benchmark.headUpdateMs)} | ${formatPercent(benchmark.updateDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`
-    );
+    lines.push(renderDevBenchmarkRow(benchmark));
   }
 
   for (const benchmark of benchmarks) {
@@ -474,13 +493,10 @@ const renderComment = () => {
     lines.push(
       `Rendered ${syntheticBuildBenchmarks.length} production build benchmark${syntheticBuildBenchmarks.length === 1 ? '' : 's'}.`,
       '',
-      '| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
-      '|---|---:|---:|---:|---:|---:|---:|---:|---:|'
+      ...productionBenchmarkTableHeader
     );
     for (const syntheticBenchmark of syntheticBuildBenchmarks) {
-      lines.push(
-        `| complex app | ${formatCount(syntheticBenchmark.runs)} | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatDurationSeconds(syntheticBenchmark.headMeanSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headP95Seconds)} | ${formatSpeedup(syntheticBenchmark.speedup)} | - |`
-      );
+      lines.push(renderSyntheticBuildBenchmarkRow(syntheticBenchmark));
     }
     lines.push('');
   }
@@ -489,13 +505,10 @@ const renderComment = () => {
     lines.push(
       `Rendered ${syntheticDevBenchmarks.length} dev benchmark fixture${syntheticDevBenchmarks.length === 1 ? '' : 's'} from the embedded complex app.`,
       '',
-      '| Benchmark | Runs | Base total | Head total | Delta | Base ready | Head ready | Base routes | Head routes | Base update/HMR | Head update/HMR | Update delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
-      '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
+      ...devBenchmarkTableHeader
     );
     for (const syntheticBenchmark of syntheticDevBenchmarks) {
-      lines.push(
-        `| complex app | ${formatCount(syntheticBenchmark.runs)} | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatSeconds(syntheticBenchmark.baseReadyMs)} | ${formatSeconds(syntheticBenchmark.headReadyMs)} | ${formatSeconds(syntheticBenchmark.baseRouteTotalMs)} | ${formatSeconds(syntheticBenchmark.headRouteTotalMs)} | ${formatSeconds(syntheticBenchmark.baseUpdateMs)} | ${formatSeconds(syntheticBenchmark.headUpdateMs)} | ${formatPercent(syntheticBenchmark.updateDeltaPercent)} | ${formatDurationSeconds(syntheticBenchmark.headMeanSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headP95Seconds)} | ${formatSpeedup(syntheticBenchmark.speedup)} | - |`
-      );
+      lines.push(renderSyntheticDevBenchmarkRow(syntheticBenchmark));
     }
   }
 
