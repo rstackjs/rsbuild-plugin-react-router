@@ -29,7 +29,7 @@ small app shell, generator, Rsbuild config, and benchmark runner.
 pnpm install --frozen-lockfile
 pnpm generate
 pnpm shape
-pnpm benchmark:rsbuild -- --runs=1
+pnpm benchmark:rsbuild -- --profile=all --runs=1
 ```
 
 There is intentionally one benchmark path. The Rsbuild config enables the
@@ -39,3 +39,5 @@ imports, and large public JSON payloads.
 
 Root CI benchmarks the PR base plugin and PR head plugin against the same
 embedded app by staging each built plugin package into this workspace fixture.
+It records a cold build plus a dev server pass with readiness, route-load, and
+generated route-module update rebuild timings.

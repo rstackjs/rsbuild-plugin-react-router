@@ -17,20 +17,28 @@ test('parseArgs defaults to the standard Rsbuild benchmark', () => {
 
 test('parseArgs accepts runs, profile, and output directory', () => {
   assert.deepEqual(
-    parseArgs(['--out=.benchmark/synthetic', '--profile=warm', '--runs=2']),
+    parseArgs(['--out=.benchmark/synthetic', '--profile=all', '--runs=2']),
     {
       out: '.benchmark/synthetic',
-      profile: 'warm',
+      profile: 'all',
       runs: 2,
     }
   );
 });
 
-test('summarizeResults reports the standard Rsbuild median and mean', () => {
+test('summarizeResults reports build and dev metrics', () => {
   assert.deepEqual(
     summarizeResults([
       { profile: 'cold', run: 1, durationSeconds: 45 },
       { profile: 'cold', run: 2, durationSeconds: 55 },
+      {
+        profile: 'dev',
+        run: 1,
+        durationSeconds: 12,
+        readyMs: 9000,
+        routeTotalMs: 2000,
+        updateMs: 500,
+      },
     ]),
     [
       {
@@ -39,6 +47,19 @@ test('summarizeResults reports the standard Rsbuild median and mean', () => {
         samples: [45, 55],
         median: 50,
         mean: 50,
+        readyMs: { samples: [], median: null, mean: null },
+        routeTotalMs: { samples: [], median: null, mean: null },
+        updateMs: { samples: [], median: null, mean: null },
+      },
+      {
+        mode: 'rsbuild',
+        profile: 'dev',
+        samples: [12],
+        median: 12,
+        mean: 12,
+        readyMs: { samples: [9000], median: 9000, mean: 9000 },
+        routeTotalMs: { samples: [2000], median: 2000, mean: 2000 },
+        updateMs: { samples: [500], median: 500, mean: 500 },
       },
     ]
   );
@@ -65,6 +86,7 @@ test('formatMarkdown includes samples, median, and mean', () => {
   assert.match(markdown, /Benchmark Rsbuild/);
   assert.match(markdown, /cold/);
   assert.match(markdown, /47\.09/);
+  assert.match(markdown, /Update\/HMR rebuild/);
 });
 
 test('parseReactRouterPerformanceLogs extracts JSON payloads from benchmark logs', () => {

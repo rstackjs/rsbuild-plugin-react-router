@@ -68,26 +68,15 @@ To run the workspace fixture against a specific plugin checkout:
 pnpm build
 pnpm bench:synthetic-app -- \
   --plugin-root "$PWD" \
+  --profile=all \
   --runs=1
 ```
 
-The synthetic app wrapper builds the selected plugin root, imports that built
-plugin by file URL through `SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT`, and writes a
-`latest.json` manifest next to the fixture's Rsbuild result.
-
-To capture Rspack tracing output for a benchmark, pass `--rspack-profile`:
-
-```sh
-node scripts/bench-builds.mjs --profile=smoke --iterations=1 --warmup=0 --rspack-profile=OVERVIEW
-node scripts/bench-builds.mjs --profile=full --filter=synthetic-1024 --iterations=1 --warmup=0 --rspack-profile=ALL
-```
-
-Trace directories are moved from fixture roots into
-`.benchmark/results/<profile>/rspack-profiles/` and referenced from the JSON
-result. `ALL` can produce large traces; use it for targeted runs.
-When `--rspack-trace-output` is provided, the benchmark writes one absolute
-trace file per run under that directory so Rsbuild does not resolve the path
-inside each generated `.rspack-profile-*` directory.
+The synthetic app wrapper builds the selected plugin root, stages its package
+into the workspace fixture, and writes a `latest.json` manifest next to the
+fixture's Rsbuild results. The CI profile runs a cold build and a dev server
+pass that records compiler readiness, representative route loads, and a
+generated route-module update rebuild used as an HMR proxy.
 
 To capture Rspack tracing output for a benchmark, pass `--rspack-profile`:
 

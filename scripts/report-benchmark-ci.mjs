@@ -130,39 +130,59 @@ const benchmarks = benchmarkIds.map(id => {
   };
 });
 
-const firstSyntheticSummary = payloads => {
-  const entry = payloads[0];
-  const summary = entry?.payload?.summaries?.[0];
-  return summary
-    ? {
+const indexSyntheticSummaries = payloads => {
+  const summaries = new Map();
+  for (const entry of payloads) {
+    for (const summary of entry.payload?.summaries ?? []) {
+      summaries.set(summary.profile, {
         ...summary,
         node: entry.payload.node ?? null,
         platform: entry.payload.platform ?? null,
         runs: entry.payload.runs ?? null,
-      }
-    : null;
+      });
+    }
+  }
+  return summaries;
 };
-const syntheticBaseSummary = firstSyntheticSummary(syntheticBasePayloads);
-const syntheticHeadSummary = firstSyntheticSummary(syntheticHeadPayloads);
-const syntheticBenchmark =
-  syntheticBaseSummary || syntheticHeadSummary
-    ? (() => {
-        const baseSummary = syntheticBaseSummary;
-        const headSummary = syntheticHeadSummary;
-        const baseMedianSeconds = baseSummary?.median ?? null;
-        const headMedianSeconds = headSummary?.median ?? null;
-        return {
-          profile: headSummary?.profile ?? baseSummary?.profile ?? null,
-          baseMedianSeconds,
-          headMedianSeconds,
-          deltaPercent: percentDelta(baseMedianSeconds, headMedianSeconds),
-          speedup: speedup(baseMedianSeconds, headMedianSeconds),
-          runs: headSummary?.runs ?? baseSummary?.runs ?? null,
-          node: headSummary?.node ?? baseSummary?.node ?? null,
-          platform: headSummary?.platform ?? baseSummary?.platform ?? null,
-        };
-      })()
-    : null;
+const syntheticBaseSummaries = indexSyntheticSummaries(syntheticBasePayloads);
+const syntheticHeadSummaries = indexSyntheticSummaries(syntheticHeadPayloads);
+const syntheticProfiles = [
+  ...new Set([...syntheticBaseSummaries.keys(), ...syntheticHeadSummaries.keys()]),
+].sort();
+const syntheticBenchmarks = syntheticProfiles.map(profile => {
+  const baseSummary = syntheticBaseSummaries.get(profile);
+  const headSummary = syntheticHeadSummaries.get(profile);
+  const baseMedianSeconds = baseSummary?.median ?? null;
+  const headMedianSeconds = headSummary?.median ?? null;
+  const baseReadyMs = baseSummary?.readyMs?.median ?? null;
+  const headReadyMs = headSummary?.readyMs?.median ?? null;
+  const baseRouteTotalMs = baseSummary?.routeTotalMs?.median ?? null;
+  const headRouteTotalMs = headSummary?.routeTotalMs?.median ?? null;
+  const baseUpdateMs = baseSummary?.updateMs?.median ?? null;
+  const headUpdateMs = headSummary?.updateMs?.median ?? null;
+  return {
+    profile,
+    baseMedianSeconds,
+    headMedianSeconds,
+    deltaPercent: percentDelta(baseMedianSeconds, headMedianSeconds),
+    speedup: speedup(baseMedianSeconds, headMedianSeconds),
+    baseReadyMs,
+    headReadyMs,
+    readyDeltaPercent: percentDelta(baseReadyMs, headReadyMs),
+    baseRouteTotalMs,
+    headRouteTotalMs,
+    routeTotalDeltaPercent: percentDelta(
+      baseRouteTotalMs,
+      headRouteTotalMs
+    ),
+    baseUpdateMs,
+    headUpdateMs,
+    updateDeltaPercent: percentDelta(baseUpdateMs, headUpdateMs),
+    runs: headSummary?.runs ?? baseSummary?.runs ?? null,
+    node: headSummary?.node ?? baseSummary?.node ?? null,
+    platform: headSummary?.platform ?? baseSummary?.platform ?? null,
+  };
+});
 
 const sumMetric = (benchmarks, key) => {
   const values = benchmarks
@@ -216,7 +236,8 @@ const report = {
   warmup: head.warmup ?? base.warmup ?? null,
   summary,
   benchmarks,
-  syntheticBenchmark,
+  syntheticBenchmark: syntheticBenchmarks[0] ?? null,
+  syntheticBenchmarks,
 };
 
 const renderComment = () => {
@@ -244,18 +265,20 @@ const renderComment = () => {
     );
   }
 
-  if (syntheticBenchmark) {
+  if (syntheticBenchmarks.length > 0) {
     lines.push(
       '',
       '### Synthetic Rsbuild App',
       '',
-      '| Benchmark | Profile | Base median | Head median | Delta | Speedup | Runs |',
-      '|---|---:|---:|---:|---:|---:|---:|'
+      '| Benchmark | Profile | Base total | Head total | Delta | Head ready | Head routes | Head update/HMR | Speedup | Runs |',
+      '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
     );
 
-    lines.push(
-      `| complex app | \`${syntheticBenchmark.profile ?? 'unknown'}\` | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatSpeedup(syntheticBenchmark.speedup)} | ${syntheticBenchmark.runs ?? '-'} |`
-    );
+    for (const syntheticBenchmark of syntheticBenchmarks) {
+      lines.push(
+        `| complex app | \`${syntheticBenchmark.profile ?? 'unknown'}\` | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatSeconds(syntheticBenchmark.headReadyMs)} | ${formatSeconds(syntheticBenchmark.headRouteTotalMs)} | ${formatSeconds(syntheticBenchmark.headUpdateMs)} | ${formatSpeedup(syntheticBenchmark.speedup)} | ${syntheticBenchmark.runs ?? '-'} |`
+      );
+    }
   }
 
   lines.push(

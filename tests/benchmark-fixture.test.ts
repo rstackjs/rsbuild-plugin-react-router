@@ -423,11 +423,31 @@ describe('benchmark fixture generator', () => {
             mean: 40,
             samples: [40],
           },
+          {
+            mode: 'rsbuild',
+            profile: 'dev',
+            median: 12,
+            mean: 12,
+            samples: [12],
+            readyMs: { median: 9000 },
+            routeTotalMs: { median: 2200 },
+            updateMs: { median: 800 },
+          },
         ],
       };
       const headSynthetic = {
         ...baseSynthetic,
-        summaries: [{ ...baseSynthetic.summaries[0], median: 36, samples: [36] }],
+        summaries: [
+          { ...baseSynthetic.summaries[0], median: 36, samples: [36] },
+          {
+            ...baseSynthetic.summaries[1],
+            median: 11,
+            samples: [11],
+            readyMs: { median: 8500 },
+            routeTotalMs: { median: 2000 },
+            updateMs: { median: 700 },
+          },
+        ],
       };
 
       mkdirSync(join(root, 'base-synthetic'), { recursive: true });
@@ -474,14 +494,25 @@ describe('benchmark fixture generator', () => {
       expect(comment).toContain('### Synthetic Rsbuild App');
       expect(comment).toContain('complex app');
       expect(comment).toContain('`cold`');
+      expect(comment).toContain('`dev`');
       expect(comment).toContain('40.00s');
       expect(comment).toContain('36.00s');
+      expect(comment).toContain('8.50s');
+      expect(comment).toContain('2.00s');
+      expect(comment).toContain('0.70s');
       expect(comment).toContain('-10.0%');
       expect(report.syntheticBenchmark).toMatchObject({
         profile: 'cold',
         baseMedianSeconds: 40,
         headMedianSeconds: 36,
         deltaPercent: -10,
+      });
+      expect(report.syntheticBenchmarks).toHaveLength(2);
+      expect(report.syntheticBenchmarks[1]).toMatchObject({
+        profile: 'dev',
+        headReadyMs: 8500,
+        headRouteTotalMs: 2000,
+        headUpdateMs: 700,
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
