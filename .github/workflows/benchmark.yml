@@ -25,7 +25,6 @@ jobs:
       BENCHMARK_WARMUP: '0'
       BENCHMARK_DEV_ROUTES: auto
       BENCHMARK_HISTORY_BRANCH: benchmark-results
-      SYNTHETIC_BENCHMARK_MODES: rsbuild-optimized,rsbuild-js-transform-contention
       SYNTHETIC_BENCHMARK_PROFILE: cold
       SYNTHETIC_BENCHMARK_RUNS: '1'
 
@@ -65,7 +64,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-benchmark-pnpm-${{ hashFiles('head/pnpm-lock.yaml', 'base/pnpm-lock.yaml', 'head/benchmarks/synthetic-web-bundler-benchmark/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-benchmark-pnpm-${{ hashFiles('head/pnpm-lock.yaml', 'base/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-benchmark-pnpm-
             ${{ runner.os }}-pnpm-store-
@@ -78,9 +77,33 @@ jobs:
         working-directory: base
         run: pnpm install --frozen-lockfile
 
-      - name: Install embedded synthetic benchmark dependencies
-        working-directory: head/benchmarks/synthetic-web-bundler-benchmark
-        run: pnpm install --frozen-lockfile
+      - name: Resolve synthetic benchmark checkout
+        id: synthetic-benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="benchmarks/synthetic-web-bundler-benchmark"
+          app_root=""
+          tool_root=""
+
+          for checkout in "$GITHUB_WORKSPACE/base" "$GITHUB_WORKSPACE/head"; do
+            if [ -z "$app_root" ] && [ -f "$checkout/$fixture/package.json" ]; then
+              app_root="$checkout/$fixture"
+            fi
+
+            if [ -z "$tool_root" ] && [ -f "$checkout/scripts/bench-synthetic-app.mjs" ]; then
+              tool_root="$checkout"
+            fi
+          done
+
+          if [ -z "$app_root" ] || [ -z "$tool_root" ]; then
+            echo "SKIP=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "SKIP=false" >> "$GITHUB_OUTPUT"
+          echo "APP_ROOT=$app_root" >> "$GITHUB_OUTPUT"
+          echo "TOOL_ROOT=$tool_root" >> "$GITHUB_OUTPUT"
 
       - name: Resolve benchmark-only React plugin
         id: benchmark-imports
@@ -118,28 +141,28 @@ jobs:
             --out "$GITHUB_WORKSPACE/benchmark-output/head"
 
       - name: Benchmark embedded synthetic app with base plugin
-        working-directory: head
+        if: steps.synthetic-benchmark.outputs.SKIP == 'false'
+        working-directory: ${{ steps.synthetic-benchmark.outputs.TOOL_ROOT }}
         run: |
           node scripts/bench-synthetic-app.mjs \
-            --app "$GITHUB_WORKSPACE/head/benchmarks/synthetic-web-bundler-benchmark" \
+            --app "${{ steps.synthetic-benchmark.outputs.APP_ROOT }}" \
             --plugin-root "$GITHUB_WORKSPACE/base" \
             --skip-install \
             --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/base" \
             --runs "$SYNTHETIC_BENCHMARK_RUNS" \
-            --profile "$SYNTHETIC_BENCHMARK_PROFILE" \
-            --modes "$SYNTHETIC_BENCHMARK_MODES"
+            --profile "$SYNTHETIC_BENCHMARK_PROFILE"
 
       - name: Benchmark embedded synthetic app with head plugin
-        working-directory: head
+        if: steps.synthetic-benchmark.outputs.SKIP == 'false'
+        working-directory: ${{ steps.synthetic-benchmark.outputs.TOOL_ROOT }}
         run: |
           node scripts/bench-synthetic-app.mjs \
-            --app "$GITHUB_WORKSPACE/head/benchmarks/synthetic-web-bundler-benchmark" \
+            --app "${{ steps.synthetic-benchmark.outputs.APP_ROOT }}" \
             --plugin-root "$GITHUB_WORKSPACE/head" \
             --skip-install \
             --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/head" \
             --runs "$SYNTHETIC_BENCHMARK_RUNS" \
-            --profile "$SYNTHETIC_BENCHMARK_PROFILE" \
-            --modes "$SYNTHETIC_BENCHMARK_MODES"
+            --profile "$SYNTHETIC_BENCHMARK_PROFILE"
 
       - name: Generate benchmark report
         working-directory: head
@@ -154,15 +177,18 @@ jobs:
           node scripts/report-benchmark-ci.mjs \
             --base "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" \
             --head "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" \
-            --synthetic-base "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json" \
-            --synthetic-head "$GITHUB_WORKSPACE/benchmark-output/synthetic/head/latest.json" \
             --out "$GITHUB_WORKSPACE/benchmark-output/report" \
             --pr "$PR_NUMBER" \
             --base-ref "$BASE_REF" \
             --base-sha "$BASE_SHA" \
             --head-ref "$HEAD_REF" \
             --head-sha "$HEAD_SHA" \
-            --run-url "$RUN_URL"
+            --run-url "$RUN_URL" \
+            $(if [ -f "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json" ] && [ -f "$GITHUB_WORKSPACE/benchmark-output/synthetic/head/latest.json" ]; then
+              printf '%s\n' \
+                --synthetic-base "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json" \
+                --synthetic-head "$GITHUB_WORKSPACE/benchmark-output/synthetic/head/latest.json"
+            fi)
 
       - name: Upload benchmark artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -231,7 +257,9 @@ jobs:
           mkdir -p "$result_dir" "$latest_dir"
           cp "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" "$result_dir/base.json"
           cp "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" "$result_dir/head.json"
-          cp -R "$GITHUB_WORKSPACE/benchmark-output/synthetic" "$result_dir/synthetic"
+          if [ -d "$GITHUB_WORKSPACE/benchmark-output/synthetic" ]; then
+            cp -R "$GITHUB_WORKSPACE/benchmark-output/synthetic" "$result_dir/synthetic"
+          fi
           cp "$GITHUB_WORKSPACE/benchmark-output/report/report.json" "$result_dir/report.json"
           cp "$GITHUB_WORKSPACE/benchmark-output/report/comment.md" "$result_dir/comment.md"
           cp "$result_dir/report.json" "$latest_dir/report.json"

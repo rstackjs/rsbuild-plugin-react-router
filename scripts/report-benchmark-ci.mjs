@@ -130,63 +130,39 @@ const benchmarks = benchmarkIds.map(id => {
   };
 });
 
-const syntheticSummaryKey = summary => `${summary.mode}:${summary.profile}`;
-const indexSyntheticSummaries = payloads =>
-  new Map(
-    payloads.flatMap(({ payload }) =>
-      (payload.summaries ?? []).map(summary => [
-        syntheticSummaryKey(summary),
-        {
-          ...summary,
-          node: payload.node ?? null,
-          platform: payload.platform ?? null,
-          runs: payload.runs ?? null,
-        },
-      ])
-    )
-  );
-const syntheticBaseSummaries = indexSyntheticSummaries(syntheticBasePayloads);
-const syntheticHeadSummaries = indexSyntheticSummaries(syntheticHeadPayloads);
-const syntheticBenchmarkKeys = [
-  ...new Set([
-    ...syntheticBaseSummaries.keys(),
-    ...syntheticHeadSummaries.keys(),
-  ]),
-].sort((a, b) => {
-  const order = [
-    'rsbuild-optimized:cold',
-    'rsbuild-optimized:warm',
-    'rsbuild-js-transform-contention:cold',
-    'rsbuild-js-transform-contention:warm',
-  ];
-  const aIndex = order.indexOf(a);
-  const bIndex = order.indexOf(b);
-  if (aIndex !== -1 || bIndex !== -1) {
-    return (
-      (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex) -
-      (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex)
-    );
-  }
-  return a.localeCompare(b);
-});
-const syntheticBenchmarks = syntheticBenchmarkKeys.map(key => {
-  const baseSummary = syntheticBaseSummaries.get(key);
-  const headSummary = syntheticHeadSummaries.get(key);
-  const [mode, profile] = key.split(':');
-  const baseMedianSeconds = baseSummary?.median ?? null;
-  const headMedianSeconds = headSummary?.median ?? null;
-  return {
-    mode,
-    profile,
-    baseMedianSeconds,
-    headMedianSeconds,
-    deltaPercent: percentDelta(baseMedianSeconds, headMedianSeconds),
-    speedup: speedup(baseMedianSeconds, headMedianSeconds),
-    runs: headSummary?.runs ?? baseSummary?.runs ?? null,
-    node: headSummary?.node ?? baseSummary?.node ?? null,
-    platform: headSummary?.platform ?? baseSummary?.platform ?? null,
-  };
-});
+const firstSyntheticSummary = payloads => {
+  const entry = payloads[0];
+  const summary = entry?.payload?.summaries?.[0];
+  return summary
+    ? {
+        ...summary,
+        node: entry.payload.node ?? null,
+        platform: entry.payload.platform ?? null,
+        runs: entry.payload.runs ?? null,
+      }
+    : null;
+};
+const syntheticBaseSummary = firstSyntheticSummary(syntheticBasePayloads);
+const syntheticHeadSummary = firstSyntheticSummary(syntheticHeadPayloads);
+const syntheticBenchmark =
+  syntheticBaseSummary || syntheticHeadSummary
+    ? (() => {
+        const baseSummary = syntheticBaseSummary;
+        const headSummary = syntheticHeadSummary;
+        const baseMedianSeconds = baseSummary?.median ?? null;
+        const headMedianSeconds = headSummary?.median ?? null;
+        return {
+          profile: headSummary?.profile ?? baseSummary?.profile ?? null,
+          baseMedianSeconds,
+          headMedianSeconds,
+          deltaPercent: percentDelta(baseMedianSeconds, headMedianSeconds),
+          speedup: speedup(baseMedianSeconds, headMedianSeconds),
+          runs: headSummary?.runs ?? baseSummary?.runs ?? null,
+          node: headSummary?.node ?? baseSummary?.node ?? null,
+          platform: headSummary?.platform ?? baseSummary?.platform ?? null,
+        };
+      })()
+    : null;
 
 const sumMetric = (benchmarks, key) => {
   const values = benchmarks
@@ -240,7 +216,7 @@ const report = {
   warmup: head.warmup ?? base.warmup ?? null,
   summary,
   benchmarks,
-  syntheticBenchmarks,
+  syntheticBenchmark,
 };
 
 const renderComment = () => {
@@ -268,20 +244,18 @@ const renderComment = () => {
     );
   }
 
-  if (syntheticBenchmarks.length > 0) {
+  if (syntheticBenchmark) {
     lines.push(
       '',
-      '### Embedded Synthetic App',
+      '### Synthetic Rsbuild App',
       '',
-      '| Mode | Profile | Base median | Head median | Delta | Speedup | Runs |',
+      '| Benchmark | Profile | Base median | Head median | Delta | Speedup | Runs |',
       '|---|---:|---:|---:|---:|---:|---:|'
     );
 
-    for (const benchmark of syntheticBenchmarks) {
-      lines.push(
-        `| \`${benchmark.mode}\` | \`${benchmark.profile}\` | ${formatDurationSeconds(benchmark.baseMedianSeconds)} | ${formatDurationSeconds(benchmark.headMedianSeconds)} | ${formatPercent(benchmark.deltaPercent)} | ${formatSpeedup(benchmark.speedup)} | ${benchmark.runs ?? '-'} |`
-      );
-    }
+    lines.push(
+      `| complex app | \`${syntheticBenchmark.profile ?? 'unknown'}\` | ${formatDurationSeconds(syntheticBenchmark.baseMedianSeconds)} | ${formatDurationSeconds(syntheticBenchmark.headMedianSeconds)} | ${formatPercent(syntheticBenchmark.deltaPercent)} | ${formatSpeedup(syntheticBenchmark.speedup)} | ${syntheticBenchmark.runs ?? '-'} |`
+    );
   }
 
   lines.push(

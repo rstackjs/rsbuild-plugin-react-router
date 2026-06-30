@@ -1,5 +1,9 @@
 import type { Config } from '@react-router/dev/config';
 
+type SyntheticReactRouterConfig = Config & {
+  splitRouteModules?: boolean | 'enforce';
+};
+
 export default {
   appDirectory: 'app',
   basename: '/',
@@ -9,6 +13,6 @@ export default {
   },
   serverBuildFile: 'index.js',
   serverModuleFormat: 'esm',
-  splitRouteModules: false,
+  splitRouteModules: true,
   ssr: true,
-} satisfies Config;
+} satisfies SyntheticReactRouterConfig;

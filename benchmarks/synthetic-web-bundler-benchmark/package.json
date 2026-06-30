@@ -11,9 +11,9 @@
     "generate": "node scripts/generate-app.mjs",
     "generate:force": "node scripts/generate-app.mjs --force",
     "shape": "node scripts/report-shape.mjs",
-    "build:rsbuild": "cross-env SYNTHETIC_BUILD_DIR=dist/rsbuild NODE_ENV=production rsbuild build --config rsbuild.fast.config.ts",
-    "benchmark:rsbuild-modes": "node scripts/benchmark-rsbuild-modes.mjs",
-    "test:benchmark-modes": "node --test scripts/benchmark-rsbuild-modes.test.mjs"
+    "build:rsbuild": "pnpm generate && cross-env SYNTHETIC_BUILD_DIR=dist/rsbuild NODE_ENV=production rsbuild build --config rsbuild.config.ts",
+    "benchmark:rsbuild": "node scripts/benchmark-rsbuild.mjs",
+    "test:benchmark": "node --test scripts/benchmark-rsbuild.test.mjs"
   },
   "dependencies": {
     "@react-router/node": "7.14.0",
@@ -49,14 +49,7 @@
     "babel-plugin-formatjs": "10.5.41",
     "babel-plugin-react-compiler": "1.0.0",
     "cross-env": "10.1.0",
+    "rsbuild-plugin-react-router": "workspace:*",
     "typescript": "6.0.1-rc"
-  },
-  "pnpm": {
-    "overrides": {
-      "@rspack/core": "2.1.0"
-    },
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   }
 }

@@ -375,7 +375,7 @@ describe('benchmark fixture generator', () => {
     expect(result.stderr).not.toContain('Unknown profile "large"');
   });
 
-  it('renders embedded synthetic app benchmark rows in CI reports', () => {
+  it('renders the embedded synthetic app benchmark row in CI reports', () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
 
     try {
@@ -417,12 +417,11 @@ describe('benchmark fixture generator', () => {
         runs: 1,
         summaries: [
           {
-            mode: 'rsbuild-optimized',
+            mode: 'rsbuild',
             profile: 'cold',
             median: 40,
             mean: 40,
             samples: [40],
-            fastest: true,
           },
         ],
       };
@@ -435,15 +434,15 @@ describe('benchmark fixture generator', () => {
       mkdirSync(join(root, 'head-synthetic'), { recursive: true });
       writeJson(join(root, 'base.json'), baseBenchmark);
       writeJson(join(root, 'head.json'), headBenchmark);
-      writeJson(join(root, 'base-synthetic/result-rsbuild-modes.json'), baseSynthetic);
-      writeJson(join(root, 'head-synthetic/result-rsbuild-modes.json'), headSynthetic);
+      writeJson(join(root, 'base-synthetic/result-rsbuild.json'), baseSynthetic);
+      writeJson(join(root, 'head-synthetic/result-rsbuild.json'), headSynthetic);
       writeJson(join(root, 'base-synthetic/latest.json'), {
         outputDirectory: join(root, 'base-synthetic'),
-        generatedFiles: ['result-rsbuild-modes.json'],
+        generatedFiles: ['result-rsbuild.json'],
       });
       writeJson(join(root, 'head-synthetic/latest.json'), {
         outputDirectory: join(root, 'head-synthetic'),
-        generatedFiles: ['result-rsbuild-modes.json'],
+        generatedFiles: ['result-rsbuild.json'],
       });
 
       const result = spawnSync(
@@ -467,13 +466,23 @@ describe('benchmark fixture generator', () => {
         }
       );
 
-      expect(result.status).toBe(0);
+      expect(result.status, result.stderr || result.stdout).toBe(0);
       const comment = readFileSync(join(root, 'report/comment.md'), 'utf8');
-      expect(comment).toContain('### Embedded Synthetic App');
-      expect(comment).toContain('`rsbuild-optimized`');
+      const report = JSON.parse(
+        readFileSync(join(root, 'report/report.json'), 'utf8')
+      );
+      expect(comment).toContain('### Synthetic Rsbuild App');
+      expect(comment).toContain('complex app');
+      expect(comment).toContain('`cold`');
       expect(comment).toContain('40.00s');
       expect(comment).toContain('36.00s');
       expect(comment).toContain('-10.0%');
+      expect(report.syntheticBenchmark).toMatchObject({
+        profile: 'cold',
+        baseMedianSeconds: 40,
+        headMedianSeconds: 36,
+        deltaPercent: -10,
+      });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

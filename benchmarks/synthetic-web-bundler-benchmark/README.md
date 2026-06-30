@@ -29,22 +29,19 @@ small app shell, generator, Rsbuild config, and benchmark runner.
 pnpm install --frozen-lockfile
 pnpm generate
 pnpm shape
-pnpm benchmark:rsbuild-modes -- --runs=1 --modes=rsbuild-optimized
+pnpm benchmark:rsbuild -- --runs=1
 ```
 
-The benchmark modes are:
-
-- `rsbuild-optimized`: production Rsbuild build using the current optimized
-  fixture config.
-- `rsbuild-js-transform-contention`: same build with the Babel app transform
-  and React Compiler path enabled to add main-thread JavaScript transform
-  contention.
+There is intentionally one benchmark path. The Rsbuild config enables the
+realistic expensive work directly: React Router Framework Mode, React Compiler,
+Babel app transforms, Tailwind, SVGR, CSS modules, worker imports, dynamic
+imports, and large public JSON payloads.
 
 The plugin under test can be selected without editing this fixture:
 
 ```sh
 SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT=file:///path/to/plugin/dist/index.js \
-  pnpm benchmark:rsbuild-modes -- --runs=1
+  pnpm benchmark:rsbuild -- --runs=1
 ```
 
 Root CI uses that environment variable to benchmark the PR base plugin and PR

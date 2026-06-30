@@ -20,7 +20,6 @@ const { values } = parseArgs({
       type: 'string',
       default: 'benchmarks/synthetic-web-bundler-benchmark',
     },
-    modes: { type: 'string' },
     out: { type: 'string', default: '.benchmark/results/synthetic-app' },
     profile: { type: 'string', default: 'cold' },
     runs: { type: 'string', default: '1' },
@@ -43,9 +42,6 @@ const benchmarkArgs = [
   `--profile=${values.profile}`,
   `--out=${outDir}`,
 ];
-if (values.modes) {
-  benchmarkArgs.push(`--modes=${values.modes}`);
-}
 
 const prepareCommands = [
   ...(!values['skip-plugin-build']
@@ -64,7 +60,7 @@ const prepareCommands = [
 const benchmarkCommand = {
   cwd: appRoot,
   command: 'pnpm',
-  args: ['benchmark:rsbuild-modes', '--', ...benchmarkArgs],
+  args: ['benchmark:rsbuild', '--', ...benchmarkArgs],
   env: {
     SYNTHETIC_REACT_ROUTER_LOG_PERFORMANCE: '1',
     SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT: pluginImport,
@@ -110,16 +106,14 @@ const generatedFiles = (await findBenchmarkJsonFiles(outDir)).filter(
   file => !existingBenchmarkFiles.has(file)
 );
 if (generatedFiles.length === 0) {
-  throw new Error(
-    `No rsbuild mode benchmark JSON files were written to ${outDir}`
-  );
+  throw new Error(`No rsbuild benchmark JSON files were written to ${outDir}`);
 }
 
 await writeFile(
   path.join(outDir, 'latest.json'),
   `${JSON.stringify(
     {
-      benchmark: 'embedded-synthetic-rsbuild-modes',
+      benchmark: 'embedded-synthetic-rsbuild',
       generatedAt: new Date().toISOString(),
       durationSeconds: (Date.now() - started) / 1000,
       appRoot,
@@ -131,7 +125,6 @@ await writeFile(
       command: {
         runs: Number(values.runs),
         profile: values.profile,
-        modes: values.modes ?? null,
       },
     },
     null,
@@ -148,6 +141,7 @@ function run(command, args, cwd, env = {}) {
     const child = spawn(command, args, {
       cwd,
       env: { ...process.env, ...env },
+      shell: process.platform === 'win32',
       stdio: 'inherit',
     });
     child.on('error', reject);
@@ -185,7 +179,7 @@ async function stagePluginPackage() {
 async function findBenchmarkJsonFiles(directory) {
   const files = await readdir(directory);
   const candidates = files
-    .filter(file => file.endsWith('-rsbuild-modes.json'))
+    .filter(file => file.endsWith('-rsbuild.json'))
     .sort();
 
   const validFiles = [];

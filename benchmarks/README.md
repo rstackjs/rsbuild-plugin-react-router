@@ -21,12 +21,12 @@ after the dev server is ready. `bench:full` adds larger route counts.
 `bench:large` runs a 355-route synthetic app with a broad source graph:
 generated modules, dynamic imports, workers, SVG assets, CSS modules, and large
 public locale payloads.
-`bench:synthetic-app` runs the embedded large Rsbuild app in
+`bench:synthetic-app` runs the large Rsbuild app workspace package in
 `benchmarks/synthetic-web-bundler-benchmark/`. That fixture keeps the larger
 10k-module app/config shape used to diagnose real-world Rsbuild transform
 contention. CI runs it against the PR base plugin build and PR head plugin build
-using the same checked-in benchmark app; it does not check out or copy another
-repository.
+using whichever PR checkout contains the workspace fixture, so older PR branches
+that do not contain the fixture can still use the base checkout copy.
 
 All benchmark profiles generate deterministic synthetic React Router apps under
 `.benchmark/fixtures/`, build the current plugin package once, then run Rsbuild
@@ -62,20 +62,18 @@ the first non-index generated route for that fixture.
 Route requests automatically add `--experimental-vm-modules` to `NODE_OPTIONS`
 for SSR ESM evaluation.
 
-To run the embedded app against a specific plugin checkout:
+To run the workspace fixture against a specific plugin checkout:
 
 ```sh
 pnpm build
 pnpm bench:synthetic-app -- \
   --plugin-root "$PWD" \
-  --runs=1 \
-  --modes=rsbuild-optimized,rsbuild-js-transform-contention
+  --runs=1
 ```
 
-The synthetic app wrapper builds the selected plugin root, installs the embedded
-fixture dependencies unless `--skip-install` is passed, injects
-`SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT=file://.../dist/index.js`, and writes a
-`latest.json` manifest next to the fixture's Rsbuild mode results.
+The synthetic app wrapper builds the selected plugin root, imports that built
+plugin by file URL through `SYNTHETIC_REACT_ROUTER_PLUGIN_IMPORT`, and writes a
+`latest.json` manifest next to the fixture's Rsbuild result.
 
 To capture Rspack tracing output for a benchmark, pass `--rspack-profile`:
 
