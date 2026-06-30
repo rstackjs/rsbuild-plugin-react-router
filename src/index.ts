@@ -19,6 +19,10 @@ import {
   PLUGIN_NAME,
 } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
+import {
+  createLazyCompilationPrewarmController,
+  normalizeLazyCompilationPrewarmOptions,
+} from './lazy-compilation-prewarm.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import {
   generateWithProps,
@@ -513,14 +517,34 @@ export const pluginReactRouter = (
       }
       routeTopologyWatcherTask.schedule();
     };
+    const lazyCompilationPrewarmConfig = normalizeLazyCompilationPrewarmOptions(
+      pluginOptions.lazyCompilationPrewarm
+    );
+    const lazyCompilationPrewarmController = lazyCompilationPrewarmConfig
+      ? createLazyCompilationPrewarmController({
+          config: lazyCompilationPrewarmConfig,
+          onError: error =>
+            api.logger.warn(
+              `[rsbuild-plugin-react-router] Lazy compilation prewarm skipped: ${error.message}`
+            ),
+        })
+      : null;
 
     if (!isBuild) {
       api.onBeforeStartDevServer(() => {
         routeTopologyWatcherClosed = false;
       });
 
+      api.onAfterStartDevServer(({ port }) => {
+        lazyCompilationPrewarmController?.setServerOrigin(
+          `http://localhost:${port}`
+        );
+        lazyCompilationPrewarmController?.schedule();
+      });
+
       api.onAfterDevCompile(() => {
         scheduleRouteTopologyWatcher();
+        lazyCompilationPrewarmController?.schedule();
       });
     }
 
@@ -540,6 +564,34 @@ export const pluginReactRouter = (
       Error,
       never
     > => tryPluginPromise(() => routeTransformExecutor.close());
+    const closeLazyCompilationPrewarmEffect = (): Effect.Effect<
+      void,
+      Error,
+      never
+    > => lazyCompilationPrewarmController?.cancelEffect() ?? Effect.void;
+    const closeBackgroundResourcesEffect = (): Effect.Effect<
+      void,
+      Error,
+      never
+    > =>
+      closeLazyCompilationPrewarmEffect().pipe(
+        Effect.matchEffect({
+          onFailure: prewarmError =>
+            closeRouteTransformExecutorEffect().pipe(
+              Effect.matchEffect({
+                onFailure: executorError =>
+                  Effect.fail(
+                    new AggregateError(
+                      [prewarmError, executorError],
+                      '[rsbuild-plugin-react-router] Failed to close dev server resources.'
+                    )
+                  ),
+                onSuccess: () => Effect.fail(prewarmError),
+              })
+            ),
+          onSuccess: () => closeRouteTransformExecutorEffect(),
+        })
+      );
     const closeDevServerResourcesEffect = (): Effect.Effect<
       void,
       Error,
@@ -548,19 +600,19 @@ export const pluginReactRouter = (
       closeRouteTopologyWatcherEffect().pipe(
         Effect.matchEffect({
           onFailure: topologyError =>
-            closeRouteTransformExecutorEffect().pipe(
+            closeBackgroundResourcesEffect().pipe(
               Effect.matchEffect({
-                onFailure: executorError =>
+                onFailure: backgroundError =>
                   Effect.fail(
                     new AggregateError(
-                      [topologyError, executorError],
+                      [topologyError, backgroundError],
                       '[rsbuild-plugin-react-router] Failed to close dev server resources.'
                     )
                   ),
                 onSuccess: () => Effect.fail(topologyError),
               })
             ),
-          onSuccess: () => closeRouteTransformExecutorEffect(),
+          onSuccess: () => closeBackgroundResourcesEffect(),
         })
       );
 
@@ -592,6 +644,8 @@ export const pluginReactRouter = (
         'virtual/react-router/browser-manifest',
         () => {
           latestBrowserManifest = manifest;
+          lazyCompilationPrewarmController?.setManifest(manifest);
+          lazyCompilationPrewarmController?.schedule();
           latestBrowserManifestModuleExports = moduleExportsByRouteId;
           const baseServerManifest = {
             ...manifest,
@@ -849,6 +903,7 @@ export const pluginReactRouter = (
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
         entryClientPath: finalEntryClientPath,
+        prewarmReactRouterModules: Boolean(lazyCompilationPrewarmConfig),
       });
       const lazyCompilation =
         guardedLazyCompilation === undefined

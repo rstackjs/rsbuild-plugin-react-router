@@ -467,6 +467,44 @@ describe('pluginReactRouter', () => {
     ).toBe(false);
   });
 
+  it('allows lazy React Router entry and route modules when prewarming is enabled', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([
+      pluginReactRouter({
+        lazyCompilation: true,
+        lazyCompilationPrewarm: true,
+      }),
+    ]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(rsbuild.onAfterStartDevServer).toHaveBeenCalled();
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
+    expect(
+      test({
+        resource: `${process.cwd()}/app/entry.client.tsx`,
+      })
+    ).toBe(true);
+    expect(
+      test({
+        nameForCondition: () =>
+          '/project/app/routes/home.tsx?react-router-route',
+      })
+    ).toBe(true);
+    expect(
+      test({
+        resource: 'virtual/react-router/browser-manifest',
+      })
+    ).toBe(false);
+  });
+
   it('guards direct Rsbuild lazy compilation config for React Router hydration entries', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {

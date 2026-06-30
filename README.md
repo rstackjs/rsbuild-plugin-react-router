@@ -91,12 +91,24 @@ pluginReactRouter({
 
   /**
    * Rsbuild dev-only lazy compilation behavior.
-   * The plugin guards React Router hydration-critical modules so
-   * `lazyCompilation: { entries: true }` remains enabled without replacing
-   * manifest route modules with lazy entry proxies.
+   * The plugin keeps React Router's browser manifest eager so route assets can
+   * still be discovered during initial dev requests.
    * @default undefined
    */
   lazyCompilation?: boolean | Rspack.LazyCompilationOptions,
+
+  /**
+   * Prewarm emitted Rspack lazy-compilation proxy modules after dev compiles.
+   * This can include React Router entry and route modules without issuing
+   * application route requests.
+   * @default false
+   */
+  lazyCompilationPrewarm?: boolean | {
+    entry?: boolean,
+    routes?: boolean | number | string[],
+    delayMs?: number,
+    triggerPrefix?: string,
+  },
 
   /**
    * Emit structured React Router plugin timing logs.
@@ -315,6 +327,7 @@ If no configuration is provided, the following defaults will be used:
   serverOutput: 'module',
   federation: false,
   lazyCompilation: undefined, // Rsbuild's dev defaults still apply
+  lazyCompilationPrewarm: false,
   logPerformance: false,
   parallelTransforms: undefined // adaptive workers; inline when no spare cores
 }
@@ -341,6 +354,14 @@ by default to avoid gzipping and printing thousands of assets. Set
 Route transform source maps are generated in development only. If you enable
 Rsbuild source maps for faster local debugging, prefer a cheap JS map:
 `output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
+
+Lazy compilation prewarming is disabled by default. When enabled alongside
+`lazyCompilation`, the plugin fetches emitted browser entry and route JS assets,
+extracts Rspack's lazy proxy activation keys, and POSTs those keys to the Rspack
+lazy trigger endpoint after dev compiles. It does not request application routes
+or run route loaders. Pass `{ routes: 16 }` to cap route assets or
+`{ routes: ['root', 'routes/about'] }` to target specific route IDs. Use
+`delayMs` when you want to move this work farther behind the ready signal.
 
 Subresource Integrity is disabled by default. Enable it with
 `subResourceIntegrity: true` in `react-router.config.*` when the deployed app

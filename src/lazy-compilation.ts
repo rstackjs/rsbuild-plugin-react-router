@@ -49,10 +49,14 @@ const matchesLazyCompilationTest = (
 
 const createReactRouterHydrationModuleTest = (entryClientPath: string) => {
   const eagerPatterns = [
-    normalizeSlashes(entryClientPath),
     'virtual/react-router/browser-manifest',
-    BUILD_CLIENT_ROUTE_QUERY_STRING,
-    '?react-router-route',
+    ...(entryClientPath
+      ? [
+          normalizeSlashes(entryClientPath),
+          BUILD_CLIENT_ROUTE_QUERY_STRING,
+          '?react-router-route',
+        ]
+      : []),
   ];
 
   return (module: LazyCompilationModule): boolean =>
@@ -65,9 +69,11 @@ const createReactRouterHydrationModuleTest = (entryClientPath: string) => {
 export const guardReactRouterLazyCompilation = ({
   lazyCompilation,
   entryClientPath,
+  prewarmReactRouterModules = false,
 }: {
   lazyCompilation: PluginOptions['lazyCompilation'] | undefined;
   entryClientPath: string;
+  prewarmReactRouterModules?: boolean;
 }): PluginOptions['lazyCompilation'] | undefined => {
   if (lazyCompilation === undefined || lazyCompilation === false) {
     return lazyCompilation;
@@ -78,8 +84,9 @@ export const guardReactRouterLazyCompilation = ({
       ? { entries: true, imports: true }
       : lazyCompilation;
   const userTest = options.test;
-  const isReactRouterHydrationModule =
-    createReactRouterHydrationModuleTest(entryClientPath);
+  const isReactRouterHydrationModule = prewarmReactRouterModules
+    ? createReactRouterHydrationModuleTest('')
+    : createReactRouterHydrationModuleTest(entryClientPath);
 
   return {
     ...options,

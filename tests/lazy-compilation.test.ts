@@ -148,4 +148,36 @@ describe('guardReactRouterLazyCompilation', () => {
       })
     ).toBe(false);
   });
+
+  it('allows React Router entry and route modules when prewarming them', () => {
+    const guarded = guardReactRouterLazyCompilation({
+      lazyCompilation: true,
+      entryClientPath,
+      prewarmReactRouterModules: true,
+    });
+    const test = getGuardedTest(guarded);
+
+    expect(
+      test({
+        request: 'virtual/react-router/browser-manifest',
+      })
+    ).toBe(false);
+    expect(
+      test({
+        resource: `${entryClientPath}!lazy-compilation-proxy`,
+      })
+    ).toBe(true);
+    expect(
+      test({
+        identifier: () =>
+          '/project/app/routes/home.tsx?__react-router-build-client-route',
+      })
+    ).toBe(true);
+    expect(
+      test({
+        nameForCondition: () =>
+          '/project/app/routes/home.tsx?react-router-route',
+      })
+    ).toBe(true);
+  });
 });
