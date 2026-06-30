@@ -48,15 +48,12 @@ export type PluginOptions = {
 
   /**
    * Run route transforms in a worker-thread pool.
-   * Pass `false` to disable or `{ maxWorkers }` to override the default worker count.
+   * Pass `true` to force the default worker count, a positive integer to set
+   * the worker count, or `false` to disable.
    * @default Automatically enabled for 256+ resolved routes. The automatic
    * pool uses available CPU cores minus 2.
    */
-  parallelTransforms?:
-    | boolean
-    | {
-        maxWorkers?: number;
-      };
+  parallelRouteTransform?: boolean | number;
 
   /**
    * Called when the route graph changes during development.

@@ -102,7 +102,7 @@ const parseArgs = argv => {
       },
       clean: { type: 'string', default: 'build' },
       filter: { type: 'string' },
-      'parallel-transforms': { type: 'string' },
+      'parallel-route-transform': { type: 'string' },
       'rspack-profile': { type: 'string' },
       'rspack-trace-output': { type: 'string' },
       'fail-fast': { type: 'boolean', default: false },
@@ -115,7 +115,7 @@ const parseArgs = argv => {
     },
   });
 
-  const parseParallelTransforms = value => {
+  const parseParallelRouteTransform = value => {
     if (value === undefined) {
       return undefined;
     }
@@ -125,16 +125,16 @@ const parseArgs = argv => {
     if (value === 'auto') {
       return undefined;
     }
-    if (value === 'true' || value === '1') {
+    if (value === 'true') {
       return true;
     }
-    const maxWorkers = Number(value);
-    if (!Number.isInteger(maxWorkers) || maxWorkers < 1) {
+    const workerCount = Number(value);
+    if (!Number.isInteger(workerCount) || workerCount < 1) {
       throw new Error(
-        '--parallel-transforms must be true, false, auto, or a positive integer.'
+        '--parallel-route-transform must be true, false, auto, or a positive integer.'
       );
     }
-    return { maxWorkers };
+    return workerCount;
   };
 
   const args = {
@@ -146,7 +146,9 @@ const parseArgs = argv => {
     out: values.out,
     clean: values.clean,
     filter: values.filter ?? null,
-    parallelTransforms: parseParallelTransforms(values['parallel-transforms']),
+    parallelRouteTransform: parseParallelRouteTransform(
+      values['parallel-route-transform']
+    ),
     rspackProfile: values['rspack-profile'] ?? null,
     rspackTraceOutput: values['rspack-trace-output'] ?? null,
     failFast: values['fail-fast'],
@@ -681,7 +683,7 @@ const renderMarkdown = result => {
           `- Dev route timeout: ${result.devRouteTimeoutMs} ms`,
         ]
       : []),
-    `- Parallel transforms: ${formatParallelTransforms(result.parallelTransforms)}`,
+    `- Parallel route transform: ${formatParallelRouteTransform(result.parallelRouteTransform)}`,
     `- Plugin performance logging: ${String(result.logPerformance)}`,
     `- Rspack profile: ${result.rspackProfile ?? 'false'}`,
     ...(result.rspackTraceOutput
@@ -827,17 +829,17 @@ const writeOutputs = async (result, outputPaths) => {
   }
 };
 
-const formatParallelTransforms = parallelTransforms => {
-  if (parallelTransforms === undefined) {
+const formatParallelRouteTransform = parallelRouteTransform => {
+  if (parallelRouteTransform === undefined) {
     return 'adaptive';
   }
-  if (!parallelTransforms) {
+  if (!parallelRouteTransform) {
     return 'false';
   }
-  if (parallelTransforms === true) {
+  if (parallelRouteTransform === true) {
     return 'true';
   }
-  return `maxWorkers=${parallelTransforms.maxWorkers}`;
+  return `workers=${parallelRouteTransform}`;
 };
 
 const git = async args => {
@@ -980,7 +982,7 @@ const main = async () => {
       fixture: benchmark.fixture ?? 'default',
       pluginImportPath,
       pluginReactImportPath,
-      parallelTransforms: args.parallelTransforms,
+      parallelRouteTransform: args.parallelRouteTransform,
     });
 
     const runs = [];
@@ -1119,7 +1121,7 @@ const main = async () => {
       ...benchmark,
       fixture: fixtureResult.fixture,
       fixtureStats: fixtureResult.stats ?? null,
-      parallelTransforms: args.parallelTransforms,
+      parallelRouteTransform: args.parallelRouteTransform,
       devRoutePaths,
       cwd: path.relative(rootDir, fixtureRoot),
       command:
@@ -1151,7 +1153,7 @@ const main = async () => {
     logPerformance: args.logPerformance,
     devRoutes: args.mode === 'dev' ? args.devRoutes : null,
     devRouteTimeoutMs: args.mode === 'dev' ? args.devRouteTimeoutMs : null,
-    parallelTransforms: args.parallelTransforms,
+    parallelRouteTransform: args.parallelRouteTransform,
     rspackProfile: args.rspackProfile,
     rspackTraceOutput: args.rspackTraceOutput,
     failed,

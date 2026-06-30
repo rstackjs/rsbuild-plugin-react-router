@@ -49,7 +49,7 @@ describe('benchmark fixture generator', () => {
       expect(rsbuildConfig).toContain(
         "sourceMap: { js: 'cheap-module-source-map', css: false }"
       );
-      expect(rsbuildConfig).not.toContain('parallelTransforms:');
+      expect(rsbuildConfig).not.toContain('parallelRouteTransform:');
 
       const reactRouterConfig = readFileSync(
         join(root, 'react-router.config.ts'),
@@ -96,14 +96,12 @@ describe('benchmark fixture generator', () => {
         root,
         routeCount: 1,
         variant: 'ssr-esm',
-        parallelTransforms: { maxWorkers: 3 },
+        parallelRouteTransform: 3,
       });
 
       const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
-      expect(result.parallelTransforms).toEqual({ maxWorkers: 3 });
-      expect(rsbuildConfig).toContain(
-        'parallelTransforms: { maxWorkers: 3 },'
-      );
+      expect(result.parallelRouteTransform).toBe(3);
+      expect(rsbuildConfig).toContain('parallelRouteTransform: 3,');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -120,12 +118,12 @@ describe('benchmark fixture generator', () => {
         root,
         routeCount: 1,
         variant: 'ssr-esm',
-        parallelTransforms: false,
+        parallelRouteTransform: false,
       });
 
       const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
-      expect(result.parallelTransforms).toBe(false);
-      expect(rsbuildConfig).toContain('parallelTransforms: false,');
+      expect(result.parallelRouteTransform).toBe(false);
+      expect(rsbuildConfig).toContain('parallelRouteTransform: false,');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
