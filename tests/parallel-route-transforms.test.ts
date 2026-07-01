@@ -262,7 +262,7 @@ describe('parallel route transforms', () => {
     const workers: FakeRouteTransformWorker[] = [];
     const executor = createRouteTransformExecutorForTesting(
       {
-        parallelTransforms: 4,
+        parallelRouteTransform: 4,
         splitRouteModules: true,
       },
       () => {
