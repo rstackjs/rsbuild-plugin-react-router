@@ -1,6 +1,6 @@
 {
   "name": "rsbuild-plugin-react-router",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "React Router plugin for Rsbuild",
   "repository": {
     "type": "git",
@@ -57,6 +57,7 @@
     "bench:baseline": "node scripts/bench-builds.mts --profile default --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/baseline",
     "bench:full": "node scripts/bench-builds.mts --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",
     "bench:large": "node scripts/bench-builds.mts --profile large --iterations 1 --warmup 0 --clean cold --format both --out .benchmark/results/large",
+    "bench:synthetic-app": "node scripts/bench-synthetic-app.mjs",
     "e2e": "pnpm build && pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e",
     "dev": "rslib build --watch",
     "test": "rstest run",
