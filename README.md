@@ -47,164 +47,86 @@ Add the plugin to your `rsbuild.config.ts`:
 
 ```ts
 import { defineConfig } from '@rsbuild/core';
-import { pluginReactRouter } from 'rsbuild-plugin-react-router';
 import { pluginReact } from '@rsbuild/plugin-react';
+import { pluginReactRouter } from 'rsbuild-plugin-react-router';
 
-export default defineConfig(() => {
-  return {
-    plugins: [
-      pluginReactRouter({
-        // Optional: Enable custom server mode
-        customServer: false,
-        // Optional: Specify server output format
-        serverOutput: 'commonjs',
-        // Optional: enable experimental support for module federation
-        federation: false,
-      }),
-      pluginReact(),
-    ],
-  };
+export default defineConfig({
+  plugins: [
+    pluginReactRouter({
+      // options here
+    }),
+    pluginReact(),
+  ],
 });
 ```
 
 ## Configuration
 
-The plugin uses a two-part configuration system:
+React Router application settings live in `react-router.config.*`. The Rsbuild
+plugin only needs options for Rsbuild-specific behavior.
 
-1. **Plugin Options** (in `rsbuild.config.ts`):
+### Plugin Options
 
 ```ts
 pluginReactRouter({
-  /**
-   * Whether to disable automatic middleware setup for custom server implementation.
-   * Enable this when you want to handle server setup manually.
-   * @default false
-   */
-  customServer?: boolean,
-
-  /**
-   * Specify the output format for server-side code.
-   * Options: "commonjs" | "module"
-   * @default "module"
-   */
-  serverOutput?: "commonjs" | "module",
-
-  /**
-   * Rsbuild dev-only lazy compilation behavior.
-   * The plugin guards React Router hydration-critical modules so
-   * `lazyCompilation: { entries: true }` remains enabled without replacing
-   * manifest route modules with lazy entry proxies.
-   * @default undefined
-   */
-  lazyCompilation?: boolean | Rspack.LazyCompilationOptions,
-
-  /**
-   * Emit structured React Router plugin timing logs.
-   * @default false
-   */
-  logPerformance?: boolean,
-
-  /**
-   * Run route transforms in a worker-thread pool.
-   * Pass `false` to disable or an integer to override the default worker count.
-   * @default undefined. The default uses a bounded worker count when spare CPU
-   * cores are available.
-   */
-  parallelTransforms?: false | number,
-
-  /**
-   * Route-topology notification for programmatic/custom dev servers.
-   * Recreate the Rsbuild server when this fires.
-   */
-  onRouteTopologyChange?: () => void | Promise<void>,
-
-  /**
-   * Enable experimental support for module federation
-   * @default false
-   */
-  federation?: boolean
-})
-
-When Module Federation is enabled, configure your Federation plugin with
-`experiments.asyncStartup: true` to avoid requiring entrypoint `import()` hacks.
-See the Module Federation examples under `examples/federation`.
-
-When Module Federation is enabled, some runtimes may expose server build exports
-as async getters. The dev server resolves these exports automatically. For
-production, use a custom server or an adapter that resolves async exports before
-passing the build to React Router's request handler.
+  customServer: false,
+  serverOutput: 'module',
+  lazyCompilation: undefined,
+  logPerformance: false,
+  parallelRouteTransform: undefined,
+  onRouteTopologyChange: undefined,
+  federation: false,
+});
 ```
 
-2. **React Router Configuration** (in `react-router.config.*`):
+| Option                   | Default     | Description                                                                                                                                                                                                                      |
+| ------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customServer`           | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
+| `serverOutput`           | `'module'`  | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
+| `lazyCompilation`        | `undefined` | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
+| `logPerformance`         | `false`     | Logs structured React Router plugin timing information through the Rsbuild logger.                                                                                                                                               |
+| `parallelRouteTransform` | `undefined` | Controls worker-thread route transforms. `undefined` auto-enables workers for 256+ routes, `true` forces the default worker count, a positive integer sets the worker count, and `false` keeps transforms inline.                |
+| `onRouteTopologyChange`  | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
+| `federation`             | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
+
+When `federation` is enabled, configure the Module Federation plugin with
+`experiments.asyncStartup: true`. The dev server resolves async server build
+exports automatically; production custom servers or adapters should resolve
+async exports before passing the build to React Router's request handler.
+
+### React Router Config
+
+Put React Router framework settings in `react-router.config.*`:
 
 ```ts
 import type { Config } from '@react-router/dev/config';
 
 export default {
-  /**
-   * Whether to enable Server-Side Rendering (SSR) support.
-   * @default true
-   */
   ssr: true,
-
-  /**
-   * The file name for the server build output.
-   * @default "index.js"
-   */
-  serverBuildFile: 'index.js',
-
-  /**
-   * The output format for the server build.
-   * Options: "esm" | "cjs"
-   * @default "esm"
-   */
-  serverModuleFormat: 'esm',
-
-  /**
-   * Split server bundles by route branch (advanced).
-   */
-  serverBundles: async ({ branch }) => branch[0]?.id ?? 'main',
-
-  /**
-   * Enable Subresource Integrity for browser assets.
-   * @default false
-   */
-  subResourceIntegrity: true,
-
-  /**
-   * Hook called after the build completes.
-   */
-  buildEnd: async ({ buildManifest, reactRouterConfig }) => {
-    console.log(buildManifest, reactRouterConfig);
-  },
-
-  /**
-   * Build directory for output files
-   * @default 'build'
-   */
-  buildDirectory: 'dist',
-
-  /**
-   * Application source directory
-   * @default 'app'
-   */
+  buildDirectory: 'build',
   appDirectory: 'app',
-
-  /**
-   * Base URL path
-   * @default '/'
-   */
-  basename: '/my-app',
-
-  /**
-   * Split client route module exports into separate chunks.
-   * @default true
-   */
+  basename: '/',
   splitRouteModules: true,
+  subResourceIntegrity: false,
 } satisfies Config;
 ```
 
-All configuration options are optional and will use sensible defaults if not specified.
+Commonly used options:
+
+| Option                 | Default      | Notes                                                                                                                     |
+| ---------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `ssr`                  | `true`       | Set `false` for SPA mode. SPA mode still runs a build-time server render to create `build/client/index.html`.             |
+| `buildDirectory`       | `'build'`    | Output root. Client assets go in `<buildDirectory>/client`; server output goes in `<buildDirectory>/server`.              |
+| `appDirectory`         | `'app'`      | Directory containing `root`, `routes`, and optional `entry.client` / `entry.server` files.                                |
+| `basename`             | `'/'`        | Base URL used for routing, prerender requests, and manifest asset paths.                                                  |
+| `serverBuildFile`      | `'index.js'` | Server build file name. It must end in `.js`.                                                                             |
+| `serverModuleFormat`   | `'esm'`      | React Router server module format: `'esm'` or `'cjs'`. `serverOutput` can override the emitted Rsbuild server format.     |
+| `serverBundles`        | `undefined`  | Advanced server bundle splitting by route branch. Disabled when `ssr: false`.                                             |
+| `routeDiscovery`       | React Router | Defaults to lazy discovery for SSR and initial discovery for SPA mode. `routeDiscovery.mode: 'lazy'` is invalid for SPA.  |
+| `prerender`            | `undefined`  | `true`, an array of paths, a function, or `{ paths, concurrency }` / `{ paths, unstable_concurrency }`.                   |
+| `splitRouteModules`    | `true`       | Splits client route module exports. The legacy `future.v8_splitRouteModules` flag is also accepted.                       |
+| `subResourceIntegrity` | `false`      | Emits SRI metadata for browser scripts. The legacy `future.unstable_subResourceIntegrity` flag is normalized to this key. |
+| `buildEnd`             | `undefined`  | Hook called after the build with the React Router build manifest and resolved config.                                     |
 
 ### Config File Resolution
 
@@ -291,48 +213,19 @@ export default {
 } satisfies Config;
 ```
 
-Prerendering defaults to one path at a time, matching React Router. You can opt
-into concurrent prerendering for large sites:
+Prerendering defaults to one path at a time, matching React Router. Use
+`concurrency` for larger sites; `unstable_concurrency` is still accepted for
+older configs:
 
 ```ts
 export default {
   ssr: false,
   prerender: {
     paths: ['/', '/about'],
-    unstable_concurrency: 4,
+    concurrency: 4,
   },
 } satisfies Config;
 ```
-
-### Default Configuration Values
-
-If no configuration is provided, the following defaults will be used:
-
-```ts
-// Plugin defaults (rsbuild.config.ts)
-{
-  customServer: false,
-  serverOutput: 'module',
-  federation: false,
-  lazyCompilation: undefined, // Rsbuild's dev defaults still apply
-  logPerformance: false,
-  parallelTransforms: undefined // adaptive workers; inline when no spare cores
-}
-
-// Router defaults (react-router.config.ts)
-{
-  ssr: true,
-  buildDirectory: 'build',
-  appDirectory: 'app',
-  basename: '/',
-  subResourceIntegrity: false
-}
-```
-
-Route transforms use worker threads by default when more than two CPU cores are
-available, with a bounded worker count to avoid oversubscribing parallel web and
-node dev compilers. Otherwise, transforms run inline. Pass a positive integer
-to set the worker count, or `false` to force inline transforms.
 
 For builds with 256+ routes, detailed file-size reporting is compacted to totals
 by default to avoid gzipping and printing thousands of assets. Set
@@ -341,12 +234,6 @@ by default to avoid gzipping and printing thousands of assets. Set
 Route transform source maps are generated in development only. If you enable
 Rsbuild source maps for faster local debugging, prefer a cheap JS map:
 `output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
-
-Subresource Integrity is disabled by default. Enable it with
-`subResourceIntegrity: true` in `react-router.config.*` when the deployed app
-should emit integrity metadata for browser scripts. The legacy
-`future.unstable_subResourceIntegrity` flag is still accepted and is normalized
-to the stable option.
 
 ### Route Configuration
 
@@ -578,15 +465,6 @@ Then update your `package.json` scripts:
 }
 ```
 
-The custom server setup allows you to:
-
-- Add custom middleware
-- Handle API routes
-- Integrate with databases
-- Implement custom authentication
-- Add server-side caching
-- And more!
-
 ## Cloudflare Workers Deployment
 
 To deploy your React Router app to Cloudflare Workers:
@@ -755,6 +633,22 @@ The plugin automatically:
 - Sets up development server with live reload
 - Handles route-based code splitting
 - Manages client and server builds
+
+### Benchmarking
+
+`pnpm bench:large` runs this repository's generated stress fixture for quick
+regression checks. `pnpm bench:synthetic-app` runs the embedded complex Rsbuild
+app under `benchmarks/synthetic-web-bundler-benchmark`, which adds heavier
+loader and transform contention for benchmark coverage closer to a large
+real-world application.
+
+```bash
+pnpm bench:large
+pnpm bench:synthetic-app -- --profile all --runs 2
+```
+
+The PR benchmark workflow reports production build, dev route-load, HMR/update,
+and embedded synthetic app timings in the same benchmark comment.
 
 ## React Router Framework Mode
 

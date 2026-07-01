@@ -3,7 +3,7 @@ import {
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
 import { Effect } from 'effect';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import { tryPluginPromise } from './effect-runtime.js';
 import { getExportNames } from './export-utils.js';
 import {
   buildEnforceChunkValidity,
@@ -72,113 +72,96 @@ export const buildRouteClientEntryCode = ({
   return `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`;
 };
 
-export const createRouteClientEntryArtifactEffect = ({
+export const createRouteClientEntryArtifact = async ({
   code,
   resourcePath,
   environmentName,
   isBuild,
   routeChunkCache,
   routeChunkConfig,
-}: RouteClientEntryArtifactOptions): Effect.Effect<
-  RouteClientEntryArtifact,
-  Error,
-  never
-> =>
-  Effect.gen(function* () {
-    const isServer = environmentName === 'node';
-    const mightHaveRouteChunks =
-      !isServer &&
-      isBuild &&
-      shouldAnalyzeRouteChunks(routeChunkConfig, resourcePath, code);
-    const routeChunkInfo = mightHaveRouteChunks
-      ? yield* tryPluginPromise(() =>
-          detectRouteChunksIfEnabled(
-            routeChunkCache,
-            routeChunkConfig,
-            resourcePath,
-            code
-          )
-        )
-      : null;
-    const exportNames =
-      routeChunkInfo?.exportNames ??
-      (yield* tryPluginPromise(() => getExportNames(code)));
-    const chunkedExports = routeChunkInfo?.chunkedExports ?? [];
-    return {
-      code: buildRouteClientEntryCode({
-        exportNames,
-        chunkedExports,
-        isServer,
+}: RouteClientEntryArtifactOptions): Promise<RouteClientEntryArtifact> => {
+  const isServer = environmentName === 'node';
+  const mightHaveRouteChunks =
+    !isServer &&
+    isBuild &&
+    shouldAnalyzeRouteChunks(routeChunkConfig, resourcePath, code);
+  const routeChunkInfo = mightHaveRouteChunks
+    ? await detectRouteChunksIfEnabled(
+        routeChunkCache,
+        routeChunkConfig,
         resourcePath,
-      }),
-    };
-  });
+        code
+      )
+    : null;
+  const exportNames =
+    routeChunkInfo?.exportNames ?? (await getExportNames(code));
+  const chunkedExports = routeChunkInfo?.chunkedExports ?? [];
+  return {
+    code: buildRouteClientEntryCode({
+      exportNames,
+      chunkedExports,
+      isServer,
+      resourcePath,
+    }),
+  };
+};
 
-export const createRouteClientEntryArtifact = (
+export const createRouteClientEntryArtifactEffect = (
   options: RouteClientEntryArtifactOptions
-): Promise<RouteClientEntryArtifact> =>
-  runPluginEffect(createRouteClientEntryArtifactEffect(options));
+): Effect.Effect<RouteClientEntryArtifact, Error, never> =>
+  tryPluginPromise(() => createRouteClientEntryArtifact(options));
 
-export const createRouteChunkArtifactEffect = ({
+export const createRouteChunkArtifact = async ({
   code,
   resource,
   resourcePath,
   isBuild,
   routeChunkCache,
   routeChunkConfig,
-}: RouteChunkArtifactOptions): Effect.Effect<
-  RouteChunkArtifact,
-  Error,
-  never
-> =>
-  Effect.gen(function* () {
-    const splitRouteModules = routeChunkConfig.splitRouteModules;
-    if (!isBuild || !splitRouteModules) {
-      return {
-        code: emptyRouteChunkSnippet(),
-        map: null,
-      };
-    }
-
-    const chunkName = getRouteChunkNameFromModuleId(resource);
-    if (!chunkName) {
-      return yield* Effect.fail(
-        new Error(`Invalid route chunk name in "${resource}"`)
-      );
-    }
-    if (chunkName !== 'main' && !code.includes(chunkName)) {
-      return {
-        code: emptyRouteChunkSnippet(),
-        map: null,
-      };
-    }
-
-    const chunk = yield* tryPluginPromise(() =>
-      getRouteChunkIfEnabled(
-        routeChunkCache,
-        routeChunkConfig,
-        resourcePath,
-        chunkName,
-        code
-      )
-    );
-
-    if (splitRouteModules === 'enforce' && chunkName === 'main' && chunk) {
-      const exportNames = yield* tryPluginPromise(() => getExportNames(chunk));
-      validateRouteChunks({
-        config: routeChunkConfig,
-        id: resourcePath,
-        valid: buildEnforceChunkValidity(exportNames),
-      });
-    }
-
+}: RouteChunkArtifactOptions): Promise<RouteChunkArtifact> => {
+  const splitRouteModules = routeChunkConfig.splitRouteModules;
+  if (!isBuild || !splitRouteModules) {
     return {
-      code: chunk ?? emptyRouteChunkSnippet(),
+      code: emptyRouteChunkSnippet(),
       map: null,
     };
-  });
+  }
 
-export const createRouteChunkArtifact = (
+  const chunkName = getRouteChunkNameFromModuleId(resource);
+  if (!chunkName) {
+    throw new Error(`Invalid route chunk name in "${resource}"`);
+  }
+  if (chunkName !== 'main' && !code.includes(chunkName)) {
+    return {
+      code: emptyRouteChunkSnippet(),
+      map: null,
+    };
+  }
+
+  const chunk = await getRouteChunkIfEnabled(
+    routeChunkCache,
+    routeChunkConfig,
+    resourcePath,
+    chunkName,
+    code
+  );
+
+  if (splitRouteModules === 'enforce' && chunkName === 'main' && chunk) {
+    const exportNames = await getExportNames(chunk);
+    validateRouteChunks({
+      config: routeChunkConfig,
+      id: resourcePath,
+      valid: buildEnforceChunkValidity(exportNames),
+    });
+  }
+
+  return {
+    code: chunk ?? emptyRouteChunkSnippet(),
+    map: null,
+  };
+};
+
+export const createRouteChunkArtifactEffect = (
   options: RouteChunkArtifactOptions
-): Promise<RouteChunkArtifact> =>
-  runPluginEffect(createRouteChunkArtifactEffect(options));
+): Effect.Effect<RouteChunkArtifact, Error, never> =>
+  tryPluginPromise(() => createRouteChunkArtifact(options));
