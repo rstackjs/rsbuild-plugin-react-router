@@ -19,7 +19,6 @@ type LazyCompilationPrewarmController = {
   setServerOrigin(origin: string): void;
   setManifest(manifest: ReactRouterManifestForDev | null): void;
   schedule(): void;
-  reschedule(): void;
   cancelEffect(): Effect.Effect<void, Error, never>;
 };
 
@@ -55,9 +54,6 @@ const collectRouteAssets = (
 
   const assets: string[] = [];
   for (const routeId in routes) {
-    if (!Object.prototype.hasOwnProperty.call(routes, routeId)) {
-      continue;
-    }
     const route = routes[routeId];
     if (route.module) {
       assets.push(route.module);
@@ -203,7 +199,7 @@ const postLazyCompilationKeys = (
   });
 };
 
-export const prewarmLazyCompilation = ({
+const prewarmLazyCompilation = ({
   manifest,
   serverOrigin,
   config,
@@ -272,9 +268,6 @@ export const createLazyCompilationPrewarmController = ({
     },
     schedule() {
       task.schedule();
-    },
-    reschedule() {
-      task.reschedule();
     },
     cancelEffect() {
       manifest = null;

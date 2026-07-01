@@ -142,7 +142,6 @@ describe('lazy compilation prewarm helpers', () => {
 
       await firstFetch;
       controller.setManifest(createManifest('/static/js/latest-entry.js'));
-      controller.reschedule();
       releaseFirstFetch?.();
 
       await expect
