@@ -1,9 +1,7 @@
 import { readFileSync, statSync, type Stats } from 'node:fs';
 import { createRequire } from 'node:module';
-import { Effect } from 'effect';
 import { dirname, relative, resolve } from 'pathe';
 import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
-import { runPluginEffect } from './effect-runtime.js';
 import {
   getExportNamesAndExportAll,
   getRouteModuleAnalysis,
@@ -263,23 +261,14 @@ export type RouteModuleResolver = (
   callback: RouteModuleResolveCallback
 ) => void;
 
-const resolveBundlerRouteModuleEffect = (
-  resolveModule: RouteModuleResolver,
-  specifier: string,
-  importerPath: string
-): Effect.Effect<string | null, never, never> =>
-  Effect.async<string | null>(resume => {
-    resolveModule(dirname(importerPath), specifier, (error, resolved) => {
-      resume(Effect.succeed(error || !resolved ? null : resolved));
-    });
-  });
-
 export const createBundlerRouteExportResolver =
   (resolveModule: RouteModuleResolver): RouteExportResolver =>
   (specifier, importerPath) =>
-    runPluginEffect(
-      resolveBundlerRouteModuleEffect(resolveModule, specifier, importerPath)
-    );
+    new Promise<string | null>(resolvePromise => {
+      resolveModule(dirname(importerPath), specifier, (error, resolved) => {
+        resolvePromise(error || !resolved ? null : resolved);
+      });
+    });
 
 export const collectClientOnlyStubExportNames = async (
   code: string,

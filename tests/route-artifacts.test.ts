@@ -1,10 +1,7 @@
 import { describe, expect, it } from '@rstest/core';
-import { runPluginEffect } from '../src/effect-runtime';
 import {
   createRouteChunkArtifact,
-  createRouteChunkArtifactEffect,
   createRouteClientEntryArtifact,
-  createRouteClientEntryArtifactEffect,
 } from '../src/route-artifacts';
 import {
   emptyRouteChunkSnippet,
@@ -136,19 +133,17 @@ describe('route artifact helpers', () => {
       });
     });
 
-    it('generates route reexports through the Effect API', async () => {
-      const result = await runPluginEffect(
-        createRouteClientEntryArtifactEffect({
-          code: `
-            export async function clientLoader() { return null; }
-            export default function Route() { return null; }
-          `,
-          resourcePath,
-          environmentName: 'web',
-          isBuild: false,
-          routeChunkConfig: disabledRouteChunkConfig,
-        })
-      );
+    it('generates route reexports for dev web entries', async () => {
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export async function clientLoader() { return null; }
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        environmentName: 'web',
+        isBuild: false,
+        routeChunkConfig: disabledRouteChunkConfig,
+      });
 
       expect(result).toEqual({
         code: `export { clientLoader, default } from ${JSON.stringify(
@@ -222,16 +217,14 @@ describe('route artifact helpers', () => {
         source
       );
 
-      const result = await runPluginEffect(
-        createRouteChunkArtifactEffect({
-          code: source,
-          resource: getRouteChunkModuleId(resourcePath, 'clientAction'),
-          resourcePath,
-          routeChunkConfig,
-          routeChunkCache: cache,
-          isBuild: true,
-        })
-      );
+      const result = await createRouteChunkArtifact({
+        code: source,
+        resource: getRouteChunkModuleId(resourcePath, 'clientAction'),
+        resourcePath,
+        routeChunkConfig,
+        routeChunkCache: cache,
+        isBuild: true,
+      });
 
       expect(result).toEqual({ code: expectedCode, map: null });
     });

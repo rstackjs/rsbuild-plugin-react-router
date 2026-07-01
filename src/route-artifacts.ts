@@ -2,8 +2,6 @@ import {
   CLIENT_ROUTE_EXPORTS_SET,
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
-import { Effect } from 'effect';
-import { tryPluginPromise } from './effect-runtime.js';
 import { getExportNames } from './export-utils.js';
 import {
   buildEnforceChunkValidity,
@@ -106,11 +104,6 @@ export const createRouteClientEntryArtifact = async ({
   };
 };
 
-export const createRouteClientEntryArtifactEffect = (
-  options: RouteClientEntryArtifactOptions
-): Effect.Effect<RouteClientEntryArtifact, Error, never> =>
-  tryPluginPromise(() => createRouteClientEntryArtifact(options));
-
 export const createRouteChunkArtifact = async ({
   code,
   resource,
@@ -160,8 +153,3 @@ export const createRouteChunkArtifact = async ({
     map: null,
   };
 };
-
-export const createRouteChunkArtifactEffect = (
-  options: RouteChunkArtifactOptions
-): Effect.Effect<RouteChunkArtifact, Error, never> =>
-  tryPluginPromise(() => createRouteChunkArtifact(options));
