@@ -1,15 +1,17 @@
-import { describe, expect, it } from '@rstest/core';
+import { describe, expect, it, rstest } from '@rstest/core';
+import { runPluginEffect } from '../src/effect-runtime';
 import {
   collectLazyCompilationPrewarmAssets,
+  createLazyCompilationPrewarmController,
   createRspackLazyCompilationTriggerClient,
   normalizeLazyCompilationPrewarmOptions,
 } from '../src/lazy-compilation-prewarm';
 
-const createManifest = () => ({
+const createManifest = (entryModule = '/static/js/entry.client.js') => ({
   version: 'dev',
   url: '/static/js/manifest.js',
   entry: {
-    module: '/static/js/entry.client.js',
+    module: entryModule,
     imports: ['/static/js/entry-vendor.js'],
     css: [],
   },
@@ -86,5 +88,72 @@ describe('lazy compilation prewarm helpers', () => {
       './app/entry.client.tsx',
       './app/routes/about.tsx?react-router-route',
     ]);
+  });
+
+  it('reschedules in-flight prewarm work with the latest manifest', async () => {
+    const config = normalizeLazyCompilationPrewarmOptions(true);
+    if (!config) {
+      throw new Error('Expected prewarm config.');
+    }
+
+    const originalFetch = globalThis.fetch;
+    const assetFetches: string[] = [];
+    const posts: string[] = [];
+    let releaseFirstFetch: (() => void) | undefined;
+    let firstFetchStarted: (() => void) | undefined;
+    const firstFetch = new Promise<void>(resolve => {
+      firstFetchStarted = resolve;
+    });
+
+    globalThis.fetch = rstest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === 'POST') {
+          posts.push(String(init.body));
+          return { ok: true, text: async () => '' } as Response;
+        }
+
+        assetFetches.push(url);
+        if (url.endsWith('/static/js/entry.client.js')) {
+          firstFetchStarted?.();
+          await new Promise<void>(resolve => {
+            releaseFirstFetch = resolve;
+          });
+        }
+
+        return {
+          ok: true,
+          text: async () => `activate({ data: ${JSON.stringify(url)} });`,
+        } as Response;
+      }
+    ) as unknown as typeof fetch;
+
+    const controller = createLazyCompilationPrewarmController({
+      config,
+      onError: error => {
+        throw error;
+      },
+    });
+
+    try {
+      controller.setServerOrigin('http://localhost:3000');
+      controller.setManifest(createManifest());
+      controller.schedule();
+
+      await firstFetch;
+      controller.setManifest(createManifest('/static/js/latest-entry.js'));
+      controller.reschedule();
+      releaseFirstFetch?.();
+
+      await expect
+        .poll(() =>
+          assetFetches.some(url => url.endsWith('/static/js/latest-entry.js'))
+        )
+        .toBe(true);
+      await expect.poll(() => posts.length).toBeGreaterThan(0);
+    } finally {
+      await runPluginEffect(controller.cancelEffect());
+      globalThis.fetch = originalFetch;
+    }
   });
 });

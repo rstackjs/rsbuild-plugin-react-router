@@ -19,6 +19,7 @@ type LazyCompilationPrewarmController = {
   setServerOrigin(origin: string): void;
   setManifest(manifest: ReactRouterManifestForDev | null): void;
   schedule(): void;
+  reschedule(): void;
   cancelEffect(): Effect.Effect<void, Error, never>;
 };
 
@@ -249,6 +250,9 @@ export const createLazyCompilationPrewarmController = ({
     },
     schedule() {
       task.schedule();
+    },
+    reschedule() {
+      task.reschedule();
     },
     cancelEffect() {
       manifest = null;

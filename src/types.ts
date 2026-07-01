@@ -20,8 +20,8 @@ export type PluginOptions = {
 
   /**
    * The output format for server builds.
-   * When set to "module", no package.json will be emitted.
-   * @default "module"
+   * When omitted, React Router's `serverModuleFormat` selects the emitted
+   * Rsbuild format (`"esm"` -> `"module"`, `"cjs"` -> `"commonjs"`).
    */
   serverOutput?: 'module' | 'commonjs';
 
@@ -43,11 +43,12 @@ export type PluginOptions = {
 
   /**
    * Prewarm Rspack lazy-compilation proxy modules after dev compiles.
-   * This only runs when lazy compilation is enabled and is disabled by default.
+   * This depends on Rspack's generated lazy-compilation client shape and should
+   * be treated as experimental.
    *
    * @default false
    */
-  lazyCompilationPrewarm?: boolean;
+  unstableLazyCompilationPrewarm?: boolean;
 
   /**
    * Emit structured React Router plugin timing logs.

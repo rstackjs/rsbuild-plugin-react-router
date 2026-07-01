@@ -72,6 +72,29 @@ describe('resolveReactRouterServerBuild', () => {
     ).resolves.toMatchObject({ assets: { version: 'module-exports' } });
   });
 
+  it('unwraps asynchronous namespace defaults', async () => {
+    const build = createBuild('async-default');
+
+    await expect(
+      resolveReactRouterServerBuild({
+        default: Promise.resolve(build),
+      })
+    ).resolves.toMatchObject({ assets: { version: 'async-default' } });
+  });
+
+  it('unwraps asynchronous module.exports namespace values', async () => {
+    const build = createBuild('async-module-exports');
+
+    await expect(
+      resolveReactRouterServerBuild({
+        default: { routes: {} },
+        'module.exports': Promise.resolve(build),
+      })
+    ).resolves.toMatchObject({
+      assets: { version: 'async-module-exports' },
+    });
+  });
+
   it('resolves recognized asynchronous build exports', async () => {
     const build = createBuild('async');
 

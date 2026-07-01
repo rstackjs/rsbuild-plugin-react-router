@@ -124,6 +124,28 @@ describe('build manifest', () => {
     expect(result?.routeIdToServerBundleId.root).toBe('good-id');
   });
 
+  it('rejects hyphenated server bundle IDs for the Vite environment API future', async () => {
+    const routes = {
+      root: { id: 'root', file: 'root.tsx', path: '' },
+    };
+
+    const serverBundles: Config['serverBundles'] = async () => 'bad-id';
+
+    await expect(
+      getBuildManifest({
+        reactRouterConfig: {
+          appDirectory: 'app',
+          buildDirectory: 'build',
+          serverBuildFile: 'index.js',
+          future: { v8_viteEnvironmentApi: true },
+          serverBundles,
+        },
+        routes,
+        rootDirectory: process.cwd(),
+      })
+    ).rejects.toThrow('alphanumeric characters and underscores');
+  });
+
   it('rejects invalid server bundle IDs', async () => {
     const routes = {
       root: { id: 'root', file: 'root.tsx', path: '' },

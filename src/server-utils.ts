@@ -207,7 +207,7 @@ export function resolveServerBuildModuleEffect(
     }
 
     for (const getCandidate of candidates) {
-      const candidate = yield* tryPluginSync(getCandidate);
+      const candidate = yield* tryPluginPromise(() => getCandidate());
       const serverBuild = yield* resolveServerBuildCandidateEffect(candidate);
       if (serverBuild) {
         return serverBuild;

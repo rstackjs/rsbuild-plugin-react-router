@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
+import { readJson } from './benchmark/ci-report-model.mjs';
 
 const parseInput = () => {
   const { values } = parseArgs({
@@ -25,8 +25,6 @@ const parseInput = () => {
 
   return values;
 };
-
-const readJson = async file => JSON.parse(await readFile(file, 'utf8'));
 
 const findBenchmark = (result, id) => {
   const benchmark = result.benchmarks?.find(item => item.id === id);

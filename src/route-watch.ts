@@ -217,13 +217,17 @@ export const createRouteTopologyWatcher = async ({
       }
       try {
         let watcher: DirectoryWatcher;
-        watcher = watchDirectoryOverride(directory, scheduleRescan, error => {
-          if (directoryWatchers.get(directory) === watcher) {
-            watcher.close();
-            directoryWatchers.delete(directory);
+        watcher = watchDirectoryOverride(
+          directory,
+          () => rescanTask.reschedule(),
+          error => {
+            if (directoryWatchers.get(directory) === watcher) {
+              watcher.close();
+              directoryWatchers.delete(directory);
+            }
+            onError(error);
           }
-          onError(error);
-        });
+        );
         directoryWatchers.set(directory, watcher);
       } catch (error) {
         onError(error);
@@ -321,10 +325,6 @@ export const createRouteTopologyWatcher = async ({
 
   const cancelScheduledRescan = (): Promise<void> =>
     runPluginEffect(rescanTask.cancelEffect());
-
-  const scheduleRescan = (): void => {
-    rescanTask.reschedule();
-  };
 
   const applyNextState = async (nextState: RouteDirectoryState) => {
     await runPluginEffect(applyNextStateEffect(nextState));

@@ -483,7 +483,7 @@ describe('pluginReactRouter', () => {
     rsbuild.addPlugins([
       pluginReactRouter({
         lazyCompilation: true,
-        lazyCompilationPrewarm: true,
+        unstableLazyCompilationPrewarm: true,
       }),
     ]);
     const config = await rsbuild.unwrapConfig();

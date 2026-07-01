@@ -32,6 +32,30 @@ export type CompilationStart =
   | { status: 'pending' }
   | { status: 'started'; identity: DevCompilationIdentity };
 
+type CompilerPairStartSide = 'latestWebStart' | 'latestNodeStart';
+
+export const createDevCompilerPair = ({
+  web,
+  node,
+}: {
+  web: Rspack.Compiler;
+  node: Rspack.Compiler;
+}): DevCompilerPair => ({
+  web,
+  node,
+  settledCompilations: new WeakSet(),
+});
+
+export const resetDevCompilerPair = (pair: DevCompilerPair): void => {
+  pair.pendingAttempt = undefined;
+  pair.currentAttemptIdentity = undefined;
+  pair.latestCompletedWebIdentity = undefined;
+  pair.latestCompletedWebStats = undefined;
+  pair.latestCompletedNodeStats = undefined;
+  pair.latestWebStart = undefined;
+  pair.latestNodeStart = undefined;
+};
+
 export const isLatestStartedCompilation = (
   identity: DevCompilationIdentity | undefined,
   start: CompilationStart | undefined
@@ -41,6 +65,32 @@ export const isLatestStartedCompilation = (
 export const hasPendingCompilation = (pair: DevCompilerPair): boolean =>
   pair.latestWebStart?.status === 'pending' ||
   pair.latestNodeStart?.status === 'pending';
+
+export const beginDevCompilerAttempt = (pair: DevCompilerPair): void => {
+  pair.pendingAttempt = undefined;
+  pair.currentAttemptIdentity = Symbol();
+};
+
+export const markDevCompilerPending = (
+  pair: DevCompilerPair,
+  side: CompilerPairStartSide
+): boolean => {
+  const attemptAlreadyPending = hasPendingCompilation(pair);
+  pair[side] = { status: 'pending' };
+  pair.pendingAttempt = undefined;
+  if (!attemptAlreadyPending) {
+    pair.currentAttemptIdentity = Symbol();
+  }
+  return !attemptAlreadyPending;
+};
+
+export const clearDevCompilerStart = (
+  pair: DevCompilerPair,
+  side: CompilerPairStartSide
+): void => {
+  pair[side] = undefined;
+  pair.pendingAttempt = undefined;
+};
 
 export type CompilationIdentityTracker = {
   getCompilationIdentity(

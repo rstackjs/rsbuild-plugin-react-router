@@ -60,6 +60,25 @@ const configRouteToBranchRoute = (route: Route) => ({
   index: route.index,
 });
 
+const validateServerBundleId = (
+  serverBundleId: string,
+  future: Required<Config>['future']
+): Error | undefined => {
+  if (future?.v8_viteEnvironmentApi) {
+    return /^[a-zA-Z0-9_]+$/.test(serverBundleId)
+      ? undefined
+      : new Error(
+          'The "serverBundles" function must only return strings containing alphanumeric characters and underscores.'
+        );
+  }
+
+  return /^[a-zA-Z0-9-_]+$/.test(serverBundleId)
+    ? undefined
+    : new Error(
+        'The "serverBundles" function must only return strings containing alphanumeric characters, hyphens and underscores.'
+      );
+};
+
 type GetBuildManifestOptions = {
   reactRouterConfig: Required<
     Pick<
@@ -82,8 +101,13 @@ export const getBuildManifestEffect = ({
   never
 > =>
   Effect.gen(function* () {
-    const { serverBundles, appDirectory, buildDirectory, serverBuildFile } =
-      reactRouterConfig;
+    const {
+      serverBundles,
+      appDirectory,
+      buildDirectory,
+      serverBuildFile,
+      future,
+    } = reactRouterConfig;
 
     if (!serverBundles) {
       return { routes };
@@ -129,12 +153,12 @@ export const getBuildManifestEffect = ({
             );
           }
 
-          if (!/^[a-zA-Z0-9-_]+$/.test(serverBundleId)) {
-            return yield* Effect.fail(
-              new Error(
-                'The "serverBundles" function must only return strings containing alphanumeric characters, hyphens and underscores.'
-              )
-            );
+          const validationError = validateServerBundleId(
+            serverBundleId,
+            future
+          );
+          if (validationError) {
+            return yield* Effect.fail(validationError);
           }
 
           buildManifest.routeIdToServerBundleId![route.id] = serverBundleId;

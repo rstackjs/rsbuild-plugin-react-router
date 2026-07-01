@@ -446,7 +446,7 @@ export const pluginReactRouter = (
     const devBackgroundResources = registerReactRouterDevBackgroundResources({
       api,
       isBuild,
-      lazyCompilationPrewarm: pluginOptions.lazyCompilationPrewarm,
+      lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
       routeTransformExecutor,
       routeRestartMarkerPath,
       watchDirectory,
@@ -736,8 +736,9 @@ export const pluginReactRouter = (
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
         entryClientPath: finalEntryClientPath,
-        prewarmReactRouterModules:
-          devBackgroundResources.prewarmReactRouterModules,
+        prewarmReactRouterModules: Boolean(
+          pluginOptions.unstableLazyCompilationPrewarm
+        ),
       });
       const lazyCompilation =
         guardedLazyCompilation === undefined

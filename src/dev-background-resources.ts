@@ -6,6 +6,7 @@ import { PLUGIN_NAME } from './constants.js';
 import {
   createDelayedPluginTask,
   DEV_BACKGROUND_STARTUP_DELAY_MS,
+  normalizeEffectError,
   runPluginEffect,
   tryPluginPromise,
 } from './effect-runtime.js';
@@ -29,7 +30,7 @@ import type { PluginOptions } from './types.js';
 type RegisterReactRouterDevBackgroundResourcesOptions = {
   api: RsbuildPluginAPI;
   isBuild: boolean;
-  lazyCompilationPrewarm: PluginOptions['lazyCompilationPrewarm'];
+  lazyCompilationPrewarm: PluginOptions['unstableLazyCompilationPrewarm'];
   routeTransformExecutor: RouteTransformExecutor;
   routeRestartMarkerPath: string;
   watchDirectory: string;
@@ -39,7 +40,6 @@ type RegisterReactRouterDevBackgroundResourcesOptions = {
 };
 
 type ReactRouterDevBackgroundResources = {
-  prewarmReactRouterModules: boolean;
   setManifest(manifest: ReactRouterManifestForDev): void;
 };
 
@@ -112,9 +112,6 @@ export const createReactRouterRouteWatchFiles = ({
   return watchFiles;
 };
 
-const toError = (error: unknown): Error =>
-  error instanceof Error ? error : new Error(String(error));
-
 const closeAll = async (
   message: string,
   closers: Array<() => Promise<void>>
@@ -124,7 +121,7 @@ const closeAll = async (
     .filter(
       (result): result is PromiseRejectedResult => result.status === 'rejected'
     )
-    .map(result => toError(result.reason));
+    .map(result => normalizeEffectError(result.reason));
 
   if (errors.length === 1) {
     throw errors[0];
@@ -251,10 +248,9 @@ export const registerReactRouterDevBackgroundResources = ({
   api.onCloseBuild(closeRouteTransformExecutor);
 
   return {
-    prewarmReactRouterModules: Boolean(lazyCompilationPrewarmConfig),
     setManifest(manifest) {
       lazyCompilationPrewarmController?.setManifest(manifest);
-      lazyCompilationPrewarmController?.schedule();
+      lazyCompilationPrewarmController?.reschedule();
     },
   };
 };
