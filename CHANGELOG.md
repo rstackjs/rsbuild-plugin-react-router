@@ -1,5 +1,40 @@
 # rsbuild-plugin-react-router
 
+## 0.3.0
+
+### Minor Changes
+
+- 95874ff: Keep development SSR requests on the last successfully evaluated atomic set of
+  React Router server entries and their paired web manifests, and expose
+  `loadReactRouterServerBuild` so custom servers use the same last-good pair.
+  Expose `resolveReactRouterServerBuild` to normalize ESM and CommonJS production
+  server modules through the same validated build boundary.
+  Preserve `serverBundles` through config normalization and publish every
+  configured bundle atomically with its exact filtered manifest.
+  This does not snapshot deferred server chunks, make emitted client assets
+  atomic, or delay Rsbuild's WebSocket success notification.
+- 31e5bf5: Expose a plugin-level `lazyCompilation` option that keeps React Router hydration
+  modules eager while preserving user lazy compilation filters.
+
+### Patch Changes
+
+- 95874ff: Improve route analysis and route chunking performance for larger applications, with benchmark tooling to track build overhead.
+- 9352787: Reload the dev server when local helper modules imported by React Router config change.
+- 95874ff: Keep React Router hydration entries compatible with Rsbuild lazy compilation when `entries: true` is enabled.
+- 3f6db5c: Preserve mixed asset query semantics for `?url&raw` and `?url&inline` requests.
+- c4b6d8b: Simplify the README configuration docs and stabilize `parallelRouteTransform` so `true` forces the default worker count, a positive integer sets the worker count, and `false` disables worker-thread route transforms.
+- 95874ff: Preserve route topology declaration order during development so reordering route
+  entries is detected as a topology change.
+- 95874ff: Harden route module transforms and development route watching so source maps,
+  server/client-only modules, and route topology restarts behave consistently.
+- 61f451e: Support React Router's stable `prerender.concurrency` config while preserving
+  the existing `unstable_concurrency` fallback.
+- 0287c14: Support React Router's stable `subResourceIntegrity` config and keep it in sync
+  with `future.unstable_subResourceIntegrity` when merging presets and user
+  configuration.
+- 95874ff: Avoid duplicate startup route topology scans and tighten development watcher
+  lifecycle handling for route additions and removals.
+
 ## 0.2.0
 
 ### Minor Changes
