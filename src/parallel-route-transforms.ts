@@ -1,6 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { setBoundedCacheEntry } from './bounded-cache.js';
 import { getAvailableCpuCount, getDefaultConcurrency } from './concurrency.js';
+import { normalizeEffectError } from './effect-runtime.js';
 import {
   executeRouteTransformTask,
   type RouteTransformResult,
@@ -122,12 +123,9 @@ const isWorkerStartupError = (error: unknown): error is WorkerStartupError =>
   error instanceof WorkerStartupError;
 
 const createWorkerStartupError = (error: unknown): WorkerStartupError => {
-  const startupError = new WorkerStartupError(
-    error instanceof Error ? error.message : String(error)
-  );
-  if (error instanceof Error) {
-    startupError.stack = error.stack;
-  }
+  const normalized = normalizeEffectError(error);
+  const startupError = new WorkerStartupError(normalized.message);
+  startupError.stack = normalized.stack;
   return startupError;
 };
 
@@ -320,7 +318,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
         // The worker may not have received the source update. Force the next
         // request for this module to send its full source again.
         state.sourceCache.delete(sourceCacheKey);
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject(normalizeEffectError(error));
       }
     });
   }

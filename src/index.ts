@@ -58,7 +58,7 @@ import {
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
-  getBuildManifestEffect,
+  getBuildManifest,
   getRoutesByServerBundleId,
 } from './build-manifest.js';
 import {
@@ -559,13 +559,11 @@ export const pluginReactRouter = (
       },
       {} as Record<string, RsbuildEntryDescription>
     );
-    const buildManifest = await runPluginEffect(
-      getBuildManifestEffect({
-        reactRouterConfig: resolvedConfigWithRoutes,
-        routes,
-        rootDirectory: process.cwd(),
-      })
-    );
+    const buildManifest = await getBuildManifest({
+      reactRouterConfig: resolvedConfigWithRoutes,
+      routes,
+      rootDirectory: process.cwd(),
+    });
     const routesByServerBundleId = getRoutesByServerBundleId(
       buildManifest,
       routes

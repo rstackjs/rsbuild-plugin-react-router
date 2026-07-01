@@ -278,9 +278,8 @@ export const createReactRouterDevRuntime = ({
     try {
       onCssAssetOwnershipChanged(change);
     } catch (cause) {
-      const reason = cause instanceof Error ? cause.message : String(cause);
       onWarning(
-        `[rsbuild-plugin-react-router] Failed to notify the browser after CSS asset ownership changed: ${reason}`
+        `[rsbuild-plugin-react-router] Failed to notify the browser after CSS asset ownership changed: ${normalizeEffectError(cause).message}`
       );
     }
   };
@@ -289,9 +288,8 @@ export const createReactRouterDevRuntime = ({
     try {
       onRouteManifestChanged();
     } catch (cause) {
-      const reason = cause instanceof Error ? cause.message : String(cause);
       onWarning(
-        `[rsbuild-plugin-react-router] Failed to notify the browser after route manifest metadata changed: ${reason}`
+        `[rsbuild-plugin-react-router] Failed to notify the browser after route manifest metadata changed: ${normalizeEffectError(cause).message}`
       );
     }
   };
