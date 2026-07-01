@@ -47,32 +47,7 @@ export type PluginOptions = {
    *
    * @default false
    */
-  lazyCompilationPrewarm?:
-    | boolean
-    | {
-        /**
-         * Include the browser entry module in the prewarm request.
-         * @default true
-         */
-        entry?: boolean;
-        /**
-         * Include route modules in the prewarm request. Pass a number to cap
-         * the number of route assets or an array of route IDs to target.
-         * @default true
-         */
-        routes?: boolean | number | string[];
-        /**
-         * Delay prewarming after a dev compile so higher-priority startup work
-         * can settle first.
-         * @default 0
-         */
-        delayMs?: number;
-        /**
-         * Override the Rspack lazy-compilation trigger prefix.
-         * @default "/_rspack/lazy/trigger"
-         */
-        triggerPrefix?: string;
-      };
+  lazyCompilationPrewarm?: boolean;
 
   /**
    * Emit structured React Router plugin timing logs.

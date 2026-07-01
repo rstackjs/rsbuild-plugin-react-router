@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@rstest/core';
 import {
   collectLazyCompilationPrewarmAssets,
-  extractLazyCompilationModuleKeys,
+  createRspackLazyCompilationTriggerClient,
   normalizeLazyCompilationPrewarmOptions,
 } from '../src/lazy-compilation-prewarm';
 
@@ -52,14 +52,11 @@ describe('lazy compilation prewarm helpers', () => {
       entry: true,
       routeLimit: 8,
       delayMs: 0,
-      triggerPrefix: '/_rspack/lazy/trigger',
     });
   });
 
-  it('collects entry and targeted route assets without duplicates', () => {
-    const config = normalizeLazyCompilationPrewarmOptions({
-      routes: ['routes/about'],
-    });
+  it('collects entry and route assets without duplicates', () => {
+    const config = normalizeLazyCompilationPrewarmOptions(true);
 
     if (!config) {
       throw new Error('Expected prewarm config.');
@@ -69,12 +66,13 @@ describe('lazy compilation prewarm helpers', () => {
     ).toEqual([
       '/static/js/entry.client.js',
       '/static/js/entry-vendor.js',
+      '/static/js/root.js',
       '/static/js/routes/about.js',
       '/static/js/routes/about-client-loader.js',
     ]);
   });
 
-  it('extracts Rspack lazy proxy activation keys from emitted code', () => {
+  it('extracts Rspack lazy proxy activation keys through the trigger client', () => {
     const source = `
       import { activate } from "@rspack/core/hot/lazy-compilation-web.js";
       activate({ data: "./app/entry.client.tsx", active: true, module });
@@ -82,7 +80,9 @@ describe('lazy compilation prewarm helpers', () => {
       activate({ data: "./app/entry.client.tsx", active: true, module });
     `;
 
-    expect(extractLazyCompilationModuleKeys(source)).toEqual([
+    const client = createRspackLazyCompilationTriggerClient();
+
+    expect(client.extractModuleKeys(source)).toEqual([
       './app/entry.client.tsx',
       './app/routes/about.tsx?react-router-route',
     ]);

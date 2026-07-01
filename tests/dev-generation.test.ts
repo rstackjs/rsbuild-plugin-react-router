@@ -17,6 +17,7 @@ import {
   createBuild,
   createCompilation,
   createGraphStats,
+  createStats,
   graphIdentity,
   noKnownChanges,
 } from './dev-runtime-fixtures';
@@ -40,6 +41,25 @@ describe('React Router development runtime', () => {
     expect(builds['static/js/app']).toMatchObject({ marker: 'default' });
     expect(loadBundle).toHaveBeenCalledTimes(2);
   });
+
+  it('accepts explicit paired dev stats without pretending they are Rspack MultiStats', async () => {
+    const { runtime } = createHarness(() => createBuild('build'));
+    const web = createCompilation('web');
+    const node = createCompilation('node');
+
+    runtime.beginAttempt();
+    captureWeb(runtime, web, 'paired-stats');
+    await runtime.finishAttempt(
+      { web: createStats(web), node: createStats(node) },
+      noKnownChanges,
+      graphIdentity(web, node)
+    );
+
+    await expect(runtime.load()).resolves.toMatchObject({
+      assets: { version: 'paired-stats' },
+    });
+  });
+
   it('publishes css-only removals when the route file overlaps node dependencies', async () => {
     const routePath = '/app/routes/about.tsx';
     const onCssAssetOwnershipChanged = rstest.fn();

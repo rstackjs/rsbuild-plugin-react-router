@@ -13,6 +13,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from 'node:util';
+import { Effect } from 'effect';
 import { execa } from 'execa';
 import {
   appendNodeOption,
@@ -20,7 +21,6 @@ import {
 } from './benchmark/dev-server.mjs';
 import { generateSyntheticFixture } from './benchmark/fixture.mts';
 import { profiles } from './benchmark/profiles.mjs';
-import { runScriptEffect, tryScriptPromise } from './script-effect.mts';
 
 const rootDir = process.cwd();
 const benchmarkRoot = path.join(rootDir, '.benchmark');
@@ -32,6 +32,23 @@ const rsbuildBin = path.join(
   'bin',
   'rsbuild.js'
 );
+
+const toError = error =>
+  error instanceof Error ? error : new Error(String(error));
+
+const tryPromise = run =>
+  Effect.tryPromise({
+    try: run,
+    catch: toError,
+  });
+
+const failFastError = ({ benchmarkId, runLabel, status }) =>
+  Object.assign(
+    new Error(
+      `Benchmark ${benchmarkId} ${runLabel} failed with status ${status ?? 1}.`
+    ),
+    { exitCode: status ?? 1 }
+  );
 
 const parseArgs = argv => {
   const { values } = parseCliArgs({
@@ -730,132 +747,101 @@ const resolveRspackTraceOutput = async ({
   return tracePath;
 };
 
-const main = async () => {
-  const args = parseArgs(process.argv.slice(2));
-  const useTime = await hasGnuTime();
-  const outputPaths = resolveOutputPaths(args);
-  const pluginImportPath = pathToFileURL(
-    path.join(rootDir, 'dist/index.js')
-  ).href;
-  const pluginReactImportPath =
-    process.env.REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT ??
-    '@rsbuild/plugin-react';
-  const selectedBenchmarks = profiles[args.profile].filter(benchmark =>
-    args.filter ? benchmark.id.includes(args.filter) : true
-  );
+const runBenchmarkIteration = (benchmarkContext, index) =>
+  Effect.gen(function* () {
+    const {
+      args,
+      benchmark,
+      benchmarkIndex,
+      devRoutePaths,
+      fixtureResult,
+      fixtureRoot,
+      measuredIterations,
+      outputPaths,
+      useTime,
+    } = benchmarkContext;
+    const measured = index >= args.warmup;
+    const runLabel = `${measured ? 'run' : 'warmup'}-${
+      measured ? index - args.warmup + 1 : index + 1
+    }`;
 
-  if (selectedBenchmarks.length === 0) {
-    throw new Error(`No benchmarks matched filter "${args.filter}".`);
-  }
-
-  if (!args.skipRootBuild) {
-    console.log('Building plugin package before benchmarks...');
-    const buildResult = await runCommand({
-      command: 'pnpm',
-      args: ['build'],
-      cwd: rootDir,
-    });
-    if (buildResult.status !== 0) {
-      process.exit(buildResult.status ?? 1);
+    if (args.clean !== 'none') {
+      yield* tryPromise(() => cleanBuildOutputs(fixtureRoot));
     }
-  }
-
-  const benchmarks = [];
-  for (const [benchmarkIndex, benchmark] of selectedBenchmarks.entries()) {
-    const measuredIterations = getMeasuredIterationCount(benchmark, args);
-    const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
-    const devRoutePaths =
-      args.mode === 'dev'
-        ? resolveDevRoutePaths(args.devRoutes, benchmark)
-        : [];
-    const fixtureResult = await generateSyntheticFixture({
-      root: fixtureRoot,
-      routeCount: benchmark.routeCount,
-      variant: benchmark.variant,
-      sourceMap: benchmark.sourceMap ?? false,
-      fixture: benchmark.fixture ?? 'default',
-      pluginImportPath,
-      pluginReactImportPath,
-      parallelRouteTransform: args.parallelRouteTransform,
-      largeConfig: benchmark.largeConfig,
-    });
-
-    const runs = [];
-    const totalRuns = args.warmup + measuredIterations;
-    for (let index = 0; index < totalRuns; index += 1) {
-      const measured = index >= args.warmup;
-      if (args.clean !== 'none') {
-        await cleanBuildOutputs(fixtureRoot);
-      }
-      if (args.clean === 'cold') {
-        await rm(path.join(fixtureRoot, 'node_modules'), {
+    if (args.clean === 'cold') {
+      yield* tryPromise(() =>
+        rm(path.join(fixtureRoot, 'node_modules'), {
           recursive: true,
           force: true,
-        });
-      }
-
-      console.log(
-        `${measured ? 'Measuring' : 'Warming'} ${benchmark.id} (${index + 1}/${totalRuns})`
+        })
       );
-      const rspackProfileEnabled =
-        args.mode === 'build' && Boolean(args.rspackProfile);
-      const beforeRspackProfiles = rspackProfileEnabled
-        ? await listRspackProfileDirs(fixtureRoot)
-        : [];
-      const runLabel = `${measured ? 'run' : 'warmup'}-${
-        measured ? index - args.warmup + 1 : index + 1
-      }`;
-      const rspackTraceOutput =
-        args.mode === 'build'
-          ? await resolveRspackTraceOutput({
+    }
+
+    console.log(
+      `${measured ? 'Measuring' : 'Warming'} ${benchmark.id} (${index + 1}/${
+        args.warmup + measuredIterations
+      })`
+    );
+
+    const rspackProfileEnabled =
+      args.mode === 'build' && Boolean(args.rspackProfile);
+    const beforeRspackProfiles = rspackProfileEnabled
+      ? yield* tryPromise(() => listRspackProfileDirs(fixtureRoot))
+      : [];
+    const rspackTraceOutput =
+      args.mode === 'build'
+        ? yield* tryPromise(() =>
+            resolveRspackTraceOutput({
               traceOutput: args.rspackTraceOutput,
               benchmarkId: benchmark.id,
               runLabel,
             })
-          : null;
-      const commonEnv = {
-        NODE_ENV: args.mode === 'build' ? 'production' : 'development',
-        ...(args.logPerformance
-          ? { REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1' }
-          : {}),
-      };
-      const commandResult =
-        args.mode === 'dev'
-          ? await (() => {
-              const devPort = args.devPortBase + benchmarkIndex * 100 + index;
-              return runDevServerBenchmark({
-                command: process.execPath,
-                args: [
-                  rsbuildBin,
-                  'dev',
-                  '--config',
-                  'rsbuild.config.mjs',
-                  '--port',
-                  String(devPort),
-                ],
-                cwd: fixtureRoot,
-                env: {
-                  ...commonEnv,
-                  ...(devRoutePaths.length > 0
-                    ? {
-                        NODE_OPTIONS: appendNodeOption(
-                          process.env.NODE_OPTIONS,
-                          '--experimental-vm-modules'
-                        ),
-                      }
-                    : {}),
-                },
-                readyEnvironments:
-                  benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
-                origin: `http://localhost:${devPort}`,
-                routePaths: devRoutePaths,
-                routeTimeoutMs: args.devRouteTimeoutMs,
-                updateFile: fixtureResult.updateFile,
-                updateRoutePaths: fixtureResult.updateRoutePaths ?? ['/'],
-                timeoutMs: args.devTimeoutMs,
-              });
-            })()
-          : await runCommand({
+          )
+        : null;
+    const commonEnv = {
+      NODE_ENV: args.mode === 'build' ? 'production' : 'development',
+      ...(args.logPerformance
+        ? { REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1' }
+        : {}),
+    };
+    const commandResult =
+      args.mode === 'dev'
+        ? yield* tryPromise(() => {
+            const devPort = args.devPortBase + benchmarkIndex * 100 + index;
+            return runDevServerBenchmark({
+              command: process.execPath,
+              args: [
+                rsbuildBin,
+                'dev',
+                '--config',
+                'rsbuild.config.mjs',
+                '--port',
+                String(devPort),
+              ],
+              cwd: fixtureRoot,
+              env: {
+                ...commonEnv,
+                ...(devRoutePaths.length > 0
+                  ? {
+                      NODE_OPTIONS: appendNodeOption(
+                        process.env.NODE_OPTIONS,
+                        '--experimental-vm-modules'
+                      ),
+                    }
+                  : {}),
+              },
+              readyEnvironments:
+                benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
+              origin: `http://localhost:${devPort}`,
+              routePaths: devRoutePaths,
+              routeTimeoutMs: args.devRouteTimeoutMs,
+              updateFile: fixtureResult.updateFile,
+              updateRoutePaths: fixtureResult.updateRoutePaths ?? ['/'],
+              timeoutMs: args.devTimeoutMs,
+            });
+          })
+        : yield* tryPromise(() =>
+            runCommand({
               command: process.execPath,
               args: [rsbuildBin, 'build', '--config', 'rsbuild.config.mjs'],
               cwd: fixtureRoot,
@@ -869,9 +855,11 @@ const main = async () => {
                   : {}),
               },
               useTime,
-            });
-      const rspackProfiles = rspackProfileEnabled
-        ? await collectRspackProfiles({
+            })
+          );
+    const rspackProfiles = rspackProfileEnabled
+      ? yield* tryPromise(() =>
+          collectRspackProfiles({
             fixtureRoot,
             beforeProfiles: beforeRspackProfiles,
             destinationRoot: path.join(
@@ -881,21 +869,28 @@ const main = async () => {
               runLabel
             ),
           })
-        : [];
-      const timeStats =
-        args.mode === 'build' && useTime
-          ? parseTimeStats(commandResult.stderr)
-          : { userMs: null, sysMs: null, maxRssKb: null };
-      const pluginReports = parsePluginReports(
-        `${commandResult.stdout}\n${commandResult.stderr}`
+        )
+      : [];
+    const timeStats =
+      args.mode === 'build' && useTime
+        ? parseTimeStats(commandResult.stderr)
+        : { userMs: null, sysMs: null, maxRssKb: null };
+    const pluginReports = parsePluginReports(
+      `${commandResult.stdout}\n${commandResult.stderr}`
+    );
+
+    if (commandResult.status !== 0 && args.failFast) {
+      yield* Effect.fail(
+        failFastError({
+          benchmarkId: benchmark.id,
+          runLabel,
+          status: commandResult.status,
+        })
       );
+    }
 
-      if (commandResult.status !== 0 && args.failFast) {
-        process.exit(commandResult.status ?? 1);
-      }
-
-      if (measured) {
-        runs.push({
+    return measured
+      ? {
           status: commandResult.status,
           wallMs: commandResult.wallMs,
           readyMs: commandResult.readyMs ?? null,
@@ -913,11 +908,58 @@ const main = async () => {
             rspackTraceOutput && !isTraceOutputStream(rspackTraceOutput)
               ? path.relative(rootDir, rspackTraceOutput)
               : rspackTraceOutput,
-        });
-      }
-    }
+        }
+      : null;
+  });
 
-    benchmarks.push({
+const runBenchmark = ({
+  args,
+  benchmark,
+  benchmarkIndex,
+  outputPaths,
+  pluginImportPath,
+  pluginReactImportPath,
+  useTime,
+}) =>
+  Effect.gen(function* () {
+    const measuredIterations = getMeasuredIterationCount(benchmark, args);
+    const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
+    const devRoutePaths =
+      args.mode === 'dev'
+        ? resolveDevRoutePaths(args.devRoutes, benchmark)
+        : [];
+    const fixtureResult = yield* tryPromise(() =>
+      generateSyntheticFixture({
+        root: fixtureRoot,
+        routeCount: benchmark.routeCount,
+        variant: benchmark.variant,
+        sourceMap: benchmark.sourceMap ?? false,
+        fixture: benchmark.fixture ?? 'default',
+        pluginImportPath,
+        pluginReactImportPath,
+        parallelRouteTransform: args.parallelRouteTransform,
+        largeConfig: benchmark.largeConfig,
+      })
+    );
+    const totalRuns = args.warmup + measuredIterations;
+    const benchmarkContext = {
+      args,
+      benchmark,
+      benchmarkIndex,
+      devRoutePaths,
+      fixtureResult,
+      fixtureRoot,
+      measuredIterations,
+      outputPaths,
+      useTime,
+    };
+    const runs = (yield* Effect.forEach(
+      Array.from({ length: totalRuns }, (_, index) => index),
+      index => runBenchmarkIteration(benchmarkContext, index),
+      { concurrency: 1 }
+    )).filter(Boolean);
+
+    return {
       ...benchmark,
       fixture: fixtureResult.fixture,
       fixtureStats:
@@ -936,45 +978,104 @@ const main = async () => {
       devRouteSummary: summarizeDevRouteRequests(runs),
       devUpdateRouteSummary: summarizeDevUpdateRouteRequests(runs),
       pluginOperations: summarizePluginOperations(runs),
-    });
-  }
+    };
+  });
 
-  const failed = benchmarks.some(benchmark =>
-    benchmark.runs.some(run => run.status !== 0)
-  );
-  const result = {
-    repo: 'rsbuild-plugin-react-router',
-    commit: await git(['rev-parse', 'HEAD']),
-    date: new Date().toISOString(),
-    node: process.version,
-    pnpm: await pnpmVersion(),
-    platform: `${os.platform()} ${os.release()} ${os.arch()}`,
-    profile: args.profile,
-    mode: args.mode,
-    iterations: args.iterations,
-    largeIterations: args.largeIterations,
-    warmup: args.warmup,
-    clean: args.clean,
-    logPerformance: args.logPerformance,
-    devRoutes: args.mode === 'dev' ? args.devRoutes : null,
-    devRouteTimeoutMs: args.mode === 'dev' ? args.devRouteTimeoutMs : null,
-    parallelRouteTransform: args.parallelRouteTransform,
-    rspackProfile: args.rspackProfile,
-    rspackTraceOutput: args.rspackTraceOutput,
-    failed,
-    benchmarks,
-  };
+const runBenchmarkSuite = argv =>
+  Effect.gen(function* () {
+    const args = parseArgs(argv);
+    const useTime = yield* tryPromise(hasGnuTime);
+    const outputPaths = resolveOutputPaths(args);
+    const pluginImportPath = pathToFileURL(
+      path.join(rootDir, 'dist/index.js')
+    ).href;
+    const pluginReactImportPath =
+      process.env.REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT ??
+      '@rsbuild/plugin-react';
+    const selectedBenchmarks = profiles[args.profile].filter(benchmark =>
+      args.filter ? benchmark.id.includes(args.filter) : true
+    );
 
-  await writeOutputs(result, outputPaths);
-  console.log(`Benchmark results written to ${outputPaths.outPath}`);
+    if (selectedBenchmarks.length === 0) {
+      yield* Effect.fail(
+        new Error(`No benchmarks matched filter "${args.filter}".`)
+      );
+    }
 
-  if (failed) {
-    console.error('One or more measured benchmark builds failed.');
-    process.exitCode = 1;
-  }
-};
+    if (!args.skipRootBuild) {
+      console.log('Building plugin package before benchmarks...');
+      const buildResult = yield* tryPromise(() =>
+        runCommand({
+          command: 'pnpm',
+          args: ['build'],
+          cwd: rootDir,
+        })
+      );
+      if (buildResult.status !== 0) {
+        yield* Effect.fail(
+          failFastError({
+            benchmarkId: 'package-build',
+            runLabel: 'build',
+            status: buildResult.status,
+          })
+        );
+      }
+    }
 
-runScriptEffect(tryScriptPromise(main)).catch(error => {
+    const benchmarks = yield* Effect.forEach(
+      selectedBenchmarks.map((benchmark, benchmarkIndex) => ({
+        benchmark,
+        benchmarkIndex,
+      })),
+      ({ benchmark, benchmarkIndex }) =>
+        runBenchmark({
+          args,
+          benchmark,
+          benchmarkIndex,
+          outputPaths,
+          pluginImportPath,
+          pluginReactImportPath,
+          useTime,
+        }),
+      { concurrency: 1 }
+    );
+
+    const failed = benchmarks.some(benchmark =>
+      benchmark.runs.some(run => run.status !== 0)
+    );
+    const result = {
+      repo: 'rsbuild-plugin-react-router',
+      commit: yield* tryPromise(() => git(['rev-parse', 'HEAD'])),
+      date: new Date().toISOString(),
+      node: process.version,
+      pnpm: yield* tryPromise(pnpmVersion),
+      platform: `${os.platform()} ${os.release()} ${os.arch()}`,
+      profile: args.profile,
+      mode: args.mode,
+      iterations: args.iterations,
+      largeIterations: args.largeIterations,
+      warmup: args.warmup,
+      clean: args.clean,
+      logPerformance: args.logPerformance,
+      devRoutes: args.mode === 'dev' ? args.devRoutes : null,
+      devRouteTimeoutMs: args.mode === 'dev' ? args.devRouteTimeoutMs : null,
+      parallelRouteTransform: args.parallelRouteTransform,
+      rspackProfile: args.rspackProfile,
+      rspackTraceOutput: args.rspackTraceOutput,
+      failed,
+      benchmarks,
+    };
+
+    yield* tryPromise(() => writeOutputs(result, outputPaths));
+    console.log(`Benchmark results written to ${outputPaths.outPath}`);
+
+    if (failed) {
+      console.error('One or more measured benchmark builds failed.');
+      process.exitCode = 1;
+    }
+  });
+
+Effect.runPromise(runBenchmarkSuite(process.argv.slice(2))).catch(error => {
   console.error(error);
-  process.exit(1);
+  process.exit(error?.exitCode ?? 1);
 });

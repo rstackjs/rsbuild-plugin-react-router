@@ -16,8 +16,8 @@ import {
 } from './dev-generation.js';
 import {
   getEnvironmentStats,
-  isPairedDevStats,
   snapshotDevChangedFiles,
+  type DevGraphIdentity,
   type DevRuntimeStats,
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
@@ -133,13 +133,6 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
-  const toRspackRuntimeStats = (
-    stats: DevRuntimeStats
-  ): Rspack.Stats | Rspack.MultiStats =>
-    isPairedDevStats(stats)
-      ? ({ stats: [stats.web, stats.node] } as Rspack.MultiStats)
-      : stats;
-
   const finishRuntimeAttemptEffect = (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
@@ -148,11 +141,7 @@ export const createReactRouterDevRuntimeController = ({
     identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
   ): Effect.Effect<void, Error, never> =>
     tryPluginPromise(() =>
-      binding.runtime.finishAttempt(
-        toRspackRuntimeStats(stats),
-        changes,
-        identity
-      )
+      binding.runtime.finishAttempt(stats, changes, identity)
     ).pipe(
       Effect.flatMap(result =>
         tryPluginSync(() => {
@@ -496,7 +485,7 @@ export const createReactRouterDevRuntimeController = ({
       web: snapshotDevChangedFiles(pair.web),
       node: snapshotDevChangedFiles(pair.node),
     };
-    const identity = {
+    const identity: DevGraphIdentity = {
       web: webIdentity,
       node: nodeIdentity,
       nodeWeb: nodeStats
@@ -504,17 +493,22 @@ export const createReactRouterDevRuntimeController = ({
             nodeStats.compilation
           )
         : undefined,
-      webAttempt: webStats
-        ? compilationIdentities.getAttemptIdentityForCompilation(
-            webStats.compilation
-          )
-        : undefined,
-      nodeAttempt: nodeStats
-        ? compilationIdentities.getAttemptIdentityForCompilation(
-            nodeStats.compilation
-          )
-        : undefined,
+      attempt: undefined,
     };
+    const webAttempt = webStats
+      ? compilationIdentities.getAttemptIdentityForCompilation(
+          webStats.compilation
+        )
+      : undefined;
+    const nodeAttempt = nodeStats
+      ? compilationIdentities.getAttemptIdentityForCompilation(
+          nodeStats.compilation
+        )
+      : undefined;
+    identity.attempt =
+      webAttempt && nodeAttempt && webAttempt === nodeAttempt
+        ? webAttempt
+        : undefined;
     const finishStats: DevRuntimeStats =
       webStats && nodeStats ? { web: webStats, node: nodeStats } : stats;
     if (!webStats || !nodeStats) {

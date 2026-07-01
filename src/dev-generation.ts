@@ -11,6 +11,7 @@ import {
   type DevCompilationIdentity,
   type DevGraphChanges,
   type DevGraphIdentity,
+  type DevRuntimeStats,
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
   type ReactRouterServerBuilds,
@@ -57,7 +58,7 @@ export type ReactRouterDevRuntime = {
     manifestsByEntryName: ReactRouterDevManifestSet
   ) => void;
   finishAttempt: (
-    stats: Rspack.Stats | Rspack.MultiStats,
+    stats: DevRuntimeStats,
     changes: DevGraphChanges,
     identity: DevGraphIdentity
   ) => Promise<'committed' | 'ignored' | 'retry-node'>;
@@ -519,15 +520,11 @@ export const createReactRouterDevRuntime = ({
         !!previous &&
         cssOnlyWebManifestChange &&
         (!nodeChanged || identity.nodeWeb !== webIdentity);
-      const sameCompileAttempt =
-        !!identity.webAttempt &&
-        !!identity.nodeAttempt &&
-        identity.webAttempt === identity.nodeAttempt;
 
       if (
         nodeChanged &&
         identity.nodeWeb !== webIdentity &&
-        !sameCompileAttempt &&
+        !identity.attempt &&
         !reusePreviousNodeBuild
       ) {
         const message =

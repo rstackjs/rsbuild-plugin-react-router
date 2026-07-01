@@ -40,6 +40,23 @@ describe('effect runtime helpers', () => {
     await expect.poll(() => run.mock.calls.length, { timeout: 1000 }).toBe(1);
   });
 
+  it('reschedules delayed plugin tasks by replacing the pending run', async () => {
+    const run = rstest.fn();
+    const task = createDelayedPluginTask({
+      delayMs: 10,
+      run: () => Effect.sync(run),
+      onError: error => {
+        throw error;
+      },
+    });
+
+    task.schedule();
+    task.reschedule();
+    task.reschedule();
+
+    await expect.poll(() => run.mock.calls.length, { timeout: 1000 }).toBe(1);
+  });
+
   it('cancels delayed plugin tasks before they start', async () => {
     const run = rstest.fn();
     const task = createDelayedPluginTask({

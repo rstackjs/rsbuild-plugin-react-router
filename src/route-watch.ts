@@ -1,10 +1,14 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { RsbuildConfig } from '@rsbuild/core';
-import { Duration, Effect, Fiber } from 'effect';
+import { Effect } from 'effect';
 import { dirname, resolve } from 'pathe';
 import { getCappedPluginConcurrency } from './concurrency.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import {
+  createDelayedPluginTask,
+  runPluginEffect,
+  tryPluginPromise,
+} from './effect-runtime.js';
 import type { Route } from './types.js';
 
 const ROUTE_RESTART_MARKER_ASSET = '.react-router/route-watch';
@@ -183,8 +187,6 @@ export const createRouteTopologyWatcher = async ({
     routeTopology: initialRouteTopology ?? discoveredState.routeTopology,
   };
   let closed = false;
-  let scheduledRescanFiber: ReturnType<typeof Effect.runFork> | undefined;
-  let scheduledRescanToken: symbol | undefined;
   let rescanQueue = Promise.resolve();
   const directoryWatchers = new Map<string, DirectoryWatcher>();
 
@@ -308,51 +310,20 @@ export const createRouteTopologyWatcher = async ({
     return rescanQueue;
   };
 
-  const cancelScheduledRescan = (): Promise<void> => {
-    const fiber = scheduledRescanFiber;
-    scheduledRescanFiber = undefined;
-    scheduledRescanToken = undefined;
-    if (!fiber) {
-      return Promise.resolve();
-    }
-    return runPluginEffect(Fiber.interrupt(fiber).pipe(Effect.asVoid));
-  };
+  const rescanTask = createDelayedPluginTask({
+    delayMs: ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS,
+    run: () =>
+      Effect.suspend(() =>
+        closed ? Effect.void : tryPluginPromise(rescan).pipe(Effect.asVoid)
+      ),
+    onError,
+  });
+
+  const cancelScheduledRescan = (): Promise<void> =>
+    runPluginEffect(rescanTask.cancelEffect());
 
   const scheduleRescan = (): void => {
-    const previousFiber = scheduledRescanFiber;
-    if (previousFiber) {
-      void runPluginEffect(
-        Fiber.interrupt(previousFiber).pipe(Effect.asVoid)
-      ).catch(onError);
-    }
-
-    const token = Symbol();
-    scheduledRescanToken = token;
-    scheduledRescanFiber = Effect.runFork(
-      Effect.sleep(Duration.millis(ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS)).pipe(
-        Effect.zipRight(
-          Effect.suspend(() => {
-            if (closed || scheduledRescanToken !== token) {
-              return Effect.void;
-            }
-            return tryPluginPromise(rescan).pipe(Effect.asVoid);
-          })
-        ),
-        Effect.catchAll(error =>
-          Effect.sync(() => {
-            onError(error);
-          })
-        ),
-        Effect.ensuring(
-          Effect.sync(() => {
-            if (scheduledRescanToken === token) {
-              scheduledRescanFiber = undefined;
-              scheduledRescanToken = undefined;
-            }
-          })
-        )
-      )
-    );
+    rescanTask.reschedule();
   };
 
   const applyNextState = async (nextState: RouteDirectoryState) => {

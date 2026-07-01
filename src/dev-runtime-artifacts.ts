@@ -3,6 +3,7 @@ import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import { Effect } from 'effect';
 import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
+import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { resolveServerBuildModuleEffect } from './server-utils.js';
 
@@ -49,8 +50,7 @@ export type DevGraphIdentity = {
   web: DevCompilationIdentity | undefined;
   node: DevCompilationIdentity | undefined;
   nodeWeb: DevCompilationIdentity | undefined;
-  webAttempt: DevCompileAttemptIdentity | undefined;
-  nodeAttempt: DevCompileAttemptIdentity | undefined;
+  attempt: DevCompileAttemptIdentity | undefined;
 };
 
 export type WebArtifact = {
@@ -158,7 +158,7 @@ export const evaluateServerBuildsEffect = (
       )
     ),
     evaluation => evaluation,
-    { concurrency: 'unbounded' }
+    { concurrency: getCappedPluginConcurrency() }
   ).pipe(
     Effect.map(
       evaluated => Object.fromEntries(evaluated) as Record<string, ServerBuild>

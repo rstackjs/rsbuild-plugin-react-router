@@ -40,6 +40,7 @@ export const tryPluginPromise = <A>(
 
 type DelayedPluginTask = {
   schedule(): void;
+  reschedule(): void;
   cancelEffect(): Effect.Effect<void, Error, never>;
   cancel(): Promise<void>;
 };
@@ -54,8 +55,9 @@ export const createDelayedPluginTask = ({
   onError: (error: Error) => void;
 }): DelayedPluginTask => {
   let activeFiber: ReturnType<typeof Effect.runFork> | undefined;
+  let version = 0;
 
-  const cancelEffect = (): Effect.Effect<void, Error, never> =>
+  const cancelActiveEffect = (): Effect.Effect<void, Error, never> =>
     Effect.sync(() => {
       const fiber = activeFiber;
       activeFiber = undefined;
@@ -66,31 +68,52 @@ export const createDelayedPluginTask = ({
       )
     );
 
+  const cancelEffect = (): Effect.Effect<void, Error, never> =>
+    Effect.sync(() => {
+      version += 1;
+    }).pipe(Effect.zipRight(cancelActiveEffect()));
+
+  const start = (taskVersion: number): void => {
+    if (activeFiber || version !== taskVersion) {
+      return;
+    }
+
+    let fiber: ReturnType<typeof Effect.runFork>;
+    fiber = Effect.runFork(
+      Effect.sleep(Duration.millis(delayMs)).pipe(
+        Effect.zipRight(Effect.suspend(run)),
+        Effect.catchAll(error =>
+          Effect.sync(() => {
+            onError(error);
+          })
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (activeFiber === fiber) {
+              activeFiber = undefined;
+            }
+          })
+        )
+      )
+    );
+    activeFiber = fiber;
+  };
+
   return {
     schedule(): void {
       if (activeFiber) {
         return;
       }
+      version += 1;
+      start(version);
+    },
 
-      let fiber: ReturnType<typeof Effect.runFork>;
-      fiber = Effect.runFork(
-        Effect.sleep(Duration.millis(delayMs)).pipe(
-          Effect.zipRight(Effect.suspend(run)),
-          Effect.catchAll(error =>
-            Effect.sync(() => {
-              onError(error);
-            })
-          ),
-          Effect.ensuring(
-            Effect.sync(() => {
-              if (activeFiber === fiber) {
-                activeFiber = undefined;
-              }
-            })
-          )
-        )
-      );
-      activeFiber = fiber;
+    reschedule(): void {
+      version += 1;
+      const taskVersion = version;
+      void runPluginEffect(cancelActiveEffect())
+        .then(() => start(taskVersion))
+        .catch(onError);
     },
 
     cancelEffect,

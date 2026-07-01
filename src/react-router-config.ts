@@ -5,6 +5,7 @@ import type {
 import type { NormalizedConfig } from '@rsbuild/core';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { Effect } from 'effect';
+import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
 export type BuildEndHook = {
@@ -185,7 +186,7 @@ export const resolveReactRouterConfigEffect = (
           const { presets: _presets, ...rest } = presetConfig as Config;
           return rest;
         }),
-      { concurrency: 'unbounded' }
+      { concurrency: getCappedPluginConcurrency() }
     );
 
     const userAndPresetConfigs = mergeReactRouterConfig(

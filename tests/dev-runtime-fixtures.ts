@@ -31,6 +31,7 @@ export const graphIdentity = (
   web: getCompilationIdentity(webCompilation),
   node: getCompilationIdentity(nodeCompilation),
   nodeWeb: getCompilationIdentity(nodeWebCompilation),
+  attempt: undefined,
 });
 
 export type TestServerBuild = ServerBuild & { marker: string };

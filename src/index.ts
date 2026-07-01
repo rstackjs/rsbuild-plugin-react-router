@@ -8,7 +8,6 @@ import {
   type RsbuildPlugin,
   type Rspack,
 } from '@rsbuild/core';
-import { Effect } from 'effect';
 import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
@@ -19,10 +18,6 @@ import {
   PLUGIN_NAME,
 } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
-import {
-  createLazyCompilationPrewarmController,
-  normalizeLazyCompilationPrewarmOptions,
-} from './lazy-compilation-prewarm.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import {
   generateWithProps,
@@ -43,7 +38,6 @@ import {
 import {
   getReactRouterManifestForDev,
   configRoutesToRouteManifest,
-  configRoutesToRouteManifestEntries,
   createReactRouterManifestStats,
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
@@ -61,14 +55,7 @@ import {
   createRouteTransformExecutor,
   shouldParallelizeRouteTransforms,
 } from './parallel-route-transforms.js';
-import {
-  createRouteTopologyWatcher,
-  createRouteManifestSnapshot,
-  ensureDevRestartMarker,
-  getRouteRestartMarkerPath,
-  mergeWatchFiles,
-  type WatchFileConfig,
-} from './route-watch.js';
+import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
   getBuildManifestEffect,
@@ -87,14 +74,14 @@ import {
 } from './performance.js';
 import { mapVirtualModules } from './virtual-modules.js';
 import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
-import {
-  createDelayedPluginTask,
-  DEV_BACKGROUND_STARTUP_DELAY_MS,
-  runPluginEffect,
-  tryPluginPromise,
-} from './effect-runtime.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import { importConfigWithWatchPaths } from './config-imports.js';
+import {
+  createReactRouterRouteTopology,
+  createReactRouterRouteWatchFiles,
+  registerReactRouterDevBackgroundResources,
+} from './dev-background-resources.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -387,22 +374,13 @@ export const pluginReactRouter = (
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
-    const createRouteTopologySnapshot = (
-      routeFile: string,
-      routeConfig: RouteConfigEntry[]
-    ) =>
-      createRouteManifestSnapshot([
-        ['root', { path: '', id: 'root', file: routeFile }],
-        ...configRoutesToRouteManifestEntries(appDirectory, routeConfig),
-      ]);
-    const getWatchedRouteTopology = async (): Promise<Set<string>> => {
-      const latestRouteConfig = await loadRouteConfig();
-      const latestRootRouteFile = relative(appDirectory, getRootRoutePath());
-      return createRouteTopologySnapshot(
-        latestRootRouteFile,
-        latestRouteConfig
-      );
-    };
+    const routeTopology = createReactRouterRouteTopology({
+      appDirectory,
+      rootRouteFile,
+      routeConfig,
+      loadRouteConfig,
+      getRootRoutePath,
+    });
 
     const routes = {
       root: { path: '', id: 'root', file: rootRouteFile },
@@ -459,179 +437,23 @@ export const pluginReactRouter = (
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
     const watchDirectory = resolve(appDirectory);
     const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
-    const routeTopologyWatchFiles: WatchFileConfig[] =
-      pluginOptions.onRouteTopologyChange
-        ? []
-        : [
-            {
-              paths: routeConfigWatchPaths,
-              type: 'reload-server',
-            },
-            {
-              paths: routeRestartMarkerPath,
-              type: 'reload-server',
-            },
-          ];
-    const routeWatchFiles: WatchFileConfig[] = [
-      {
-        paths: configWatchPaths,
-        type: 'reload-server',
-      },
-      ...routeTopologyWatchFiles,
-    ];
-    let closeRouteTopologyWatcher: (() => Promise<void>) | undefined;
-    let routeTopologyWatcherClosed = false;
-
-    const reportRouteTopologyWatcherError = (error: unknown): void => {
-      api.logger.warn(
-        `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
-      );
-    };
-
-    const routeTopologyWatcherTask = createDelayedPluginTask({
-      delayMs: DEV_BACKGROUND_STARTUP_DELAY_MS,
-      run: () =>
-        Effect.gen(function* () {
-          yield* tryPluginPromise(() =>
-            ensureDevRestartMarker(routeRestartMarkerPath)
-          );
-          const closeWatcher = yield* tryPluginPromise(() =>
-            createRouteTopologyWatcher({
-              watchDirectory,
-              getRouteTopology: getWatchedRouteTopology,
-              initialRouteTopology: createRouteTopologySnapshot(
-                rootRouteFile,
-                routeConfig
-              ),
-              restartMarkerPath: routeRestartMarkerPath,
-              onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-              onError: reportRouteTopologyWatcherError,
-            })
-          );
-          if (routeTopologyWatcherClosed) {
-            yield* tryPluginPromise(() => closeWatcher());
-            return;
-          }
-          closeRouteTopologyWatcher = closeWatcher;
-        }),
-      onError: reportRouteTopologyWatcherError,
+    const routeWatchFiles = createReactRouterRouteWatchFiles({
+      configWatchPaths,
+      routeConfigWatchPaths,
+      routeRestartMarkerPath,
+      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
     });
-
-    const scheduleRouteTopologyWatcher = (): void => {
-      if (routeTopologyWatcherClosed || closeRouteTopologyWatcher) {
-        return;
-      }
-      routeTopologyWatcherTask.schedule();
-    };
-    const lazyCompilationPrewarmConfig = normalizeLazyCompilationPrewarmOptions(
-      pluginOptions.lazyCompilationPrewarm
-    );
-    const lazyCompilationPrewarmController = lazyCompilationPrewarmConfig
-      ? createLazyCompilationPrewarmController({
-          config: lazyCompilationPrewarmConfig,
-          onError: error =>
-            api.logger.warn(
-              `[rsbuild-plugin-react-router] Lazy compilation prewarm skipped: ${error.message}`
-            ),
-        })
-      : null;
-
-    if (!isBuild) {
-      api.onBeforeStartDevServer(() => {
-        routeTopologyWatcherClosed = false;
-      });
-
-      api.onAfterStartDevServer(({ port }) => {
-        lazyCompilationPrewarmController?.setServerOrigin(
-          `http://localhost:${port}`
-        );
-        lazyCompilationPrewarmController?.schedule();
-      });
-
-      api.onAfterDevCompile(() => {
-        scheduleRouteTopologyWatcher();
-        lazyCompilationPrewarmController?.schedule();
-      });
-
-      api.onAfterCreateCompiler(() => {
-        routeTransformExecutor.prewarm();
-      });
-    }
-
-    const closeRouteTopologyWatcherEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > =>
-      Effect.gen(function* () {
-        routeTopologyWatcherClosed = true;
-        yield* routeTopologyWatcherTask.cancelEffect();
-        yield* tryPluginPromise(() => closeRouteTopologyWatcher?.());
-        closeRouteTopologyWatcher = undefined;
-      });
-    const closeRouteTransformExecutorEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > => tryPluginPromise(() => routeTransformExecutor.close());
-    const closeLazyCompilationPrewarmEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > => lazyCompilationPrewarmController?.cancelEffect() ?? Effect.void;
-    const closeBackgroundResourcesEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > =>
-      closeLazyCompilationPrewarmEffect().pipe(
-        Effect.matchEffect({
-          onFailure: prewarmError =>
-            closeRouteTransformExecutorEffect().pipe(
-              Effect.matchEffect({
-                onFailure: executorError =>
-                  Effect.fail(
-                    new AggregateError(
-                      [prewarmError, executorError],
-                      '[rsbuild-plugin-react-router] Failed to close dev server resources.'
-                    )
-                  ),
-                onSuccess: () => Effect.fail(prewarmError),
-              })
-            ),
-          onSuccess: () => closeRouteTransformExecutorEffect(),
-        })
-      );
-    const closeDevServerResourcesEffect = (): Effect.Effect<
-      void,
-      Error,
-      never
-    > =>
-      closeRouteTopologyWatcherEffect().pipe(
-        Effect.matchEffect({
-          onFailure: topologyError =>
-            closeBackgroundResourcesEffect().pipe(
-              Effect.matchEffect({
-                onFailure: backgroundError =>
-                  Effect.fail(
-                    new AggregateError(
-                      [topologyError, backgroundError],
-                      '[rsbuild-plugin-react-router] Failed to close dev server resources.'
-                    )
-                  ),
-                onSuccess: () => Effect.fail(topologyError),
-              })
-            ),
-          onSuccess: () => closeBackgroundResourcesEffect(),
-        })
-      );
-
-    api.onCloseDevServer(() =>
-      runPluginEffect(closeDevServerResourcesEffect())
-    );
-    api.onCloseBuild(() =>
-      runPluginEffect(closeRouteTransformExecutorEffect())
-    );
+    const devBackgroundResources = registerReactRouterDevBackgroundResources({
+      api,
+      isBuild,
+      lazyCompilationPrewarm: pluginOptions.lazyCompilationPrewarm,
+      routeTransformExecutor,
+      routeRestartMarkerPath,
+      watchDirectory,
+      getRouteTopology: routeTopology.getRouteTopology,
+      initialRouteTopology: routeTopology.initialRouteTopology,
+      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
+    });
 
     type ReactRouterManifest = Awaited<
       ReturnType<typeof getReactRouterManifestForDev>
@@ -654,8 +476,7 @@ export const pluginReactRouter = (
         'virtual/react-router/browser-manifest',
         () => {
           latestBrowserManifest = manifest;
-          lazyCompilationPrewarmController?.setManifest(manifest);
-          lazyCompilationPrewarmController?.schedule();
+          devBackgroundResources.setManifest(manifest);
           latestBrowserManifestModuleExports = moduleExportsByRouteId;
           const baseServerManifest = {
             ...manifest,
@@ -915,7 +736,8 @@ export const pluginReactRouter = (
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
         entryClientPath: finalEntryClientPath,
-        prewarmReactRouterModules: Boolean(lazyCompilationPrewarmConfig),
+        prewarmReactRouterModules:
+          devBackgroundResources.prewarmReactRouterModules,
       });
       const lazyCompilation =
         guardedLazyCompilation === undefined

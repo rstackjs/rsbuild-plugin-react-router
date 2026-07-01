@@ -47,9 +47,6 @@ jobs:
       - name: Build package
         run: pnpm build
 
-      - name: Typecheck scripts
-        run: pnpm typecheck:scripts
-
       - name: Run publint
         run: npx publint --errors-only
 

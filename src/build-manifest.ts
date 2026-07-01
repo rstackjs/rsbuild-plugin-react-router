@@ -1,5 +1,6 @@
 import { relative, resolve } from 'pathe';
 import { Effect } from 'effect';
+import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import type { Config } from './react-router-config.js';
 import type { Route } from './types.js';
@@ -147,7 +148,7 @@ export const getBuildManifestEffect = ({
             ),
           };
         }),
-      { concurrency: 'unbounded', discard: true }
+      { concurrency: getCappedPluginConcurrency(), discard: true }
     );
 
     return buildManifest;

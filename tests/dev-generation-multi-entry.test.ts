@@ -31,6 +31,7 @@ const graphIdentity = (
   web: getCompilationIdentity(webCompilation),
   node: getCompilationIdentity(nodeCompilation),
   nodeWeb: getCompilationIdentity(webCompilation),
+  attempt: undefined,
 });
 
 type TestServerBuild = ServerBuild & { marker: string };

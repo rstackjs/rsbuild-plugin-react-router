@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import type { ReactRouterManifestForDev } from './manifest.js';
-import type { PluginOptions, RouteManifestItem } from './types.js';
+import type { RouteManifestItem } from './types.js';
 import { createDelayedPluginTask, tryPluginPromise } from './effect-runtime.js';
 
 const DEFAULT_LAZY_COMPILATION_TRIGGER_PREFIX = '/_rspack/lazy/trigger';
@@ -9,17 +9,10 @@ const DEFAULT_ROUTE_PREWARM_LIMIT = 8;
 const PREWARM_FETCH_CONCURRENCY = 8;
 const PREWARM_TRIGGER_CANDIDATES = 4;
 
-type LazyCompilationPrewarmOptions = Exclude<
-  NonNullable<PluginOptions['lazyCompilationPrewarm']>,
-  boolean
->;
-
 type LazyCompilationPrewarmConfig = {
   entry: boolean;
-  routeIds?: Set<string>;
   routeLimit: number;
   delayMs: number;
-  triggerPrefix: string;
 };
 
 type LazyCompilationPrewarmController = {
@@ -29,39 +22,25 @@ type LazyCompilationPrewarmController = {
   cancelEffect(): Effect.Effect<void, Error, never>;
 };
 
-const parsePositiveInteger = (
-  value: number | undefined,
-  fallback: number
-): number =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : fallback;
+export type RspackLazyCompilationTriggerClient = {
+  extractModuleKeys(source: string): string[];
+  trigger(
+    origin: string,
+    keys: readonly string[]
+  ): Effect.Effect<void, Error, never>;
+};
 
 export const normalizeLazyCompilationPrewarmOptions = (
-  options: PluginOptions['lazyCompilationPrewarm']
+  options: boolean | undefined
 ): LazyCompilationPrewarmConfig | null => {
   if (!options) {
     return null;
   }
 
-  const normalized: LazyCompilationPrewarmOptions =
-    options === true ? {} : options;
-  const routes = normalized.routes ?? true;
-  const routeIds = Array.isArray(routes) ? new Set(routes) : undefined;
-  const routeLimit =
-    typeof routes === 'number'
-      ? parsePositiveInteger(routes, DEFAULT_ROUTE_PREWARM_LIMIT)
-      : routes === false
-        ? 0
-        : DEFAULT_ROUTE_PREWARM_LIMIT;
-
   return {
-    entry: normalized.entry ?? true,
-    routeIds,
-    routeLimit,
-    delayMs: parsePositiveInteger(normalized.delayMs, DEFAULT_PREWARM_DELAY_MS),
-    triggerPrefix:
-      normalized.triggerPrefix ?? DEFAULT_LAZY_COMPILATION_TRIGGER_PREFIX,
+    entry: true,
+    routeLimit: DEFAULT_ROUTE_PREWARM_LIMIT,
+    delayMs: DEFAULT_PREWARM_DELAY_MS,
   };
 };
 
@@ -74,10 +53,7 @@ const collectRouteAssets = (
   }
 
   const assets: string[] = [];
-  for (const [routeId, route] of Object.entries(routes)) {
-    if (config.routeIds && !config.routeIds.has(routeId)) {
-      continue;
-    }
+  for (const route of Object.values(routes)) {
     for (const asset of [
       route.module,
       route.clientActionModule,
@@ -121,7 +97,7 @@ const parseJsonStringLiteral = (value: string): string | null => {
   }
 };
 
-export const extractLazyCompilationModuleKeys = (source: string): string[] => {
+const extractLazyCompilationModuleKeys = (source: string): string[] => {
   const keys = new Set<string>();
   const pattern = /activate\(\{\s*data:\s*("(?:\\.|[^"\\])*")/g;
   let match: RegExpExecArray | null;
@@ -136,9 +112,19 @@ export const extractLazyCompilationModuleKeys = (source: string): string[] => {
   return Array.from(keys);
 };
 
+export const createRspackLazyCompilationTriggerClient = (
+  triggerPrefix: string = DEFAULT_LAZY_COMPILATION_TRIGGER_PREFIX
+): RspackLazyCompilationTriggerClient => ({
+  extractModuleKeys: extractLazyCompilationModuleKeys,
+  trigger(origin, keys) {
+    return postLazyCompilationKeys(origin, triggerPrefix, keys);
+  },
+});
+
 const fetchLazyCompilationKeys = (
   origin: string,
-  assets: readonly string[]
+  assets: readonly string[],
+  triggerClient: RspackLazyCompilationTriggerClient
 ): Effect.Effect<string[], Error, never> =>
   Effect.forEach(
     assets,
@@ -148,7 +134,7 @@ const fetchLazyCompilationKeys = (
         if (!response.ok) {
           return [];
         }
-        return extractLazyCompilationModuleKeys(await response.text());
+        return triggerClient.extractModuleKeys(await response.text());
       }),
     { concurrency: PREWARM_FETCH_CONCURRENCY }
   ).pipe(Effect.map(results => Array.from(new Set(results.flat()))));
@@ -212,15 +198,21 @@ export const prewarmLazyCompilation = ({
   manifest,
   serverOrigin,
   config,
+  triggerClient = createRspackLazyCompilationTriggerClient(),
 }: {
   manifest: ReactRouterManifestForDev;
   serverOrigin: string;
   config: LazyCompilationPrewarmConfig;
+  triggerClient?: RspackLazyCompilationTriggerClient;
 }): Effect.Effect<void, Error, never> =>
   Effect.gen(function* () {
     const assets = collectLazyCompilationPrewarmAssets(manifest, config);
-    const keys = yield* fetchLazyCompilationKeys(serverOrigin, assets);
-    yield* postLazyCompilationKeys(serverOrigin, config.triggerPrefix, keys);
+    const keys = yield* fetchLazyCompilationKeys(
+      serverOrigin,
+      assets,
+      triggerClient
+    );
+    yield* triggerClient.trigger(serverOrigin, keys);
   });
 
 export const createLazyCompilationPrewarmController = ({

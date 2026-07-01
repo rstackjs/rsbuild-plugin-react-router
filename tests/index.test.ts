@@ -489,6 +489,9 @@ describe('pluginReactRouter', () => {
     const config = await rsbuild.unwrapConfig();
 
     expect(rsbuild.onAfterStartDevServer).toHaveBeenCalled();
+    expect(rsbuild.onAfterDevCompile).toHaveBeenCalled();
+    expect(rsbuild.onAfterCreateCompiler).toHaveBeenCalled();
+    expect(rsbuild.onCloseDevServer).toHaveBeenCalled();
     expect(config.dev.lazyCompilation).toMatchObject({
       entries: true,
       imports: true,
