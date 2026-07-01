@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { createReadyLogObserver } from '../../../scripts/benchmark/dev-server.mjs';
+import {
+  createReadyLogObserver,
+  runDevServerBenchmark,
+} from '../../../scripts/benchmark/dev-server.mjs';
 import {
   formatMarkdown,
   parseArgs,
@@ -131,6 +137,126 @@ test('createReadyLogObserver handles ready lines split across chunks', () => {
   observer.observe('stderr', '(node)\n');
 
   assert.deepEqual(environments, ['web', 'node', 'node']);
+});
+
+const withTempDir = async callback => {
+  const dir = await mkdtemp(join(tmpdir(), 'rr-benchmark-test-'));
+  try {
+    return await callback(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+};
+
+const writeChildScript = async (dir, source) => {
+  const script = join(dir, 'child.mjs');
+  await writeFile(script, source);
+  return script;
+};
+
+test('runDevServerBenchmark stops a ready dev server successfully', async () => {
+  await withTempDir(async dir => {
+    const script = await writeChildScript(
+      dir,
+      [
+        "console.log('ready built in 1.0s (web)');",
+        "console.error('ready built in 1.1s (node)');",
+        'setTimeout(() => {}, 10_000);',
+      ].join('\n')
+    );
+
+    const result = await runDevServerBenchmark({
+      command: process.execPath,
+      args: [script],
+      cwd: dir,
+      readyEnvironments: ['web', 'node'],
+      origin: 'http://127.0.0.1:1',
+      routeTimeoutMs: 100,
+      timeoutMs: 1_000,
+      captureOutput: false,
+    });
+
+    assert.equal(result.status, 0);
+    assert.equal(result.timedOut, false);
+    assert.equal(typeof result.readyMs, 'number');
+  });
+});
+
+test('runDevServerBenchmark reports exit before readiness', async () => {
+  await withTempDir(async dir => {
+    const script = await writeChildScript(dir, 'process.exit(7);');
+
+    const result = await runDevServerBenchmark({
+      command: process.execPath,
+      args: [script],
+      cwd: dir,
+      readyEnvironments: ['web'],
+      origin: 'http://127.0.0.1:1',
+      routeTimeoutMs: 100,
+      timeoutMs: 1_000,
+      captureOutput: false,
+    });
+
+    assert.equal(result.status, 7);
+    assert.equal(result.readyMs, null);
+    assert.equal(result.timedOut, false);
+  });
+});
+
+test('runDevServerBenchmark times out before readiness', async () => {
+  await withTempDir(async dir => {
+    const script = await writeChildScript(dir, 'setTimeout(() => {}, 10_000);');
+
+    const result = await runDevServerBenchmark({
+      command: process.execPath,
+      args: [script],
+      cwd: dir,
+      readyEnvironments: ['web'],
+      origin: 'http://127.0.0.1:1',
+      routeTimeoutMs: 100,
+      timeoutMs: 100,
+      captureOutput: false,
+    });
+
+    assert.equal(result.status, 1);
+    assert.equal(result.readyMs, null);
+    assert.equal(result.timedOut, true);
+  });
+});
+
+test('runDevServerBenchmark restores update files after rebuild failure', async () => {
+  await withTempDir(async dir => {
+    const routeFile = join(dir, 'route.ts');
+    const source = 'export const value = 1;\n';
+    await writeFile(routeFile, source);
+    const script = await writeChildScript(
+      dir,
+      [
+        "console.log('ready built in 1.0s (web)');",
+        'setTimeout(() => process.exit(0), 50);',
+      ].join('\n')
+    );
+
+    const result = await runDevServerBenchmark({
+      command: process.execPath,
+      args: [script],
+      cwd: dir,
+      readyEnvironments: ['web'],
+      origin: 'http://127.0.0.1:1',
+      routeTimeoutMs: 100,
+      timeoutMs: 1_000,
+      updateFile: routeFile,
+      updateRoutePaths: ['/'],
+      captureOutput: false,
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /Dev server exited before update rebuild completed/
+    );
+    assert.equal(await readFile(routeFile, 'utf8'), source);
+  });
 });
 
 test('parseReactRouterPerformanceLogs rejects malformed prefixed JSON', () => {

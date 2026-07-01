@@ -13,30 +13,71 @@ if (!token || !repository || !prNumber || !commentPath) {
   );
 }
 
-const request = async (path, options = {}) => {
-  const response = await fetch(
-    `https://api.github.com/repos/${repository}${path}`,
-    {
-      ...options,
-      headers: {
-        accept: 'application/vnd.github+json',
-        authorization: `Bearer ${token}`,
-        'content-type': 'application/json',
-        'x-github-api-version': '2022-11-28',
-        ...options.headers,
-      },
+const getRequestUrl = path =>
+  path.startsWith('https://')
+    ? path
+    : `https://api.github.com/repos/${repository}${path}`;
+
+const getNextPageUrl = linkHeader => {
+  if (!linkHeader) {
+    return null;
+  }
+
+  for (const link of linkHeader.split(',')) {
+    const match = link.match(/<([^>]+)>;\s*rel="next"/);
+    if (match) {
+      return match[1];
     }
-  );
+  }
+
+  return null;
+};
+
+const requestJson = async (path, options = {}) => {
+  const response = await fetch(getRequestUrl(path), {
+    ...options,
+    headers: {
+      accept: 'application/vnd.github+json',
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'x-github-api-version': '2022-11-28',
+      ...options.headers,
+    },
+  });
   if (!response.ok) {
     throw new Error(
       `GitHub API ${options.method ?? 'GET'} ${path} failed with ${response.status}: ${await response.text()}`
     );
   }
-  return response.status === 204 ? null : response.json();
+  return {
+    data: response.status === 204 ? null : await response.json(),
+    nextPage: getNextPageUrl(response.headers.get('link')),
+  };
+};
+
+const request = async (path, options = {}) =>
+  (await requestJson(path, options)).data;
+
+const requestPages = async path => {
+  let nextPath = path;
+  const results = [];
+
+  while (nextPath) {
+    const { data, nextPage } = await requestJson(nextPath);
+    if (!Array.isArray(data)) {
+      throw new Error(`Expected ${nextPath} to return an array.`);
+    }
+    results.push(...data);
+    nextPath = nextPage;
+  }
+
+  return results;
 };
 
 const body = await readFile(commentPath, 'utf8');
-const comments = await request(`/issues/${prNumber}/comments?per_page=100`);
+const comments = await requestPages(
+  `/issues/${prNumber}/comments?per_page=100`
+);
 const existingComment = comments
   .filter(comment => comment.body?.includes(marker))
   .at(-1);

@@ -133,7 +133,7 @@ export const createFileUpdate = async ({
 
 export const stopProcessTree = (child, { onError } = {}) =>
   new Promise(resolve => {
-    if (child.exitCode !== null) {
+    if (child.exitCode !== null || child.signalCode !== null) {
       resolve();
       return;
     }
@@ -218,7 +218,7 @@ export const runDevServerBenchmark = async ({
     };
 
     const stopChild = () => {
-      if (child.exitCode !== null || stopping) {
+      if (child.exitCode !== null || child.signalCode !== null || stopping) {
         return;
       }
       stopping = true;
@@ -273,7 +273,6 @@ export const runDevServerBenchmark = async ({
           return false;
         };
         const interval = setInterval(check, 25);
-        interval.unref?.();
         check();
       });
 

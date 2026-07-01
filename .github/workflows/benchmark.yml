@@ -83,6 +83,10 @@ jobs:
         id: synthetic-benchmark
         run: node head/scripts/benchmark/ci-resolve-synthetic.mjs
 
+      - name: Test benchmark scripts
+        working-directory: head/benchmarks/synthetic-web-bundler-benchmark
+        run: pnpm test:benchmark
+
       - name: Resolve benchmark-only React plugin
         id: benchmark-imports
         shell: bash
