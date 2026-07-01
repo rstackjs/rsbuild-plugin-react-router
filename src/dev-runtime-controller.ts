@@ -1,5 +1,5 @@
 import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
 import {

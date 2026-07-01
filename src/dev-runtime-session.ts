@@ -1,5 +1,5 @@
 import type { RsbuildDevServer } from '@rsbuild/core';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import { PLUGIN_NAME } from './constants.js';
 import type { ReactRouterDevRuntime } from './dev-generation.js';
 import type { DevCompilerPair } from './dev-runtime-compilation.js';

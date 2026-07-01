@@ -1,5 +1,5 @@
 import { relative, resolve } from 'pathe';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import type { Config } from './react-router-config.js';

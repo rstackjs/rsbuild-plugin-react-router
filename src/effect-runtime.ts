@@ -1,4 +1,9 @@
-import { Cause, Duration, Effect, Exit, Fiber, Option } from 'effect';
+import * as Cause from 'effect/Cause';
+import * as Duration from 'effect/Duration';
+import * as Effect from 'effect/Effect';
+import * as Exit from 'effect/Exit';
+import * as Fiber from 'effect/Fiber';
+import * as Option from 'effect/Option';
 
 export const DEV_BACKGROUND_STARTUP_DELAY_MS = 3_000;
 

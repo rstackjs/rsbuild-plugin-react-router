@@ -1,6 +1,6 @@
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import { relative } from 'pathe';
 import { PLUGIN_NAME } from './constants.js';
 import {

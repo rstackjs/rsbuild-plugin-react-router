@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import type { ReactRouterManifestForDev } from './manifest.js';
 import type { RouteManifestItem } from './types.js';
 import { createDelayedPluginTask, tryPluginPromise } from './effect-runtime.js';

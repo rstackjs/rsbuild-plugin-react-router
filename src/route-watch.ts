@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { RsbuildConfig } from '@rsbuild/core';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import { dirname, resolve } from 'pathe';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import {

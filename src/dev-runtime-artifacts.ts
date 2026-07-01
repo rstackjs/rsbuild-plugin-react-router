@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from 'node:path';
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
 import { getCappedPluginConcurrency } from './concurrency.js';

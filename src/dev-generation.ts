@@ -1,5 +1,6 @@
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
-import { Deferred as EffectDeferred, Effect } from 'effect';
+import * as EffectDeferred from 'effect/Deferred';
+import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import {
   evaluateServerBuildsEffect,

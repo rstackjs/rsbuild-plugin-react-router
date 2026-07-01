@@ -1,5 +1,5 @@
 import { resolve } from 'pathe';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import {
   runPluginEffect,

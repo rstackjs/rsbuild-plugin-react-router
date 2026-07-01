@@ -1,6 +1,6 @@
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import type { ResultPromise } from 'execa';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import {
   createDelayedPluginTask,
   DEV_BACKGROUND_STARTUP_DELAY_MS,

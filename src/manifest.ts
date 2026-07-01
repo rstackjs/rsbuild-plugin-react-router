@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { combineURLs, createRouteId } from './plugin-utils.js';

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import fsExtra from 'fs-extra';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import {
   createRequestHandler,

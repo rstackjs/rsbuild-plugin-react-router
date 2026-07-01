@@ -1,5 +1,5 @@
 import { availableParallelism, cpus } from 'node:os';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
 const DEFAULT_RESERVED_CORES = 2;
