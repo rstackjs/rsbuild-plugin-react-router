@@ -48,6 +48,7 @@ const verifyRegistrationEffect = (writer, reader) =>
       modifyEnvironmentConfig: noop,
       onBeforeBuild: noop,
       onBeforeStartDevServer: collect(starts),
+      onAfterStartDevServer: noop,
       onCloseDevServer: collect(closes),
       onCloseBuild: noop,
       onAfterEnvironmentCompile: noop,
