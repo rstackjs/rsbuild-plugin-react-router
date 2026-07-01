@@ -73,6 +73,7 @@ const parseArgs = argv => {
       'parallel-route-transform': { type: 'string' },
       'rspack-profile': { type: 'string' },
       'rspack-trace-output': { type: 'string' },
+      'cpu-limit': { type: 'string' },
       'fail-fast': { type: 'boolean', default: false },
       'skip-root-build': { type: 'boolean', default: false },
       'log-performance': { type: 'boolean', default: false },
@@ -121,6 +122,8 @@ const parseArgs = argv => {
     parallelRouteTransform: parseParallelRouteTransform(
       values['parallel-route-transform']
     ),
+    cpuLimit:
+      values['cpu-limit'] === undefined ? null : Number(values['cpu-limit']),
     rspackProfile: values['rspack-profile'] ?? null,
     rspackTraceOutput: values['rspack-trace-output'] ?? null,
     failFast: values['fail-fast'],
@@ -151,6 +154,14 @@ const parseArgs = argv => {
   }
   if (!Number.isInteger(args.warmup) || args.warmup < 0) {
     throw new Error('--warmup must be a non-negative integer.');
+  }
+  if (args.cpuLimit !== null) {
+    if (!Number.isInteger(args.cpuLimit) || args.cpuLimit < 1) {
+      throw new Error('--cpu-limit must be a positive integer.');
+    }
+    if (process.platform !== 'linux') {
+      throw new Error('--cpu-limit requires Linux (uses taskset).');
+    }
   }
   if (!['json', 'md', 'markdown', 'both'].includes(args.format)) {
     throw new Error('--format must be json, md, markdown, or both.');
@@ -245,6 +256,14 @@ const runCommand = async ({
     wallMs: performance.now() - startedAt,
   };
 };
+
+const withCpuLimit = ({ command, args, cpuLimit }) =>
+  cpuLimit === null
+    ? { command, args }
+    : {
+        command: 'taskset',
+        args: ['-c', `0-${cpuLimit - 1}`, command, ...args],
+      };
 
 const defaultDevRouteIndexes = [0, 1, 2, 10, 50, 100, 200];
 
@@ -450,7 +469,7 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
       args.mode === 'dev'
         ? yield* tryPromise(() => {
             const devPort = args.devPortBase + benchmarkIndex * 100 + index;
-            return runDevServerBenchmark({
+            const devCommand = withCpuLimit({
               command: process.execPath,
               args: [
                 rsbuildBin,
@@ -460,6 +479,11 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
                 '--port',
                 String(devPort),
               ],
+              cpuLimit: args.cpuLimit,
+            });
+            return runDevServerBenchmark({
+              command: devCommand.command,
+              args: devCommand.args,
               cwd: fixtureRoot,
               env: {
                 ...commonEnv,
@@ -484,8 +508,11 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
           })
         : yield* tryPromise(() =>
             runCommand({
-              command: process.execPath,
-              args: [rsbuildBin, 'build', '--config', 'rsbuild.config.mjs'],
+              ...withCpuLimit({
+                command: process.execPath,
+                args: [rsbuildBin, 'build', '--config', 'rsbuild.config.mjs'],
+                cpuLimit: args.cpuLimit,
+              }),
               cwd: fixtureRoot,
               env: {
                 ...commonEnv,
@@ -702,6 +729,7 @@ const runBenchmarkSuite = argv =>
       devRoutes: args.mode === 'dev' ? args.devRoutes : null,
       devRouteTimeoutMs: args.mode === 'dev' ? args.devRouteTimeoutMs : null,
       parallelRouteTransform: args.parallelRouteTransform,
+      cpuLimit: args.cpuLimit,
       rspackProfile: args.rspackProfile,
       rspackTraceOutput: args.rspackTraceOutput,
       failed,
