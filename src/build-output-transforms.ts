@@ -12,6 +12,10 @@ import { createBundlerRouteExportResolver } from './route-export-resolution.js';
 import type { RouteChunkConfig } from './route-chunks.js';
 import type { PluginOptions, Route } from './types.js';
 import { isSourceMapEnabled } from './warnings/warn-on-client-source-maps.js';
+import {
+  analyzeRouteModuleCode,
+  type RouteModuleAnalysis,
+} from './export-utils.js';
 
 type ReactRouterManifest = Awaited<
   ReturnType<typeof getReactRouterManifestForDev>
@@ -39,6 +43,10 @@ type RegisterBuildOutputTransformsOptions = {
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
+  onRouteModuleAnalysis?: (
+    resourcePath: string,
+    analysis: RouteModuleAnalysis
+  ) => void;
 };
 
 export const registerBuildOutputTransforms = ({
@@ -61,9 +69,25 @@ export const registerBuildOutputTransforms = ({
   ssr,
   isSpaMode,
   rootRoutePath,
+  onRouteModuleAnalysis,
 }: RegisterBuildOutputTransformsOptions): void => {
-  const transformRouteModule = async (args: Parameters<TransformHandler>[0]) =>
-    performanceProfiler.record(
+  const rememberRouteModuleAnalysis = (
+    args: Parameters<TransformHandler>[0]
+  ): void => {
+    if (!routeByFilePath.has(args.resourcePath)) {
+      return;
+    }
+    onRouteModuleAnalysis?.(
+      args.resourcePath,
+      analyzeRouteModuleCode(args.code)
+    );
+  };
+
+  const transformRouteModule = async (
+    args: Parameters<TransformHandler>[0]
+  ) => {
+    rememberRouteModuleAnalysis(args);
+    return performanceProfiler.record(
       args.environment?.name,
       'route:module',
       args.resource,
@@ -83,6 +107,7 @@ export const registerBuildOutputTransforms = ({
           rootRoutePath,
         })
     );
+  };
 
   api.processAssets(
     { stage: 'additional', targets: ['node'] },
@@ -150,9 +175,11 @@ export const registerBuildOutputTransforms = ({
   api.transform(
     {
       resourceQuery: /__react-router-build-client-route/,
+      order: 'post',
     },
-    async args =>
-      performanceProfiler.record(
+    async args => {
+      rememberRouteModuleAnalysis(args);
+      return performanceProfiler.record(
         args.environment?.name,
         'route:client-entry',
         args.resource,
@@ -165,16 +192,18 @@ export const registerBuildOutputTransforms = ({
             isBuild,
             routeChunkConfig,
           })
-      )
+      );
+    }
   );
 
   api.transform(
     {
       resourceQuery: /route-chunk=/,
       environments: ['web'],
+      order: 'post',
     },
-    async args =>
-      performanceProfiler.record(
+    async args => {
+      return performanceProfiler.record(
         args.environment?.name,
         'route:chunk',
         args.resource,
@@ -187,7 +216,8 @@ export const registerBuildOutputTransforms = ({
             isBuild,
             routeChunkConfig,
           })
-      )
+      );
+    }
   );
 
   if (isBuild && splitRouteModules) {
@@ -198,9 +228,10 @@ export const registerBuildOutputTransforms = ({
           not: /__react-router-build-client-route|react-router-route|route-chunk=/,
         },
         environments: ['web'],
+        order: 'post',
       },
-      async args =>
-        performanceProfiler.record(
+      async args => {
+        return performanceProfiler.record(
           args.environment?.name,
           'route:split-exports',
           args.resource,
@@ -211,7 +242,8 @@ export const registerBuildOutputTransforms = ({
               resourcePath: args.resourcePath,
               routeChunkConfig,
             })
-        )
+        );
+      }
     );
   }
 

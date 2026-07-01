@@ -14,7 +14,7 @@ type ExportInfo = {
   readonly exportAllModules: readonly string[];
 };
 
-type RouteModuleAnalysis = {
+export type RouteModuleAnalysis = {
   readonly code: string;
   readonly exports: readonly string[];
   readonly exportAllModules: readonly string[];
@@ -177,6 +177,18 @@ export const getExportNamesAndExportAll = async (
   return trackedExportInfo;
 };
 
+export const analyzeRouteModuleCode = (
+  code: string,
+  resourcePath?: string
+): RouteModuleAnalysis => {
+  const program = parseProgram(code, resourcePath);
+  return {
+    code,
+    exports: collectProgramExportNames(program),
+    exportAllModules: collectExportAllModules(program),
+  };
+};
+
 export const getRouteModuleAnalysis = async (
   resourcePath: string
 ): Promise<RouteModuleAnalysis> => {
@@ -188,12 +200,7 @@ export const getRouteModuleAnalysis = async (
 
   const analysis = (async () => {
     const source = await readFile(resourcePath, 'utf8');
-    const program = parseProgram(source, resourcePath);
-    return {
-      code: source,
-      exports: collectProgramExportNames(program),
-      exportAllModules: collectExportAllModules(program),
-    };
+    return analyzeRouteModuleCode(source, resourcePath);
   })();
 
   let trackedAnalysis: Promise<RouteModuleAnalysis>;

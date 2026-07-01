@@ -1,7 +1,15 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import { pluginReactRouter, shouldParallelizeEnvironmentBuilds } from '../src';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  pluginReactRouter,
+  pluginReactRouterRSC,
+  shouldParallelizeEnvironmentBuilds,
+} from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
@@ -33,6 +41,8 @@ const getLazyCompilationTest = (
   return lazyCompilation.test;
 };
 
+const requireFromHere = createRequire(import.meta.url);
+
 const captureEnv = (keys: string[]) => {
   const previousValues = new Map(
     keys.map(key => [key, process.env[key]] as const)
@@ -62,6 +72,20 @@ describe('pluginReactRouter', () => {
     expect(config.dev.liveReload).toBe(true);
     expect(config.dev.writeToDisk).toBe(true);
     expect(config.dev.lazyCompilation).toBeUndefined();
+  });
+
+  it('aliases React Router packages to the app install', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.tools.rspack.resolve.alias).toMatchObject({
+      'react-router$': requireFromHere.resolve('react-router'),
+      'react-router/dom$': requireFromHere.resolve('react-router/dom'),
+    });
   });
 
   it('adds the committed custom-server build entry only in development', async () => {
@@ -320,6 +344,90 @@ describe('pluginReactRouter', () => {
     expect(
       config.environments?.web?.tools?.rspack?.optimization?.avoidEntryIife
     ).toBe(true);
+  });
+
+  it('composes RSC bundler plumbing with the React Router environments', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.tools.swc.rspackExperiments.reactServerComponents).toBe(
+      true
+    );
+    expect(config.environments.node.source.include).toEqual([
+      {
+        not: /[\\/]core-js[\\/]/,
+      },
+    ]);
+    expect(config.environments.node.tools.rspack.dependencies).toBeUndefined();
+    expect(config.environments.web.output.target).toBe('web');
+    expect(
+      config.environments.web.tools.rspack.output.workerChunkLoading
+    ).toBe('import-scripts');
+    expect(config.environments.web.tools.rspack.optimization.usedExports).toBe(
+      false
+    );
+    expect(
+      config.environments.web.tools.rspack.optimization.mangleExports
+    ).toBe(false);
+  });
+
+  it('exposes an explicit RSC plugin helper', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouterRSC()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.environments.web.source.entry).toEqual({
+      index: {
+        import: expect.stringMatching(/entry\.rsc\.client/),
+        html: false,
+      },
+    });
+    expect(config.environments.node.source.entry.index).toMatchObject({
+      import: expect.stringMatching(/entry\.rsc/),
+      layer: 'react-server-components',
+    });
+  });
+
+  it('publishes option types from the package root declarations', () => {
+    const outDir = fs.mkdtempSync(join(tmpdir(), 'rr-plugin-dts-'));
+
+    try {
+      execFileSync(
+        'pnpm',
+        [
+          'exec',
+          'tsc',
+          '-p',
+          'tsconfig.json',
+          '--emitDeclarationOnly',
+          '--outDir',
+          outDir,
+          '--tsBuildInfoFile',
+          join(outDir, 'tsconfig.tsbuildinfo'),
+          '--isolatedDeclarations',
+          'false',
+        ],
+        { cwd: process.cwd(), stdio: 'pipe' }
+      );
+
+      const rootDeclarations = fs.readFileSync(
+        join(outDir, 'index.d.ts'),
+        'utf8'
+      );
+
+      expect(rootDeclarations).toContain(
+        "export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';"
+      );
+    } finally {
+      fs.rmSync(outDir, { force: true, recursive: true });
+    }
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {

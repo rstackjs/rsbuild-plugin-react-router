@@ -15,7 +15,10 @@ import {
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
-import { getRouteModuleAnalysis } from './export-utils.js';
+import {
+  getRouteModuleAnalysis,
+  type RouteModuleAnalysis,
+} from './export-utils.js';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
@@ -79,6 +82,10 @@ type RouteChunkManifestOptions = {
   rootRouteFile?: string;
   isBuild?: boolean;
   cache?: RouteChunkCache;
+  analyzeRouteModule?: (
+    routeFilePath: string,
+    route: Route
+  ) => Promise<RouteModuleAnalysis | undefined>;
 };
 
 export type ReactRouterManifestForDev = {
@@ -278,6 +285,8 @@ const analyzeRouteForManifestEffect = ({
   routeChunkConfig,
   routeEntryName,
   routeFilePath,
+  route,
+  analyzeRouteModule,
 }: {
   discoveredCssAssets: string[];
   isBuild: boolean;
@@ -285,10 +294,16 @@ const analyzeRouteForManifestEffect = ({
   routeChunkConfig: RouteChunkConfig | null;
   routeEntryName: string;
   routeFilePath: string;
+  route: Route;
+  analyzeRouteModule?: (
+    routeFilePath: string,
+    route: Route
+  ) => Promise<RouteModuleAnalysis | undefined>;
 }): Effect.Effect<RouteManifestAnalysis, Error, never> =>
   tryPluginPromise(async () => {
     const { code, exports: exportNames } =
-      await getRouteModuleAnalysis(routeFilePath);
+      (await analyzeRouteModule?.(routeFilePath, route)) ??
+      (await getRouteModuleAnalysis(routeFilePath));
     const cssAssets =
       !isBuild && discoveredCssAssets.length === 0 && CSS_IMPORT_RE.test(code)
         ? [
@@ -430,6 +445,8 @@ export function generateReactRouterManifestForDevEffect(
             routeChunkConfig,
             routeEntryName,
             routeFilePath,
+            route,
+            analyzeRouteModule: routeChunkOptions?.analyzeRouteModule,
           });
 
           const hasClientAction = routeAnalysis.exports.has(
