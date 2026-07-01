@@ -9,10 +9,30 @@ const configPath = path.join(root, 'synthetic.config.json');
 const manifestPath = path.join(root, 'app/generated/.manifest.json');
 const force = process.argv.includes('--force');
 const configSource = await fs.readFile(configPath, 'utf8');
-const config = JSON.parse(configSource);
+const config = {
+  ...JSON.parse(configSource),
+  ...readConfigOverrides(process.env),
+};
 const generatorHash = createHash('sha256')
-  .update(`${GENERATOR_VERSION}\0${configSource}`)
+  .update(`${GENERATOR_VERSION}\0${JSON.stringify(config)}`)
   .digest('hex');
+
+function readConfigOverrides(env) {
+  const routes = readPositiveIntegerEnv(env, 'SYNTHETIC_ROUTES');
+  return routes == null ? {} : { routes };
+}
+
+function readPositiveIntegerEnv(env, name) {
+  const value = env[name];
+  if (value == null || value === '') {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
 
 if (!force) {
   try {
