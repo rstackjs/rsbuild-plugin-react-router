@@ -1,0 +1,6194 @@
+{
+  "repo": "rsbuild-plugin-react-router",
+  "commit": "0f9b463ed3a8b31a1b53f06f92892a68a49331f5",
+  "date": "2026-06-30T23:49:46.909Z",
+  "node": "v22.23.1",
+  "pnpm": "9.15.3",
+  "platform": "linux 6.17.0-1018-azure x64",
+  "profile": "full",
+  "mode": "dev",
+  "iterations": 10,
+  "largeIterations": 5,
+  "warmup": 0,
+  "clean": "build",
+  "logPerformance": false,
+  "devRoutes": "auto",
+  "devRouteTimeoutMs": 30000,
+  "rspackProfile": null,
+  "rspackTraceOutput": null,
+  "failed": false,
+  "benchmarks": [
+    {
+      "id": "synthetic-48-ssr-esm",
+      "routeCount": 48,
+      "variant": "ssr-esm",
+      "fixture": "default",
+      "fixtureStats": null,
+      "iterations": 10,
+      "devRoutePaths": [
+        "/",
+        "/route-0002",
+        "/route-0003",
+        "/route-0011",
+        "/route-0048"
+      ],
+      "cwd": ".benchmark/fixtures/synthetic-48-ssr-esm",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 1061.13497,
+          "readyMs": 737.9655199999997,
+          "routeTotalMs": 178.42744200000016,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 110.38680199999999,
+              "bytes": 2550
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 13.480160000000069,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 18.704231000000618,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 13.615529000000606,
+              "bytes": 3009
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 21.968179999999847,
+              "bytes": 2934
+            }
+          ],
+          "updateMs": 77.58678899999995,
+          "updateRouteTotalMs": 41.19274899999982,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 41.167270999999346,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1013.4400149999992,
+          "readyMs": 737.0079579999992,
+          "routeTotalMs": 139.8257680000006,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 87.90826900000047,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 12.496195000000625,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 10.68267300000025,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 11.74942099999953,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 16.782046000000264,
+              "bytes": 2935
+            }
+          ],
+          "updateMs": 75.4895030000007,
+          "updateRouteTotalMs": 34.72816199999943,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 34.60619300000053,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1033.5155289999993,
+          "readyMs": 744.9656160000004,
+          "routeTotalMs": 151.008374,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 95.69475700000021,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 15.578537999999753,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 11.577193999999508,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 11.733242999999675,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 16.348390999999538,
+              "bytes": 2936
+            }
+          ],
+          "updateMs": 76.37486400000034,
+          "updateRouteTotalMs": 33.9031329999998,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 33.877236000000266,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1022.8336060000001,
+          "readyMs": 740.294910999999,
+          "routeTotalMs": 151.294077999999,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 99.86606599999868,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 12.592560999999478,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 9.45216199999959,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 9.578246999999465,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 19.761279000000286,
+              "bytes": 2936
+            }
+          ],
+          "updateMs": 51.82378100000096,
+          "updateRouteTotalMs": 53.106259999998656,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 53.082775000000765,
+              "bytes": 2550
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1015.4253360000002,
+          "readyMs": 723.0553089999994,
+          "routeTotalMs": 149.87053300000116,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 100.64582800000062,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 10.984615999999733,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 9.586167999999816,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 9.333519000001615,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 19.275096999999732,
+              "bytes": 2935
+            }
+          ],
+          "updateMs": 75.5316299999995,
+          "updateRouteTotalMs": 43.07090299999982,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 43.04138000000057,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1061.3075819999995,
+          "readyMs": 750.9317570000003,
+          "routeTotalMs": 137.75670799999898,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 91.64192700000058,
+              "bytes": 2550
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 13.073585000000094,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 11.75735799999893,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 9.853699999999662,
+              "bytes": 3009
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 11.374846999999136,
+              "bytes": 2934
+            }
+          ],
+          "updateMs": 78.11696499999925,
+          "updateRouteTotalMs": 69.51400699999976,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 69.49550100000124,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1001.5333330000012,
+          "readyMs": 709.8011260000003,
+          "routeTotalMs": 156.92940500000077,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 107.51464699999997,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 16.89851600000111,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 9.11425700000109,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 10.27560799999992,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 13.075263000000632,
+              "bytes": 2936
+            }
+          ],
+          "updateMs": 50.52028699999937,
+          "updateRouteTotalMs": 61.8574950000002,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 61.83421199999975,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1002.5011400000003,
+          "readyMs": 729.258659000001,
+          "routeTotalMs": 143.3969990000005,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 93.05704999999944,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 13.614627999999357,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 9.125142999999298,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 9.27047599999969,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 18.276534000000538,
+              "bytes": 2935
+            }
+          ],
+          "updateMs": 50.69746200000009,
+          "updateRouteTotalMs": 54.078803999998854,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 54.05587999999989,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 975.8915749999996,
+          "readyMs": 689.3253879999993,
+          "routeTotalMs": 150.12584799999968,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 100.34039900000062,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 11.826962999999523,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 12.691489000000729,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 10.893495000000257,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 14.32783500000005,
+              "bytes": 2936
+            }
+          ],
+          "updateMs": 50.57557599999927,
+          "updateRouteTotalMs": 62.90299199999936,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 62.87790500000119,
+              "bytes": 2553
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1012.0049039999994,
+          "readyMs": 733.7849310000001,
+          "routeTotalMs": 144.75306799999998,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 95.2560029999986,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 11.83414300000004,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 9.781487000000197,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 11.688018999999258,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0048",
+              "status": 200,
+              "ok": true,
+              "ms": 16.140991000000213,
+              "bytes": 2935
+            }
+          ],
+          "updateMs": 75.87731399999939,
+          "updateRouteTotalMs": 36.260129000000234,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 36.233329000000595,
+              "bytes": 2553
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 975.8915749999996,
+          "median": 1015.4253360000002,
+          "mean": 1019.9587989999998,
+          "p95": 1061.3075819999995,
+          "stdev": 25.119210817237228
+        },
+        "readyMs": {
+          "min": 689.3253879999993,
+          "median": 737.0079579999992,
+          "mean": 729.6391174999999,
+          "p95": 750.9317570000003,
+          "stdev": 17.33457389938822
+        },
+        "routeTotalMs": {
+          "min": 137.75670799999898,
+          "median": 150.12584799999968,
+          "mean": 150.3388223000001,
+          "p95": 178.42744200000016,
+          "stdev": 10.873156283391241
+        },
+        "updateMs": {
+          "min": 50.52028699999937,
+          "median": 75.5316299999995,
+          "mean": 66.25941709999988,
+          "p95": 78.11696499999925,
+          "stdev": 12.566505262055019
+        },
+        "updateRouteTotalMs": {
+          "min": 33.9031329999998,
+          "median": 53.106259999998656,
+          "mean": 49.061463399999596,
+          "p95": 69.51400699999976,
+          "stdev": 12.296597565215832
+        },
+        "userMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "sysMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "maxRssKb": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        }
+      },
+      "devRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 87.90826900000047,
+            "median": 99.86606599999868,
+            "mean": 98.23117479999992,
+            "p95": 110.38680199999999,
+            "stdev": 6.6251911324779735
+          },
+          "bytes": {
+            "min": 2550,
+            "median": 2551,
+            "mean": 2551.2,
+            "p95": 2552,
+            "stdev": 0.7483314773547882
+          }
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 10.984615999999733,
+            "median": 13.073585000000094,
+            "mean": 13.237990499999977,
+            "p95": 16.89851600000111,
+            "stdev": 1.7062081768364366
+          },
+          "bytes": {
+            "min": 2931,
+            "median": 2932,
+            "mean": 2932.2,
+            "p95": 2933,
+            "stdev": 0.7483314773547882
+          }
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 9.11425700000109,
+            "median": 10.68267300000025,
+            "mean": 11.247216200000002,
+            "p95": 18.704231000000618,
+            "stdev": 2.7488762264592976
+          },
+          "bytes": {
+            "min": 2931,
+            "median": 2932,
+            "mean": 2932.2,
+            "p95": 2933,
+            "stdev": 0.7483314773547882
+          }
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 9.27047599999969,
+            "median": 10.893495000000257,
+            "mean": 10.799125699999967,
+            "p95": 13.615529000000606,
+            "stdev": 1.3285337383793077
+          },
+          "bytes": {
+            "min": 3009,
+            "median": 3010,
+            "mean": 3010.2,
+            "p95": 3011,
+            "stdev": 0.7483314773547882
+          }
+        },
+        {
+          "path": "/route-0048",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 11.374846999999136,
+            "median": 16.782046000000264,
+            "mean": 16.733046300000023,
+            "p95": 21.968179999999847,
+            "stdev": 3.0626263914858285
+          },
+          "bytes": {
+            "min": 2934,
+            "median": 2935,
+            "mean": 2935.2,
+            "p95": 2936,
+            "stdev": 0.7483314773547882
+          }
+        }
+      ],
+      "devUpdateRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 33.877236000000266,
+            "median": 53.082775000000765,
+            "mean": 49.02716820000042,
+            "p95": 69.49550100000124,
+            "stdev": 12.309860903040931
+          },
+          "bytes": {
+            "min": 2550,
+            "median": 2552,
+            "mean": 2551.6,
+            "p95": 2553,
+            "stdev": 0.9165151389911681
+          }
+        }
+      ],
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-256-ssr-esm",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "fixture": "default",
+      "fixtureStats": null,
+      "iterations": 10,
+      "devRoutePaths": [
+        "/",
+        "/route-0002",
+        "/route-0003",
+        "/route-0011",
+        "/route-0051",
+        "/route-0101",
+        "/route-0201",
+        "/route-0256"
+      ],
+      "cwd": ".benchmark/fixtures/synthetic-256-ssr-esm",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 1843.9675069999976,
+          "readyMs": 1264.3799279999985,
+          "routeTotalMs": 283.88493599999856,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 129.98219000000245,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 21.488302999998268,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 13.374959999997373,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 15.788964999999735,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 18.030062999998336,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 36.034427999999025,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 28.36351300000024,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 20.754402999999,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 178.80035200000202,
+          "updateRouteTotalMs": 87.57154300000184,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 87.55055200000061,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1920.3506720000005,
+          "readyMs": 1365.2376700000023,
+          "routeTotalMs": 311.39087199999994,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 158.56924000000072,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 24.57404300000053,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 17.329232000000047,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 19.83602299999984,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 28.252870999996958,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 23.82068900000013,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 15.760323000002245,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 23.186470000000554,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 132.34555099999852,
+          "updateRouteTotalMs": 78.50586900000053,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 78.4941429999999,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1913.1310589999994,
+          "readyMs": 1364.587618999998,
+          "routeTotalMs": 300.1955049999997,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 144.08879100000195,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 23.71795900000143,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 23.60718700000143,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 19.90672700000141,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 25.807969999998022,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 24.32813299999907,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 15.574781999999686,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 23.1065239999989,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 129.20698400000038,
+          "updateRouteTotalMs": 80.97599199999968,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 80.94100199999957,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1922.2822879999985,
+          "readyMs": 1327.0743389999989,
+          "routeTotalMs": 327.8228769999987,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 138.13430599999992,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 22.208435000000463,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 26.10112300000037,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 27.716669000001275,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 33.50987499999974,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 25.469539000001532,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 21.284911999999167,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 33.32598099999814,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 158.93425299999944,
+          "updateRouteTotalMs": 78.86012099999789,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 78.84931499999948,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1997.9936510000007,
+          "readyMs": 1370.7110780000003,
+          "routeTotalMs": 330.5606489999991,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 163.20647400000234,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 24.120042999998986,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 25.893865999998525,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 28.77882899999895,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 24.00402899999972,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 23.381531999999424,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 20.953401999999187,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 20.159794999999576,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 128.2152550000028,
+          "updateRouteTotalMs": 130.54969699999856,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 130.53559700000187,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1947.8823889999985,
+          "readyMs": 1310.3698299999996,
+          "routeTotalMs": 322.2983020000029,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 137.4626419999986,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 18.45691199999783,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 25.255886999999348,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 23.41264299999966,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 34.39133600000059,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 25.047010000002047,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 25.48183600000266,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 32.71860200000083,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 132.1476819999989,
+          "updateRouteTotalMs": 139.81909300000189,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 139.80626399999892,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1892.559494000001,
+          "readyMs": 1300.3564060000026,
+          "routeTotalMs": 304.77103200000056,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 130.0177029999977,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 23.15866499999902,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 16.82995999999912,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 18.836677999999665,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 26.38243599999987,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 38.43410899999799,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 21.025433000002522,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 30.02896399999736,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 154.26094699999885,
+          "updateRouteTotalMs": 97.44396399999823,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 97.43155499999921,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1909.4785389999997,
+          "readyMs": 1329.362373,
+          "routeTotalMs": 314.88543800000116,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 133.376522999999,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 41.77575199999774,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 21.38264600000184,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 14.889906000000337,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 25.546518999999535,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 35.38355500000034,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 16.185519999999087,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 26.28512000000046,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 126.6685899999975,
+          "updateRouteTotalMs": 106.23082799999975,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 106.21713799999998,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1907.4091309999967,
+          "readyMs": 1305.179766000001,
+          "routeTotalMs": 293.7858779999988,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 133.0676510000012,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 23.577470000000176,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 14.843794000000344,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 15.910160999999789,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 17.317922000002,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 41.88768100000016,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 22.7301890000017,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 24.3844820000013,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 181.86221699999805,
+          "updateRouteTotalMs": 92.5231930000009,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 92.50865099999646,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1986.2875910000002,
+          "readyMs": 1299.266760999999,
+          "routeTotalMs": 347.0151379999952,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 151.1196029999992,
+              "bytes": 2553
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 26.0963980000015,
+              "bytes": 2934
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 20.170429999998305,
+              "bytes": 2934
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 29.234714999998687,
+              "bytes": 3012
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 29.89778600000136,
+              "bytes": 2934
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 38.69765799999732,
+              "bytes": 3012
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 17.719851000001654,
+              "bytes": 2934
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 34.014641000001575,
+              "bytes": 3012
+            }
+          ],
+          "updateMs": 155.5795550000039,
+          "updateRouteTotalMs": 150.140664999999,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 150.10820799999783,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 1843.9675069999976,
+          "median": 1920.3506720000005,
+          "mean": 1924.1342320999993,
+          "p95": 1997.9936510000007,
+          "stdev": 42.35472798588488
+        },
+        "readyMs": {
+          "min": 1264.3799279999985,
+          "median": 1327.0743389999989,
+          "mean": 1323.652577,
+          "p95": 1370.7110780000003,
+          "stdev": 32.91217556483592
+        },
+        "routeTotalMs": {
+          "min": 283.88493599999856,
+          "median": 314.88543800000116,
+          "mean": 313.66106269999943,
+          "p95": 347.0151379999952,
+          "stdev": 17.949642564809807
+        },
+        "updateMs": {
+          "min": 126.6685899999975,
+          "median": 154.26094699999885,
+          "mean": 147.80213860000003,
+          "p95": 181.86221699999805,
+          "stdev": 20.017810392977378
+        },
+        "updateRouteTotalMs": {
+          "min": 78.50586900000053,
+          "median": 97.44396399999823,
+          "mean": 104.26209649999983,
+          "p95": 150.140664999999,
+          "stdev": 25.25431949370722
+        },
+        "userMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "sysMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "maxRssKb": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        }
+      },
+      "devRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 129.98219000000245,
+            "median": 138.13430599999992,
+            "mean": 141.9025123000003,
+            "p95": 163.20647400000234,
+            "stdev": 11.355065136029006
+          },
+          "bytes": {
+            "min": 2551,
+            "median": 2551,
+            "mean": 2551.5,
+            "p95": 2553,
+            "stdev": 0.6708203932499369
+          }
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 18.45691199999783,
+            "median": 23.71795900000143,
+            "mean": 24.917397999999594,
+            "p95": 41.77575199999774,
+            "stdev": 5.945671226843237
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932.5,
+            "p95": 2934,
+            "stdev": 0.6708203932499369
+          }
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 13.374959999997373,
+            "median": 21.38264600000184,
+            "mean": 20.47890849999967,
+            "p95": 26.10112300000037,
+            "stdev": 4.471068082201516
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932.5,
+            "p95": 2934,
+            "stdev": 0.6708203932499369
+          }
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 14.889906000000337,
+            "median": 19.90672700000141,
+            "mean": 21.431131599999937,
+            "p95": 29.234714999998687,
+            "stdev": 5.244245434464257
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3010,
+            "mean": 3010.5,
+            "p95": 3012,
+            "stdev": 0.6708203932499369
+          }
+        },
+        {
+          "path": "/route-0051",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 17.317922000002,
+            "median": 26.38243599999987,
+            "mean": 26.314080699999614,
+            "p95": 34.39133600000059,
+            "stdev": 5.379270314931975
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932.5,
+            "p95": 2934,
+            "stdev": 0.6708203932499369
+          }
+        },
+        {
+          "path": "/route-0101",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 23.381531999999424,
+            "median": 35.38355500000034,
+            "mean": 31.248433399999705,
+            "p95": 41.88768100000016,
+            "stdev": 7.050721950477265
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3010,
+            "mean": 3010.5,
+            "p95": 3012,
+            "stdev": 0.6708203932499369
+          }
+        },
+        {
+          "path": "/route-0201",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 15.574781999999686,
+            "median": 21.025433000002522,
+            "mean": 20.507976100000814,
+            "p95": 28.36351300000024,
+            "stdev": 4.071739800495406
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932.5,
+            "p95": 2934,
+            "stdev": 0.6708203932499369
+          }
+        },
+        {
+          "path": "/route-0256",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 20.159794999999576,
+            "median": 26.28512000000046,
+            "mean": 26.796498199999768,
+            "p95": 34.014641000001575,
+            "stdev": 5.035237496559122
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3010,
+            "mean": 3010.5,
+            "p95": 3012,
+            "stdev": 0.6708203932499369
+          }
+        }
+      ],
+      "devUpdateRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 78.4941429999999,
+            "median": 97.43155499999921,
+            "mean": 104.24424249999939,
+            "p95": 150.10820799999783,
+            "stdev": 25.252951211251542
+          },
+          "bytes": {
+            "min": 2551,
+            "median": 2551,
+            "mean": 2551.4,
+            "p95": 2552,
+            "stdev": 0.48989794855663565
+          }
+        }
+      ],
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-1024-ssr-esm",
+      "routeCount": 1024,
+      "variant": "ssr-esm",
+      "fixture": "default",
+      "fixtureStats": null,
+      "iterations": 5,
+      "devRoutePaths": [
+        "/",
+        "/route-0002",
+        "/route-0003",
+        "/route-0011",
+        "/route-0051",
+        "/route-0101",
+        "/route-0201",
+        "/route-1024"
+      ],
+      "cwd": ".benchmark/fixtures/synthetic-1024-ssr-esm",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 4499.382405999997,
+          "readyMs": 3258.925565999998,
+          "routeTotalMs": 568.9151469999997,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 251.44609499999933,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 41.62188900000183,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 58.72859299999982,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 36.670317000003706,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 51.10288500000024,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 37.27361999999994,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 60.518935000000056,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 31.49850300000253,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 453.4994710000028,
+          "updateRouteTotalMs": 164.9101659999942,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 164.89853800000128,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4469.240990999999,
+          "readyMs": 3267.9779750000016,
+          "routeTotalMs": 535.8333060000004,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 254.83478900000046,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 41.67684900000313,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 58.69167400000151,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 36.0875440000018,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 36.63412399999652,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 39.59071899999981,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 38.8668039999975,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 29.386118999995233,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 453.5715659999987,
+          "updateRouteTotalMs": 155.56522899999982,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 155.53934200000367,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4448.389374999999,
+          "readyMs": 3253.741697999998,
+          "routeTotalMs": 522.3547659999967,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 253.48350100000243,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 43.79975099999865,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 53.9118610000005,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 34.8684659999999,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 36.50790799999959,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 36.01554600000236,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 35.785768999994616,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 27.930129000000306,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 451.71886200000154,
+          "updateRouteTotalMs": 167.72997600000235,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 167.7160159999985,
+              "bytes": 2550
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4828.114592999998,
+          "readyMs": 3237.1524839999984,
+          "routeTotalMs": 546.0444510000016,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 260.89907599999424,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 46.55589299999701,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 55.77337200000329,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 36.97364899999957,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 37.45365800000582,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 36.75310599999648,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 41.802576000001864,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 29.779754000002868,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 432.0022020000033,
+          "updateRouteTotalMs": 554.0081900000005,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 553.9950400000016,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4432.4328160000005,
+          "readyMs": 3201.829332000001,
+          "routeTotalMs": 547.6502970000001,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 247.3400910000055,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 43.136913000002096,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 59.173101000000315,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 49.38491399999475,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 36.07211400000233,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 39.455980999999156,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 40.69659899999533,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 32.33533200000238,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 453.1289809999944,
+          "updateRouteTotalMs": 173.33767899999657,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 173.32348799999454,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 4432.4328160000005,
+          "median": 4469.240990999999,
+          "mean": 4535.512036199999,
+          "p95": 4828.114592999998,
+          "stdev": 148.0061766196236
+        },
+        "readyMs": {
+          "min": 3201.829332000001,
+          "median": 3253.741697999998,
+          "mean": 3243.9254109999993,
+          "p95": 3267.9779750000016,
+          "stdev": 23.31455503665453
+        },
+        "routeTotalMs": {
+          "min": 522.3547659999967,
+          "median": 546.0444510000016,
+          "mean": 544.1595933999997,
+          "p95": 568.9151469999997,
+          "stdev": 15.31896010601973
+        },
+        "updateMs": {
+          "min": 432.0022020000033,
+          "median": 453.1289809999944,
+          "mean": 448.78421640000016,
+          "p95": 453.5715659999987,
+          "stdev": 8.41757059589196
+        },
+        "updateRouteTotalMs": {
+          "min": 155.56522899999982,
+          "median": 167.72997600000235,
+          "mean": 243.11024799999868,
+          "p95": 554.0081900000005,
+          "stdev": 155.55533440419683
+        },
+        "userMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "sysMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "maxRssKb": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        }
+      },
+      "devRouteSummary": [
+        {
+          "path": "/",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 247.3400910000055,
+            "median": 253.48350100000243,
+            "mean": 253.6007104000004,
+            "p95": 260.89907599999424,
+            "stdev": 4.441633736793565
+          },
+          "bytes": {
+            "min": 2551,
+            "median": 2551,
+            "mean": 2551,
+            "p95": 2551,
+            "stdev": 0
+          }
+        },
+        {
+          "path": "/route-0002",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 41.62188900000183,
+            "median": 43.136913000002096,
+            "mean": 43.358259000000544,
+            "p95": 46.55589299999701,
+            "stdev": 1.806150204202181
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2932,
+            "stdev": 0
+          }
+        },
+        {
+          "path": "/route-0003",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 53.9118610000005,
+            "median": 58.69167400000151,
+            "mean": 57.255720200001086,
+            "p95": 59.173101000000315,
+            "stdev": 2.0633185536112797
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2932,
+            "stdev": 0
+          }
+        },
+        {
+          "path": "/route-0011",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 34.8684659999999,
+            "median": 36.670317000003706,
+            "mean": 38.796977999999946,
+            "p95": 49.38491399999475,
+            "stdev": 5.3427678880075575
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3010,
+            "mean": 3010,
+            "p95": 3010,
+            "stdev": 0
+          }
+        },
+        {
+          "path": "/route-0051",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 36.07211400000233,
+            "median": 36.63412399999652,
+            "mean": 39.5541378000009,
+            "p95": 51.10288500000024,
+            "stdev": 5.791650258951564
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2932,
+            "stdev": 0
+          }
+        },
+        {
+          "path": "/route-0101",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 36.01554600000236,
+            "median": 37.27361999999994,
+            "mean": 37.81779439999955,
+            "p95": 39.59071899999981,
+            "stdev": 1.449462206179438
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3010,
+            "mean": 3010,
+            "p95": 3010,
+            "stdev": 0
+          }
+        },
+        {
+          "path": "/route-0201",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 35.785768999994616,
+            "median": 40.69659899999533,
+            "mean": 43.53413659999787,
+            "p95": 60.518935000000056,
+            "stdev": 8.733321160880436
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2932,
+            "stdev": 0
+          }
+        },
+        {
+          "path": "/route-1024",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 27.930129000000306,
+            "median": 29.779754000002868,
+            "mean": 30.185967400000663,
+            "p95": 32.33533200000238,
+            "stdev": 1.5643587543308592
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3010,
+            "mean": 3010,
+            "p95": 3010,
+            "stdev": 0
+          }
+        }
+      ],
+      "devUpdateRouteSummary": [
+        {
+          "path": "/",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 155.53934200000367,
+            "median": 167.7160159999985,
+            "mean": 243.09448479999992,
+            "p95": 553.9950400000016,
+            "stdev": 155.5567869965463
+          },
+          "bytes": {
+            "min": 2550,
+            "median": 2551,
+            "mean": 2550.8,
+            "p95": 2551,
+            "stdev": 0.39999999999999997
+          }
+        }
+      ],
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-256-ssr-esm-split",
+      "routeCount": 256,
+      "variant": "ssr-esm-split",
+      "fixture": "default",
+      "fixtureStats": null,
+      "iterations": 10,
+      "devRoutePaths": [
+        "/",
+        "/route-0002",
+        "/route-0003",
+        "/route-0011",
+        "/route-0051",
+        "/route-0101",
+        "/route-0201",
+        "/route-0256"
+      ],
+      "cwd": ".benchmark/fixtures/synthetic-256-ssr-esm-split",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 1886.437214000005,
+          "readyMs": 1306.1080660000007,
+          "routeTotalMs": 319.19138699999894,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 134.33847100000276,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 20.870589000005566,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 31.52930699999706,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 21.869281999999657,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 26.44221500000276,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 27.243093000004592,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 19.611644999997225,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 37.226926000003004,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 151.56507799999963,
+          "updateRouteTotalMs": 72.39740100000199,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 72.38570400000026,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1916.336513000002,
+          "readyMs": 1313.5870009999999,
+          "routeTotalMs": 331.96568800000387,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 149.4381429999994,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 28.226684000001114,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 33.2648840000038,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 25.2161150000029,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 22.535594000000856,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 30.95631200000207,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 19.675379000000248,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 22.58575099999871,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 150.43751699999848,
+          "updateRouteTotalMs": 82.31944400000066,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 82.30410200000188,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1861.2324480000025,
+          "readyMs": 1269.935620999997,
+          "routeTotalMs": 281.9852530000062,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 129.51805400000012,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 15.409186999997473,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 14.420579000005091,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 13.567459999998391,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 20.80464899999788,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 22.42900300000474,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 15.352979999996023,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 50.42105900000024,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 205.43988000000536,
+          "updateRouteTotalMs": 68.35907399999996,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 68.34434299999702,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1931.2007920000033,
+          "readyMs": 1376.390591000003,
+          "routeTotalMs": 307.59352700000454,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 146.57183500000247,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 30.41379700000107,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 21.014556000001903,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 17.11559600000328,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 24.38937900000019,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 27.842365999997128,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 18.979795999999624,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 21.193033000003197,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 125.08155700000498,
+          "updateRouteTotalMs": 87.75322799999412,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 87.73796500000026,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1928.429903999997,
+          "readyMs": 1329.1019549999983,
+          "routeTotalMs": 338.0921340000059,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 160.24255099998845,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 23.95775699999649,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 29.098220999992918,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 24.759711000006064,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 17.31367699999828,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 25.30447400000412,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 16.584493999995175,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 40.767825999995694,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 157.02056799999264,
+          "updateRouteTotalMs": 74.85152299999027,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 74.84047699999064,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1922.648291000005,
+          "readyMs": 1315.814280000006,
+          "routeTotalMs": 301.8304819999903,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 142.9100269999908,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 22.51811399999133,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 15.41577099999995,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 14.36501799999678,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 20.468267000003834,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 41.7087840000022,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 19.2131389999995,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 25.177423000001,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 177.44007799999963,
+          "updateRouteTotalMs": 93.32495700000436,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 93.3107469999959,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1921.7871449999948,
+          "readyMs": 1355.636050000001,
+          "routeTotalMs": 297.010282999996,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 132.26419699999678,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 23.675703999993857,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 36.18767800000205,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 18.607459999999264,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 25.93119800000568,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 19.839806999996654,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 18.110352999996394,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 22.328489999999874,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 158.3948640000017,
+          "updateRouteTotalMs": 80.90503799999715,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 80.89363200000662,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1911.5575289999979,
+          "readyMs": 1311.313930000004,
+          "routeTotalMs": 322.0453780000098,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 133.8144270000048,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 24.577184000008856,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 18.121283999993466,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 31.85157299999264,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 22.898350999996183,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 37.404836000001524,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 25.725616000010632,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 27.585118999995757,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 154.7068539999891,
+          "updateRouteTotalMs": 90.78021100000478,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 90.76638000000094,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1966.2944879999995,
+          "readyMs": 1416.7252979999903,
+          "routeTotalMs": 300.79990800000087,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 147.97660700000415,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 22.873468999998295,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 19.21013399999356,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 25.260525000005146,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 21.192511999994167,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 21.478294999993523,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 17.633370000010473,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 25.10932899999898,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 155.68573800000013,
+          "updateRouteTotalMs": 58.92666000001191,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 58.912037999994936,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 1920.1682449999935,
+          "readyMs": 1370.9472089999908,
+          "routeTotalMs": 306.7061779999931,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 144.22667600000568,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 22.73210600001039,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 19.232076000000234,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 20.71646100000362,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 29.070523999995203,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 29.24868500001321,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 18.17281499999808,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 23.245674000005238,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 152.78829300000507,
+          "updateRouteTotalMs": 57.76264600000286,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 57.750268000003416,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 1861.2324480000025,
+          "median": 1921.7871449999948,
+          "mean": 1916.6092569,
+          "p95": 1966.2944879999995,
+          "stdev": 26.267369717859584
+        },
+        "readyMs": {
+          "min": 1269.935620999997,
+          "median": 1329.1019549999983,
+          "mean": 1336.556000099999,
+          "p95": 1416.7252979999903,
+          "stdev": 40.714352356106126
+        },
+        "routeTotalMs": {
+          "min": 281.9852530000062,
+          "median": 307.59352700000454,
+          "mean": 310.72202180000096,
+          "p95": 338.0921340000059,
+          "stdev": 16.179001524754632
+        },
+        "updateMs": {
+          "min": 125.08155700000498,
+          "median": 155.68573800000013,
+          "mean": 158.85604269999968,
+          "p95": 205.43988000000536,
+          "stdev": 19.615890827314054
+        },
+        "updateRouteTotalMs": {
+          "min": 57.76264600000286,
+          "median": 80.90503799999715,
+          "mean": 76.73801820000081,
+          "p95": 93.32495700000436,
+          "stdev": 11.883083316546948
+        },
+        "userMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "sysMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "maxRssKb": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        }
+      },
+      "devRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 129.51805400000012,
+            "median": 144.22667600000568,
+            "mean": 142.13009879999953,
+            "p95": 160.24255099998845,
+            "stdev": 9.091988731324408
+          },
+          "bytes": {
+            "min": 2551,
+            "median": 2552,
+            "mean": 2551.5,
+            "p95": 2552,
+            "stdev": 0.5
+          }
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 15.409186999997473,
+            "median": 23.675703999993857,
+            "mean": 23.525459100000443,
+            "p95": 30.41379700000107,
+            "stdev": 3.8191327194272064
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2933,
+            "mean": 2932.5,
+            "p95": 2933,
+            "stdev": 0.5
+          }
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 14.420579000005091,
+            "median": 21.014556000001903,
+            "mean": 23.749448999999004,
+            "p95": 36.18767800000205,
+            "stdev": 7.55668261386869
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2933,
+            "mean": 2932.5,
+            "p95": 2933,
+            "stdev": 0.5
+          }
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 13.567459999998391,
+            "median": 21.869281999999657,
+            "mean": 21.332920100000774,
+            "p95": 31.85157299999264,
+            "stdev": 5.3630768133193465
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3011,
+            "mean": 3010.5,
+            "p95": 3011,
+            "stdev": 0.5
+          }
+        },
+        {
+          "path": "/route-0051",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 17.31367699999828,
+            "median": 22.898350999996183,
+            "mean": 23.104636599999502,
+            "p95": 29.070523999995203,
+            "stdev": 3.2583652167931785
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2933,
+            "mean": 2932.5,
+            "p95": 2933,
+            "stdev": 0.5
+          }
+        },
+        {
+          "path": "/route-0101",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 19.839806999996654,
+            "median": 27.842365999997128,
+            "mean": 28.345565500001975,
+            "p95": 41.7087840000022,
+            "stdev": 6.5841290179336625
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3011,
+            "mean": 3010.5,
+            "p95": 3011,
+            "stdev": 0.5
+          }
+        },
+        {
+          "path": "/route-0201",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 15.352979999996023,
+            "median": 18.979795999999624,
+            "mean": 18.905958700000337,
+            "p95": 25.725616000010632,
+            "stdev": 2.617257424009831
+          },
+          "bytes": {
+            "min": 2932,
+            "median": 2933,
+            "mean": 2932.5,
+            "p95": 2933,
+            "stdev": 0.5
+          }
+        },
+        {
+          "path": "/route-0256",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 21.193033000003197,
+            "median": 25.177423000001,
+            "mean": 29.564063000000168,
+            "p95": 50.42105900000024,
+            "stdev": 9.345095395661923
+          },
+          "bytes": {
+            "min": 3010,
+            "median": 3011,
+            "mean": 3010.5,
+            "p95": 3011,
+            "stdev": 0.5
+          }
+        }
+      ],
+      "devUpdateRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 57.750268000003416,
+            "median": 80.89363200000662,
+            "mean": 76.72456559999918,
+            "p95": 93.3107469999959,
+            "stdev": 11.88273967603682
+          },
+          "bytes": {
+            "min": 2551,
+            "median": 2551,
+            "mean": 2551.3,
+            "p95": 2552,
+            "stdev": 0.45825756949558405
+          }
+        }
+      ],
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-1024-ssr-esm-split",
+      "routeCount": 1024,
+      "variant": "ssr-esm-split",
+      "fixture": "default",
+      "fixtureStats": null,
+      "iterations": 5,
+      "devRoutePaths": [
+        "/",
+        "/route-0002",
+        "/route-0003",
+        "/route-0011",
+        "/route-0051",
+        "/route-0101",
+        "/route-0201",
+        "/route-1024"
+      ],
+      "cwd": ".benchmark/fixtures/synthetic-1024-ssr-esm-split",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 4525.292258000001,
+          "readyMs": 3321.0972290000063,
+          "routeTotalMs": 523.0213070000027,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 247.79488999999012,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 43.0167849999998,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 55.74630299999262,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 35.97180300000764,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 35.21127900001011,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 34.93366199999582,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 38.25069000000076,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 32.01199300000735,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 453.25289200000407,
+          "updateRouteTotalMs": 180.00845999999729,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 179.99112399999285,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4529.871503999995,
+          "readyMs": 3352.156382999994,
+          "routeTotalMs": 520.5030180000031,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 248.19422099999792,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 43.04768499999773,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 53.729790000012144,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 36.34090300000389,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 37.03859999999986,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 35.84997799999837,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 34.447249000004376,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 31.799020999998902,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 454.3691669999971,
+          "updateRouteTotalMs": 151.71143299998948,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 151.6987039999949,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4999.652688999995,
+          "readyMs": 3392.3324500000017,
+          "routeTotalMs": 538.1447269999917,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 260.5332630000048,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 41.89073899999494,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 58.119495999999344,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 37.912953999999445,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 36.34881300000416,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 39.03193299999111,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 35.2598880000005,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 28.99656600000162,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 452.5036449999898,
+          "updateRouteTotalMs": 563.1036000000022,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 563.0908519999939,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4428.569253000009,
+          "readyMs": 3212.421472000002,
+          "routeTotalMs": 529.3738460000022,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 246.83979800000088,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 42.324506000004476,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 54.222861999995075,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 36.479214999999385,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 37.07404600000882,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 39.592405000003055,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 41.07998399999633,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 31.70330599999579,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 454.6247730000032,
+          "updateRouteTotalMs": 170.54377899999963,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 170.53149999999732,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 4434.374411000012,
+          "readyMs": 3237.4707800000033,
+          "routeTotalMs": 514.2551590000076,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 242.45837100000062,
+              "bytes": 2550
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 44.747495000003255,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 53.799050999994506,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 37.749085000003106,
+              "bytes": 3009
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 35.83233800000744,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 34.61213100000168,
+              "bytes": 3009
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 36.54357899999013,
+              "bytes": 2931
+            },
+            {
+              "path": "/route-1024",
+              "status": 200,
+              "ok": true,
+              "ms": 28.45686600000772,
+              "bytes": 3009
+            }
+          ],
+          "updateMs": 451.8931569999986,
+          "updateRouteTotalMs": 174.05907700001262,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 174.0441249999858,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 4428.569253000009,
+          "median": 4525.292258000001,
+          "mean": 4583.552023000002,
+          "p95": 4999.652688999995,
+          "stdev": 212.45666923045445
+        },
+        "readyMs": {
+          "min": 3212.421472000002,
+          "median": 3321.0972290000063,
+          "mean": 3303.0956628000013,
+          "p95": 3392.3324500000017,
+          "stdev": 68.15078717332837
+        },
+        "routeTotalMs": {
+          "min": 514.2551590000076,
+          "median": 523.0213070000027,
+          "mean": 525.0596114000015,
+          "p95": 538.1447269999917,
+          "stdev": 8.142312820724204
+        },
+        "updateMs": {
+          "min": 451.8931569999986,
+          "median": 453.25289200000407,
+          "mean": 453.32872679999855,
+          "p95": 454.6247730000032,
+          "stdev": 1.0497259743940122
+        },
+        "updateRouteTotalMs": {
+          "min": 151.71143299998948,
+          "median": 174.05907700001262,
+          "mean": 247.88526980000023,
+          "p95": 563.1036000000022,
+          "stdev": 157.89317707237754
+        },
+        "userMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "sysMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "maxRssKb": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        }
+      },
+      "devRouteSummary": [
+        {
+          "path": "/",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 242.45837100000062,
+            "median": 247.79488999999012,
+            "mean": 249.16410859999888,
+            "p95": 260.5332630000048,
+            "stdev": 6.040570334458711
+          },
+          "bytes": {
+            "min": 2550,
+            "median": 2551,
+            "mean": 2551,
+            "p95": 2552,
+            "stdev": 0.6324555320336759
+          }
+        },
+        {
+          "path": "/route-0002",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 41.89073899999494,
+            "median": 43.0167849999998,
+            "mean": 43.00544200000004,
+            "p95": 44.747495000003255,
+            "stdev": 0.9739505535527289
+          },
+          "bytes": {
+            "min": 2931,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2933,
+            "stdev": 0.6324555320336759
+          }
+        },
+        {
+          "path": "/route-0003",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 53.729790000012144,
+            "median": 54.222861999995075,
+            "mean": 55.12350039999874,
+            "p95": 58.119495999999344,
+            "stdev": 1.6656300389669763
+          },
+          "bytes": {
+            "min": 2931,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2933,
+            "stdev": 0.6324555320336759
+          }
+        },
+        {
+          "path": "/route-0011",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 35.97180300000764,
+            "median": 36.479214999999385,
+            "mean": 36.89079200000269,
+            "p95": 37.912953999999445,
+            "stdev": 0.7871208737481661
+          },
+          "bytes": {
+            "min": 3009,
+            "median": 3010,
+            "mean": 3010,
+            "p95": 3011,
+            "stdev": 0.6324555320336759
+          }
+        },
+        {
+          "path": "/route-0051",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 35.21127900001011,
+            "median": 36.34881300000416,
+            "mean": 36.30101520000608,
+            "p95": 37.07404600000882,
+            "stdev": 0.7142934814205746
+          },
+          "bytes": {
+            "min": 2931,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2933,
+            "stdev": 0.6324555320336759
+          }
+        },
+        {
+          "path": "/route-0101",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 34.61213100000168,
+            "median": 35.84997799999837,
+            "mean": 36.80402179999801,
+            "p95": 39.592405000003055,
+            "stdev": 2.0953042651612965
+          },
+          "bytes": {
+            "min": 3009,
+            "median": 3010,
+            "mean": 3010,
+            "p95": 3011,
+            "stdev": 0.6324555320336759
+          }
+        },
+        {
+          "path": "/route-0201",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 34.447249000004376,
+            "median": 36.54357899999013,
+            "mean": 37.11627799999842,
+            "p95": 41.07998399999633,
+            "stdev": 2.362021999037296
+          },
+          "bytes": {
+            "min": 2931,
+            "median": 2932,
+            "mean": 2932,
+            "p95": 2933,
+            "stdev": 0.6324555320336759
+          }
+        },
+        {
+          "path": "/route-1024",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 28.45686600000772,
+            "median": 31.70330599999579,
+            "mean": 30.59355040000228,
+            "p95": 32.01199300000735,
+            "stdev": 1.5370410318340815
+          },
+          "bytes": {
+            "min": 3009,
+            "median": 3010,
+            "mean": 3010,
+            "p95": 3011,
+            "stdev": 0.6324555320336759
+          }
+        }
+      ],
+      "devUpdateRouteSummary": [
+        {
+          "path": "/",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 151.6987039999949,
+            "median": 174.0441249999858,
+            "mean": 247.87126099999296,
+            "p95": 563.0908519999939,
+            "stdev": 157.89372939465616
+          },
+          "bytes": {
+            "min": 2551,
+            "median": 2551,
+            "mean": 2551.4,
+            "p95": 2552,
+            "stdev": 0.4898979485566356
+          }
+        }
+      ],
+      "pluginOperations": []
+    },
+    {
+      "id": "synthetic-256-sourcemaps",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "sourceMap": true,
+      "fixture": "default",
+      "fixtureStats": null,
+      "iterations": 10,
+      "devRoutePaths": [
+        "/",
+        "/route-0002",
+        "/route-0003",
+        "/route-0011",
+        "/route-0051",
+        "/route-0101",
+        "/route-0201",
+        "/route-0256"
+      ],
+      "cwd": ".benchmark/fixtures/synthetic-256-sourcemaps",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 2122.7373780000053,
+          "readyMs": 1577.5574049999996,
+          "routeTotalMs": 298.0182599999971,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 181.7897779999912,
+              "bytes": 2549
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 18.28657500000554,
+              "bytes": 2930
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 13.945191999999224,
+              "bytes": 2930
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 16.27027700000326,
+              "bytes": 3008
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 14.95865600000252,
+              "bytes": 2930
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 16.45413600000029,
+              "bytes": 3008
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 16.946467000001576,
+              "bytes": 2930
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 19.309892999997828,
+              "bytes": 3008
+            }
+          ],
+          "updateMs": 151.6477409999934,
+          "updateRouteTotalMs": 57.610568000003695,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 57.59831000000122,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2202.6724410000024,
+          "readyMs": 1624.2799200000009,
+          "routeTotalMs": 284.4788280000066,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 169.64542499999516,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 16.508887000003597,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 14.665376999997534,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 16.62778999999864,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 15.39274199999636,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 17.394883999993908,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 16.98900400000275,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 17.200788999994984,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 153.0649080000003,
+          "updateRouteTotalMs": 107.11854100000346,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 107.10619299999962,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2133.4929700000066,
+          "readyMs": 1591.3455539999995,
+          "routeTotalMs": 301.67162000000826,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 184.12684099999024,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 22.397981999994954,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 13.609741000007489,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 13.264113999990514,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 17.152658999999403,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 16.15871299999708,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 12.99105499999132,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 21.92184399999678,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 125.76215300000331,
+          "updateRouteTotalMs": 75.78168899999582,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 75.76966099999845,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2114.229920999991,
+          "readyMs": 1529.412480999992,
+          "routeTotalMs": 340.4706950000109,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 209.80888199999754,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 21.219624999997905,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 16.034962999998243,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 21.514767999993637,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 19.116815999994287,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 17.85590899999079,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 17.476900000008754,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 17.381183000004967,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 127.49425000000338,
+          "updateRouteTotalMs": 80.17693600000348,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 80.16536899999483,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2163.3375099999976,
+          "readyMs": 1643.179105999996,
+          "routeTotalMs": 277.10135199999786,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 167.25508499999705,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 15.876952000005986,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 13.423107999988133,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 15.959733000010601,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 14.7295310000045,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 15.893666000003577,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 17.47190699999919,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 16.43482500000391,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 126.0347630000033,
+          "updateRouteTotalMs": 83.3877819999907,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 83.37650600000052,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2192.2732770000002,
+          "readyMs": 1599.0382269999973,
+          "routeTotalMs": 303.5784069999936,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 178.9342789999937,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 21.983846000002814,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 17.313125000000582,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 14.996201000001747,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 19.004241000002366,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 18.3077820000035,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 12.396243999988656,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 20.554816999996547,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 154.00445500000205,
+          "updateRouteTotalMs": 102.33178100000077,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 102.31990299999597,
+              "bytes": 2551
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2172.1201470000087,
+          "readyMs": 1628.1377080000093,
+          "routeTotalMs": 300.95426299999235,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 179.15056199999526,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 20.53330100000312,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 16.979326000000583,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 14.604298000005656,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 18.41158399998676,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 16.939978000009432,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 13.88321200000064,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 20.400957999998354,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 127.33201900000859,
+          "updateRouteTotalMs": 78.74200800000108,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 78.72999100000015,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2162.7254089999915,
+          "readyMs": 1640.4695829999982,
+          "routeTotalMs": 279.198246999993,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 164.3651830000017,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 16.311488000006648,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 14.100009000001592,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 16.629804999989574,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 16.148690000001807,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 16.771753000008175,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 17.31194400000095,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 17.507540000005974,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 129.51296100000036,
+          "updateRouteTotalMs": 78.57845900001121,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 78.53796899999725,
+              "bytes": 2550
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2283.011759000001,
+          "readyMs": 1700.602211000005,
+          "routeTotalMs": 277.3615060000011,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 162.73224499999196,
+              "bytes": 2552
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 16.582563999996637,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 14.880201000007219,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 13.479930999994394,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 15.731088000000454,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 19.183323000004748,
+              "bytes": 3011
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 13.801021000006585,
+              "bytes": 2933
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 20.92300100000284,
+              "bytes": 3011
+            }
+          ],
+          "updateMs": 155.34788699999626,
+          "updateRouteTotalMs": 112.53334100000211,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 112.51756800001021,
+              "bytes": 2552
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 2140.4408200000034,
+          "readyMs": 1625.920093000008,
+          "routeTotalMs": 275.0339019999956,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 167.45630900000106,
+              "bytes": 2551
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 15.81901600000856,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0003",
+              "status": 200,
+              "ok": true,
+              "ms": 13.554971000005025,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0011",
+              "status": 200,
+              "ok": true,
+              "ms": 13.689157000000705,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0051",
+              "status": 200,
+              "ok": true,
+              "ms": 15.393773999996483,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0101",
+              "status": 200,
+              "ok": true,
+              "ms": 19.096707000004244,
+              "bytes": 3010
+            },
+            {
+              "path": "/route-0201",
+              "status": 200,
+              "ok": true,
+              "ms": 13.301614000010886,
+              "bytes": 2932
+            },
+            {
+              "path": "/route-0256",
+              "status": 200,
+              "ok": true,
+              "ms": 16.674835000012536,
+              "bytes": 3010
+            }
+          ],
+          "updateMs": 128.76172199999564,
+          "updateRouteTotalMs": 76.29799500000081,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 76.28704000001017,
+              "bytes": 2550
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 2114.229920999991,
+          "median": 2163.3375099999976,
+          "mean": 2168.704163200001,
+          "p95": 2283.011759000001,
+          "stdev": 46.873043418966056
+        },
+        "readyMs": {
+          "min": 1529.412480999992,
+          "median": 1625.920093000008,
+          "mean": 1615.9942288000007,
+          "p95": 1700.602211000005,
+          "stdev": 43.2204377023009
+        },
+        "routeTotalMs": {
+          "min": 275.0339019999956,
+          "median": 298.0182599999971,
+          "mean": 293.78670799999963,
+          "p95": 340.4706950000109,
+          "stdev": 18.989575162921657
+        },
+        "updateMs": {
+          "min": 125.76215300000331,
+          "median": 129.51296100000036,
+          "mean": 137.89628590000066,
+          "p95": 155.34788699999626,
+          "stdev": 12.824509710903653
+        },
+        "updateRouteTotalMs": {
+          "min": 57.610568000003695,
+          "median": 80.17693600000348,
+          "mean": 85.25591000000131,
+          "p95": 112.53334100000211,
+          "stdev": 16.01309912494033
+        },
+        "userMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "sysMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "maxRssKb": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        }
+      },
+      "devRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 162.73224499999196,
+            "median": 178.9342789999937,
+            "mean": 176.52645889999548,
+            "p95": 209.80888199999754,
+            "stdev": 13.26507869371663
+          },
+          "bytes": {
+            "min": 2549,
+            "median": 2551,
+            "mean": 2551.2,
+            "p95": 2552,
+            "stdev": 0.8717797887081347
+          }
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 15.81901600000856,
+            "median": 18.28657500000554,
+            "mean": 18.552023600002578,
+            "p95": 22.397981999994954,
+            "stdev": 2.556938364289587
+          },
+          "bytes": {
+            "min": 2930,
+            "median": 2932,
+            "mean": 2932.2,
+            "p95": 2933,
+            "stdev": 0.8717797887081347
+          }
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 13.423107999988133,
+            "median": 14.665376999997534,
+            "mean": 14.850601300000562,
+            "p95": 17.313125000000582,
+            "stdev": 1.366479883595727
+          },
+          "bytes": {
+            "min": 2930,
+            "median": 2932,
+            "mean": 2932.2,
+            "p95": 2933,
+            "stdev": 0.8717797887081347
+          }
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 13.264113999990514,
+            "median": 15.959733000010601,
+            "mean": 15.703607399998873,
+            "p95": 21.514767999993637,
+            "stdev": 2.2919650502613957
+          },
+          "bytes": {
+            "min": 3008,
+            "median": 3010,
+            "mean": 3010.2,
+            "p95": 3011,
+            "stdev": 0.8717797887081347
+          }
+        },
+        {
+          "path": "/route-0051",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 14.7295310000045,
+            "median": 16.148690000001807,
+            "mean": 16.603978099998493,
+            "p95": 19.116815999994287,
+            "stdev": 1.605168343139833
+          },
+          "bytes": {
+            "min": 2930,
+            "median": 2932,
+            "mean": 2932.2,
+            "p95": 2933,
+            "stdev": 0.8717797887081347
+          }
+        },
+        {
+          "path": "/route-0101",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 15.893666000003577,
+            "median": 17.394883999993908,
+            "mean": 17.405685100001573,
+            "p95": 19.183323000004748,
+            "stdev": 1.1136197056328994
+          },
+          "bytes": {
+            "min": 3008,
+            "median": 3010,
+            "mean": 3010.2,
+            "p95": 3011,
+            "stdev": 0.8717797887081347
+          }
+        },
+        {
+          "path": "/route-0201",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 12.396243999988656,
+            "median": 16.946467000001576,
+            "mean": 15.256936800001132,
+            "p95": 17.476900000008754,
+            "stdev": 2.0263226493573128
+          },
+          "bytes": {
+            "min": 2930,
+            "median": 2932,
+            "mean": 2932.2,
+            "p95": 2933,
+            "stdev": 0.8717797887081347
+          }
+        },
+        {
+          "path": "/route-0256",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 16.43482500000391,
+            "median": 19.309892999997828,
+            "mean": 18.83096850000147,
+            "p95": 21.92184399999678,
+            "stdev": 1.9104251419635023
+          },
+          "bytes": {
+            "min": 3008,
+            "median": 3010,
+            "mean": 3010.2,
+            "p95": 3011,
+            "stdev": 0.8717797887081347
+          }
+        }
+      ],
+      "devUpdateRouteSummary": [
+        {
+          "path": "/",
+          "count": 10,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 57.59831000000122,
+            "median": 80.16536899999483,
+            "mean": 85.24085100000084,
+            "p95": 112.51756800001021,
+            "stdev": 16.013578480550187
+          },
+          "bytes": {
+            "min": 2550,
+            "median": 2552,
+            "mean": 2551.3,
+            "p95": 2552,
+            "stdev": 0.7810249675906654
+          }
+        }
+      ],
+      "pluginOperations": []
+    },
+    {
+      "id": "large-355-ssr-esm",
+      "routeCount": 355,
+      "variant": "ssr-esm",
+      "fixture": "large",
+      "devRoutePathOffset": 0,
+      "fixtureStats": {
+        "codeModules": 10895,
+        "dynamicImports": 1065,
+        "routes": 355,
+        "components": 6390,
+        "utilities": 1420,
+        "lazyModules": 1065,
+        "workers": 120,
+        "restrictedModules": 1187,
+        "svgAssets": 1184,
+        "cssModules": 217,
+        "localeFiles": 111,
+        "localeTotalBytes": 151289856
+      },
+      "iterations": 5,
+      "devRoutePaths": [
+        "/",
+        "/route-0001",
+        "/route-0002",
+        "/route-0010",
+        "/route-0050",
+        "/route-0100",
+        "/route-0200",
+        "/route-0354"
+      ],
+      "cwd": ".benchmark/fixtures/large-355-ssr-esm",
+      "command": "node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>",
+      "runs": [
+        {
+          "status": 0,
+          "wallMs": 14505.986936000001,
+          "readyMs": 9623.14850000001,
+          "routeTotalMs": 1857.5388550000207,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1649.1823640000075,
+              "bytes": 10385
+            },
+            {
+              "path": "/route-0001",
+              "status": 200,
+              "ok": true,
+              "ms": 28.072412999987137,
+              "bytes": 10998
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 30.77161499997601,
+              "bytes": 10848
+            },
+            {
+              "path": "/route-0010",
+              "status": 200,
+              "ok": true,
+              "ms": 30.79325700001209,
+              "bytes": 10920
+            },
+            {
+              "path": "/route-0050",
+              "status": 200,
+              "ok": true,
+              "ms": 35.15794899998582,
+              "bytes": 10997
+            },
+            {
+              "path": "/route-0100",
+              "status": 200,
+              "ok": true,
+              "ms": 26.055909999995492,
+              "bytes": 10847
+            },
+            {
+              "path": "/route-0200",
+              "status": 200,
+              "ok": true,
+              "ms": 29.540523000003304,
+              "bytes": 10993
+            },
+            {
+              "path": "/route-0354",
+              "status": 200,
+              "ok": true,
+              "ms": 27.88845399999991,
+              "bytes": 10841
+            }
+          ],
+          "updateMs": 1594.4313250000123,
+          "updateRouteTotalMs": 1265.1983300000138,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1265.1855510000023,
+              "bytes": 10384
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 14295.760012999992,
+          "readyMs": 9257.20924299999,
+          "routeTotalMs": 1920.2201540000096,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1729.3373070000089,
+              "bytes": 10384
+            },
+            {
+              "path": "/route-0001",
+              "status": 200,
+              "ok": true,
+              "ms": 26.542427000007592,
+              "bytes": 10997
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 24.781608000019332,
+              "bytes": 10847
+            },
+            {
+              "path": "/route-0010",
+              "status": 200,
+              "ok": true,
+              "ms": 29.07684799999697,
+              "bytes": 10919
+            },
+            {
+              "path": "/route-0050",
+              "status": 200,
+              "ok": true,
+              "ms": 28.50744499999564,
+              "bytes": 10996
+            },
+            {
+              "path": "/route-0100",
+              "status": 200,
+              "ok": true,
+              "ms": 29.21983800001908,
+              "bytes": 10846
+            },
+            {
+              "path": "/route-0200",
+              "status": 200,
+              "ok": true,
+              "ms": 23.05353799997829,
+              "bytes": 10992
+            },
+            {
+              "path": "/route-0354",
+              "status": 200,
+              "ok": true,
+              "ms": 29.6568280000065,
+              "bytes": 10840
+            }
+          ],
+          "updateMs": 1669.8252689999936,
+          "updateRouteTotalMs": 1278.5152799999923,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1278.501489999995,
+              "bytes": 10386
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 14375.257249999995,
+          "readyMs": 9528.372216999996,
+          "routeTotalMs": 1936.9460680000193,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1752.7440179999976,
+              "bytes": 10384
+            },
+            {
+              "path": "/route-0001",
+              "status": 200,
+              "ok": true,
+              "ms": 26.02700500001083,
+              "bytes": 10997
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 23.330086000001756,
+              "bytes": 10847
+            },
+            {
+              "path": "/route-0010",
+              "status": 200,
+              "ok": true,
+              "ms": 27.699380000005476,
+              "bytes": 10919
+            },
+            {
+              "path": "/route-0050",
+              "status": 200,
+              "ok": true,
+              "ms": 27.67765200001304,
+              "bytes": 10996
+            },
+            {
+              "path": "/route-0100",
+              "status": 200,
+              "ok": true,
+              "ms": 27.85665400000289,
+              "bytes": 10846
+            },
+            {
+              "path": "/route-0200",
+              "status": 200,
+              "ok": true,
+              "ms": 22.274980999995023,
+              "bytes": 10992
+            },
+            {
+              "path": "/route-0354",
+              "status": 200,
+              "ok": true,
+              "ms": 29.2877210000006,
+              "bytes": 10840
+            }
+          ],
+          "updateMs": 1568.248407999985,
+          "updateRouteTotalMs": 1253.695179000002,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1253.6827219999977,
+              "bytes": 10384
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 14275.187726999982,
+          "readyMs": 9281.052130999975,
+          "routeTotalMs": 1955.9188610000128,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1762.4301780000096,
+              "bytes": 10385
+            },
+            {
+              "path": "/route-0001",
+              "status": 200,
+              "ok": true,
+              "ms": 27.77813099999912,
+              "bytes": 10998
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 25.666257999982918,
+              "bytes": 10848
+            },
+            {
+              "path": "/route-0010",
+              "status": 200,
+              "ok": true,
+              "ms": 30.455881999980193,
+              "bytes": 10920
+            },
+            {
+              "path": "/route-0050",
+              "status": 200,
+              "ok": true,
+              "ms": 27.106537999992725,
+              "bytes": 10997
+            },
+            {
+              "path": "/route-0100",
+              "status": 200,
+              "ok": true,
+              "ms": 28.865623999998206,
+              "bytes": 10847
+            },
+            {
+              "path": "/route-0200",
+              "status": 200,
+              "ok": true,
+              "ms": 23.72390399998403,
+              "bytes": 10993
+            },
+            {
+              "path": "/route-0354",
+              "status": 200,
+              "ok": true,
+              "ms": 29.845207999984268,
+              "bytes": 10841
+            }
+          ],
+          "updateMs": 1673.23949800001,
+          "updateRouteTotalMs": 1275.749668000004,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1275.7361580000143,
+              "bytes": 10384
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        },
+        {
+          "status": 0,
+          "wallMs": 14190.899571000016,
+          "readyMs": 9229.851901000016,
+          "routeTotalMs": 1948.5715540000238,
+          "routeRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1763.7335039999743,
+              "bytes": 10385
+            },
+            {
+              "path": "/route-0001",
+              "status": 200,
+              "ok": true,
+              "ms": 25.936954000004334,
+              "bytes": 10998
+            },
+            {
+              "path": "/route-0002",
+              "status": 200,
+              "ok": true,
+              "ms": 23.71917600001325,
+              "bytes": 10848
+            },
+            {
+              "path": "/route-0010",
+              "status": 200,
+              "ok": true,
+              "ms": 27.339168000005884,
+              "bytes": 10920
+            },
+            {
+              "path": "/route-0050",
+              "status": 200,
+              "ok": true,
+              "ms": 27.72593399998732,
+              "bytes": 10997
+            },
+            {
+              "path": "/route-0100",
+              "status": 200,
+              "ok": true,
+              "ms": 28.74356400000397,
+              "bytes": 10847
+            },
+            {
+              "path": "/route-0200",
+              "status": 200,
+              "ok": true,
+              "ms": 22.004294999991544,
+              "bytes": 10993
+            },
+            {
+              "path": "/route-0354",
+              "status": 200,
+              "ok": true,
+              "ms": 29.323803999985103,
+              "bytes": 10841
+            }
+          ],
+          "updateMs": 1665.648290000012,
+          "updateRouteTotalMs": 1252.8479050000024,
+          "updateRouteRequests": [
+            {
+              "path": "/",
+              "status": 200,
+              "ok": true,
+              "ms": 1252.8349860000017,
+              "bytes": 10384
+            }
+          ],
+          "userMs": null,
+          "sysMs": null,
+          "maxRssKb": null,
+          "pluginReports": [],
+          "rspackProfiles": [],
+          "rspackTraceOutput": null
+        }
+      ],
+      "summary": {
+        "wallMs": {
+          "min": 14190.899571000016,
+          "median": 14295.760012999992,
+          "mean": 14328.618299399997,
+          "p95": 14505.986936000001,
+          "stdev": 106.33509878366506
+        },
+        "readyMs": {
+          "min": 9229.851901000016,
+          "median": 9281.052130999975,
+          "mean": 9383.926798399998,
+          "p95": 9623.14850000001,
+          "stdev": 160.29417426654555
+        },
+        "routeTotalMs": {
+          "min": 1857.5388550000207,
+          "median": 1936.9460680000193,
+          "mean": 1923.8390984000173,
+          "p95": 1955.9188610000128,
+          "stdev": 35.274402090022384
+        },
+        "updateMs": {
+          "min": 1568.248407999985,
+          "median": 1665.648290000012,
+          "mean": 1634.2785580000025,
+          "p95": 1673.23949800001,
+          "stdev": 44.075767222213635
+        },
+        "updateRouteTotalMs": {
+          "min": 1252.8479050000024,
+          "median": 1265.1983300000138,
+          "mean": 1265.2012724000028,
+          "p95": 1278.5152799999923,
+          "stdev": 10.710063755303752
+        },
+        "userMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "sysMs": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        },
+        "maxRssKb": {
+          "min": null,
+          "median": null,
+          "mean": null,
+          "p95": null,
+          "stdev": null
+        }
+      },
+      "devRouteSummary": [
+        {
+          "path": "/",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 1649.1823640000075,
+            "median": 1752.7440179999976,
+            "mean": 1731.4854741999995,
+            "p95": 1763.7335039999743,
+            "stdev": 42.96010329284138
+          },
+          "bytes": {
+            "min": 10384,
+            "median": 10385,
+            "mean": 10384.6,
+            "p95": 10385,
+            "stdev": 0.48989794855663565
+          }
+        },
+        {
+          "path": "/route-0001",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 25.936954000004334,
+            "median": 26.542427000007592,
+            "mean": 26.871386000001802,
+            "p95": 28.072412999987137,
+            "stdev": 0.8898324346927482
+          },
+          "bytes": {
+            "min": 10997,
+            "median": 10998,
+            "mean": 10997.6,
+            "p95": 10998,
+            "stdev": 0.48989794855663565
+          }
+        },
+        {
+          "path": "/route-0002",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 23.330086000001756,
+            "median": 24.781608000019332,
+            "mean": 25.653748599998654,
+            "p95": 30.77161499997601,
+            "stdev": 2.686831636797366
+          },
+          "bytes": {
+            "min": 10847,
+            "median": 10848,
+            "mean": 10847.6,
+            "p95": 10848,
+            "stdev": 0.48989794855663565
+          }
+        },
+        {
+          "path": "/route-0010",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 27.339168000005884,
+            "median": 29.07684799999697,
+            "mean": 29.07290700000012,
+            "p95": 30.79325700001209,
+            "stdev": 1.3974739242223695
+          },
+          "bytes": {
+            "min": 10919,
+            "median": 10920,
+            "mean": 10919.6,
+            "p95": 10920,
+            "stdev": 0.48989794855663565
+          }
+        },
+        {
+          "path": "/route-0050",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 27.106537999992725,
+            "median": 27.72593399998732,
+            "mean": 29.235103599994908,
+            "p95": 35.15794899998582,
+            "stdev": 2.99478294878718
+          },
+          "bytes": {
+            "min": 10996,
+            "median": 10997,
+            "mean": 10996.6,
+            "p95": 10997,
+            "stdev": 0.48989794855663565
+          }
+        },
+        {
+          "path": "/route-0100",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 26.055909999995492,
+            "median": 28.74356400000397,
+            "mean": 28.14831800000393,
+            "p95": 29.21983800001908,
+            "stdev": 1.1384410336923227
+          },
+          "bytes": {
+            "min": 10846,
+            "median": 10847,
+            "mean": 10846.6,
+            "p95": 10847,
+            "stdev": 0.48989794855663565
+          }
+        },
+        {
+          "path": "/route-0200",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 22.004294999991544,
+            "median": 23.05353799997829,
+            "mean": 24.119448199990437,
+            "p95": 29.540523000003304,
+            "stdev": 2.7769265048721645
+          },
+          "bytes": {
+            "min": 10992,
+            "median": 10993,
+            "mean": 10992.6,
+            "p95": 10993,
+            "stdev": 0.48989794855663565
+          }
+        },
+        {
+          "path": "/route-0354",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 27.88845399999991,
+            "median": 29.323803999985103,
+            "mean": 29.200402999995276,
+            "p95": 29.845207999984268,
+            "stdev": 0.6882092250410927
+          },
+          "bytes": {
+            "min": 10840,
+            "median": 10841,
+            "mean": 10840.6,
+            "p95": 10841,
+            "stdev": 0.48989794855663565
+          }
+        }
+      ],
+      "devUpdateRouteSummary": [
+        {
+          "path": "/",
+          "count": 5,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0,
+          "ms": {
+            "min": 1252.8349860000017,
+            "median": 1265.1855510000023,
+            "mean": 1265.1881814000021,
+            "p95": 1278.501489999995,
+            "stdev": 10.709631513248217
+          },
+          "bytes": {
+            "min": 10384,
+            "median": 10384,
+            "mean": 10384.4,
+            "p95": 10386,
+            "stdev": 0.7999999999999999
+          }
+        }
+      ],
+      "pluginOperations": []
+    }
+  ]
+}
