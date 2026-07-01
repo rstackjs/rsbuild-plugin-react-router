@@ -53,7 +53,10 @@ import {
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
-import { createRouteTransformExecutor } from './parallel-route-transforms.js';
+import {
+  createRouteTransformExecutor,
+  shouldParallelizeRouteTransforms,
+} from './parallel-route-transforms.js';
 import {
   createRouteTopologyWatcher,
   createRouteManifestSnapshot,
@@ -435,7 +438,9 @@ export const pluginReactRouter = (
     };
     const routeChunkCache: RouteChunkCache = new Map();
     const routeTransformExecutor = createRouteTransformExecutor({
-      parallelTransforms: pluginOptions.parallelTransforms,
+      parallelRouteTransform:
+        pluginOptions.parallelRouteTransform ??
+        shouldParallelizeRouteTransforms(routeCount),
       routeChunkCache,
       splitRouteModules: Boolean(splitRouteModules),
     });
