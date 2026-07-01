@@ -430,17 +430,6 @@ const validatePrerenderPathMatches = (
   }
 };
 
-export const runBoundedPrerenderTasks = (
-  prerenderPaths: string[],
-  concurrency: number,
-  renderPath: (path: string) => Promise<void>
-): Promise<void> =>
-  runPluginEffect(
-    createBoundedPrerenderTasksEffect(prerenderPaths, concurrency, path =>
-      tryPluginPromise(() => renderPath(path))
-    )
-  );
-
 export const createBoundedPrerenderTasksEffect = (
   prerenderPaths: string[],
   concurrency: number,

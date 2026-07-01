@@ -3,7 +3,6 @@ import { Effect } from 'effect';
 import {
   createBoundedPrerenderTasksEffect,
   createBuildRequestEffect,
-  runBoundedPrerenderTasks,
   withBuildRequest,
 } from '../src/prerender-build';
 import {
@@ -15,7 +14,7 @@ import {
   resolvePrerenderPaths,
   validatePrerenderConfig,
 } from '../src/prerender';
-import { runPluginEffect } from '../src/effect-runtime';
+import { runPluginEffect, tryPluginPromise } from '../src/effect-runtime';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
 const routes: RouteConfigEntry[] = [
@@ -385,18 +384,18 @@ describe('prerender build scheduler', () => {
     let maxActive = 0;
     const completed: string[] = [];
 
-    await runBoundedPrerenderTasks(
-      ['/slow', '/fast', '/medium'],
-      2,
-      async path => {
-        active += 1;
-        maxActive = Math.max(maxActive, active);
-        await new Promise(resolve =>
-          setTimeout(resolve, path === '/slow' ? 15 : 1)
-        );
-        completed.push(path);
-        active -= 1;
-      }
+    await runPluginEffect(
+      createBoundedPrerenderTasksEffect(['/slow', '/fast', '/medium'], 2, path =>
+        tryPluginPromise(async () => {
+          active += 1;
+          maxActive = Math.max(maxActive, active);
+          await new Promise(resolve =>
+            setTimeout(resolve, path === '/slow' ? 15 : 1)
+          );
+          completed.push(path);
+          active -= 1;
+        })
+      )
     );
 
     expect(maxActive).toBeLessThanOrEqual(2);
@@ -407,18 +406,18 @@ describe('prerender build scheduler', () => {
     const started: string[] = [];
 
     await expect(
-      runBoundedPrerenderTasks(
-        ['/fail', '/slow', '/later'],
-        2,
-        async path => {
-          started.push(path);
-          await new Promise(resolve =>
-            setTimeout(resolve, path === '/fail' ? 1 : 15)
-          );
-          if (path === '/fail') {
-            throw new Error('prerender failed');
-          }
-        }
+      runPluginEffect(
+        createBoundedPrerenderTasksEffect(['/fail', '/slow', '/later'], 2, path =>
+          tryPluginPromise(async () => {
+            started.push(path);
+            await new Promise(resolve =>
+              setTimeout(resolve, path === '/fail' ? 1 : 15)
+            );
+            if (path === '/fail') {
+              throw new Error('prerender failed');
+            }
+          })
+        )
       )
     ).rejects.toThrow('prerender failed');
 

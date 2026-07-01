@@ -4,7 +4,7 @@ import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
 import { getCappedPluginConcurrency } from './concurrency.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import { tryPluginPromise } from './effect-runtime.js';
 import { resolveServerBuildModuleEffect } from './server-utils.js';
 
 export type ReactRouterDevManifest = ReactRouterManifestForDev;
@@ -164,12 +164,6 @@ export const evaluateServerBuildsEffect = (
       evaluated => Object.fromEntries(evaluated) as Record<string, ServerBuild>
     )
   );
-
-export const evaluateServerBuilds = (
-  server: RsbuildDevServer,
-  entryNames: readonly string[]
-): Promise<ReactRouterServerBuilds> =>
-  runPluginEffect(evaluateServerBuildsEffect(server, entryNames));
 
 const assertBuildMatchesManifest = (
   entryName: string,
