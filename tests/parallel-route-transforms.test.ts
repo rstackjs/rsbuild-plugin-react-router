@@ -4,6 +4,7 @@ import { getExportNames } from '../src/export-utils';
 import {
   executeRouteTransformTask,
   type RouteTransformResult,
+  type RouteClientEntryTransformTask,
   type RouteModuleTransformTask,
 } from '../src/route-transform-tasks';
 import {
@@ -46,6 +47,21 @@ const createRouteModuleTask = (
   isBuild: false,
   isSpaMode: false,
   rootRoutePath: '/app/root.tsx',
+  ...overrides,
+});
+
+const createRouteClientEntryTask = (
+  overrides: Partial<Omit<RouteClientEntryTransformTask, 'kind'>> = {}
+): RouteClientEntryTransformTask => ({
+  kind: 'routeClientEntry' as const,
+  code: `
+    export async function clientLoader() { return null; }
+    export default function Route() { return null; }
+  `,
+  resourcePath,
+  environmentName: 'web',
+  isBuild: true,
+  routeChunkConfig,
   ...overrides,
 });
 
@@ -100,12 +116,12 @@ describe('parallel route transforms', () => {
     [2, 0],
     [3, 1],
     [4, 1],
-    [5, 3],
-    [6, 4],
-    [8, 4],
-    [10, 4],
-    [12, 4],
-    [24, 4],
+    [5, 2],
+    [6, 2],
+    [8, 2],
+    [10, 2],
+    [12, 2],
+    [24, 2],
   ])('caps default worker count by available CPUs', (cpus, workers) => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
@@ -290,6 +306,45 @@ describe('parallel route transforms', () => {
 
     await executor.close();
     expect(workers.map(worker => worker.terminateCalls)).toEqual([1, 1]);
+  });
+
+  it('keeps related route source transforms on the same worker', async () => {
+    const workers: FakeRouteTransformWorker[] = [];
+    const executor = createRouteTransformExecutorForTesting(
+      {
+        parallelRouteTransform: 2,
+        splitRouteModules: true,
+      },
+      () => {
+        const worker = new FakeRouteTransformWorker();
+        workers.push(worker);
+        return worker;
+      }
+    );
+    const code = `
+      export async function clientLoader() { return null; }
+      export default function Route() { return null; }
+    `;
+
+    const clientEntry = executor.run(createRouteClientEntryTask({ code }));
+    expect(workers).toHaveLength(1);
+    expect(workers[0]?.messages[0]?.task.code).toBe(code);
+    resolveWorkerMessage(workers[0]!, { code: 'client' });
+    await expect(clientEntry).resolves.toEqual({ code: 'client' });
+
+    const routeModule = executor.run(
+      createRouteModuleTask({
+        code,
+        environmentName: 'node',
+        isBuild: true,
+      })
+    );
+    expect(workers).toHaveLength(1);
+    expect(workers[0]?.messages[1]?.task.code).toBeUndefined();
+    resolveWorkerMessage(workers[0]!, { code: 'module' });
+    await expect(routeModule).resolves.toEqual({ code: 'module' });
+
+    await executor.close();
   });
 
   it('can prewarm worker slots before the first route transform', async () => {

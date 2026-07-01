@@ -60,7 +60,7 @@ class WorkerStartupError extends Error {
 
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
-const DEFAULT_WORKER_COUNT_LIMIT = 4;
+const DEFAULT_WORKER_COUNT_LIMIT = 2;
 const SMALL_MACHINE_WORKER_COUNT_LIMIT = 1;
 const SMALL_MACHINE_CPU_COUNT = 4;
 
@@ -151,9 +151,8 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #closePromise: Promise<void> | undefined;
   #workersDisabled = false;
   #nextId = 1;
-  #nextRouteModuleWorkerIndex = 0;
-  #nextSplitRouteAnalysisWorkerIndex = 0;
-  #splitRouteAnalysisWorkers = new Map<string, number>();
+  #nextRouteSourceWorkerIndex = 0;
+  #routeSourceWorkers = new Map<string, number>();
   #workers: Array<WorkerState | undefined> | undefined;
   #prewarmScheduled = false;
 
@@ -354,28 +353,36 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
         task.kind === 'routeChunk' ||
         task.kind === 'splitRouteExports')
     ) {
-      const existingWorkerIndex = this.#splitRouteAnalysisWorkers.get(
-        task.resourcePath
+      return this.#getRouteSourceWorkerIndex(
+        task.resourcePath,
+        safeWorkerCount
       );
-      if (existingWorkerIndex !== undefined) {
-        return existingWorkerIndex % safeWorkerCount;
-      }
-      const workerIndex =
-        this.#nextSplitRouteAnalysisWorkerIndex % safeWorkerCount;
-      this.#nextSplitRouteAnalysisWorkerIndex += 1;
-      this.#splitRouteAnalysisWorkers.set(task.resourcePath, workerIndex);
-      return workerIndex;
     }
     if (
       this.balanceRouteModuleTransforms &&
       task.kind === 'routeModule' &&
       !(task.environmentName === 'web' && !task.ssr && task.isSpaMode)
     ) {
-      const workerIndex = this.#nextRouteModuleWorkerIndex % safeWorkerCount;
-      this.#nextRouteModuleWorkerIndex += 1;
-      return workerIndex;
+      return this.#getRouteSourceWorkerIndex(
+        task.resourcePath,
+        safeWorkerCount
+      );
     }
     return hashString(task.resourcePath) % safeWorkerCount;
+  }
+
+  #getRouteSourceWorkerIndex(
+    resourcePath: string,
+    safeWorkerCount: number
+  ): number {
+    const existingWorkerIndex = this.#routeSourceWorkers.get(resourcePath);
+    if (existingWorkerIndex !== undefined) {
+      return existingWorkerIndex % safeWorkerCount;
+    }
+    const workerIndex = this.#nextRouteSourceWorkerIndex % safeWorkerCount;
+    this.#nextRouteSourceWorkerIndex += 1;
+    this.#routeSourceWorkers.set(resourcePath, workerIndex);
+    return workerIndex;
   }
 }
 
