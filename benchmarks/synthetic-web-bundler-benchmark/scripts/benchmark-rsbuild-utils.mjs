@@ -46,6 +46,16 @@ export function parseArgs(argv) {
   return { out, profile, runs };
 }
 
+export function expandProfiles(profile) {
+  if (profile === 'both') {
+    return ['cold', 'warm'];
+  }
+  if (profile === 'all') {
+    return ['cold', 'warm', 'dev'];
+  }
+  return [profile];
+}
+
 const numeric = value => typeof value === 'number' && Number.isFinite(value);
 
 export function summarizeMetric(values) {

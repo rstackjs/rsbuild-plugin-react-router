@@ -9,6 +9,7 @@ import {
   runDevServerBenchmark,
 } from '../../../scripts/benchmark/dev-server.mjs';
 import {
+  expandProfiles,
   formatMarkdown,
   isReactRouterPerformanceLoggingEnabled,
   parseArgs,
@@ -33,12 +34,7 @@ const devRouteTimeoutMs = readPositiveIntegerEnv(
 await run(process.execPath, [path.join(root, 'scripts/generate-app.mjs')]);
 
 const results = [];
-const selectedProfiles =
-  profile === 'both'
-    ? ['cold', 'warm']
-    : profile === 'all'
-      ? ['cold', 'dev']
-      : [profile];
+const selectedProfiles = expandProfiles(profile);
 
 for (const selectedProfile of selectedProfiles) {
   if (selectedProfile === 'warm') {

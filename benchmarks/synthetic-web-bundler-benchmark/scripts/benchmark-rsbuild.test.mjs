@@ -8,6 +8,7 @@ import {
   runDevServerBenchmark,
 } from '../../../scripts/benchmark/dev-server.mjs';
 import {
+  expandProfiles,
   formatMarkdown,
   parseArgs,
   parseReactRouterPerformanceLogs,
@@ -31,6 +32,12 @@ test('parseArgs accepts runs, profile, and output directory', () => {
       runs: 2,
     }
   );
+});
+
+test('expandProfiles maps grouped profiles to concrete benchmark runs', () => {
+  assert.deepEqual(expandProfiles('cold'), ['cold']);
+  assert.deepEqual(expandProfiles('both'), ['cold', 'warm']);
+  assert.deepEqual(expandProfiles('all'), ['cold', 'warm', 'dev']);
 });
 
 test('summarizeResults reports build and dev metrics', () => {
