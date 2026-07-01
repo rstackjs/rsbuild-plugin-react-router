@@ -214,9 +214,9 @@ export const registerReactRouterDevBackgroundResources = ({
       lazyCompilationPrewarmController?.schedule();
     });
 
-    api.onAfterCreateCompiler(() => {
-      routeTransformExecutor.prewarm();
-    });
+    // Spawn transform workers now so thread startup overlaps Rsbuild's own
+    // compiler creation instead of delaying the first route transform.
+    routeTransformExecutor.prewarm();
   }
 
   const closeRouteTopologyWatcher = async (): Promise<void> => {
