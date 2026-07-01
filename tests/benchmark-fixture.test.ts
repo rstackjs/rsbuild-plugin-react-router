@@ -138,6 +138,31 @@ describe('benchmark fixture generator', () => {
     }
   });
 
+  it('uses current plugin option names for benchmark environment toggles', async () => {
+    const { generateSyntheticFixture } = await import(
+      '../scripts/benchmark/fixture.mts'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
+
+    try {
+      await generateSyntheticFixture({
+        root,
+        routeCount: 1,
+        variant: 'ssr-esm',
+      });
+
+      const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
+      expect(rsbuildConfig).toContain('REACT_ROUTER_BENCHMARK_LAZY_COMPILATION');
+      expect(rsbuildConfig).toContain(
+        'REACT_ROUTER_BENCHMARK_LAZY_COMPILATION_PREWARM'
+      );
+      expect(rsbuildConfig).toContain('unstableLazyCompilationPrewarm: true');
+      expect(rsbuildConfig).not.toContain('lazyCompilationPrewarm: true');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('omits server-only route exports from SPA benchmark fixtures', async () => {
     const { generateSyntheticFixture } = await import(
       '../scripts/benchmark/fixture.mts'
@@ -737,7 +762,6 @@ describe('benchmark fixture generator', () => {
     }
   });
 });
-
 function writeJson(file: string, value: unknown) {
   writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }

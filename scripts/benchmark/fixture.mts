@@ -250,6 +250,21 @@ const renderParallelRouteTransformOption = parallelRouteTransform => {
   return [`      parallelRouteTransform: ${parallelRouteTransform},`];
 };
 
+const benchmarkEnv = {
+  lazyCompilation: 'REACT_ROUTER_BENCHMARK_LAZY_COMPILATION',
+  lazyCompilationPrewarm: 'REACT_ROUTER_BENCHMARK_LAZY_COMPILATION_PREWARM',
+  logPerformance: 'REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE',
+};
+
+const renderBenchmarkEnvOption = (envName, enabledOption) =>
+  `      ...(process.env.${envName} === '1' ? { ${enabledOption}: true } : {}),`;
+
+const renderLazyCompilationOption = () =>
+  `      ...(process.env.${benchmarkEnv.lazyCompilation} === '0'` +
+  ` ? { lazyCompilation: false }` +
+  ` : process.env.${benchmarkEnv.lazyCompilation} === '1'` +
+  ` ? { lazyCompilation: true } : {}),`;
+
 const createRsbuildConfig = ({
   variant,
   sourceMap,
@@ -258,14 +273,6 @@ const createRsbuildConfig = ({
   parallelRouteTransform,
 }) => {
   const ssr = variant !== 'spa';
-  const lazyCompilationOption =
-    `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '0'` +
-    ` ? { lazyCompilation: false }` +
-    ` : process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '1'` +
-    ` ? { lazyCompilation: true } : {}),`;
-  const lazyCompilationPrewarmOption =
-    `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION_PREWARM === '1'` +
-    ` ? { lazyCompilationPrewarm: true } : {}),`;
 
   return [
     `import { defineConfig } from '@rsbuild/core';`,
@@ -278,9 +285,12 @@ const createRsbuildConfig = ({
     '    pluginReactRouter({',
     ...(ssr ? [`      serverOutput: 'module',`] : []),
     ...renderParallelRouteTransformOption(parallelRouteTransform),
-    lazyCompilationOption,
-    lazyCompilationPrewarmOption,
-    `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
+    renderLazyCompilationOption(),
+    renderBenchmarkEnvOption(
+      benchmarkEnv.lazyCompilationPrewarm,
+      'unstableLazyCompilationPrewarm'
+    ),
+    `      logPerformance: process.env.${benchmarkEnv.logPerformance} === '1',`,
     '    }),',
     '  ],',
     '  output: {',
