@@ -636,25 +636,19 @@ The plugin automatically:
 
 ### Benchmarking
 
-`pnpm bench:large` runs this repository's generated stress fixture, which is
-useful for quick regression checks but is not the full OpenAI support
-application shape. For the exact synthetic support reproduction, run:
+`pnpm bench:large` runs this repository's generated stress fixture for quick
+regression checks. `pnpm bench:synthetic-app` runs the embedded complex Rsbuild
+app under `benchmarks/synthetic-web-bundler-benchmark`, which adds heavier
+loader and transform contention for benchmark coverage closer to a large
+real-world application.
 
 ```bash
-pnpm bench:support-repro
+pnpm bench:large
+pnpm bench:synthetic-app -- --profile all --runs 2
 ```
 
-That command runs the support repo's `benchmark:rsbuild-modes` script with the
-`rsbuild-optimized` mode, `cold` profile, 3 runs, and React Router performance
-logs.
-By default it copies the support repo into `.benchmark/support-repro/workdir`,
-packs the current plugin branch, installs that tarball into the copied app, and
-runs the copied benchmark scripts there. Use `--package=installed` to benchmark
-the support repo's existing package spec, or `--package=<specifier>` to
-benchmark a canary such as `pkg.pr.new`.
-The PR benchmark workflow reports both `rsbuild-optimized` and
-`rsbuild-js-transform-contention` so transform-heavy regressions are visible in
-the same comment as the large local fixture.
+The PR benchmark workflow reports production build, dev route-load, HMR/update,
+and embedded synthetic app timings in the same benchmark comment.
 
 ## React Router Framework Mode
 

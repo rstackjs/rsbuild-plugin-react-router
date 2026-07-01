@@ -2,7 +2,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -11,7 +10,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from '@rstest/core';
-import { Effect } from 'effect';
 
 describe('benchmark fixture generator', () => {
   it('creates a deterministic synthetic React Router app', async () => {
@@ -30,6 +28,8 @@ describe('benchmark fixture generator', () => {
 
       expect(result.routeCount).toBe(8);
       expect(result.variant).toBe('ssr-esm-split');
+      expect(result.updateFile).toBe(join(root, 'app/routes/route-0001.tsx'));
+      expect(result.updateRoutePaths).toEqual(['/']);
       expect(existsSync(join(root, 'app/routes.ts'))).toBe(true);
       expect(existsSync(join(root, 'rsbuild.config.mjs'))).toBe(true);
 
@@ -278,6 +278,10 @@ describe('benchmark fixture generator', () => {
 
       expect(result.fixture).toBe('large');
       expect(result.routeCount).toBe(2);
+      expect(result.updateFile).toBe(
+        join(root, 'app/generated/routes/route-0000.tsx')
+      );
+      expect(result.updateRoutePaths).toEqual(['/']);
       expect(result.stats).toEqual({
         codeModules: 19,
         dynamicImports: 2,
@@ -338,6 +342,7 @@ describe('benchmark fixture generator', () => {
         'scripts/bench-builds.mts',
         '--profile=smoke',
         '--iterations=1',
+        '--large-iterations=1',
         '--warmup=0',
         '--filter=missing',
         '--rspack-profile=ALL',
@@ -377,264 +382,292 @@ describe('benchmark fixture generator', () => {
     expect(result.stderr).not.toContain('Unknown profile "large"');
   });
 
-  it('parses support reproduction benchmark defaults', async () => {
-    const { parseSupportReproArgs } = await import(
-      '../scripts/bench-support-repro.mts'
-    );
-    const options = await Effect.runPromise(parseSupportReproArgs([]));
-
-    expect(options.repo).toBe(
-      '/home/zack/Downloads/openai-support/synthetic-build-repro/synthetic-web-bundler-benchmark'
-    );
-    expect(options.runs).toBe(3);
-    expect(options.profile).toBe('cold');
-    expect(options.modes).toBe('rsbuild-optimized');
-    expect(options.packageSpec).toBe('local');
-    expect(options.workdir).toBe('.benchmark/support-repro/workdir');
-  });
-
-  it('accepts support reproduction benchmark overrides', async () => {
-    const { parseSupportReproArgs } = await import(
-      '../scripts/bench-support-repro.mts'
-    );
-    const options = await Effect.runPromise(
-      parseSupportReproArgs([
-        '--repo=/tmp/synthetic-web-bundler-benchmark',
-        '--runs=5',
-        '--profile=both',
-        '--modes=rsbuild-optimized,rsbuild-no-tailwind',
-        '--package=installed',
-        '--skip-build',
-        '--rspack-profile=OVERVIEW',
-        '--out=.benchmark/results/support',
-        '--workdir=.benchmark/support/workdir',
-        '--dry-run',
-      ])
-    );
-
-    expect(options.repo).toBe('/tmp/synthetic-web-bundler-benchmark');
-    expect(options.runs).toBe(5);
-    expect(options.profile).toBe('both');
-    expect(options.modes).toBe('rsbuild-optimized,rsbuild-no-tailwind');
-    expect(options.packageSpec).toBe('installed');
-    expect(options.skipBuild).toBe(true);
-    expect(options.rspackProfile).toBe('OVERVIEW');
-    expect(options.out).toBe('.benchmark/results/support');
-    expect(options.workdir).toBe('.benchmark/support/workdir');
-    expect(options.dryRun).toBe(true);
-  });
-
-  it('accepts a leading separator in support reproduction benchmark args', async () => {
-    const { parseSupportReproArgs } = await import(
-      '../scripts/bench-support-repro.mts'
-    );
-    const options = await Effect.runPromise(
-      parseSupportReproArgs(['--', '--dry-run', '--runs=1'])
-    );
-
-    expect(options.dryRun).toBe(true);
-    expect(options.runs).toBe(1);
-  });
-
-  it('materializes the support reproduction benchmark without copied build outputs', async () => {
-    const { isCopiedSupportEntry, materializeSupportBenchmarkRepo } =
-      await import('../scripts/bench-support-repro.mts');
-    expect(isCopiedSupportEntry('node_modules')).toBe(false);
-    expect(isCopiedSupportEntry('benchmark-results')).toBe(false);
-    expect(isCopiedSupportEntry('app')).toBe(true);
-    const sourceRoot = mkdtempSync(join(tmpdir(), 'rr-support-source-'));
-    const workdir = mkdtempSync(join(tmpdir(), 'rr-support-workdir-'));
-
-    try {
-      writeFileSync(
-        join(sourceRoot, 'package.json'),
-        JSON.stringify({
-          scripts: { 'benchmark:rsbuild-modes': 'node scripts/bench.mjs' },
-          devDependencies: { 'rsbuild-plugin-react-router': 'file:plugin.tgz' },
-        })
-      );
-      mkdirSync(join(sourceRoot, 'scripts'), { recursive: true });
-      writeFileSync(join(sourceRoot, 'scripts/bench.mjs'), '');
-      mkdirSync(join(sourceRoot, 'app'), { recursive: true });
-      writeFileSync(join(sourceRoot, 'app/root.tsx'), 'export default null;');
-      mkdirSync(join(sourceRoot, 'node_modules'), { recursive: true });
-      writeFileSync(join(sourceRoot, 'node_modules/ignored.txt'), '');
-      mkdirSync(join(sourceRoot, 'benchmark-results'), { recursive: true });
-      writeFileSync(join(sourceRoot, 'benchmark-results/ignored.json'), '{}');
-
-      await Effect.runPromise(
-        materializeSupportBenchmarkRepo({ sourceRepo: sourceRoot, workdir })
-      );
-
-      expect(existsSync(join(workdir, 'package.json'))).toBe(true);
-      expect(existsSync(join(workdir, 'scripts/bench.mjs'))).toBe(true);
-      expect(existsSync(join(workdir, 'app/root.tsx'))).toBe(true);
-      const workdirEntries = readdirSync(workdir).sort();
-      expect(workdirEntries).not.toContain('node_modules');
-      expect(workdirEntries).not.toContain('benchmark-results');
-    } finally {
-      rmSync(sourceRoot, { recursive: true, force: true });
-      rmSync(workdir, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects invalid support reproduction run counts', async () => {
-    const { parseSupportReproArgs } = await import(
-      '../scripts/bench-support-repro.mts'
-    );
-
-    await expect(
-      Effect.runPromise(parseSupportReproArgs(['--runs=0']))
-    ).rejects.toThrow('--runs must be a positive integer.');
-  });
-
-  it('rejects mixed benchmark modes in CI reports', () => {
+  it('renders the embedded synthetic app benchmark row in CI reports', () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
+
     try {
-      const base = join(root, 'base.json');
-      const head = join(root, 'head.json');
-      writeFileSync(
-        base,
-        JSON.stringify({ mode: 'build', benchmarks: [] }),
-        'utf8'
-      );
-      writeFileSync(
-        head,
-        JSON.stringify({ mode: 'dev', benchmarks: [] }),
-        'utf8'
-      );
+      const baseBenchmark = {
+        commit: 'base-sha',
+        profile: 'full',
+        mode: 'dev',
+        iterations: 1,
+        warmup: 0,
+        benchmarks: [
+          {
+            id: 'large-355-ssr-esm',
+            fixture: 'large',
+            routeCount: 355,
+            variant: 'ssr-esm',
+            summary: {
+              wallMs: { median: 1000, mean: 1020, p95: 1100 },
+              readyMs: { median: 700 },
+              routeTotalMs: { median: 300 },
+              updateMs: { median: 220 },
+              updateRouteTotalMs: { median: 180 },
+              maxRssKb: { p95: 512000 },
+            },
+            runs: [{ wallMs: 1000 }],
+            devRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 240, mean: 240, p95: 240 },
+                bytes: { median: 4096 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 180, mean: 180, p95: 180 },
+                bytes: { median: 4096 },
+              },
+            ],
+            pluginOperations: [],
+          },
+          {
+            id: 'synthetic-256-spa',
+            routeCount: 256,
+            variant: 'spa',
+            summary: {
+              wallMs: { median: 800, mean: 810, p95: 900 },
+              readyMs: { median: 500 },
+              routeTotalMs: { median: 250 },
+              updateMs: { median: 160 },
+              updateRouteTotalMs: { median: 90 },
+              maxRssKb: { p95: 256000 },
+            },
+            runs: [{ wallMs: 800 }],
+            devRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 120, mean: 125, p95: 150 },
+                bytes: { median: 2048 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 90, mean: 95, p95: 110 },
+                bytes: { median: 2048 },
+              },
+            ],
+            pluginOperations: [
+              {
+                environment: 'web',
+                operation: 'route:module',
+                count: 256,
+                totalMs: 600,
+                wallMs: 400,
+                maxMs: 20,
+                reports: 1,
+              },
+            ],
+          },
+        ],
+      };
+      const headBenchmark = {
+        ...baseBenchmark,
+        commit: 'head-sha',
+        benchmarks: [
+          {
+            ...baseBenchmark.benchmarks[0],
+            summary: {
+              wallMs: { median: 900, mean: 920, p95: 1000 },
+              readyMs: { median: 650 },
+              routeTotalMs: { median: 250 },
+              updateMs: { median: 200 },
+              updateRouteTotalMs: { median: 150 },
+              maxRssKb: { p95: 500000 },
+            },
+            runs: [{ wallMs: 900 }],
+            devRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 200, mean: 200, p95: 200 },
+                bytes: { median: 4096 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 150, mean: 150, p95: 150 },
+                bytes: { median: 4096 },
+              },
+            ],
+          },
+          {
+            ...baseBenchmark.benchmarks[1],
+            summary: {
+              wallMs: { median: 760, mean: 780, p95: 840 },
+              readyMs: { median: 460 },
+              routeTotalMs: { median: 230 },
+              updateMs: { median: 140 },
+              updateRouteTotalMs: { median: 80 },
+              maxRssKb: { p95: 250000 },
+            },
+            runs: [{ wallMs: 760 }],
+            devRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 100, mean: 105, p95: 130 },
+                bytes: { median: 2048 },
+              },
+            ],
+            devUpdateRouteSummary: [
+              {
+                path: '/route-0001',
+                count: 1,
+                statuses: ['200'],
+                failures: 0,
+                ms: { median: 80, mean: 85, p95: 100 },
+                bytes: { median: 2048 },
+              },
+            ],
+            pluginOperations: [
+              {
+                environment: 'web',
+                operation: 'route:module',
+                count: 256,
+                totalMs: 500,
+                wallMs: 350,
+                maxMs: 18,
+                reports: 1,
+              },
+            ],
+          },
+        ],
+      };
+      const baseBuildBenchmark = {
+        ...baseBenchmark,
+        mode: 'build',
+        benchmarks: baseBenchmark.benchmarks.map(benchmark => ({
+          ...benchmark,
+          summary: {
+            wallMs: benchmark.summary.wallMs,
+            userMs: { median: 700 },
+            sysMs: { median: 100 },
+            maxRssKb: benchmark.summary.maxRssKb,
+          },
+          devRouteSummary: [],
+          devUpdateRouteSummary: [],
+        })),
+      };
+      const headBuildBenchmark = {
+        ...headBenchmark,
+        mode: 'build',
+        benchmarks: headBenchmark.benchmarks.map(benchmark => ({
+          ...benchmark,
+          summary: {
+            wallMs: benchmark.summary.wallMs,
+            userMs: { median: 650 },
+            sysMs: { median: 90 },
+            maxRssKb: benchmark.summary.maxRssKb,
+          },
+          devRouteSummary: [],
+          devUpdateRouteSummary: [],
+        })),
+      };
+      const baseSynthetic = {
+        generatedAt: '2026-06-15T00:00:00.000Z',
+        node: 'v22.22.2',
+        platform: 'linux-x64',
+        runs: 1,
+        summaries: [
+          {
+            mode: 'rsbuild',
+            profile: 'cold',
+            median: 40,
+            mean: 40,
+            samples: [40],
+          },
+          {
+            mode: 'rsbuild',
+            profile: 'dev',
+            median: 12,
+            mean: 12,
+            samples: [12],
+            readyMs: { median: 9000 },
+            routeTotalMs: { median: 2200 },
+            updateMs: { median: 800 },
+          },
+        ],
+      };
+      const headSynthetic = {
+        ...baseSynthetic,
+        summaries: [
+          {
+            ...baseSynthetic.summaries[0],
+            median: 36,
+            mean: 36,
+            samples: [36],
+          },
+          {
+            ...baseSynthetic.summaries[1],
+            median: 11,
+            mean: 11,
+            samples: [11],
+            readyMs: { median: 8500 },
+            routeTotalMs: { median: 2000 },
+            updateMs: { median: 700 },
+          },
+        ],
+      };
 
-      const result = spawnSync(
-        process.execPath,
-        ['scripts/report-benchmark-ci.mts', '--base', base, '--head', head],
-        {
-          cwd: process.cwd(),
-          encoding: 'utf8',
-        }
-      );
-
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        'Cannot compare benchmark results with different modes: base=build, head=dev.'
-      );
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('includes support reproduction benchmarks in CI reports', () => {
-    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
-    try {
-      const base = join(root, 'base.json');
-      const head = join(root, 'head.json');
-      const supportBase = join(root, 'support-base.json');
-      const supportHead = join(root, 'support-head.json');
-      const supportBaseWorkdir = join(root, 'support-base-workdir');
-      const supportHeadWorkdir = join(root, 'support-head-workdir');
-      const outDir = join(root, 'report');
-      mkdirSync(join(supportBaseWorkdir, 'benchmark-results'), {
-        recursive: true,
+      mkdirSync(join(root, 'base-synthetic'), { recursive: true });
+      mkdirSync(join(root, 'head-synthetic'), { recursive: true });
+      writeJson(join(root, 'base.json'), baseBenchmark);
+      writeJson(join(root, 'head.json'), headBenchmark);
+      writeJson(join(root, 'base-build.json'), baseBuildBenchmark);
+      writeJson(join(root, 'head-build.json'), headBuildBenchmark);
+      writeJson(join(root, 'base-synthetic/result-rsbuild.json'), baseSynthetic);
+      writeJson(join(root, 'head-synthetic/result-rsbuild.json'), headSynthetic);
+      writeJson(join(root, 'base-synthetic/latest.json'), {
+        outputDirectory: join(root, 'base-synthetic'),
+        generatedFiles: ['result-rsbuild.json'],
       });
-      mkdirSync(join(supportHeadWorkdir, 'benchmark-results'), {
-        recursive: true,
+      writeJson(join(root, 'head-synthetic/latest.json'), {
+        outputDirectory: join(root, 'head-synthetic'),
+        generatedFiles: ['result-rsbuild.json'],
       });
-      writeFileSync(
-        base,
-        JSON.stringify({ mode: 'dev', benchmarks: [] }),
-        'utf8'
-      );
-      writeFileSync(
-        head,
-        JSON.stringify({ mode: 'dev', benchmarks: [] }),
-        'utf8'
-      );
-      writeFileSync(
-        join(
-          supportBaseWorkdir,
-          'benchmark-results/2026-06-30T00-00-00Z-rsbuild-modes.json'
-        ),
-        JSON.stringify({
-          profile: 'cold',
-          runs: 1,
-          summaries: [
-            {
-              mode: 'rsbuild-optimized',
-              samples: [70],
-              median: 70,
-              mean: 70,
-            },
-            {
-              mode: 'rsbuild-js-transform-contention',
-              samples: [95],
-              median: 95,
-              mean: 95,
-            },
-          ],
-        }),
-        'utf8'
-      );
-      writeFileSync(
-        join(
-          supportHeadWorkdir,
-          'benchmark-results/2026-06-30T00-00-01Z-rsbuild-modes.json'
-        ),
-        JSON.stringify({
-          profile: 'cold',
-          runs: 1,
-          summaries: [
-            {
-              mode: 'rsbuild-optimized',
-              samples: [63],
-              median: 63,
-              mean: 63,
-            },
-            {
-              mode: 'rsbuild-js-transform-contention',
-              samples: [76],
-              median: 76,
-              mean: 76,
-            },
-          ],
-        }),
-        'utf8'
-      );
-      writeFileSync(
-        supportBase,
-        JSON.stringify({
-          generatedFiles: [
-            'benchmark-results/2026-06-30T00-00-00Z-rsbuild-modes.json',
-          ],
-          packageSpec: 'base.tgz',
-          workdir: supportBaseWorkdir,
-        }),
-        'utf8'
-      );
-      writeFileSync(
-        supportHead,
-        JSON.stringify({
-          generatedFiles: [
-            'benchmark-results/2026-06-30T00-00-01Z-rsbuild-modes.json',
-          ],
-          packageSpec: 'head.tgz',
-          workdir: supportHeadWorkdir,
-        }),
-        'utf8'
-      );
 
       const result = spawnSync(
         process.execPath,
         [
           'scripts/report-benchmark-ci.mts',
           '--base',
-          base,
+          join(root, 'base.json'),
           '--head',
-          head,
-          '--support-base',
-          supportBase,
-          '--support-head',
-          supportHead,
+          join(root, 'head.json'),
+          '--build-base',
+          join(root, 'base-build.json'),
+          '--build-head',
+          join(root, 'head-build.json'),
+          '--synthetic-base',
+          join(root, 'base-synthetic/latest.json'),
+          '--synthetic-head',
+          join(root, 'head-synthetic/latest.json'),
           '--out',
-          outDir,
+          join(root, 'report'),
         ],
         {
           cwd: process.cwd(),
@@ -642,13 +675,69 @@ describe('benchmark fixture generator', () => {
         }
       );
 
-      expect(result.status).toBe(0);
-      const comment = readFileSync(join(outDir, 'comment.md'), 'utf8');
-      expect(comment).toContain('### Support Repo Benchmarks');
-      expect(comment).toContain('| `rsbuild-optimized` | 70.00s | 63.00s | -10.0% | 1.11x | `1` | `cold` |');
-      expect(comment).toContain('| `rsbuild-js-transform-contention` | 95.00s | 76.00s | -20.0% | 1.25x | `1` | `cold` |');
+      expect(result.status, result.stderr || result.stdout).toBe(0);
+      const comment = readFileSync(join(root, 'report/comment.md'), 'utf8');
+      const report = JSON.parse(
+        readFileSync(join(root, 'report/report.json'), 'utf8')
+      );
+      expect(comment).toContain('### Production Build Benchmarks');
+      expect(comment).toContain('Rendered 2 production build benchmarks.');
+      expect(comment).toContain('### Dev Rollup');
+      expect(comment).toContain(
+        '| All dev fixtures | 2 | 1.80s | 1.66s | -7.8% | 1.20s | 1.11s | -7.5% | 0.55s | 0.48s | -12.7% | 0.38s | 0.34s | -10.5% | 1.08x |'
+      );
+      expect(comment).toContain(
+        '| Large app | 1 | 1.00s | 0.90s | -10.0% | 0.70s | 0.65s | -7.1% | 0.30s | 0.25s | -16.7% | 0.22s | 0.20s | -9.1% | 1.11x |'
+      );
+      expect(comment).toContain(
+        '| Standard fixtures | 1 | 0.80s | 0.76s | -5.0% | 0.50s | 0.46s | -8.0% | 0.25s | 0.23s | -8.0% | 0.16s | 0.14s | -12.5% | 1.05x |'
+      );
+      expect(comment).toContain('Rendered 2 dev benchmark fixtures');
+      expect(comment).toContain('`large-355-ssr-esm`');
+      expect(comment).toContain('`synthetic-256-spa`');
+      expect(comment).not.toContain('Dev Route Requests');
+      expect(comment).not.toContain('Dev Update Route Requests');
+      expect(comment).toContain('#### synthetic-256-spa Plugin Operations');
+      expect(comment).toContain('`route:module`');
+      expect(comment).toContain('| web | `route:module` | 256 | 600.0ms | 500.0ms | -16.7% | 350.0ms | 18.0ms | 1 |');
+      expect(comment).toContain('### Synthetic Rsbuild App');
+      expect(comment).toContain('Rendered 1 production build benchmark.');
+      expect(comment).toContain('Rendered 1 dev benchmark fixture from the embedded complex app.');
+      expect(comment).toContain('complex app');
+      expect(comment).toContain('| complex app | 1 | 40.00s | 36.00s | -10.0% | 36.00s | - | 1.11x | - |');
+      expect(comment).toContain('| complex app | 1 | 12.00s | 11.00s | -8.3% | 9.00s | 8.50s | 2.20s | 2.00s | 0.80s | 0.70s | -12.5% | 11.00s | - | 1.09x | - |');
+      expect(report.benchmarks).toHaveLength(2);
+      expect(report.benchmarks.map((benchmark: { id: string }) => benchmark.id)).toEqual([
+        'large-355-ssr-esm',
+        'synthetic-256-spa',
+      ]);
+      expect(report.summaryGroups).toHaveLength(3);
+      expect(report.summary.headWallMs).toBe(1660);
+      expect(report.benchmarks[0].devRouteSummaries).toHaveLength(1);
+      expect(
+        report.benchmarks.find(
+          (benchmark: { id: string }) => benchmark.id === 'synthetic-256-spa'
+        ).pluginOperations
+      ).toHaveLength(1);
+      expect(report.syntheticBenchmark).toMatchObject({
+        profile: 'cold',
+        baseMedianSeconds: 40,
+        headMedianSeconds: 36,
+        deltaPercent: -10,
+      });
+      expect(report.syntheticBenchmarks).toHaveLength(2);
+      expect(report.syntheticBenchmarks[1]).toMatchObject({
+        profile: 'dev',
+        headReadyMs: 8500,
+        headRouteTotalMs: 2000,
+        headUpdateMs: 700,
+      });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 });
+
+function writeJson(file: string, value: unknown) {
+  writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+}

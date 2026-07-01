@@ -800,6 +800,8 @@ const generateLargeFixture = async ({
     fixture: 'large',
     parallelRouteTransform,
     stats: createLargeStats(config),
+    updateFile: path.join(root, 'app/generated/routes/route-0000.tsx'),
+    updateRoutePaths: ['/'],
   };
 };
 
@@ -911,5 +913,7 @@ export async function generateSyntheticFixture({
     sourceMap,
     fixture,
     parallelRouteTransform,
+    updateFile: path.join(root, 'app', routeFile(1)),
+    updateRoutePaths: ['/'],
   };
 }
