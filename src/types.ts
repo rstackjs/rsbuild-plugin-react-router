@@ -31,12 +31,13 @@ export type PluginOptions = {
   federation?: boolean;
 
   /**
-   * Opt in to Rsbuild's dev-only lazy compilation behavior.
+   * Rsbuild dev-only lazy compilation behavior.
    *
    * React Router's browser manifest remains eager so initial dev requests can
    * discover browser assets without lazy proxy delays.
    *
-   * @default undefined
+   * Pass `false` to disable.
+   * @default true
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
 
