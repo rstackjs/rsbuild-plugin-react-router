@@ -225,6 +225,7 @@ export const createLazyCompilationPrewarmController = ({
 }): LazyCompilationPrewarmController => {
   let serverOrigin: string | undefined;
   let manifest: ReactRouterManifestForDev | null = null;
+  let lastPrewarmAssetsKey: string | undefined;
   const task = createDelayedPluginTask({
     delayMs: config.delayMs,
     run: () =>
@@ -247,6 +248,19 @@ export const createLazyCompilationPrewarmController = ({
     },
     setManifest(nextManifest) {
       manifest = nextManifest;
+      if (!nextManifest) {
+        lastPrewarmAssetsKey = undefined;
+        return;
+      }
+      const assetsKey = collectLazyCompilationPrewarmAssets(
+        nextManifest,
+        config
+      ).join('\n');
+      if (assetsKey === lastPrewarmAssetsKey) {
+        return;
+      }
+      lastPrewarmAssetsKey = assetsKey;
+      task.reschedule();
     },
     schedule() {
       task.schedule();
@@ -257,6 +271,7 @@ export const createLazyCompilationPrewarmController = ({
     cancelEffect() {
       manifest = null;
       serverOrigin = undefined;
+      lastPrewarmAssetsKey = undefined;
       return task.cancelEffect();
     },
   };

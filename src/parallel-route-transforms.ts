@@ -60,6 +60,7 @@ class WorkerStartupError extends Error {
 }
 
 const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
+const MAX_ROUTE_SOURCE_WORKER_ENTRIES = 4096;
 const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
 const DEFAULT_WORKER_COUNT_LIMIT = 2;
 const SMALL_MACHINE_WORKER_COUNT_LIMIT = 1;
@@ -379,7 +380,12 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     }
     const workerIndex = this.#nextRouteSourceWorkerIndex % safeWorkerCount;
     this.#nextRouteSourceWorkerIndex += 1;
-    this.#routeSourceWorkers.set(resourcePath, workerIndex);
+    setBoundedCacheEntry(
+      this.#routeSourceWorkers,
+      resourcePath,
+      workerIndex,
+      MAX_ROUTE_SOURCE_WORKER_ENTRIES
+    );
     return workerIndex;
   }
 }

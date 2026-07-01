@@ -250,7 +250,6 @@ export const registerReactRouterDevBackgroundResources = ({
   return {
     setManifest(manifest) {
       lazyCompilationPrewarmController?.setManifest(manifest);
-      lazyCompilationPrewarmController?.reschedule();
     },
   };
 };
