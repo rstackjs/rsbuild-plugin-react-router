@@ -33,12 +33,45 @@ export type PluginOptions = {
   /**
    * Opt in to Rsbuild's dev-only lazy compilation behavior.
    *
-   * React Router hydration modules remain eager so initial dev requests can
-   * load the browser manifest and route modules without lazy proxy delays.
+   * React Router's browser manifest remains eager so initial dev requests can
+   * discover browser assets without lazy proxy delays.
    *
    * @default undefined
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
+
+  /**
+   * Prewarm Rspack lazy-compilation proxy modules after dev compiles.
+   * This only runs when lazy compilation is enabled and is disabled by default.
+   *
+   * @default false
+   */
+  lazyCompilationPrewarm?:
+    | boolean
+    | {
+        /**
+         * Include the browser entry module in the prewarm request.
+         * @default true
+         */
+        entry?: boolean;
+        /**
+         * Include route modules in the prewarm request. Pass a number to cap
+         * the number of route assets or an array of route IDs to target.
+         * @default true
+         */
+        routes?: boolean | number | string[];
+        /**
+         * Delay prewarming after a dev compile so higher-priority startup work
+         * can settle first.
+         * @default 0
+         */
+        delayMs?: number;
+        /**
+         * Override the Rspack lazy-compilation trigger prefix.
+         * @default "/_rspack/lazy/trigger"
+         */
+        triggerPrefix?: string;
+      };
 
   /**
    * Emit structured React Router plugin timing logs.

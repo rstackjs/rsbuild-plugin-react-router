@@ -72,6 +72,7 @@ pluginReactRouter({
   customServer: false,
   serverOutput: 'module',
   lazyCompilation: undefined,
+  lazyCompilationPrewarm: false,
   logPerformance: false,
   parallelRouteTransform: undefined,
   onRouteTopologyChange: undefined,
@@ -84,6 +85,7 @@ pluginReactRouter({
 | `customServer`           | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
 | `serverOutput`           | `'module'`  | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
 | `lazyCompilation`        | `undefined` | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
+| `lazyCompilationPrewarm` | `false`     | Prewarms emitted Rspack lazy-compilation proxy modules after dev compiles. Pass `{ routes: 16 }` to cap route assets or `{ routes: ['root'] }` to target route IDs.                                                             |
 | `logPerformance`         | `false`     | Logs structured React Router plugin timing information through the Rsbuild logger.                                                                                                                                               |
 | `parallelRouteTransform` | `undefined` | Controls worker-thread route transforms. `undefined` auto-enables workers for 256+ routes, `true` forces the default worker count, a positive integer sets the worker count, and `false` keeps transforms inline.                |
 | `onRouteTopologyChange`  | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
@@ -234,6 +236,20 @@ by default to avoid gzipping and printing thousands of assets. Set
 Route transform source maps are generated in development only. If you enable
 Rsbuild source maps for faster local debugging, prefer a cheap JS map:
 `output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
+
+Lazy compilation prewarming is disabled by default. When enabled alongside
+`lazyCompilation`, the plugin fetches emitted browser entry and route JS assets,
+extracts Rspack's lazy proxy activation keys, and POSTs those keys to the Rspack
+lazy trigger endpoint after dev compiles. It does not request application routes
+or run route loaders. Pass `{ routes: 16 }` to cap route assets or
+`{ routes: ['root', 'routes/about'] }` to target specific route IDs. Use
+`delayMs` when you want to move this work farther behind the ready signal.
+
+Subresource Integrity is disabled by default. Enable it with
+`subResourceIntegrity: true` in `react-router.config.*` when the deployed app
+should emit integrity metadata for browser scripts. The legacy
+`future.unstable_subResourceIntegrity` flag is still accepted and is normalized
+to the stable option.
 
 ### Route Configuration
 

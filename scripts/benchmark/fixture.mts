@@ -263,6 +263,9 @@ const createRsbuildConfig = ({
     ` ? { lazyCompilation: false }` +
     ` : process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '1'` +
     ` ? { lazyCompilation: true } : {}),`;
+  const lazyCompilationPrewarmOption =
+    `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION_PREWARM === '1'` +
+    ` ? { lazyCompilationPrewarm: true } : {}),`;
 
   return [
     `import { defineConfig } from '@rsbuild/core';`,
@@ -276,6 +279,7 @@ const createRsbuildConfig = ({
     ...(ssr ? [`      serverOutput: 'module',`] : []),
     ...renderParallelRouteTransformOption(parallelRouteTransform),
     lazyCompilationOption,
+    lazyCompilationPrewarmOption,
     `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
     '    }),',
     '  ],',
