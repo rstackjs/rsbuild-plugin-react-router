@@ -14,17 +14,21 @@ concurrency:
 
 jobs:
   benchmark:
-    name: Compare large dev benchmark
+    name: Compare full build and dev benchmark
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     env:
-      BENCHMARK_PROFILE: large
+      BENCHMARK_PROFILE: full
+      BENCHMARK_BUILD_ITERATIONS: '10'
+      BENCHMARK_LARGE_ITERATIONS: '5'
       BENCHMARK_MODE: dev
-      BENCHMARK_ITERATIONS: '5'
+      BENCHMARK_ITERATIONS: '10'
       BENCHMARK_WARMUP: '0'
       BENCHMARK_DEV_ROUTES: auto
       BENCHMARK_HISTORY_BRANCH: benchmark-results
+      SYNTHETIC_BENCHMARK_PROFILE: all
+      SYNTHETIC_BENCHMARK_RUNS: '2'
 
     steps:
       - name: Checkout PR head
@@ -75,6 +79,14 @@ jobs:
         working-directory: base
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve synthetic benchmark checkout
+        id: synthetic-benchmark
+        run: node head/scripts/benchmark/ci-resolve-synthetic.mjs
+
+      - name: Test benchmark scripts
+        working-directory: head/benchmarks/synthetic-web-bundler-benchmark
+        run: pnpm test:benchmark
+
       - name: Resolve benchmark-only React plugin
         id: benchmark-imports
         shell: bash
@@ -82,7 +94,75 @@ jobs:
           node -e "const { pathToFileURL } = require('node:url'); console.log('PLUGIN_REACT_IMPORT=' + pathToFileURL(process.argv[1]).href)" \
             "$GITHUB_WORKSPACE/head/node_modules/@rsbuild/plugin-react/dist/index.js" >> "$GITHUB_OUTPUT"
 
-      - name: Benchmark base
+      - name: Restore base benchmark results
+        id: base-benchmark-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            benchmark-output/build/base
+            benchmark-output/dev/base
+            benchmark-output/synthetic/base
+          key: >-
+            ${{ runner.os }}-benchmark-base-${{ github.event.pull_request.base.sha }}-${{
+            hashFiles(
+              'head/.nvmrc',
+              'head/package.json',
+              'head/pnpm-lock.yaml',
+              'head/scripts/bench-builds.mjs',
+              'head/scripts/bench-synthetic-app.mjs',
+              'head/scripts/benchmark/**',
+              'head/benchmarks/synthetic-web-bundler-benchmark/**',
+              'base/package.json',
+              'base/pnpm-lock.yaml'
+            ) }}-${{ env.BENCHMARK_PROFILE }}-${{ env.BENCHMARK_BUILD_ITERATIONS }}-${{
+            env.BENCHMARK_LARGE_ITERATIONS }}-${{ env.BENCHMARK_MODE }}-${{
+            env.BENCHMARK_ITERATIONS }}-${{ env.BENCHMARK_WARMUP }}-${{
+            env.BENCHMARK_DEV_ROUTES }}-${{ env.SYNTHETIC_BENCHMARK_PROFILE }}-${{
+            env.SYNTHETIC_BENCHMARK_RUNS }}
+
+      - name: Validate cached base benchmark results
+        if: steps.base-benchmark-cache.outputs.cache-hit == 'true'
+        env:
+          SYNTHETIC_BENCHMARK_SKIP: ${{ steps.synthetic-benchmark.outputs.SKIP }}
+        run: |
+          set -euo pipefail
+          test -f "$GITHUB_WORKSPACE/benchmark-output/build/base/baseline.json"
+          test -f "$GITHUB_WORKSPACE/benchmark-output/dev/base/baseline.json"
+          if [ "$SYNTHETIC_BENCHMARK_SKIP" = "false" ]; then
+            test -f "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json"
+          fi
+
+      - name: Benchmark base production build
+        if: steps.base-benchmark-cache.outputs.cache-hit != 'true'
+        working-directory: base
+        env:
+          REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
+        run: |
+          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mjs" \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode build \
+            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --clean build \
+            --format both \
+            --out "$GITHUB_WORKSPACE/benchmark-output/build/base"
+
+      - name: Benchmark head production build
+        working-directory: head
+        run: |
+          node scripts/bench-builds.mjs \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode build \
+            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --clean build \
+            --format both \
+            --out "$GITHUB_WORKSPACE/benchmark-output/build/head"
+
+      - name: Benchmark base dev
+        if: steps.base-benchmark-cache.outputs.cache-hit != 'true'
         working-directory: base
         env:
           REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
@@ -91,24 +171,50 @@ jobs:
             --profile "$BENCHMARK_PROFILE" \
             --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
-            --out "$GITHUB_WORKSPACE/benchmark-output/base"
+            --out "$GITHUB_WORKSPACE/benchmark-output/dev/base"
 
-      - name: Benchmark head
+      - name: Benchmark head dev
         working-directory: head
         run: |
           node scripts/bench-builds.mjs \
             --profile "$BENCHMARK_PROFILE" \
             --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
             --warmup "$BENCHMARK_WARMUP" \
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
-            --out "$GITHUB_WORKSPACE/benchmark-output/head"
+            --out "$GITHUB_WORKSPACE/benchmark-output/dev/head"
+
+      - name: Benchmark embedded synthetic app with base plugin
+        if: steps.synthetic-benchmark.outputs.SKIP == 'false' && steps.base-benchmark-cache.outputs.cache-hit != 'true'
+        working-directory: ${{ steps.synthetic-benchmark.outputs.TOOL_ROOT }}
+        run: |
+          node scripts/bench-synthetic-app.mjs \
+            --app "${{ steps.synthetic-benchmark.outputs.APP_ROOT }}" \
+            --plugin-root "$GITHUB_WORKSPACE/base" \
+            --skip-install \
+            --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/base" \
+            --runs "$SYNTHETIC_BENCHMARK_RUNS" \
+            --profile "$SYNTHETIC_BENCHMARK_PROFILE"
+
+      - name: Benchmark embedded synthetic app with head plugin
+        if: steps.synthetic-benchmark.outputs.SKIP == 'false'
+        working-directory: ${{ steps.synthetic-benchmark.outputs.TOOL_ROOT }}
+        run: |
+          node scripts/bench-synthetic-app.mjs \
+            --app "${{ steps.synthetic-benchmark.outputs.APP_ROOT }}" \
+            --plugin-root "$GITHUB_WORKSPACE/head" \
+            --skip-install \
+            --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/head" \
+            --runs "$SYNTHETIC_BENCHMARK_RUNS" \
+            --profile "$SYNTHETIC_BENCHMARK_PROFILE"
 
       - name: Generate benchmark report
         working-directory: head
@@ -121,15 +227,22 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node scripts/report-benchmark-ci.mjs \
-            --base "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" \
-            --head "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" \
+            --base "$GITHUB_WORKSPACE/benchmark-output/dev/base/baseline.json" \
+            --head "$GITHUB_WORKSPACE/benchmark-output/dev/head/baseline.json" \
+            --build-base "$GITHUB_WORKSPACE/benchmark-output/build/base/baseline.json" \
+            --build-head "$GITHUB_WORKSPACE/benchmark-output/build/head/baseline.json" \
             --out "$GITHUB_WORKSPACE/benchmark-output/report" \
             --pr "$PR_NUMBER" \
             --base-ref "$BASE_REF" \
             --base-sha "$BASE_SHA" \
             --head-ref "$HEAD_REF" \
             --head-sha "$HEAD_SHA" \
-            --run-url "$RUN_URL"
+            --run-url "$RUN_URL" \
+            $(if [ -f "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json" ] && [ -f "$GITHUB_WORKSPACE/benchmark-output/synthetic/head/latest.json" ]; then
+              printf '%s\n' \
+                --synthetic-base "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json" \
+                --synthetic-head "$GITHUB_WORKSPACE/benchmark-output/synthetic/head/latest.json"
+            fi)
 
       - name: Upload benchmark artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -144,21 +257,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          marker='<!-- react-router-benchmark-ci -->'
-          comment_body="$GITHUB_WORKSPACE/benchmark-output/report/comment.md"
-          body="$(cat "$comment_body")"
-          comment_id="$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
-            --jq ".[] | select(.body | contains(\"$marker\")) | .id" | tail -n 1)"
-
-          if [ -n "$comment_id" ]; then
-            gh api --method PATCH "repos/$REPOSITORY/issues/comments/$comment_id" \
-              --field body="$body"
-          else
-            gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
-              --field body="$body"
-          fi
+          COMMENT_BODY: ${{ github.workspace }}/benchmark-output/report/comment.md
+        run: node head/scripts/benchmark/ci-comment-report.mjs
 
       - name: Persist benchmark history
         if: github.event.pull_request.head.repo.full_name == github.repository
@@ -167,47 +267,4 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REPOSITORY: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          history_dir="$GITHUB_WORKSPACE/benchmark-history"
-          remote_url="https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
-
-          set +e
-          git ls-remote --exit-code --heads "$remote_url" "$BENCHMARK_HISTORY_BRANCH" > /dev/null 2>&1
-          branch_status=$?
-          set -e
-
-          if [ "$branch_status" -eq 0 ]; then
-            git clone --depth 1 --branch "$BENCHMARK_HISTORY_BRANCH" "$remote_url" "$history_dir"
-          elif [ "$branch_status" -eq 2 ]; then
-            git clone --depth 1 "$remote_url" "$history_dir"
-            cd "$history_dir"
-            git checkout --orphan "$BENCHMARK_HISTORY_BRANCH"
-            git rm -rf .
-          else
-            exit "$branch_status"
-          fi
-
-          cd "$history_dir"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          result_dir="pull-requests/${PR_NUMBER}/${HEAD_SHA}"
-          latest_dir="pull-requests/${PR_NUMBER}/latest"
-          mkdir -p "$result_dir" "$latest_dir"
-          cp "$GITHUB_WORKSPACE/benchmark-output/base/baseline.json" "$result_dir/base.json"
-          cp "$GITHUB_WORKSPACE/benchmark-output/head/baseline.json" "$result_dir/head.json"
-          cp "$GITHUB_WORKSPACE/benchmark-output/report/report.json" "$result_dir/report.json"
-          cp "$GITHUB_WORKSPACE/benchmark-output/report/comment.md" "$result_dir/comment.md"
-          cp "$result_dir/report.json" "$latest_dir/report.json"
-          cp "$result_dir/comment.md" "$latest_dir/comment.md"
-
-          git add pull-requests
-          if git diff --cached --quiet; then
-            echo "Benchmark history is already up to date."
-            exit 0
-          fi
-
-          git commit -m "bench: record PR ${PR_NUMBER} ${HEAD_SHA:0:7}"
-          git push origin "$BENCHMARK_HISTORY_BRANCH"
+        run: node head/scripts/benchmark/ci-persist-history.mjs

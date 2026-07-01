@@ -8,14 +8,18 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from 'node:util';
 import { execa } from 'execa';
+import {
+  appendNodeOption,
+  runDevServerBenchmark,
+} from './benchmark/dev-server.mjs';
 import { generateSyntheticFixture } from './benchmark/fixture.mjs';
+import { profiles } from './benchmark/profiles.mjs';
 
 const rootDir = process.cwd();
 const benchmarkRoot = path.join(rootDir, '.benchmark');
@@ -28,63 +32,6 @@ const rsbuildBin = path.join(
   'rsbuild.js'
 );
 
-const profiles = {
-  smoke: [{ id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' }],
-  default: [
-    { id: 'synthetic-256-ssr-esm', routeCount: 256, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-256-ssr-esm-split',
-      routeCount: 256,
-      variant: 'ssr-esm-split',
-    },
-    { id: 'synthetic-256-spa', routeCount: 256, variant: 'spa' },
-    {
-      id: 'synthetic-256-sourcemaps',
-      routeCount: 256,
-      variant: 'ssr-esm',
-      sourceMap: true,
-    },
-  ],
-  ci: [
-    { id: 'synthetic-1024-ssr-esm', routeCount: 1024, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-1024-ssr-esm-split',
-      routeCount: 1024,
-      variant: 'ssr-esm-split',
-    },
-  ],
-  full: [
-    { id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' },
-    { id: 'synthetic-256-ssr-esm', routeCount: 256, variant: 'ssr-esm' },
-    { id: 'synthetic-1024-ssr-esm', routeCount: 1024, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-256-ssr-esm-split',
-      routeCount: 256,
-      variant: 'ssr-esm-split',
-    },
-    {
-      id: 'synthetic-1024-ssr-esm-split',
-      routeCount: 1024,
-      variant: 'ssr-esm-split',
-    },
-    {
-      id: 'synthetic-256-sourcemaps',
-      routeCount: 256,
-      variant: 'ssr-esm',
-      sourceMap: true,
-    },
-  ],
-  large: [
-    {
-      id: 'large-355-ssr-esm',
-      routeCount: 355,
-      variant: 'ssr-esm',
-      fixture: 'large',
-      devRoutePathOffset: 0,
-    },
-  ],
-};
-
 const parseArgs = argv => {
   const { values } = parseCliArgs({
     args: argv,
@@ -94,6 +41,7 @@ const parseArgs = argv => {
       profile: { type: 'string', default: 'default' },
       mode: { type: 'string', default: 'build' },
       iterations: { type: 'string', default: '5' },
+      'large-iterations': { type: 'string' },
       warmup: { type: 'string', default: '1' },
       format: { type: 'string', default: 'both' },
       out: {
@@ -141,6 +89,10 @@ const parseArgs = argv => {
     profile: values.profile,
     mode: values.mode,
     iterations: Number(values.iterations),
+    largeIterations:
+      values['large-iterations'] === undefined
+        ? null
+        : Number(values['large-iterations']),
     warmup: Number(values.warmup),
     format: values.format,
     out: values.out,
@@ -170,6 +122,12 @@ const parseArgs = argv => {
   }
   if (!Number.isInteger(args.iterations) || args.iterations < 1) {
     throw new Error('--iterations must be a positive integer.');
+  }
+  if (
+    args.largeIterations !== null &&
+    (!Number.isInteger(args.largeIterations) || args.largeIterations < 1)
+  ) {
+    throw new Error('--large-iterations must be a positive integer.');
   }
   if (!Number.isInteger(args.warmup) || args.warmup < 0) {
     throw new Error('--warmup must be a non-negative integer.');
@@ -217,6 +175,14 @@ const parseArgs = argv => {
   return args;
 };
 
+const isLargeBenchmark = benchmark =>
+  benchmark.fixture === 'large' || benchmark.routeCount >= 1024;
+
+const getMeasuredIterationCount = (benchmark, args) =>
+  args.largeIterations !== null && isLargeBenchmark(benchmark)
+    ? Math.min(args.iterations, args.largeIterations)
+    : args.iterations;
+
 const hasGnuTime = async () => {
   try {
     await access('/usr/bin/time');
@@ -259,8 +225,6 @@ const runCommand = async ({
     wallMs: performance.now() - startedAt,
   };
 };
-
-const stripAnsi = value => value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
 
 const defaultDevRouteIndexes = [0, 1, 2, 10, 50, 100, 200];
 
@@ -309,211 +273,6 @@ const resolveDevRoutePaths = (value, benchmark) => {
   }
   return routePaths;
 };
-
-const appendNodeOption = (value, option) => {
-  const options = (value ?? '').split(/\s+/).filter(Boolean);
-  return options.includes(option)
-    ? options.join(' ')
-    : [...options, option].join(' ');
-};
-
-const fetchDevRoute = async ({ origin, routePath, timeoutMs }) => {
-  const startedAt = performance.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  timeout.unref?.();
-
-  try {
-    const response = await fetch(new URL(routePath, origin), {
-      signal: controller.signal,
-    });
-    const body = await response.arrayBuffer();
-    return {
-      path: routePath,
-      status: response.status,
-      ok: response.ok,
-      ms: performance.now() - startedAt,
-      bytes: body.byteLength,
-    };
-  } catch (error) {
-    return {
-      path: routePath,
-      status: null,
-      ok: false,
-      ms: performance.now() - startedAt,
-      bytes: null,
-      error:
-        error?.name === 'AbortError'
-          ? `Timed out after ${timeoutMs} ms`
-          : (error?.stack ?? error?.message ?? String(error)),
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
-const fetchDevRoutes = async ({ origin, routePaths, timeoutMs }) => {
-  const requests = [];
-  for (const routePath of routePaths) {
-    requests.push(await fetchDevRoute({ origin, routePath, timeoutMs }));
-  }
-  return requests;
-};
-
-const runDevServerUntilReady = async ({
-  command,
-  args,
-  cwd,
-  env = {},
-  readyEnvironments,
-  devRouteOrigin,
-  devRoutePaths = [],
-  devRouteTimeoutMs,
-  timeoutMs,
-}) =>
-  new Promise(resolve => {
-    const startedAt = performance.now();
-    const requiredReady = new Set(readyEnvironments);
-    const seenReady = new Set();
-    let stdout = '';
-    let stderr = '';
-    let ready = false;
-    let readyMs = null;
-    let routePhasePending = false;
-    let routeTotalMs = null;
-    let routeRequests = [];
-    let readyStatus = 0;
-    let timedOut = false;
-    let settled = false;
-    let stopping = false;
-    let killTimer = null;
-
-    const child = spawn(command, args, {
-      cwd,
-      detached: process.platform !== 'win32',
-      env: { ...process.env, ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const finish = (status, signal) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeoutTimer);
-      clearTimeout(killTimer);
-      resolve({
-        status,
-        signal,
-        stdout,
-        stderr,
-        wallMs: performance.now() - startedAt,
-        readyMs,
-        routeTotalMs,
-        routeRequests,
-        timedOut,
-      });
-    };
-
-    const signalChild = signal => {
-      if (child.exitCode !== null) {
-        return;
-      }
-      try {
-        if (process.platform === 'win32' || !child.pid) {
-          child.kill(signal);
-        } else {
-          process.kill(-child.pid, signal);
-        }
-      } catch (error) {
-        if (error?.code !== 'ESRCH') {
-          stderr += `${error.stack ?? error.message}\n`;
-        }
-      }
-    };
-
-    const stopChild = () => {
-      if (child.exitCode !== null || stopping) {
-        return;
-      }
-      stopping = true;
-      signalChild('SIGTERM');
-      killTimer = setTimeout(() => {
-        signalChild('SIGKILL');
-      }, 5_000);
-      killTimer.unref?.();
-    };
-
-    const handleReady = async () => {
-      readyMs = performance.now() - startedAt;
-      if (devRoutePaths.length > 0) {
-        routePhasePending = true;
-        const routeStartedAt = performance.now();
-        routeRequests = await fetchDevRoutes({
-          origin: devRouteOrigin,
-          routePaths: devRoutePaths,
-          timeoutMs: devRouteTimeoutMs,
-        });
-        routeTotalMs = performance.now() - routeStartedAt;
-        routePhasePending = false;
-        if (routeRequests.some(request => !request.ok)) {
-          readyStatus = 1;
-        }
-      }
-      stopChild();
-    };
-
-    const scanReady = () => {
-      if (ready) {
-        return;
-      }
-      const output = stripAnsi(`${stdout}\n${stderr}`);
-      for (const match of output.matchAll(
-        /ready\s+built in .*?\((web|node)\)/gi
-      )) {
-        seenReady.add(match[1].toLowerCase());
-      }
-      if ([...requiredReady].every(environment => seenReady.has(environment))) {
-        ready = true;
-        void handleReady();
-      }
-    };
-
-    child.stdout?.on('data', chunk => {
-      const text = String(chunk);
-      stdout += text;
-      process.stdout.write(text);
-      scanReady();
-    });
-    child.stderr?.on('data', chunk => {
-      const text = String(chunk);
-      stderr += text;
-      process.stderr.write(text);
-      scanReady();
-    });
-
-    const timeoutTimer = setTimeout(() => {
-      timedOut = true;
-      stopChild();
-    }, timeoutMs);
-    timeoutTimer.unref?.();
-
-    child.on('error', error => {
-      stderr += `${error.stack ?? error.message}\n`;
-      finish(1, null);
-    });
-    child.on('exit', (code, signal) => {
-      if (ready) {
-        if (routePhasePending) {
-          finish(1, signal);
-          return;
-        }
-        finish(readyStatus, signal);
-        return;
-      }
-      finish(code ?? 1, signal);
-    });
-  });
 
 const parseTimeStats = stderr => {
   const user = stderr.match(/User time \(seconds\):\s*([\d.]+)/);
@@ -573,15 +332,17 @@ const summarizeRuns = runs => ({
   wallMs: summarizeMetric(runs.map(run => run.wallMs)),
   readyMs: summarizeMetric(runs.map(run => run.readyMs)),
   routeTotalMs: summarizeMetric(runs.map(run => run.routeTotalMs)),
+  updateMs: summarizeMetric(runs.map(run => run.updateMs)),
+  updateRouteTotalMs: summarizeMetric(runs.map(run => run.updateRouteTotalMs)),
   userMs: summarizeMetric(runs.map(run => run.userMs)),
   sysMs: summarizeMetric(runs.map(run => run.sysMs)),
   maxRssKb: summarizeMetric(runs.map(run => run.maxRssKb)),
 });
 
-const summarizeDevRouteRequests = runs => {
+const summarizeDevRequests = (runs, key) => {
   const requestsByPath = new Map();
   for (const run of runs) {
-    for (const request of run.routeRequests ?? []) {
+    for (const request of run[key] ?? []) {
       const requests = requestsByPath.get(request.path) ?? [];
       requests.push(request);
       requestsByPath.set(request.path, requests);
@@ -606,6 +367,12 @@ const summarizeDevRouteRequests = runs => {
     };
   });
 };
+
+const summarizeDevRouteRequests = runs =>
+  summarizeDevRequests(runs, 'routeRequests');
+
+const summarizeDevUpdateRouteRequests = runs =>
+  summarizeDevRequests(runs, 'updateRouteRequests');
 
 const summarizePluginOperations = runs => {
   const operations = new Map();
@@ -664,6 +431,40 @@ const formatReportMs = value => (value == null ? '-' : `${value.toFixed(1)}ms`);
 const formatRss = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
 
+const appendDevRequestSummary = (lines, benchmark, key, title) => {
+  const requests = benchmark[key];
+  if (!requests?.length) {
+    return;
+  }
+
+  lines.push(
+    '',
+    `## ${benchmark.id} ${title}`,
+    '',
+    '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
+    '|---|---:|---:|---:|---:|---|---:|'
+  );
+
+  for (const request of requests) {
+    lines.push(
+      [
+        `\`${request.path}\``,
+        formatMs(request.ms.median),
+        formatMs(request.ms.mean),
+        formatMs(request.ms.p95),
+        request.bytes.median == null
+          ? '-'
+          : String(Math.round(request.bytes.median)),
+        request.statuses.join(', '),
+        request.failures,
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |')
+    );
+  }
+};
+
 const renderMarkdown = result => {
   const lines = [
     '# Rsbuild React Router Benchmark Baseline',
@@ -690,8 +491,8 @@ const renderMarkdown = result => {
       ? [`- Rspack trace output: ${result.rspackTraceOutput}`]
       : []),
     '',
-    '| Benchmark | Routes | Variant | Median ready | Median route load | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
-    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|',
+    '| Benchmark | Routes | Variant | Median ready | Median route load | Median update/HMR | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
+    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|',
   ];
 
   for (const benchmark of result.benchmarks) {
@@ -702,6 +503,7 @@ const renderMarkdown = result => {
         benchmark.variant,
         formatMs(benchmark.summary.readyMs.median),
         formatMs(benchmark.summary.routeTotalMs.median),
+        formatMs(benchmark.summary.updateMs.median),
         formatMs(benchmark.summary.wallMs.median),
         formatMs(benchmark.summary.wallMs.mean),
         formatMs(benchmark.summary.wallMs.p95),
@@ -715,34 +517,18 @@ const renderMarkdown = result => {
   }
 
   for (const benchmark of result.benchmarks) {
-    if (!benchmark.devRouteSummary?.length) {
-      continue;
-    }
-    lines.push(
-      '',
-      `## ${benchmark.id} Dev Route Requests`,
-      '',
-      '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
-      '|---|---:|---:|---:|---:|---|---:|'
+    appendDevRequestSummary(
+      lines,
+      benchmark,
+      'devRouteSummary',
+      'Dev Route Requests'
     );
-    for (const request of benchmark.devRouteSummary) {
-      lines.push(
-        [
-          `\`${request.path}\``,
-          formatMs(request.ms.median),
-          formatMs(request.ms.mean),
-          formatMs(request.ms.p95),
-          request.bytes.median == null
-            ? '-'
-            : String(Math.round(request.bytes.median)),
-          request.statuses.join(', '),
-          request.failures,
-        ]
-          .join(' | ')
-          .replace(/^/, '| ')
-          .replace(/$/, ' |')
-      );
-    }
+    appendDevRequestSummary(
+      lines,
+      benchmark,
+      'devUpdateRouteSummary',
+      'Dev Update Route Requests'
+    );
   }
 
   for (const benchmark of result.benchmarks) {
@@ -969,6 +755,7 @@ const main = async () => {
 
   const benchmarks = [];
   for (const [benchmarkIndex, benchmark] of selectedBenchmarks.entries()) {
+    const measuredIterations = getMeasuredIterationCount(benchmark, args);
     const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
     const devRoutePaths =
       args.mode === 'dev'
@@ -986,7 +773,7 @@ const main = async () => {
     });
 
     const runs = [];
-    const totalRuns = args.warmup + args.iterations;
+    const totalRuns = args.warmup + measuredIterations;
     for (let index = 0; index < totalRuns; index += 1) {
       const measured = index >= args.warmup;
       if (args.clean !== 'none') {
@@ -1028,7 +815,7 @@ const main = async () => {
         args.mode === 'dev'
           ? await (() => {
               const devPort = args.devPortBase + benchmarkIndex * 100 + index;
-              return runDevServerUntilReady({
+              return runDevServerBenchmark({
                 command: process.execPath,
                 args: [
                   rsbuildBin,
@@ -1052,9 +839,11 @@ const main = async () => {
                 },
                 readyEnvironments:
                   benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
-                devRouteOrigin: `http://localhost:${devPort}`,
-                devRoutePaths,
-                devRouteTimeoutMs: args.devRouteTimeoutMs,
+                origin: `http://localhost:${devPort}`,
+                routePaths: devRoutePaths,
+                routeTimeoutMs: args.devRouteTimeoutMs,
+                updateFile: fixtureResult.updateFile,
+                updateRoutePaths: fixtureResult.updateRoutePaths ?? ['/'],
                 timeoutMs: args.devTimeoutMs,
               });
             })()
@@ -1104,6 +893,9 @@ const main = async () => {
           readyMs: commandResult.readyMs ?? null,
           routeTotalMs: commandResult.routeTotalMs ?? null,
           routeRequests: commandResult.routeRequests ?? [],
+          updateMs: commandResult.updateMs ?? null,
+          updateRouteTotalMs: commandResult.updateRouteTotalMs ?? null,
+          updateRouteRequests: commandResult.updateRouteRequests ?? [],
           userMs: timeStats.userMs ?? null,
           sysMs: timeStats.sysMs ?? null,
           maxRssKb: timeStats.maxRssKb ?? null,
@@ -1121,6 +913,7 @@ const main = async () => {
       ...benchmark,
       fixture: fixtureResult.fixture,
       fixtureStats: fixtureResult.stats ?? null,
+      iterations: measuredIterations,
       parallelRouteTransform: args.parallelRouteTransform,
       devRoutePaths,
       cwd: path.relative(rootDir, fixtureRoot),
@@ -1131,6 +924,7 @@ const main = async () => {
       runs,
       summary: summarizeRuns(runs),
       devRouteSummary: summarizeDevRouteRequests(runs),
+      devUpdateRouteSummary: summarizeDevUpdateRouteRequests(runs),
       pluginOperations: summarizePluginOperations(runs),
     });
   }
@@ -1148,6 +942,7 @@ const main = async () => {
     profile: args.profile,
     mode: args.mode,
     iterations: args.iterations,
+    largeIterations: args.largeIterations,
     warmup: args.warmup,
     clean: args.clean,
     logPerformance: args.logPerformance,
