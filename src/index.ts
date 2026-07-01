@@ -34,7 +34,10 @@ import type { RouteModuleAnalysis } from './export-utils.js';
 import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
 import { registerBuildOutputTransforms } from './build-output-transforms.js';
 import { type RouteChunkCache, type RouteChunkConfig } from './route-chunks.js';
-import { createRouteTransformExecutor } from './parallel-route-transforms.js';
+import {
+  createRouteTransformExecutor,
+  shouldParallelizeRouteTransforms,
+} from './parallel-route-transforms.js';
 import {
   mergeWatchFiles,
   registerRouteTopologyDevWatch,
@@ -388,7 +391,9 @@ const createReactRouterPlugin = (
     const routeTransformExecutor = isRscMode
       ? undefined
       : createRouteTransformExecutor({
-          parallelTransforms: pluginOptions.parallelTransforms,
+          parallelRouteTransform:
+            pluginOptions.parallelRouteTransform ??
+            shouldParallelizeRouteTransforms(routeCount),
           routeChunkCache,
           splitRouteModules: Boolean(splitRouteModules),
         });

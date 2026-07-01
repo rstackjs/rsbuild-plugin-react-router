@@ -8,20 +8,19 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from 'node:util';
-import { Effect, Fiber } from 'effect';
 import { execa } from 'execa';
-import { generateSyntheticFixture } from './benchmark/fixture.mts';
 import {
-  runScriptEffect,
-  tryScriptPromise,
-  tryScriptSync,
-} from './script-effect.mts';
+  appendNodeOption,
+  runDevServerBenchmark,
+} from './benchmark/dev-server.mjs';
+import { generateSyntheticFixture } from './benchmark/fixture.mts';
+import { profiles } from './benchmark/profiles.mjs';
+import { runScriptEffect, tryScriptPromise } from './script-effect.mts';
 
 const rootDir = process.cwd();
 const benchmarkRoot = path.join(rootDir, '.benchmark');
@@ -34,118 +33,6 @@ const rsbuildBin = path.join(
   'rsbuild.js'
 );
 
-class ScriptExitError extends Error {
-  readonly exitCode: number;
-
-  constructor(message: string, exitCode: number) {
-    super(message);
-    this.name = 'ScriptExitError';
-    this.exitCode = exitCode;
-  }
-}
-
-const profiles = {
-  smoke: [{ id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' }],
-  default: [
-    { id: 'synthetic-256-ssr-esm', routeCount: 256, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-256-ssr-esm-split',
-      routeCount: 256,
-      variant: 'ssr-esm-split',
-    },
-    { id: 'synthetic-256-spa', routeCount: 256, variant: 'spa' },
-    {
-      id: 'synthetic-256-sourcemaps',
-      routeCount: 256,
-      variant: 'ssr-esm',
-      sourceMap: true,
-    },
-  ],
-  ci: [
-    { id: 'synthetic-1024-ssr-esm', routeCount: 1024, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-1024-ssr-esm-split',
-      routeCount: 1024,
-      variant: 'ssr-esm-split',
-    },
-  ],
-  full: [
-    { id: 'synthetic-48-ssr-esm', routeCount: 48, variant: 'ssr-esm' },
-    { id: 'synthetic-256-ssr-esm', routeCount: 256, variant: 'ssr-esm' },
-    { id: 'synthetic-1024-ssr-esm', routeCount: 1024, variant: 'ssr-esm' },
-    {
-      id: 'synthetic-256-ssr-esm-split',
-      routeCount: 256,
-      variant: 'ssr-esm-split',
-    },
-    {
-      id: 'synthetic-1024-ssr-esm-split',
-      routeCount: 1024,
-      variant: 'ssr-esm-split',
-    },
-    {
-      id: 'synthetic-256-sourcemaps',
-      routeCount: 256,
-      variant: 'ssr-esm',
-      sourceMap: true,
-    },
-  ],
-  large: [
-    {
-      id: 'large-355-ssr-esm',
-      routeCount: 355,
-      variant: 'ssr-esm',
-      fixture: 'large',
-      devRoutePathOffset: 0,
-    },
-  ],
-};
-
-const DEFAULT_RESERVED_CORES = 2;
-const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
-const DEFAULT_ROUTE_TRANSFORM_WORKER_LIMIT = 4;
-const SMALL_MACHINE_ROUTE_TRANSFORM_WORKER_LIMIT = 1;
-const SMALL_MACHINE_CPU_COUNT = 4;
-
-const getAvailableCpuCount = () =>
-  typeof os.availableParallelism === 'function'
-    ? os.availableParallelism()
-    : os.cpus().length;
-
-const getDefaultConcurrency = cpuCount =>
-  Math.max(0, Math.floor(cpuCount) - DEFAULT_RESERVED_CORES);
-
-const getDefaultRouteTransformWorkerCount = cpuCount => {
-  const workerCount = getDefaultConcurrency(cpuCount);
-  if (workerCount < 1) {
-    return 0;
-  }
-  const workerLimit =
-    cpuCount <= SMALL_MACHINE_CPU_COUNT
-      ? SMALL_MACHINE_ROUTE_TRANSFORM_WORKER_LIMIT
-      : DEFAULT_ROUTE_TRANSFORM_WORKER_LIMIT;
-  return Math.min(workerCount, workerLimit);
-};
-
-const resolveConcurrency = parallelTransforms => {
-  const availableCpuCount = getAvailableCpuCount();
-  const spareCoreCount = getDefaultConcurrency(availableCpuCount);
-  return {
-    availableCpuCount,
-    reservedCoreCount: DEFAULT_RESERVED_CORES,
-    spareCoreCount,
-    minParallelEnvironmentBuildSpareCores:
-      MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES,
-    parallelEnvironmentBuilds:
-      spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES,
-    routeTransformWorkers:
-      parallelTransforms === false
-        ? 0
-        : (parallelTransforms ??
-          getDefaultRouteTransformWorkerCount(availableCpuCount)),
-  };
-};
-
 const parseArgs = argv => {
   const { values } = parseCliArgs({
     args: argv,
@@ -155,6 +42,7 @@ const parseArgs = argv => {
       profile: { type: 'string', default: 'default' },
       mode: { type: 'string', default: 'build' },
       iterations: { type: 'string', default: '5' },
+      'large-iterations': { type: 'string' },
       warmup: { type: 'string', default: '1' },
       format: { type: 'string', default: 'both' },
       out: {
@@ -163,7 +51,7 @@ const parseArgs = argv => {
       },
       clean: { type: 'string', default: 'build' },
       filter: { type: 'string' },
-      'parallel-transforms': { type: 'string' },
+      'parallel-route-transform': { type: 'string' },
       'rspack-profile': { type: 'string' },
       'rspack-trace-output': { type: 'string' },
       'fail-fast': { type: 'boolean', default: false },
@@ -176,7 +64,7 @@ const parseArgs = argv => {
     },
   });
 
-  const parseParallelTransforms = value => {
+  const parseParallelRouteTransform = value => {
     if (value === undefined) {
       return undefined;
     }
@@ -186,10 +74,13 @@ const parseArgs = argv => {
     if (value === 'auto') {
       return undefined;
     }
+    if (value === 'true') {
+      return true;
+    }
     const workerCount = Number(value);
     if (!Number.isInteger(workerCount) || workerCount < 1) {
       throw new Error(
-        '--parallel-transforms must be false, auto, or a positive integer.'
+        '--parallel-route-transform must be true, false, auto, or a positive integer.'
       );
     }
     return workerCount;
@@ -199,12 +90,18 @@ const parseArgs = argv => {
     profile: values.profile,
     mode: values.mode,
     iterations: Number(values.iterations),
+    largeIterations:
+      values['large-iterations'] === undefined
+        ? null
+        : Number(values['large-iterations']),
     warmup: Number(values.warmup),
     format: values.format,
     out: values.out,
     clean: values.clean,
     filter: values.filter ?? null,
-    parallelTransforms: parseParallelTransforms(values['parallel-transforms']),
+    parallelRouteTransform: parseParallelRouteTransform(
+      values['parallel-route-transform']
+    ),
     rspackProfile: values['rspack-profile'] ?? null,
     rspackTraceOutput: values['rspack-trace-output'] ?? null,
     failFast: values['fail-fast'],
@@ -226,6 +123,12 @@ const parseArgs = argv => {
   }
   if (!Number.isInteger(args.iterations) || args.iterations < 1) {
     throw new Error('--iterations must be a positive integer.');
+  }
+  if (
+    args.largeIterations !== null &&
+    (!Number.isInteger(args.largeIterations) || args.largeIterations < 1)
+  ) {
+    throw new Error('--large-iterations must be a positive integer.');
   }
   if (!Number.isInteger(args.warmup) || args.warmup < 0) {
     throw new Error('--warmup must be a non-negative integer.');
@@ -273,46 +176,56 @@ const parseArgs = argv => {
   return args;
 };
 
-const hasGnuTimeEffect = () =>
-  tryScriptPromise(async () => {
-    try {
-      await access('/usr/bin/time');
-      const probe = await execa(
-        '/usr/bin/time',
-        ['-v', process.execPath, '-e', ''],
-        { reject: false }
-      );
-      return probe.exitCode === 0;
-    } catch {
-      return false;
-    }
+const isLargeBenchmark = benchmark =>
+  benchmark.fixture === 'large' || benchmark.routeCount >= 1024;
+
+const getMeasuredIterationCount = (benchmark, args) =>
+  args.largeIterations !== null && isLargeBenchmark(benchmark)
+    ? Math.min(args.iterations, args.largeIterations)
+    : args.iterations;
+
+const hasGnuTime = async () => {
+  try {
+    await access('/usr/bin/time');
+    const probe = await execa(
+      '/usr/bin/time',
+      ['-v', process.execPath, '-e', ''],
+      { reject: false }
+    );
+    return probe.exitCode === 0;
+  } catch {
+    return false;
+  }
+};
+
+const runCommand = async ({
+  command,
+  args,
+  cwd,
+  env = {},
+  useTime = false,
+}) => {
+  const startedAt = performance.now();
+  const childCommand = useTime ? '/usr/bin/time' : command;
+  const childArgs = useTime ? ['-v', command, ...args] : args;
+
+  const child = execa(childCommand, childArgs, {
+    cwd,
+    env,
+    reject: false,
   });
 
-const runCommandEffect = ({ command, args, cwd, env = {}, useTime = false }) =>
-  tryScriptPromise(async () => {
-    const startedAt = performance.now();
-    const childCommand = useTime ? '/usr/bin/time' : command;
-    const childArgs = useTime ? ['-v', command, ...args] : args;
+  child.stdout?.pipe(process.stdout);
+  child.stderr?.pipe(process.stderr);
 
-    const child = execa(childCommand, childArgs, {
-      cwd,
-      env,
-      reject: false,
-    });
-
-    child.stdout?.pipe(process.stdout);
-    child.stderr?.pipe(process.stderr);
-
-    const result = await child;
-    return {
-      status: result.exitCode,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      wallMs: performance.now() - startedAt,
-    };
-  });
-
-const stripAnsi = value => value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+  const result = await child;
+  return {
+    status: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    wallMs: performance.now() - startedAt,
+  };
+};
 
 const defaultDevRouteIndexes = [0, 1, 2, 10, 50, 100, 200];
 
@@ -361,230 +274,6 @@ const resolveDevRoutePaths = (value, benchmark) => {
   }
   return routePaths;
 };
-
-const appendNodeOption = (value, option) => {
-  const options = (value ?? '').split(/\s+/).filter(Boolean);
-  return options.includes(option)
-    ? options.join(' ')
-    : [...options, option].join(' ');
-};
-
-const fetchDevRouteEffect = ({ origin, routePath, timeoutMs }) => {
-  const startedAt = performance.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  timeout.unref?.();
-
-  return tryScriptPromise(async () => {
-    const response = await fetch(new URL(routePath, origin), {
-      signal: controller.signal,
-    });
-    const body = await response.arrayBuffer();
-    return {
-      path: routePath,
-      status: response.status,
-      ok: response.ok,
-      ms: performance.now() - startedAt,
-      bytes: body.byteLength,
-    };
-  }).pipe(
-    Effect.catchAll(error =>
-      Effect.succeed({
-        path: routePath,
-        status: null,
-        ok: false,
-        ms: performance.now() - startedAt,
-        bytes: null,
-        error:
-          error?.name === 'AbortError'
-            ? `Timed out after ${timeoutMs} ms`
-            : (error?.stack ?? error?.message ?? String(error)),
-      })
-    ),
-    Effect.ensuring(Effect.sync(() => clearTimeout(timeout)))
-  );
-};
-
-const fetchDevRoutesEffect = ({ origin, routePaths, timeoutMs }) =>
-  Effect.forEach(
-    routePaths,
-    routePath => fetchDevRouteEffect({ origin, routePath, timeoutMs }),
-    { concurrency: 1 }
-  );
-
-const runDevServerUntilReadyEffect = ({
-  command,
-  args,
-  cwd,
-  env = {},
-  readyEnvironments,
-  devRouteOrigin,
-  devRoutePaths = [],
-  devRouteTimeoutMs,
-  timeoutMs,
-}) =>
-  Effect.async(resume => {
-    const startedAt = performance.now();
-    const requiredReady = new Set(readyEnvironments);
-    const seenReady = new Set();
-    let stdout = '';
-    let stderr = '';
-    let ready = false;
-    let readyWallMs: number | null = null;
-    let readyMs: number | null = null;
-    let routePhasePending = false;
-    let routeTotalMs: number | null = null;
-    let routeRequests: any[] = [];
-    let readyStatus = 0;
-    let timedOut = false;
-    let settled = false;
-    let stopping = false;
-    let killTimer: ReturnType<typeof setTimeout> | undefined;
-    let readyFiber: ReturnType<typeof Effect.runFork> | undefined;
-
-    const child = spawn(command, args, {
-      cwd,
-      detached: process.platform !== 'win32',
-      env: { ...process.env, ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const finish = (status, signal) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeoutTimer);
-      clearTimeout(killTimer);
-      resume(
-        Effect.succeed({
-          status,
-          signal,
-          stdout,
-          stderr,
-          wallMs: readyWallMs ?? performance.now() - startedAt,
-          readyMs,
-          routeTotalMs,
-          routeRequests,
-          timedOut,
-        })
-      );
-    };
-
-    const signalChild = (signal: NodeJS.Signals) => {
-      if (child.exitCode !== null) {
-        return;
-      }
-      try {
-        if (process.platform === 'win32' || !child.pid) {
-          child.kill(signal);
-        } else {
-          process.kill(-child.pid, signal);
-        }
-      } catch (error) {
-        const systemError = error as NodeJS.ErrnoException;
-        if (systemError.code !== 'ESRCH') {
-          stderr += `${systemError.stack ?? systemError.message}\n`;
-        }
-      }
-    };
-
-    const stopChild = () => {
-      if (child.exitCode !== null || stopping) {
-        return;
-      }
-      stopping = true;
-      signalChild('SIGTERM');
-      killTimer = setTimeout(() => {
-        signalChild('SIGKILL');
-      }, 5_000);
-      killTimer.unref?.();
-    };
-
-    const handleReadyEffect = Effect.gen(function* () {
-      readyMs = readyWallMs ?? performance.now() - startedAt;
-      if (devRoutePaths.length > 0) {
-        routePhasePending = true;
-        const routeStartedAt = performance.now();
-        routeRequests = yield* fetchDevRoutesEffect({
-          origin: devRouteOrigin,
-          routePaths: devRoutePaths,
-          timeoutMs: devRouteTimeoutMs,
-        });
-        routeTotalMs = performance.now() - routeStartedAt;
-        routePhasePending = false;
-        if (routeRequests.some(request => !request.ok)) {
-          readyStatus = 1;
-        }
-      }
-      stopChild();
-    });
-
-    const handleReady = () => {
-      readyFiber = Effect.runFork(handleReadyEffect);
-    };
-
-    const scanReady = () => {
-      if (ready) {
-        return;
-      }
-      const output = stripAnsi(`${stdout}\n${stderr}`);
-      for (const match of output.matchAll(
-        /ready\s+built in .*?\((web|node)\)/gi
-      )) {
-        seenReady.add(match[1].toLowerCase());
-      }
-      if ([...requiredReady].every(environment => seenReady.has(environment))) {
-        ready = true;
-        readyWallMs = performance.now() - startedAt;
-        handleReady();
-      }
-    };
-
-    child.stdout?.on('data', chunk => {
-      const text = String(chunk);
-      stdout += text;
-      process.stdout.write(text);
-      scanReady();
-    });
-    child.stderr?.on('data', chunk => {
-      const text = String(chunk);
-      stderr += text;
-      process.stderr.write(text);
-      scanReady();
-    });
-
-    const timeoutTimer = setTimeout(() => {
-      timedOut = true;
-      stopChild();
-    }, timeoutMs);
-    timeoutTimer.unref?.();
-
-    child.on('error', error => {
-      stderr += `${error.stack ?? error.message}\n`;
-      finish(1, null);
-    });
-    child.on('exit', (code, signal) => {
-      if (ready) {
-        if (routePhasePending) {
-          finish(1, signal);
-          return;
-        }
-        finish(readyStatus, signal);
-        return;
-      }
-      finish(code ?? 1, signal);
-    });
-
-    return Effect.gen(function* () {
-      clearTimeout(timeoutTimer);
-      clearTimeout(killTimer);
-      stopChild();
-      if (readyFiber) {
-        yield* Fiber.interrupt(readyFiber).pipe(Effect.asVoid);
-      }
-    });
-  });
 
 const parseTimeStats = stderr => {
   const user = stderr.match(/User time \(seconds\):\s*([\d.]+)/);
@@ -644,15 +333,17 @@ const summarizeRuns = runs => ({
   wallMs: summarizeMetric(runs.map(run => run.wallMs)),
   readyMs: summarizeMetric(runs.map(run => run.readyMs)),
   routeTotalMs: summarizeMetric(runs.map(run => run.routeTotalMs)),
+  updateMs: summarizeMetric(runs.map(run => run.updateMs)),
+  updateRouteTotalMs: summarizeMetric(runs.map(run => run.updateRouteTotalMs)),
   userMs: summarizeMetric(runs.map(run => run.userMs)),
   sysMs: summarizeMetric(runs.map(run => run.sysMs)),
   maxRssKb: summarizeMetric(runs.map(run => run.maxRssKb)),
 });
 
-const summarizeDevRouteRequests = runs => {
+const summarizeDevRequests = (runs, key) => {
   const requestsByPath = new Map();
   for (const run of runs) {
-    for (const request of run.routeRequests ?? []) {
+    for (const request of run[key] ?? []) {
       const requests = requestsByPath.get(request.path) ?? [];
       requests.push(request);
       requestsByPath.set(request.path, requests);
@@ -678,8 +369,22 @@ const summarizeDevRouteRequests = runs => {
   });
 };
 
+const summarizeDevRouteRequests = runs =>
+  summarizeDevRequests(runs, 'routeRequests');
+
+const summarizeDevUpdateRouteRequests = runs =>
+  summarizeDevRequests(runs, 'updateRouteRequests');
+
+const getObjectNumber = (value, key) => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const entry = Object.entries(value).find(([entryKey]) => entryKey === key);
+  return typeof entry?.[1] === 'number' ? entry[1] : null;
+};
+
 const summarizePluginOperations = runs => {
-  const operations = new Map<string, any>();
+  const operations = new Map();
 
   for (const run of runs) {
     for (const report of run.pluginReports) {
@@ -690,23 +395,10 @@ const summarizePluginOperations = runs => {
           continue;
         }
 
-        const operationMetrics = metrics as Record<string, unknown>;
-        const count =
-          typeof operationMetrics.count === 'number'
-            ? operationMetrics.count
-            : 0;
-        const totalMs =
-          typeof operationMetrics.totalMs === 'number'
-            ? operationMetrics.totalMs
-            : 0;
-        const wallMs =
-          typeof operationMetrics.wallMs === 'number'
-            ? operationMetrics.wallMs
-            : null;
-        const maxMs =
-          typeof operationMetrics.maxMs === 'number'
-            ? operationMetrics.maxMs
-            : 0;
+        const count = getObjectNumber(metrics, 'count') ?? 0;
+        const totalMs = getObjectNumber(metrics, 'totalMs') ?? 0;
+        const wallMs = getObjectNumber(metrics, 'wallMs');
+        const maxMs = getObjectNumber(metrics, 'maxMs') ?? 0;
 
         const key = `${report.environment}:${operation}`;
         const current = operations.get(key) ?? {
@@ -746,8 +438,41 @@ const formatReportMs = value => (value == null ? '-' : `${value.toFixed(1)}ms`);
 const formatRss = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
 
+const appendDevRequestSummary = (lines, benchmark, key, title) => {
+  const requests = benchmark[key];
+  if (!requests?.length) {
+    return;
+  }
+
+  lines.push(
+    '',
+    `## ${benchmark.id} ${title}`,
+    '',
+    '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
+    '|---|---:|---:|---:|---:|---|---:|'
+  );
+
+  for (const request of requests) {
+    lines.push(
+      [
+        `\`${request.path}\``,
+        formatMs(request.ms.median),
+        formatMs(request.ms.mean),
+        formatMs(request.ms.p95),
+        request.bytes.median == null
+          ? '-'
+          : String(Math.round(request.bytes.median)),
+        request.statuses.join(', '),
+        request.failures,
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |')
+    );
+  }
+};
+
 const renderMarkdown = result => {
-  const concurrency = result.concurrency;
   const lines = [
     '# Rsbuild React Router Benchmark Baseline',
     '',
@@ -760,25 +485,21 @@ const renderMarkdown = result => {
     `- Mode: ${result.mode}`,
     `- Iterations: ${result.iterations}`,
     `- Warmup: ${result.warmup}`,
-    `- Available CPUs: ${concurrency.availableCpuCount}`,
-    `- Spare cores: ${concurrency.spareCoreCount}`,
-    `- Parallel environment builds: ${String(concurrency.parallelEnvironmentBuilds)}`,
     ...(result.mode === 'dev'
       ? [
           `- Dev routes: ${result.devRoutes}`,
           `- Dev route timeout: ${result.devRouteTimeoutMs} ms`,
         ]
       : []),
-    `- Parallel transforms: ${formatParallelTransforms(result.parallelTransforms)}`,
-    `- Resolved route transform workers: ${concurrency.routeTransformWorkers}`,
+    `- Parallel route transform: ${formatParallelRouteTransform(result.parallelRouteTransform)}`,
     `- Plugin performance logging: ${String(result.logPerformance)}`,
     `- Rspack profile: ${result.rspackProfile ?? 'false'}`,
     ...(result.rspackTraceOutput
       ? [`- Rspack trace output: ${result.rspackTraceOutput}`]
       : []),
     '',
-    '| Benchmark | Routes | Variant | Median ready | Median route load | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
-    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|',
+    '| Benchmark | Routes | Variant | Median ready | Median route load | Median update/HMR | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
+    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|',
   ];
 
   for (const benchmark of result.benchmarks) {
@@ -789,6 +510,7 @@ const renderMarkdown = result => {
         benchmark.variant,
         formatMs(benchmark.summary.readyMs.median),
         formatMs(benchmark.summary.routeTotalMs.median),
+        formatMs(benchmark.summary.updateMs.median),
         formatMs(benchmark.summary.wallMs.median),
         formatMs(benchmark.summary.wallMs.mean),
         formatMs(benchmark.summary.wallMs.p95),
@@ -802,34 +524,18 @@ const renderMarkdown = result => {
   }
 
   for (const benchmark of result.benchmarks) {
-    if (!benchmark.devRouteSummary?.length) {
-      continue;
-    }
-    lines.push(
-      '',
-      `## ${benchmark.id} Dev Route Requests`,
-      '',
-      '| Route | Median | Mean | p95 | Median bytes | Statuses | Failures |',
-      '|---|---:|---:|---:|---:|---|---:|'
+    appendDevRequestSummary(
+      lines,
+      benchmark,
+      'devRouteSummary',
+      'Dev Route Requests'
     );
-    for (const request of benchmark.devRouteSummary) {
-      lines.push(
-        [
-          `\`${request.path}\``,
-          formatMs(request.ms.median),
-          formatMs(request.ms.mean),
-          formatMs(request.ms.p95),
-          request.bytes.median == null
-            ? '-'
-            : String(Math.round(request.bytes.median)),
-          request.statuses.join(', '),
-          request.failures,
-        ]
-          .join(' | ')
-          .replace(/^/, '| ')
-          .replace(/$/, ' |')
-      );
-    }
+    appendDevRequestSummary(
+      lines,
+      benchmark,
+      'devUpdateRouteSummary',
+      'Dev Update Route Requests'
+    );
   }
 
   for (const benchmark of result.benchmarks) {
@@ -898,368 +604,135 @@ const resolveOutputPaths = args => {
   };
 };
 
-const writeOutputsEffect = (result, outputPaths) =>
-  tryScriptPromise(async () => {
-    const { jsonPath, mdPath, outPath, writeJson, writeMd } = outputPaths;
+const writeOutputs = async (result, outputPaths) => {
+  const { jsonPath, mdPath, outPath, writeJson, writeMd } = outputPaths;
 
-    if (writeJson && writeMd) {
-      await mkdir(outPath, { recursive: true });
-      await writeFile(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
-      await writeFile(mdPath, renderMarkdown(result));
-      return;
-    }
-
-    await mkdir(path.dirname(outPath), { recursive: true });
-    if (writeJson) {
-      await writeFile(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
-    } else {
-      await writeFile(mdPath, renderMarkdown(result));
-    }
-  });
-
-const formatParallelTransforms = parallelTransforms => {
-  if (parallelTransforms === undefined) {
-    return 'adaptive';
+  if (writeJson && writeMd) {
+    await mkdir(outPath, { recursive: true });
+    await writeFile(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
+    await writeFile(mdPath, renderMarkdown(result));
+    return;
   }
-  if (!parallelTransforms) {
-    return 'false';
+
+  await mkdir(path.dirname(outPath), { recursive: true });
+  if (writeJson) {
+    await writeFile(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
+  } else {
+    await writeFile(mdPath, renderMarkdown(result));
   }
-  return `workers=${parallelTransforms}`;
 };
 
-const gitEffect = args =>
-  Effect.gen(function* () {
-    const result = yield* runCommandEffect({
-      command: 'git',
-      args,
-      cwd: rootDir,
-      useTime: false,
-    });
-    return result.status === 0 ? result.stdout.trim() : null;
+const formatParallelRouteTransform = parallelRouteTransform => {
+  if (parallelRouteTransform === undefined) {
+    return 'adaptive';
+  }
+  if (!parallelRouteTransform) {
+    return 'false';
+  }
+  if (parallelRouteTransform === true) {
+    return 'true';
+  }
+  return `workers=${parallelRouteTransform}`;
+};
+
+const git = async args => {
+  const result = await runCommand({
+    command: 'git',
+    args,
+    cwd: rootDir,
+    useTime: false,
   });
+  return result.status === 0 ? result.stdout.trim() : null;
+};
 
-const pnpmVersionEffect = () =>
-  Effect.gen(function* () {
-    const result = yield* runCommandEffect({
-      command: 'pnpm',
-      args: ['--version'],
-      cwd: rootDir,
-      useTime: false,
-    });
-    return result.status === 0 ? result.stdout.trim() : null;
+const pnpmVersion = async () => {
+  const result = await runCommand({
+    command: 'pnpm',
+    args: ['--version'],
+    cwd: rootDir,
+    useTime: false,
   });
+  return result.status === 0 ? result.stdout.trim() : null;
+};
 
-const cleanBuildOutputsEffect = fixtureRoot =>
-  Effect.all(
-    [
-      tryScriptPromise(() =>
-        rm(path.join(fixtureRoot, 'build'), { recursive: true, force: true })
-      ),
-      tryScriptPromise(() =>
-        rm(path.join(fixtureRoot, '.react-router'), {
-          recursive: true,
-          force: true,
-        })
-      ),
-    ],
-    { discard: true }
-  );
+const cleanBuildOutputs = async fixtureRoot => {
+  await Promise.all([
+    rm(path.join(fixtureRoot, 'build'), { recursive: true, force: true }),
+    rm(path.join(fixtureRoot, '.react-router'), {
+      recursive: true,
+      force: true,
+    }),
+  ]);
+};
 
-const listRspackProfileDirsEffect = cwd =>
-  tryScriptPromise(async () => {
-    const entries = await readdir(cwd, { withFileTypes: true });
-    return entries
-      .filter(
-        entry =>
-          entry.isDirectory() && entry.name.startsWith('.rspack-profile-')
-      )
-      .map(entry => entry.name)
-      .sort();
-  });
+const listRspackProfileDirs = async cwd => {
+  const entries = await readdir(cwd, { withFileTypes: true });
+  return entries
+    .filter(
+      entry => entry.isDirectory() && entry.name.startsWith('.rspack-profile-')
+    )
+    .map(entry => entry.name)
+    .sort();
+};
 
-const moveDirectoryEffect = (source, destination) =>
-  tryScriptPromise(async () => {
-    await rm(destination, { recursive: true, force: true });
-    await mkdir(path.dirname(destination), { recursive: true });
-    try {
-      await rename(source, destination);
-    } catch (error) {
-      if (error?.code !== 'EXDEV') {
-        throw error;
-      }
-      await cp(source, destination, { recursive: true });
-      await rm(source, { recursive: true, force: true });
+const moveDirectory = async (source, destination) => {
+  await rm(destination, { recursive: true, force: true });
+  await mkdir(path.dirname(destination), { recursive: true });
+  try {
+    await rename(source, destination);
+  } catch (error) {
+    if (error?.code !== 'EXDEV') {
+      throw error;
     }
-  });
+    await cp(source, destination, { recursive: true });
+    await rm(source, { recursive: true, force: true });
+  }
+};
 
-const collectRspackProfilesEffect = ({
+const collectRspackProfiles = async ({
   fixtureRoot,
   beforeProfiles,
   destinationRoot,
-}) =>
-  Effect.gen(function* () {
-    const before = new Set(beforeProfiles);
-    const afterProfiles = yield* listRspackProfileDirsEffect(fixtureRoot);
-    const createdProfiles = afterProfiles.filter(
-      profile => !before.has(profile)
-    );
-    const collected = [];
+}) => {
+  const before = new Set(beforeProfiles);
+  const afterProfiles = await listRspackProfileDirs(fixtureRoot);
+  const createdProfiles = afterProfiles.filter(profile => !before.has(profile));
+  const collected = [];
 
-    for (const profile of createdProfiles) {
-      const source = path.join(fixtureRoot, profile);
-      const destination = path.join(destinationRoot, profile.slice(1));
-      yield* moveDirectoryEffect(source, destination);
-      collected.push(path.relative(rootDir, destination));
-    }
+  for (const profile of createdProfiles) {
+    const source = path.join(fixtureRoot, profile);
+    const destination = path.join(destinationRoot, profile.slice(1));
+    await moveDirectory(source, destination);
+    collected.push(path.relative(rootDir, destination));
+  }
 
-    return collected;
-  });
+  return collected;
+};
 
 const isTraceOutputStream = value => value === 'stdout' || value === 'stderr';
 
-const resolveRspackTraceOutputEffect = ({
+const resolveRspackTraceOutput = async ({
   traceOutput,
   benchmarkId,
   runLabel,
-}) =>
-  Effect.gen(function* () {
-    if (!traceOutput || isTraceOutputStream(traceOutput)) {
-      return traceOutput;
-    }
+}) => {
+  if (!traceOutput || isTraceOutputStream(traceOutput)) {
+    return traceOutput;
+  }
 
-    const tracePath = path.resolve(
-      rootDir,
-      traceOutput,
-      benchmarkId,
-      `${runLabel}.log`
-    );
-    yield* tryScriptPromise(() =>
-      mkdir(path.dirname(tracePath), { recursive: true })
-    );
-    return tracePath;
-  });
+  const tracePath = path.resolve(
+    rootDir,
+    traceOutput,
+    benchmarkId,
+    `${runLabel}.log`
+  );
+  await mkdir(path.dirname(tracePath), { recursive: true });
+  return tracePath;
+};
 
-const runBenchmarkIterationEffect = ({
-  args,
-  benchmark,
-  benchmarkIndex,
-  fixtureRoot,
-  index,
-  outputPaths,
-  useTime,
-  devRoutePaths,
-}) =>
-  Effect.gen(function* () {
-    const measured = index >= args.warmup;
-    if (args.clean !== 'none') {
-      yield* cleanBuildOutputsEffect(fixtureRoot);
-    }
-    if (args.clean === 'cold') {
-      yield* tryScriptPromise(() =>
-        rm(path.join(fixtureRoot, 'node_modules'), {
-          recursive: true,
-          force: true,
-        })
-      );
-    }
-
-    console.log(
-      `${measured ? 'Measuring' : 'Warming'} ${benchmark.id} (${index + 1}/${
-        args.warmup + args.iterations
-      })`
-    );
-    const rspackProfileEnabled =
-      args.mode === 'build' && Boolean(args.rspackProfile);
-    const beforeRspackProfiles = rspackProfileEnabled
-      ? yield* listRspackProfileDirsEffect(fixtureRoot)
-      : [];
-    const runLabel = `${measured ? 'run' : 'warmup'}-${
-      measured ? index - args.warmup + 1 : index + 1
-    }`;
-    const rspackTraceOutput =
-      args.mode === 'build'
-        ? yield* resolveRspackTraceOutputEffect({
-            traceOutput: args.rspackTraceOutput,
-            benchmarkId: benchmark.id,
-            runLabel,
-          })
-        : null;
-    const commonEnv = {
-      NODE_ENV: args.mode === 'build' ? 'production' : 'development',
-      ...(args.logPerformance
-        ? { REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1' }
-        : {}),
-    };
-    const devPort = args.devPortBase + benchmarkIndex * 100 + index;
-    const commandEffect =
-      args.mode === 'dev'
-        ? runDevServerUntilReadyEffect({
-            command: process.execPath,
-            args: [
-              rsbuildBin,
-              'dev',
-              '--config',
-              'rsbuild.config.mjs',
-              '--port',
-              String(devPort),
-            ],
-            cwd: fixtureRoot,
-            env: {
-              ...commonEnv,
-              ...(devRoutePaths.length > 0
-                ? {
-                    NODE_OPTIONS: appendNodeOption(
-                      process.env.NODE_OPTIONS,
-                      '--experimental-vm-modules'
-                    ),
-                  }
-                : {}),
-            },
-            readyEnvironments:
-              benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
-            devRouteOrigin: `http://localhost:${devPort}`,
-            devRoutePaths,
-            devRouteTimeoutMs: args.devRouteTimeoutMs,
-            timeoutMs: args.devTimeoutMs,
-          })
-        : runCommandEffect({
-            command: process.execPath,
-            args: [rsbuildBin, 'build', '--config', 'rsbuild.config.mjs'],
-            cwd: fixtureRoot,
-            env: {
-              ...commonEnv,
-              ...(args.rspackProfile
-                ? { RSPACK_PROFILE: args.rspackProfile }
-                : {}),
-              ...(rspackTraceOutput
-                ? { RSPACK_TRACE_OUTPUT: rspackTraceOutput }
-                : {}),
-            },
-            useTime,
-          });
-    const commandResult = (yield* commandEffect) as any;
-    const rspackProfiles = rspackProfileEnabled
-      ? yield* collectRspackProfilesEffect({
-          fixtureRoot,
-          beforeProfiles: beforeRspackProfiles,
-          destinationRoot: path.join(
-            outputPaths.artifactRoot,
-            'rspack-profiles',
-            benchmark.id,
-            runLabel
-          ),
-        })
-      : [];
-    const timeStats: any =
-      args.mode === 'build' && useTime
-        ? parseTimeStats(commandResult.stderr)
-        : {};
-    const pluginReports = parsePluginReports(
-      `${commandResult.stdout}\n${commandResult.stderr}`
-    );
-
-    if (commandResult.status !== 0 && args.failFast) {
-      return yield* Effect.fail(
-        new ScriptExitError(
-          `Benchmark command failed with status ${commandResult.status ?? 1}.`,
-          commandResult.status ?? 1
-        )
-      );
-    }
-
-    if (!measured) {
-      return null;
-    }
-
-    return {
-      status: commandResult.status,
-      wallMs: commandResult.wallMs,
-      readyMs: commandResult.readyMs ?? null,
-      routeTotalMs: commandResult.routeTotalMs ?? null,
-      routeRequests: commandResult.routeRequests ?? [],
-      userMs: timeStats.userMs ?? null,
-      sysMs: timeStats.sysMs ?? null,
-      maxRssKb: timeStats.maxRssKb ?? null,
-      pluginReports,
-      rspackProfiles,
-      rspackTraceOutput:
-        rspackTraceOutput && !isTraceOutputStream(rspackTraceOutput)
-          ? path.relative(rootDir, rspackTraceOutput)
-          : rspackTraceOutput,
-    };
-  });
-
-const runBenchmarkEffect = ({
-  args,
-  benchmark,
-  benchmarkIndex,
-  concurrency,
-  outputPaths,
-  pluginImportPath,
-  pluginReactImportPath,
-  useTime,
-}) =>
-  Effect.gen(function* () {
-    const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
-    const devRoutePaths =
-      args.mode === 'dev'
-        ? resolveDevRoutePaths(args.devRoutes, benchmark)
-        : [];
-    const fixtureResult = (yield* tryScriptPromise(() =>
-      generateSyntheticFixture({
-        root: fixtureRoot,
-        routeCount: benchmark.routeCount,
-        variant: benchmark.variant,
-        sourceMap: benchmark.sourceMap ?? false,
-        fixture: benchmark.fixture ?? 'default',
-        pluginImportPath,
-        pluginReactImportPath,
-        parallelTransforms: args.parallelTransforms,
-        largeConfig: undefined,
-      })
-    )) as any;
-
-    const runs: any[] = [];
-    const totalRuns = args.warmup + args.iterations;
-    for (let index = 0; index < totalRuns; index += 1) {
-      const run = yield* runBenchmarkIterationEffect({
-        args,
-        benchmark,
-        benchmarkIndex,
-        fixtureRoot,
-        index,
-        outputPaths,
-        useTime,
-        devRoutePaths,
-      });
-      if (run) {
-        runs.push(run);
-      }
-    }
-
-    return {
-      ...benchmark,
-      fixture: fixtureResult.fixture,
-      fixtureStats: fixtureResult.stats ?? null,
-      parallelTransforms: args.parallelTransforms,
-      resolvedRouteTransformWorkers: concurrency.routeTransformWorkers,
-      devRoutePaths,
-      cwd: path.relative(rootDir, fixtureRoot),
-      command:
-        args.mode === 'dev'
-          ? 'node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>'
-          : 'node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs',
-      runs,
-      summary: summarizeRuns(runs),
-      devRouteSummary: summarizeDevRouteRequests(runs),
-      pluginOperations: summarizePluginOperations(runs),
-    };
-  });
-
-const mainEffect = Effect.gen(function* () {
-  const args = yield* tryScriptSync(() => parseArgs(process.argv.slice(2)));
-  const concurrency = resolveConcurrency(args.parallelTransforms);
-  const useTime = yield* hasGnuTimeEffect();
+const main = async () => {
+  const args = parseArgs(process.argv.slice(2));
+  const useTime = await hasGnuTime();
   const outputPaths = resolveOutputPaths(args);
   const pluginImportPath = pathToFileURL(
     path.join(rootDir, 'dist/index.js')
@@ -1272,42 +745,198 @@ const mainEffect = Effect.gen(function* () {
   );
 
   if (selectedBenchmarks.length === 0) {
-    return yield* Effect.fail(
-      new Error(`No benchmarks matched filter "${args.filter}".`)
-    );
+    throw new Error(`No benchmarks matched filter "${args.filter}".`);
   }
 
   if (!args.skipRootBuild) {
     console.log('Building plugin package before benchmarks...');
-    const buildResult = yield* runCommandEffect({
+    const buildResult = await runCommand({
       command: 'pnpm',
       args: ['build'],
       cwd: rootDir,
     });
     if (buildResult.status !== 0) {
-      return yield* Effect.fail(
-        new ScriptExitError(
-          `Package build failed with status ${buildResult.status ?? 1}.`,
-          buildResult.status ?? 1
-        )
-      );
+      process.exit(buildResult.status ?? 1);
     }
   }
 
-  const benchmarks: any[] = [];
+  const benchmarks = [];
   for (const [benchmarkIndex, benchmark] of selectedBenchmarks.entries()) {
-    benchmarks.push(
-      yield* runBenchmarkEffect({
-        args,
-        benchmark,
-        benchmarkIndex,
-        concurrency,
-        outputPaths,
-        pluginImportPath,
-        pluginReactImportPath,
-        useTime,
-      })
-    );
+    const measuredIterations = getMeasuredIterationCount(benchmark, args);
+    const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
+    const devRoutePaths =
+      args.mode === 'dev'
+        ? resolveDevRoutePaths(args.devRoutes, benchmark)
+        : [];
+    const fixtureResult = await generateSyntheticFixture({
+      root: fixtureRoot,
+      routeCount: benchmark.routeCount,
+      variant: benchmark.variant,
+      sourceMap: benchmark.sourceMap ?? false,
+      fixture: benchmark.fixture ?? 'default',
+      pluginImportPath,
+      pluginReactImportPath,
+      parallelRouteTransform: args.parallelRouteTransform,
+      largeConfig: benchmark.largeConfig,
+    });
+
+    const runs = [];
+    const totalRuns = args.warmup + measuredIterations;
+    for (let index = 0; index < totalRuns; index += 1) {
+      const measured = index >= args.warmup;
+      if (args.clean !== 'none') {
+        await cleanBuildOutputs(fixtureRoot);
+      }
+      if (args.clean === 'cold') {
+        await rm(path.join(fixtureRoot, 'node_modules'), {
+          recursive: true,
+          force: true,
+        });
+      }
+
+      console.log(
+        `${measured ? 'Measuring' : 'Warming'} ${benchmark.id} (${index + 1}/${totalRuns})`
+      );
+      const rspackProfileEnabled =
+        args.mode === 'build' && Boolean(args.rspackProfile);
+      const beforeRspackProfiles = rspackProfileEnabled
+        ? await listRspackProfileDirs(fixtureRoot)
+        : [];
+      const runLabel = `${measured ? 'run' : 'warmup'}-${
+        measured ? index - args.warmup + 1 : index + 1
+      }`;
+      const rspackTraceOutput =
+        args.mode === 'build'
+          ? await resolveRspackTraceOutput({
+              traceOutput: args.rspackTraceOutput,
+              benchmarkId: benchmark.id,
+              runLabel,
+            })
+          : null;
+      const commonEnv = {
+        NODE_ENV: args.mode === 'build' ? 'production' : 'development',
+        ...(args.logPerformance
+          ? { REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE: '1' }
+          : {}),
+      };
+      const commandResult =
+        args.mode === 'dev'
+          ? await (() => {
+              const devPort = args.devPortBase + benchmarkIndex * 100 + index;
+              return runDevServerBenchmark({
+                command: process.execPath,
+                args: [
+                  rsbuildBin,
+                  'dev',
+                  '--config',
+                  'rsbuild.config.mjs',
+                  '--port',
+                  String(devPort),
+                ],
+                cwd: fixtureRoot,
+                env: {
+                  ...commonEnv,
+                  ...(devRoutePaths.length > 0
+                    ? {
+                        NODE_OPTIONS: appendNodeOption(
+                          process.env.NODE_OPTIONS,
+                          '--experimental-vm-modules'
+                        ),
+                      }
+                    : {}),
+                },
+                readyEnvironments:
+                  benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
+                origin: `http://localhost:${devPort}`,
+                routePaths: devRoutePaths,
+                routeTimeoutMs: args.devRouteTimeoutMs,
+                updateFile: fixtureResult.updateFile,
+                updateRoutePaths: fixtureResult.updateRoutePaths ?? ['/'],
+                timeoutMs: args.devTimeoutMs,
+              });
+            })()
+          : await runCommand({
+              command: process.execPath,
+              args: [rsbuildBin, 'build', '--config', 'rsbuild.config.mjs'],
+              cwd: fixtureRoot,
+              env: {
+                ...commonEnv,
+                ...(args.rspackProfile
+                  ? { RSPACK_PROFILE: args.rspackProfile }
+                  : {}),
+                ...(rspackTraceOutput
+                  ? { RSPACK_TRACE_OUTPUT: rspackTraceOutput }
+                  : {}),
+              },
+              useTime,
+            });
+      const rspackProfiles = rspackProfileEnabled
+        ? await collectRspackProfiles({
+            fixtureRoot,
+            beforeProfiles: beforeRspackProfiles,
+            destinationRoot: path.join(
+              outputPaths.artifactRoot,
+              'rspack-profiles',
+              benchmark.id,
+              runLabel
+            ),
+          })
+        : [];
+      const timeStats =
+        args.mode === 'build' && useTime
+          ? parseTimeStats(commandResult.stderr)
+          : { userMs: null, sysMs: null, maxRssKb: null };
+      const pluginReports = parsePluginReports(
+        `${commandResult.stdout}\n${commandResult.stderr}`
+      );
+
+      if (commandResult.status !== 0 && args.failFast) {
+        process.exit(commandResult.status ?? 1);
+      }
+
+      if (measured) {
+        runs.push({
+          status: commandResult.status,
+          wallMs: commandResult.wallMs,
+          readyMs: commandResult.readyMs ?? null,
+          routeTotalMs: commandResult.routeTotalMs ?? null,
+          routeRequests: commandResult.routeRequests ?? [],
+          updateMs: commandResult.updateMs ?? null,
+          updateRouteTotalMs: commandResult.updateRouteTotalMs ?? null,
+          updateRouteRequests: commandResult.updateRouteRequests ?? [],
+          userMs: timeStats.userMs ?? null,
+          sysMs: timeStats.sysMs ?? null,
+          maxRssKb: timeStats.maxRssKb ?? null,
+          pluginReports,
+          rspackProfiles,
+          rspackTraceOutput:
+            rspackTraceOutput && !isTraceOutputStream(rspackTraceOutput)
+              ? path.relative(rootDir, rspackTraceOutput)
+              : rspackTraceOutput,
+        });
+      }
+    }
+
+    benchmarks.push({
+      ...benchmark,
+      fixture: fixtureResult.fixture,
+      fixtureStats:
+        Object.entries(fixtureResult).find(([key]) => key === 'stats')?.[1] ??
+        null,
+      iterations: measuredIterations,
+      parallelRouteTransform: args.parallelRouteTransform,
+      devRoutePaths,
+      cwd: path.relative(rootDir, fixtureRoot),
+      command:
+        args.mode === 'dev'
+          ? 'node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js dev --config rsbuild.config.mjs --port <port>'
+          : 'node <repo>/node_modules/@rsbuild/core/bin/rsbuild.js build --config rsbuild.config.mjs',
+      runs,
+      summary: summarizeRuns(runs),
+      devRouteSummary: summarizeDevRouteRequests(runs),
+      devUpdateRouteSummary: summarizeDevUpdateRouteRequests(runs),
+      pluginOperations: summarizePluginOperations(runs),
+    });
   }
 
   const failed = benchmarks.some(benchmark =>
@@ -1315,37 +944,37 @@ const mainEffect = Effect.gen(function* () {
   );
   const result = {
     repo: 'rsbuild-plugin-react-router',
-    commit: yield* gitEffect(['rev-parse', 'HEAD']),
+    commit: await git(['rev-parse', 'HEAD']),
     date: new Date().toISOString(),
     node: process.version,
-    pnpm: yield* pnpmVersionEffect(),
+    pnpm: await pnpmVersion(),
     platform: `${os.platform()} ${os.release()} ${os.arch()}`,
     profile: args.profile,
     mode: args.mode,
     iterations: args.iterations,
+    largeIterations: args.largeIterations,
     warmup: args.warmup,
     clean: args.clean,
     logPerformance: args.logPerformance,
-    concurrency,
     devRoutes: args.mode === 'dev' ? args.devRoutes : null,
     devRouteTimeoutMs: args.mode === 'dev' ? args.devRouteTimeoutMs : null,
-    parallelTransforms: args.parallelTransforms,
+    parallelRouteTransform: args.parallelRouteTransform,
     rspackProfile: args.rspackProfile,
     rspackTraceOutput: args.rspackTraceOutput,
     failed,
     benchmarks,
   };
 
-  yield* writeOutputsEffect(result, outputPaths);
+  await writeOutputs(result, outputPaths);
   console.log(`Benchmark results written to ${outputPaths.outPath}`);
 
   if (failed) {
     console.error('One or more measured benchmark builds failed.');
     process.exitCode = 1;
   }
-});
+};
 
-runScriptEffect(mainEffect).catch(error => {
+runScriptEffect(tryScriptPromise(main)).catch(error => {
   console.error(error);
-  process.exitCode = error instanceof ScriptExitError ? error.exitCode : 1;
+  process.exit(1);
 });
