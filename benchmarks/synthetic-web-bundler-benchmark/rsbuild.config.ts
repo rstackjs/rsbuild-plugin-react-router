@@ -26,6 +26,7 @@ export default defineConfig({
     }),
     pluginBabel({
       include: /[/\\]app[/\\].*\.[cm]?[jt]sx?$/,
+      parallel: true,
       babelLoaderOptions(babelOptions) {
         babelOptions.plugins = [
           ...createBabelPlugins(!isDevelopment),
@@ -34,6 +35,7 @@ export default defineConfig({
       },
     }),
     pluginSvgr({
+      parallel: true,
       svgrOptions: {
         exportType: 'default',
         svgo: true,
@@ -70,8 +72,5 @@ export default defineConfig({
   output: {
     legalComments: 'none',
     minify: !isDevelopment,
-  },
-  performance: {
-    buildCache: false,
   },
 });
