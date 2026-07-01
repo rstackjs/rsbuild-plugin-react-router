@@ -37,7 +37,7 @@ The first migration keeps the existing `ParallelRouteTransformExecutor` class an
 
 ## Route Transform Executor Behavior To Preserve
 
-- `parallelTransforms: false` runs all tasks inline.
+- `parallelRouteTransform: false` runs all tasks inline.
 - Invalid explicit worker counts throw the same validation error.
 - Worker startup errors disable workers and fall back to inline execution for later tasks.
 - Route transform task errors propagate normally.
