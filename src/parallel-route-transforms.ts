@@ -376,6 +376,8 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   ): number {
     const existingWorkerIndex = this.#routeSourceWorkers.get(resourcePath);
     if (existingWorkerIndex !== undefined) {
+      this.#routeSourceWorkers.delete(resourcePath);
+      this.#routeSourceWorkers.set(resourcePath, existingWorkerIndex);
       return existingWorkerIndex % safeWorkerCount;
     }
     const workerIndex = this.#nextRouteSourceWorkerIndex % safeWorkerCount;

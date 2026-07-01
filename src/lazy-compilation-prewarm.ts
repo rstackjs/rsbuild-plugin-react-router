@@ -54,17 +54,25 @@ const collectRouteAssets = (
   }
 
   const assets: string[] = [];
-  for (const route of Object.values(routes)) {
-    for (const asset of [
-      route.module,
-      route.clientActionModule,
-      route.clientLoaderModule,
-      route.clientMiddlewareModule,
-      route.hydrateFallbackModule,
-    ]) {
-      if (asset) {
-        assets.push(asset);
-      }
+  for (const routeId in routes) {
+    if (!Object.prototype.hasOwnProperty.call(routes, routeId)) {
+      continue;
+    }
+    const route = routes[routeId];
+    if (route.module) {
+      assets.push(route.module);
+    }
+    if (route.clientActionModule) {
+      assets.push(route.clientActionModule);
+    }
+    if (route.clientLoaderModule) {
+      assets.push(route.clientLoaderModule);
+    }
+    if (route.clientMiddlewareModule) {
+      assets.push(route.clientMiddlewareModule);
+    }
+    if (route.hydrateFallbackModule) {
+      assets.push(route.hydrateFallbackModule);
     }
     if (assets.length >= config.routeLimit) {
       break;

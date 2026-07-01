@@ -147,7 +147,7 @@ export const registerReactRouterDevBackgroundResources = ({
 
   const reportRouteTopologyWatcherError = (error: unknown): void => {
     api.logger.warn(
-      `[${PLUGIN_NAME}] Failed to watch route topology changes: ${normalizeEffectError(error).message}`
+      `[${PLUGIN_NAME}] Failed to watch route topology changes: ${String(normalizeEffectError(error))}`
     );
   };
 
