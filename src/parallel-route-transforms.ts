@@ -121,6 +121,31 @@ const createDefaultWorker = (): RouteTransformWorker =>
 const isWorkerStartupError = (error: unknown): error is WorkerStartupError =>
   error instanceof WorkerStartupError;
 
+const createWorkerStartupError = (error: unknown): WorkerStartupError => {
+  const startupError = new WorkerStartupError(
+    error instanceof Error ? error.message : String(error)
+  );
+  if (error instanceof Error) {
+    startupError.stack = error.stack;
+  }
+  return startupError;
+};
+
+const rejectPendingTasks = (state: WorkerState, error: Error): void => {
+  for (const pending of state.pending.values()) {
+    pending.reject(error);
+  }
+  state.pending.clear();
+};
+
+const createInlineRouteTransformExecutor = (
+  options: RouteTransformTaskOptions
+): RouteTransformExecutor => ({
+  run: task => executeRouteTransformTask(task, options),
+  prewarm: () => {},
+  close: async () => {},
+});
+
 class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   #closed = false;
   #closePromise: Promise<void> | undefined;
@@ -174,13 +199,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
         try {
           this.#getWorker(index);
         } catch (error) {
-          const startupError = new WorkerStartupError(
-            error instanceof Error ? error.message : String(error)
-          );
-          if (error instanceof Error) {
-            startupError.stack = error.stack;
-          }
-          this.#disableWorkers(startupError);
+          this.#disableWorkers(createWorkerStartupError(error));
           return;
         }
       }
@@ -200,10 +219,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     this.#workers = [];
     this.#closePromise = Promise.all(
       workers.map(async state => {
-        for (const pending of state.pending.values()) {
-          pending.reject(new Error('Route transform worker closed.'));
-        }
-        state.pending.clear();
+        rejectPendingTasks(state, new Error('Route transform worker closed.'));
         await state.worker.terminate();
       })
     ).then(() => undefined);
@@ -220,10 +236,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     );
     this.#workers = [];
     for (const state of workers) {
-      for (const pending of state.pending.values()) {
-        pending.reject(error);
-      }
-      state.pending.clear();
+      rejectPendingTasks(state, error);
       void state.worker.terminate();
     }
   }
@@ -250,9 +263,7 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
     });
 
     worker.on('error', (error: Error) => {
-      const startupError = new WorkerStartupError(error.message);
-      startupError.stack = error.stack;
-      this.#disableWorkers(startupError);
+      this.#disableWorkers(createWorkerStartupError(error));
     });
 
     worker.on('exit', code => {
@@ -396,20 +407,12 @@ const createRouteTransformExecutorWithWorkerFactory = (
     parallelRouteTransform === undefined ||
     parallelRouteTransform === false
   ) {
-    return {
-      run: task => executeRouteTransformTask(task, options),
-      prewarm: () => {},
-      close: async () => {},
-    };
+    return createInlineRouteTransformExecutor(options);
   }
 
   const workerCount = getConfiguredWorkerCount(parallelRouteTransform);
   if (workerCount < 1) {
-    return {
-      run: task => executeRouteTransformTask(task, options),
-      prewarm: () => {},
-      close: async () => {},
-    };
+    return createInlineRouteTransformExecutor(options);
   }
 
   return new ParallelRouteTransformExecutor(

@@ -78,13 +78,17 @@ const collectRouteAssets = (
     if (config.routeIds && !config.routeIds.has(routeId)) {
       continue;
     }
-    assets.push(
+    for (const asset of [
       route.module,
-      route.clientActionModule ?? '',
-      route.clientLoaderModule ?? '',
-      route.clientMiddlewareModule ?? '',
-      route.hydrateFallbackModule ?? ''
-    );
+      route.clientActionModule,
+      route.clientLoaderModule,
+      route.clientMiddlewareModule,
+      route.hydrateFallbackModule,
+    ]) {
+      if (asset) {
+        assets.push(asset);
+      }
+    }
     if (assets.length >= config.routeLimit) {
       break;
     }

@@ -274,6 +274,7 @@ const createDevRuntimeHarness = async (esm: boolean) => {
       dev: { cliShortcuts: false, hmr: false, liveReload: false },
       plugins: [
         pluginReactRouter({
+          lazyCompilation: false,
           onRouteTopologyChange() {},
           ...(esm ? {} : { serverOutput: 'commonjs' as const }),
         }),
