@@ -87,28 +87,40 @@ describe('build output transforms', () => {
 
     registerBuildOutputTransforms(options);
 
-    const routeModuleTransforms = harness.transforms.filter(
-      transform => transform.descriptor.order === 'post'
+    const explicitRouteModuleTransform = harness.transforms.find(
+      transform =>
+        String(transform.descriptor.resourceQuery) ===
+        String(/\?react-router-route/)
+    );
+    const querylessRouteModuleTransform = harness.transforms.find(
+      transform =>
+        transform.descriptor.order === 'post' &&
+        transform.descriptor.environments === undefined &&
+        typeof transform.descriptor.test === 'function' &&
+        (transform.descriptor.test as (path: string) => boolean)(
+          options.routePath
+        )
     );
 
-    expect(routeModuleTransforms).toHaveLength(2);
-    expect(routeModuleTransforms[0].descriptor).toMatchObject({
+    expect(explicitRouteModuleTransform?.descriptor).toMatchObject({
       resourceQuery: /\?react-router-route/,
       order: 'post',
     });
-    expect(routeModuleTransforms[1].descriptor).toMatchObject({
+    expect(querylessRouteModuleTransform?.descriptor).toMatchObject({
       order: 'post',
     });
     expect(
-      (routeModuleTransforms[1].descriptor.test as (path: string) => boolean)(
-        options.routePath
-      )
+      (
+        querylessRouteModuleTransform!.descriptor.test as (
+          path: string
+        ) => boolean
+      )(options.routePath)
     ).toBe(true);
 
-    await routeModuleTransforms[0].handler(
+    await explicitRouteModuleTransform!.handler(
       createTransformArgs(options.routePath, '?react-router-route')
     );
-    await routeModuleTransforms[1].handler(
+    await querylessRouteModuleTransform!.handler(
       createTransformArgs(options.routePath)
     );
 
@@ -117,6 +129,44 @@ describe('build output transforms', () => {
       expect.objectContaining({ kind: 'routeModule' })
     );
     expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('captures post-loader route exports for manifest generation', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness);
+    const onRouteModuleAnalysis = rstest.fn();
+
+    registerBuildOutputTransforms({
+      ...options,
+      onRouteModuleAnalysis,
+    });
+
+    const clientRouteTransform = harness.transforms.find(
+      transform =>
+        String(transform.descriptor.resourceQuery) ===
+        String(/__react-router-build-client-route/)
+    );
+    expect(clientRouteTransform?.descriptor).toMatchObject({
+      order: 'post',
+    });
+
+    await clientRouteTransform!.handler(
+      createTransformArgs(
+        options.routePath,
+        '?__react-router-build-client-route',
+        `
+          export const loader = () => null;
+          export default function MDXContent() { return null; }
+        `
+      )
+    );
+
+    expect(onRouteModuleAnalysis).toHaveBeenCalledWith(
+      options.routePath,
+      expect.objectContaining({
+        exports: expect.arrayContaining(['loader', 'default']),
+      })
+    );
   });
 
   it('does not match queryless route-module transforms for internal route requests', () => {
@@ -128,6 +178,7 @@ describe('build output transforms', () => {
     const querylessRouteModuleTransform = harness.transforms.find(
       transform =>
         transform.descriptor.order === 'post' &&
+        transform.descriptor.environments === undefined &&
         typeof transform.descriptor.test === 'function'
     );
 

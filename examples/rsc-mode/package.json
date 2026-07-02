@@ -1,0 +1,41 @@
+{
+  "name": "rsc-mode-example",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_OPTIONS=\"--experimental-vm-modules --experimental-global-webcrypto\" rsbuild dev --port 3021 --host 127.0.0.1",
+    "build": "rsbuild build",
+    "start": "HOST=127.0.0.1 PORT=3021 node start.js",
+    "typecheck": "react-router typegen && tsc",
+    "test:e2e": "pnpm run test:e2e:dev && pnpm run build && pnpm run test:e2e:prod",
+    "test:e2e:dev": "playwright test",
+    "test:e2e:prod": "cross-env RSC_E2E_MODE=production playwright test"
+  },
+  "dependencies": {
+    "@react-router/node": "^8.0.1",
+    "@react-router/serve": "^8.0.1",
+    "@remix-run/node-fetch-server": "^0.13.3",
+    "express": "^4.22.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router": "^8.0.1",
+    "react-server-dom-rspack": "0.0.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@react-router/dev": "^8.0.1",
+    "@rsbuild/core": "2.1.0",
+    "@rsbuild/plugin-react": "2.1.0",
+    "@types/node": "^25.0.10",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "cross-env": "^10.1.0",
+    "rsbuild-plugin-react-router": "workspace:*",
+    "rsbuild-plugin-rsc": "^0.1.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

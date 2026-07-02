@@ -13,12 +13,11 @@ type PrerenderPathsConfig =
       getStaticPaths: () => string[];
     }) => boolean | string[] | Promise<boolean | string[]>);
 
-type PrerenderConfigObject = Extract<
-  NonNullable<ReactRouterPrerenderConfig>,
-  { paths: unknown }
-> & {
+type PrerenderConfigObject = {
+  paths?: PrerenderPathsConfig;
+  concurrency?: number;
   unstable_concurrency?: number;
-};
+} & Record<string, unknown>;
 
 type PrerenderConfig = ReactRouterPrerenderConfig | PrerenderConfigObject;
 type PrerenderConcurrencyConfig =
@@ -78,7 +77,11 @@ export const createPrerenderRoutes = (
   grouped: Record<string, any[]> = groupRoutesByParentId(manifest)
 ): MatchRouteObject[] => {
   return (grouped[parentId] || []).map(route => {
-    const common = { id: route.id, path: route.path };
+    const common = {
+      id: route.id,
+      path: route.path,
+      caseSensitive: route.caseSensitive,
+    };
     if (route.index) {
       return { index: true, ...common } as MatchRouteObject;
     }
@@ -120,10 +123,9 @@ export const getSsrFalsePrerenderExportErrors = ({
   const errors: string[] = [];
   for (const [routeId, route] of Object.entries(manifestRoutes)) {
     const exports = routeExports[routeId] ?? [];
-    const invalidApis: string[] = [];
-
-    if (exports.includes('headers')) invalidApis.push('headers');
-    if (exports.includes('action')) invalidApis.push('action');
+    const invalidApis = ['headers', 'action', 'middleware'].filter(api =>
+      exports.includes(api)
+    );
 
     if (invalidApis.length > 0) {
       errors.push(

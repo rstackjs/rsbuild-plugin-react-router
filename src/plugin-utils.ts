@@ -35,41 +35,15 @@ export function findEntryFile(basePath: string): string {
 
 export function generateWithProps() {
   return `
-    import { createElement as h } from "react";
-    import { useActionData, useLoaderData, useMatches, useParams, useRouteError } from "react-router";
+    import {
+      UNSAFE_withComponentProps,
+      UNSAFE_withErrorBoundaryProps,
+      UNSAFE_withHydrateFallbackProps,
+    } from "react-router";
 
-    export function withComponentProps(Component) {
-      return function Wrapped() {
-        const props = {
-          params: useParams(),
-          loaderData: useLoaderData(),
-          actionData: useActionData(),
-          matches: useMatches(),
-        };
-        return h(Component, props);
-      };
-    }
-
-    export function withHydrateFallbackProps(HydrateFallback) {
-      return function Wrapped() {
-        const props = {
-          params: useParams(),
-        };
-        return h(HydrateFallback, props);
-      };
-    }
-
-    export function withErrorBoundaryProps(ErrorBoundary) {
-      return function Wrapped() {
-        const props = {
-          params: useParams(),
-          loaderData: useLoaderData(),
-          actionData: useActionData(),
-          error: useRouteError(),
-        };
-        return h(ErrorBoundary, props);
-      };
-    }
+    export const withComponentProps = UNSAFE_withComponentProps;
+    export const withHydrateFallbackProps = UNSAFE_withHydrateFallbackProps;
+    export const withErrorBoundaryProps = UNSAFE_withErrorBoundaryProps;
   `;
 }
 

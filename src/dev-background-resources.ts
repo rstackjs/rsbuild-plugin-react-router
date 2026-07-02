@@ -31,7 +31,7 @@ type RegisterReactRouterDevBackgroundResourcesOptions = {
   api: RsbuildPluginAPI;
   isBuild: boolean;
   lazyCompilationPrewarm: PluginOptions['unstableLazyCompilationPrewarm'];
-  routeTransformExecutor: RouteTransformExecutor;
+  routeTransformExecutor?: RouteTransformExecutor;
   routeRestartMarkerPath: string;
   watchDirectory: string;
   getRouteTopology: () => Promise<Set<string>>;
@@ -216,7 +216,7 @@ export const registerReactRouterDevBackgroundResources = ({
 
     // Spawn transform workers now so thread startup overlaps Rsbuild's own
     // compiler creation instead of delaying the first route transform.
-    routeTransformExecutor.prewarm();
+    routeTransformExecutor?.prewarm();
   }
 
   const closeRouteTopologyWatcher = async (): Promise<void> => {
@@ -233,7 +233,7 @@ export const registerReactRouterDevBackgroundResources = ({
   };
 
   const closeRouteTransformExecutor = (): Promise<void> =>
-    routeTransformExecutor.close();
+    routeTransformExecutor?.close() ?? Promise.resolve();
 
   api.onCloseDevServer(() =>
     closeAll(

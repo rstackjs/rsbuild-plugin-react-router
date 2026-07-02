@@ -115,6 +115,17 @@ describe('prerender helpers', () => {
     expect(getPrerenderConcurrency({ paths: ['/'] }, 2)).toBe(1);
   });
 
+  it('validates stable prerender concurrency config', () => {
+    expect(
+      validatePrerenderConfig({ paths: ['/'], concurrency: 1 } as any)
+    ).toBeNull();
+    expect(
+      validatePrerenderConfig({ paths: ['/'], concurrency: 1.5 } as any)
+    ).toBe(
+      'The `prerender.concurrency` config must be a positive integer if specified.'
+    );
+  });
+
   it('creates React Router match routes from a route manifest', () => {
     expect(
       createPrerenderRoutes({
@@ -256,6 +267,51 @@ describe('prerender helpers', () => {
         '`dashboard` when pre-rendering with `ssr:false`: `headers`, `action`'
       ),
     ]);
+  });
+
+  it('reports invalid ssr:false prerender middleware exports', () => {
+    const manifestRoutes = {
+      root: { id: 'root', file: 'root.tsx', path: '' },
+      dashboard: {
+        id: 'dashboard',
+        parentId: 'root',
+        file: 'routes/dashboard.tsx',
+        path: 'dashboard',
+      },
+    };
+
+    expect(
+      getSsrFalsePrerenderExportErrors({
+        routes: manifestRoutes,
+        manifestRoutes,
+        routeExports: {
+          dashboard: ['middleware'],
+        },
+        prerenderPaths: ['/dashboard'],
+      })
+    ).toEqual([
+      expect.stringContaining(
+        '`dashboard` when pre-rendering with `ssr:false`: `middleware`'
+      ),
+    ]);
+  });
+
+  it('preserves case sensitivity when matching prerender paths', () => {
+    const prerenderRoutes = createPrerenderRoutes({
+      root: { id: 'root', file: 'root.tsx', path: '' },
+      settings: {
+        id: 'settings',
+        parentId: 'root',
+        file: 'routes/settings.tsx',
+        path: 'Settings',
+        caseSensitive: true,
+      },
+    });
+
+    expect(prerenderRoutes[0]?.children?.[0]).toMatchObject({
+      id: 'settings',
+      caseSensitive: true,
+    });
   });
 
   it('reports loader exports on routes outside the ssr:false prerender set', () => {

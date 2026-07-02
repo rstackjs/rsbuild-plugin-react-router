@@ -412,6 +412,60 @@ describe('manifest', () => {
     }
   });
 
+  it('uses transformed route analysis for non-JavaScript route modules', async () => {
+    const { root, appDir } = createTempApp(`
+      import { MdxComponent } from '../components/mdx';
+
+      export const loader = () => ({ content: 'from mdx' });
+
+      ## MDX Route
+      <MdxComponent />
+    `);
+    try {
+      const { manifest, moduleExportsByRouteId } =
+        await generateReactRouterManifestForDev(
+          {
+            ...routes,
+            'routes/page': {
+              ...routes['routes/page'],
+              file: 'routes/page.mdx',
+            },
+          },
+          {},
+          clientStats,
+          appDir,
+          '/',
+          {
+            isBuild: true,
+            rootRouteFile: 'root.tsx',
+            splitRouteModules: false,
+            analyzeRouteModule: async routeFilePath =>
+              routeFilePath.endsWith('page.mdx')
+                ? {
+                    code: `
+                      export const loader = () => ({ content: 'from mdx' });
+                      export default function MDXContent() { return <h1>MDX</h1>; }
+                    `,
+                    exports: ['loader', 'default'],
+                    exportAllModules: [],
+                  }
+                : undefined,
+          }
+        );
+
+      expect(manifest.routes['routes/page']).toMatchObject({
+        hasLoader: true,
+        hasDefaultExport: true,
+      });
+      expect(moduleExportsByRouteId['routes/page']).toEqual([
+        'loader',
+        'default',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('preserves dev css fallback when route analysis uses transformed code', async () => {
     const { root, appDir } = createTempApp(`
       import './page.css';

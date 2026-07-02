@@ -687,6 +687,7 @@ The repository includes several examples demonstrating different use cases:
 | [custom-node-server](./examples/custom-node-server)                     | Custom Express server with SSR          | 3003 | `pnpm dev` |
 | [cloudflare](./examples/cloudflare)                                     | Cloudflare Workers deployment           | 3004 | `pnpm dev` |
 | [client-only](./examples/client-only)                                   | `.client` modules with SSR hydration    | 3010 | `pnpm dev` |
+| [react-router-8](./examples/react-router-8)                             | React Router 8 framework-mode SSR       | 3020 | `pnpm dev` |
 | [epic-stack](./examples/epic-stack)                                     | Full-featured Epic Stack example        | 3005 | `pnpm dev` |
 | [federation/epic-stack](./examples/federation/epic-stack)               | Module Federation host                  | 3006 | `pnpm dev` |
 | [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote                | 3007 | `pnpm dev` |

@@ -89,10 +89,7 @@ describe('plugin-utils', () => {
     it('should generate withComponentProps HOC', () => {
       const result = generateWithProps();
       expect(result).toContain('withComponentProps');
-      expect(result).toContain('useLoaderData');
-      expect(result).toContain('useActionData');
-      expect(result).toContain('useParams');
-      expect(result).toContain('useMatches');
+      expect(result).toContain('UNSAFE_withComponentProps');
     });
 
     it('should generate withHydrateFallbackProps HOC', () => {
@@ -103,7 +100,7 @@ describe('plugin-utils', () => {
     it('should generate withErrorBoundaryProps HOC', () => {
       const result = generateWithProps();
       expect(result).toContain('withErrorBoundaryProps');
-      expect(result).toContain('useRouteError');
+      expect(result).toContain('UNSAFE_withErrorBoundaryProps');
     });
 
     it('should import from react-router', () => {
@@ -221,8 +218,11 @@ describe('plugin-utils', () => {
         export { Route as default };
       `);
 
-      expect(result.indexOf("'use client'")).toBeLessThan(
-        result.indexOf('virtual/react-router/with-props')
+      expect(result.search(/['"]use client['"]/)).toBeLessThan(
+        result.search(/from ['"]react-router['"]/)
+      );
+      expect(result).toContain(
+        'UNSAFE_withComponentProps as _withComponentProps'
       );
       expect(result).toContain('withComponentProps');
       expect(result).not.toContain('withdefaultProps');

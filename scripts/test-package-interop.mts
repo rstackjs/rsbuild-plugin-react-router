@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -102,9 +103,48 @@ const verifyPackIncludesOriginalSource = async () => {
   );
 };
 
+const verifyRscPublicSurface = async (esm, commonjs) => {
+  assert.equal(typeof esm.pluginReactRouterRSC, 'function');
+  assert.equal(typeof commonjs.pluginReactRouterRSC, 'function');
+  assert.match(
+    readFileSync(new URL('../dist/index.js', import.meta.url), 'utf8'),
+    /rsc-route-transform-loader\.js/
+  );
+  assert.match(
+    readFileSync(new URL('../dist/index.cjs', import.meta.url), 'utf8'),
+    /rsc-route-transform-loader\.cjs/
+  );
+
+  for (const specifier of [
+    'rsbuild-plugin-react-router/templates/entry.rsc',
+    'rsbuild-plugin-react-router/templates/entry.rsc.client',
+    'rsbuild-plugin-react-router/templates/entry.rsc.ssr',
+  ]) {
+    const resolved = import.meta.resolve(specifier);
+    assert.match(
+      resolved,
+      /\/dist\/templates\/entry\.rsc(?:\.client|\.ssr)?\.js$/
+    );
+    assert.throws(
+      () => require.resolve(specifier),
+      error => {
+        const code =
+          error && typeof error === 'object' && 'code' in error
+            ? error.code
+            : undefined;
+        return (
+          code === 'ERR_PACKAGE_PATH_NOT_EXPORTED' ||
+          code === 'ERR_PACKAGE_IMPORT_NOT_DEFINED'
+        );
+      }
+    );
+  }
+};
+
 const main = async () => {
   const [esm, commonjs] = await loadEntryPoints();
   await verifyPackIncludesOriginalSource();
+  await verifyRscPublicSurface(esm, commonjs);
   process.chdir(
     fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
   );
