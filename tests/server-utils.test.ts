@@ -38,6 +38,16 @@ describe('resolveReactRouterServerBuild', () => {
     });
   });
 
+  it('accepts server builds with omitted route discovery', async () => {
+    const { routeDiscovery: _routeDiscovery, ...build } = createBuild(
+      'no-route-discovery'
+    ) as ServerBuild & { routeDiscovery?: unknown };
+
+    await expect(resolveReactRouterServerBuild(build)).resolves.toMatchObject({
+      assets: { version: 'no-route-discovery' },
+    });
+  });
+
   it('unwraps CommonJS dynamic-import namespaces', async () => {
     const build = createBuild('commonjs');
 
@@ -60,6 +70,29 @@ describe('resolveReactRouterServerBuild', () => {
     ).resolves.toMatchObject({ assets: { version: 'module-exports' } });
   });
 
+  it('unwraps asynchronous namespace defaults', async () => {
+    const build = createBuild('async-default');
+
+    await expect(
+      resolveReactRouterServerBuild({
+        default: Promise.resolve(build),
+      })
+    ).resolves.toMatchObject({ assets: { version: 'async-default' } });
+  });
+
+  it('unwraps asynchronous module.exports namespace values', async () => {
+    const build = createBuild('async-module-exports');
+
+    await expect(
+      resolveReactRouterServerBuild({
+        default: { routes: {} },
+        'module.exports': Promise.resolve(build),
+      })
+    ).resolves.toMatchObject({
+      assets: { version: 'async-module-exports' },
+    });
+  });
+
   it('resolves recognized asynchronous build exports', async () => {
     const build = createBuild('async');
 
@@ -69,6 +102,17 @@ describe('resolveReactRouterServerBuild', () => {
         assets: async () => build.assets,
       })
     ).resolves.toMatchObject({ assets: { version: 'async' } });
+  });
+
+  it('resolves server builds through the Effect path', async () => {
+    const build = createBuild('effect');
+
+    await expect(
+      resolveReactRouterServerBuild({
+        ...build,
+        assets: async () => build.assets,
+      })
+    ).resolves.toMatchObject({ assets: { version: 'effect' } });
   });
 
   it('rejects modules without a React Router server build', async () => {

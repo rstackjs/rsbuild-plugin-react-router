@@ -250,6 +250,21 @@ const renderParallelRouteTransformOption = parallelRouteTransform => {
   return [`      parallelRouteTransform: ${parallelRouteTransform},`];
 };
 
+const benchmarkEnv = {
+  lazyCompilation: 'REACT_ROUTER_BENCHMARK_LAZY_COMPILATION',
+  lazyCompilationPrewarm: 'REACT_ROUTER_BENCHMARK_LAZY_COMPILATION_PREWARM',
+  logPerformance: 'REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE',
+};
+
+const renderBenchmarkEnvOption = (envName, enabledOption) =>
+  `      ...(process.env.${envName} === '1' ? { ${enabledOption}: true } : {}),`;
+
+const renderLazyCompilationOption = () =>
+  `      ...(process.env.${benchmarkEnv.lazyCompilation} === '0'` +
+  ` ? { lazyCompilation: false }` +
+  ` : process.env.${benchmarkEnv.lazyCompilation} === '1'` +
+  ` ? { lazyCompilation: true } : {}),`;
+
 const createRsbuildConfig = ({
   variant,
   sourceMap,
@@ -258,11 +273,6 @@ const createRsbuildConfig = ({
   parallelRouteTransform,
 }) => {
   const ssr = variant !== 'spa';
-  const lazyCompilationOption =
-    `      ...(process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '0'` +
-    ` ? { lazyCompilation: false }` +
-    ` : process.env.REACT_ROUTER_BENCHMARK_LAZY_COMPILATION === '1'` +
-    ` ? { lazyCompilation: true } : {}),`;
 
   return [
     `import { defineConfig } from '@rsbuild/core';`,
@@ -275,8 +285,12 @@ const createRsbuildConfig = ({
     '    pluginReactRouter({',
     ...(ssr ? [`      serverOutput: 'module',`] : []),
     ...renderParallelRouteTransformOption(parallelRouteTransform),
-    lazyCompilationOption,
-    `      logPerformance: process.env.REACT_ROUTER_BENCHMARK_LOG_PERFORMANCE === '1',`,
+    renderLazyCompilationOption(),
+    renderBenchmarkEnvOption(
+      benchmarkEnv.lazyCompilationPrewarm,
+      'unstableLazyCompilationPrewarm'
+    ),
+    `      logPerformance: process.env.${benchmarkEnv.logPerformance} === '1',`,
     '    }),',
     '  ],',
     '  output: {',
@@ -374,7 +388,7 @@ const writeFanoutFixtures = async root => {
 const largeId = index => String(index).padStart(4, '0');
 const largePairId = index => String(index).padStart(2, '0');
 
-const normalizeLargeConfig = (routeCount, largeConfig = {}) => ({
+const normalizeLargeConfig = (routeCount, largeConfig: any = {}) => ({
   ...largeFixtureConfig,
   ...largeConfig,
   routes: largeConfig.routes ?? routeCount ?? largeFixtureConfig.routes,
@@ -419,7 +433,7 @@ const writeInBatches = async (items, writer, batchSize = 128) => {
 
 const range = length => Array.from({ length }, (_, index) => index);
 
-const writeFiles = (files, batchSize) =>
+const writeFiles = (files, batchSize = 128) =>
   writeInBatches(
     files,
     ([filePath, contents]) => writeFile(filePath, contents),

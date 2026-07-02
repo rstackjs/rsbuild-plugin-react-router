@@ -1,7 +1,7 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
-import { pluginReactRouter } from '../src';
+import { pluginReactRouter, shouldParallelizeEnvironmentBuilds } from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
@@ -61,7 +61,15 @@ describe('pluginReactRouter', () => {
     expect(config.dev.hmr).toBe(true);
     expect(config.dev.liveReload).toBe(true);
     expect(config.dev.writeToDisk).toBe(true);
-    expect(config.dev.lazyCompilation).toBeUndefined();
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+    expect(
+      config.dev.lazyCompilation.test({
+        resource: `${process.cwd()}/app/entry.client.tsx`,
+      })
+    ).toBe(false);
   });
 
   it('adds the committed custom-server build entry only in development', async () => {
@@ -127,6 +135,41 @@ describe('pluginReactRouter', () => {
           paths: expect.stringMatching(
             /build\/client\/\.react-router\/route-watch$/
           ),
+          type: 'reload-server',
+        },
+      ])
+    );
+  });
+
+  it('reloads the dev server when imported route config helpers change', async () => {
+    testGlobal.__reactRouterTestJitiCache = {
+      '/project/node_modules/jiti/dist/jiti.cjs': {
+        filename: '/project/node_modules/jiti/dist/jiti.cjs',
+      },
+    };
+    testGlobal.__reactRouterTestJitiCacheAfterImport = {
+      '/project/app/routes.ts': {
+        filename: '/project/app/routes.ts',
+      },
+      '/project/app/dev-routes.ts': {
+        filename: '/project/app/dev-routes.ts',
+      },
+    };
+
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.watchFiles).toEqual(
+      expect.arrayContaining([
+        {
+          paths: expect.arrayContaining([
+            expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
+            expect.stringMatching(/app\/dev-routes\.ts$/),
+          ]),
           type: 'reload-server',
         },
       ])
@@ -432,6 +475,47 @@ describe('pluginReactRouter', () => {
     ).toBe(false);
   });
 
+  it('allows lazy React Router entry and route modules when prewarming is enabled', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([
+      pluginReactRouter({
+        lazyCompilation: true,
+        unstableLazyCompilationPrewarm: true,
+      }),
+    ]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(rsbuild.onAfterStartDevServer).toHaveBeenCalled();
+    expect(rsbuild.onAfterDevCompile).toHaveBeenCalled();
+    expect(rsbuild.onAfterCreateCompiler).toHaveBeenCalled();
+    expect(rsbuild.onCloseDevServer).toHaveBeenCalled();
+    expect(config.dev.lazyCompilation).toMatchObject({
+      entries: true,
+      imports: true,
+    });
+
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
+    expect(
+      test({
+        resource: `${process.cwd()}/app/entry.client.tsx`,
+      })
+    ).toBe(true);
+    expect(
+      test({
+        nameForCondition: () =>
+          '/project/app/routes/home.tsx?react-router-route',
+      })
+    ).toBe(true);
+    expect(
+      test({
+        resource: 'virtual/react-router/browser-manifest',
+      })
+    ).toBe(false);
+  });
+
   it('guards direct Rsbuild lazy compilation config for React Router hydration entries', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {
@@ -536,6 +620,45 @@ describe('pluginReactRouter', () => {
     const nodeConfig = config.environments?.node?.tools?.rspack;
     expect(nodeConfig.externals).toContain('express');
     expect(nodeConfig.experiments.outputModule).toBe(true);
+  });
+
+  it('should apply the resolved development compiler dependency policy', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    const nodeConfig = config.environments?.node?.tools?.rspack;
+    expect(nodeConfig.dependencies).toEqual(
+      shouldParallelizeEnvironmentBuilds({ isBuild: false })
+        ? undefined
+        : ['web']
+    );
+  });
+
+  it.each([
+    [{ isBuild: false, spareCoreCount: 4 }, true],
+    [{ isBuild: false, spareCoreCount: 3 }, false],
+    [{ isBuild: false, spareCoreCount: 1 }, false],
+    [{ isBuild: false, spareCoreCount: 0 }, false],
+    [{ isBuild: true, spareCoreCount: 8 }, false],
+  ])('should resolve parallel environment build mode', (options, expected) => {
+    expect(shouldParallelizeEnvironmentBuilds(options)).toBe(expected);
+  });
+
+  it('should keep the node compiler dependent on web during production builds', async () => {
+    const rsbuild = await createStubRsbuild({
+      action: 'build',
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    const nodeConfig = config.environments?.node?.tools?.rspack;
+    expect(nodeConfig.dependencies).toEqual(['web']);
   });
 
   it('should use async-node target for federation builds', async () => {

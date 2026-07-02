@@ -1,10 +1,16 @@
 import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
+import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
 import {
+  beginDevCompilerAttempt,
+  clearDevCompilerStart,
   createCompilationIdentityTracker,
+  createDevCompilerPair,
   hasPendingCompilation,
   isLatestStartedCompilation,
+  markDevCompilerPending,
+  resetDevCompilerPair,
   type DevCompilerPair,
 } from './dev-runtime-compilation.js';
 import {
@@ -16,6 +22,8 @@ import {
 import {
   getEnvironmentStats,
   snapshotDevChangedFiles,
+  type DevGraphIdentity,
+  type DevRuntimeStats,
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
@@ -23,6 +31,12 @@ import {
   createDevRuntimeSessionManager,
   type RuntimeBinding,
 } from './dev-runtime-session.js';
+import {
+  normalizeEffectError,
+  runPluginEffect,
+  tryPluginPromise,
+  tryPluginSync,
+} from './effect-runtime.js';
 
 type ServerSetup = Exclude<
   NonNullable<NonNullable<RsbuildConfig['server']>['setup']>,
@@ -107,10 +121,7 @@ export const createReactRouterDevRuntimeController = ({
     reloadAfterCssAssetOwnershipRemoval = false;
     const pair = binding.compilers;
     if (pair) {
-      pair.pendingAttempt = undefined;
-      pair.latestCompletedWebIdentity = undefined;
-      pair.latestWebStart = undefined;
-      pair.latestNodeStart = undefined;
+      resetDevCompilerPair(pair);
     }
     binding.compilers = undefined;
     binding.runtime.close(error);
@@ -120,6 +131,46 @@ export const createReactRouterDevRuntimeController = ({
   const sessions = createDevRuntimeSessionManager(closeBinding);
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
+
+  const finishRuntimeAttemptEffect = (
+    binding: RuntimeBinding,
+    pair: DevCompilerPair,
+    stats: DevRuntimeStats,
+    changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
+    identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
+  ): Effect.Effect<void, Error, never> =>
+    tryPluginPromise(() =>
+      binding.runtime.finishAttempt(stats, changes, identity)
+    ).pipe(
+      Effect.flatMap(result =>
+        tryPluginSync(() => {
+          if (
+            result === 'retry-node' &&
+            sessions.getActiveBinding()?.id === binding.id
+          ) {
+            pair.node.watching?.invalidate();
+          }
+        })
+      ),
+      Effect.catchAll(cause =>
+        tryPluginSync(() => {
+          if (sessions.getActiveBinding()?.id === binding.id) {
+            binding.runtime.failAttempt(normalizeEffectError(cause));
+          }
+        })
+      )
+    );
+
+  const finishRuntimeAttempt = (
+    binding: RuntimeBinding,
+    pair: DevCompilerPair,
+    stats: DevRuntimeStats,
+    changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
+    identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
+  ): Promise<void> =>
+    runPluginEffect(
+      finishRuntimeAttemptEffect(binding, pair, stats, changes, identity)
+    );
 
   const flushSettledAttempt = (
     binding: RuntimeBinding,
@@ -141,15 +192,13 @@ export const createReactRouterDevRuntimeController = ({
     ) {
       return;
     }
-    void binding.runtime
-      .finishAttempt(pending.stats, pending.changes, pending.identity)
-      .catch(cause => {
-        if (sessions.getActiveBinding()?.id === binding.id) {
-          binding.runtime.failAttempt(
-            cause instanceof Error ? cause : new Error(String(cause))
-          );
-        }
-      });
+    void finishRuntimeAttempt(
+      binding,
+      pair,
+      pending.stats,
+      pending.changes,
+      pending.identity
+    );
   };
 
   const rejectUnsupportedCompiler = (reason: string): void => {
@@ -247,7 +296,7 @@ export const createReactRouterDevRuntimeController = ({
       if (!binding || !pair || hasPendingCompilation(pair)) {
         return;
       }
-      pair.pendingAttempt = undefined;
+      beginDevCompilerAttempt(pair);
       binding.runtime.beginAttempt();
     },
   });
@@ -267,22 +316,17 @@ export const createReactRouterDevRuntimeController = ({
     if (!binding) {
       return;
     }
-    const pair: DevCompilerPair = {
-      web,
-      node,
-      settledCompilations: new WeakSet(),
-    };
+    const pair: DevCompilerPair = createDevCompilerPair({ web, node });
     binding.compilers = pair;
     const sessionId = binding.id;
     const runtime = binding.runtime;
     const failCurrentAttempt = (side: 'web' | 'node', error: Error): void => {
       if (sessions.getActiveBinding()?.id === sessionId) {
         if (side === 'web') {
-          pair.latestWebStart = undefined;
+          clearDevCompilerStart(pair, 'latestWebStart');
         } else {
-          pair.latestNodeStart = undefined;
+          clearDevCompilerStart(pair, 'latestNodeStart');
         }
-        pair.pendingAttempt = undefined;
         runtime.failAttempt(error);
       }
     };
@@ -293,12 +337,9 @@ export const createReactRouterDevRuntimeController = ({
         sessions.getActiveBinding()?.id === sessionId &&
         pair[side]?.status !== 'pending'
       ) {
-        const attemptAlreadyPending = hasPendingCompilation(pair);
         // Invalidation can arrive before the aggregate before-compile hook.
         // Supersede any evaluation that could resolve in that gap immediately.
-        pair[side] = { status: 'pending' };
-        pair.pendingAttempt = undefined;
-        if (!attemptAlreadyPending) {
+        if (markDevCompilerPending(pair, side)) {
           runtime.beginAttempt();
         }
         if (side === 'latestWebStart' && reloadAfterCssAssetOwnershipRemoval) {
@@ -322,12 +363,27 @@ export const createReactRouterDevRuntimeController = ({
         pair.latestCompletedWebIdentity = getCompilationIdentity(
           stats.compilation
         );
+        pair.latestCompletedWebStats = stats;
+      }
+    );
+    node.hooks.done.tap(
+      { name: `${PLUGIN_NAME}:dev-node-complete`, stage: -1000 },
+      stats => {
+        if (sessions.getActiveBinding()?.id === sessionId) {
+          pair.latestCompletedNodeStats = stats;
+        }
       }
     );
     web.hooks.thisCompilation.tap(
       `${PLUGIN_NAME}:dev-web-compilation`,
       compilation => {
         if (sessions.getActiveBinding()?.id === sessionId) {
+          if (pair.currentAttemptIdentity) {
+            compilationIdentities.setAttemptIdentityForCompilation(
+              compilation,
+              pair.currentAttemptIdentity
+            );
+          }
           pair.latestWebStart = {
             status: 'started',
             identity: getCompilationIdentity(compilation),
@@ -349,6 +405,12 @@ export const createReactRouterDevRuntimeController = ({
           status: 'started',
           identity: getCompilationIdentity(compilation),
         };
+        if (pair.currentAttemptIdentity) {
+          compilationIdentities.setAttemptIdentityForCompilation(
+            compilation,
+            pair.currentAttemptIdentity
+          );
+        }
         if (pair.latestCompletedWebIdentity) {
           compilationIdentities.setWebIdentityForNodeCompilation(
             compilation,
@@ -386,8 +448,10 @@ export const createReactRouterDevRuntimeController = ({
     if (!binding || !pair) {
       return;
     }
-    const webStats = getEnvironmentStats(stats, 'web');
-    const nodeStats = getEnvironmentStats(stats, 'node');
+    const webStats =
+      getEnvironmentStats(stats, 'web') ?? pair.latestCompletedWebStats;
+    const nodeStats =
+      getEnvironmentStats(stats, 'node') ?? pair.latestCompletedNodeStats;
     if (
       (webStats && webStats.compilation.compiler !== pair.web) ||
       (nodeStats && nodeStats.compilation.compiler !== pair.node)
@@ -410,7 +474,17 @@ export const createReactRouterDevRuntimeController = ({
       web: snapshotDevChangedFiles(pair.web),
       node: snapshotDevChangedFiles(pair.node),
     };
-    const identity = {
+    const webAttempt = webStats
+      ? compilationIdentities.getAttemptIdentityForCompilation(
+          webStats.compilation
+        )
+      : undefined;
+    const nodeAttempt = nodeStats
+      ? compilationIdentities.getAttemptIdentityForCompilation(
+          nodeStats.compilation
+        )
+      : undefined;
+    const identity: DevGraphIdentity = {
       web: webIdentity,
       node: nodeIdentity,
       nodeWeb: nodeStats
@@ -418,13 +492,19 @@ export const createReactRouterDevRuntimeController = ({
             nodeStats.compilation
           )
         : undefined,
+      attempt:
+        webAttempt && nodeAttempt && webAttempt === nodeAttempt
+          ? webAttempt
+          : undefined,
     };
+    const finishStats: DevRuntimeStats =
+      webStats && nodeStats ? { web: webStats, node: nodeStats } : stats;
     if (!webStats || !nodeStats) {
-      await binding.runtime.finishAttempt(stats, changes, identity);
+      await finishRuntimeAttempt(binding, pair, finishStats, changes, identity);
       return;
     }
     pair.pendingAttempt = {
-      stats,
+      stats: finishStats,
       changes,
       identity,
       webCompilation: webStats.compilation,

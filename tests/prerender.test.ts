@@ -1,4 +1,10 @@
 import { describe, expect, it } from '@rstest/core';
+import { Effect } from 'effect';
+import {
+  createBoundedPrerenderTasksEffect,
+  createBuildRequestEffect,
+  withBuildRequest,
+} from '../src/prerender-build';
 import {
   createPrerenderRoutes,
   getPrerenderConcurrency,
@@ -7,8 +13,8 @@ import {
   normalizePrerenderMatchPath,
   resolvePrerenderPaths,
   validatePrerenderConfig,
-  withBuildRequest,
 } from '../src/prerender';
+import { runPluginEffect, tryPluginPromise } from '../src/effect-runtime';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 
 const routes: RouteConfigEntry[] = [
@@ -166,6 +172,22 @@ describe('prerender helpers', () => {
     );
 
     expect(result).toBe('handled');
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('aborts effect build request signals after the handler rejects', async () => {
+    const failure = new Error('prerender handler failed');
+    let signal: AbortSignal | undefined;
+
+    await expect(
+      runPluginEffect(
+        createBuildRequestEffect('http://localhost/about', undefined, request => {
+          signal = request.signal;
+          throw failure;
+        })
+      )
+    ).rejects.toBe(failure);
+
     expect(signal?.aborted).toBe(true);
   });
 
@@ -327,5 +349,78 @@ describe('prerender helpers', () => {
     ).toBe(
       'The `prerender.unstable_concurrency` config must be a positive integer if specified.'
     );
+  });
+});
+
+describe('prerender build scheduler', () => {
+  it('runs prerender task effects with a concurrency cap', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const completed: string[] = [];
+
+    await runPluginEffect(
+      createBoundedPrerenderTasksEffect(
+        ['/slow', '/fast', '/medium'],
+        2,
+        path =>
+          Effect.promise(async () => {
+            active += 1;
+            maxActive = Math.max(maxActive, active);
+            await new Promise(resolve =>
+              setTimeout(resolve, path === '/slow' ? 15 : 1)
+            );
+            completed.push(path);
+            active -= 1;
+          })
+      )
+    );
+
+    expect(maxActive).toBeLessThanOrEqual(2);
+    expect(completed.sort()).toEqual(['/fast', '/medium', '/slow']);
+  });
+
+  it('runs prerender tasks with a concurrency cap', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const completed: string[] = [];
+
+    await runPluginEffect(
+      createBoundedPrerenderTasksEffect(['/slow', '/fast', '/medium'], 2, path =>
+        tryPluginPromise(async () => {
+          active += 1;
+          maxActive = Math.max(maxActive, active);
+          await new Promise(resolve =>
+            setTimeout(resolve, path === '/slow' ? 15 : 1)
+          );
+          completed.push(path);
+          active -= 1;
+        })
+      )
+    );
+
+    expect(maxActive).toBeLessThanOrEqual(2);
+    expect(completed.sort()).toEqual(['/fast', '/medium', '/slow']);
+  });
+
+  it('rejects without starting later prerender tasks after an early failure', async () => {
+    const started: string[] = [];
+
+    await expect(
+      runPluginEffect(
+        createBoundedPrerenderTasksEffect(['/fail', '/slow', '/later'], 2, path =>
+          tryPluginPromise(async () => {
+            started.push(path);
+            await new Promise(resolve =>
+              setTimeout(resolve, path === '/fail' ? 1 : 15)
+            );
+            if (path === '/fail') {
+              throw new Error('prerender failed');
+            }
+          })
+        )
+      )
+    ).rejects.toThrow('prerender failed');
+
+    expect(started).toEqual(['/fail', '/slow']);
   });
 });

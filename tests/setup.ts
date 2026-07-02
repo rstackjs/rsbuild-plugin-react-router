@@ -156,6 +156,7 @@ rstest.mock('@scripts/test-helper', () => ({
       unwrapConfig: rstest.fn(),
       processAssets: rstest.fn(),
       onBeforeStartDevServer: rstest.fn(),
+      onAfterStartDevServer: rstest.fn(),
       onCloseDevServer: rstest.fn(),
       onCloseBuild: rstest.fn(),
       onBeforeBuild: rstest.fn(),

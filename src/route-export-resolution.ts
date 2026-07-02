@@ -264,9 +264,9 @@ export type RouteModuleResolver = (
 export const createBundlerRouteExportResolver =
   (resolveModule: RouteModuleResolver): RouteExportResolver =>
   (specifier, importerPath) =>
-    new Promise<string | null>(resolveResolvedPath => {
+    new Promise<string | null>(resolvePromise => {
       resolveModule(dirname(importerPath), specifier, (error, resolved) => {
-        resolveResolvedPath(error || !resolved ? null : resolved);
+        resolvePromise(error || !resolved ? null : resolved);
       });
     });
 

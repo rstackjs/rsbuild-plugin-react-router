@@ -41,7 +41,7 @@ Pass `--mode dev` to measure dev-server startup readiness instead of production
 builds:
 
 ```sh
-node scripts/bench-builds.mjs --profile=large --mode=dev --iterations=5 --warmup=0
+node scripts/bench-builds.mts --profile=large --mode=dev --iterations=5 --warmup=0
 ```
 
 Dev mode starts `rsbuild dev`, waits for the required compilers to print ready
@@ -56,8 +56,8 @@ the last route in the fixture. Use `--dev-routes=none` for readiness-only
 startup measurements, or pass a comma-separated list of route indexes or paths:
 
 ```sh
-node scripts/bench-builds.mjs --profile=large --mode=dev --dev-routes=0,1,10,200
-node scripts/bench-builds.mjs --profile=large --mode=dev --dev-routes=/,/route-0001
+node scripts/bench-builds.mts --profile=large --mode=dev --dev-routes=0,1,10,200
+node scripts/bench-builds.mts --profile=large --mode=dev --dev-routes=/,/route-0001
 ```
 
 Numeric route indexes are ordinal benchmark positions: `0` is `/`, and `1` is
@@ -85,8 +85,8 @@ generated route-module update rebuild used as an HMR proxy.
 To capture Rspack tracing output for a benchmark, pass `--rspack-profile`:
 
 ```sh
-node scripts/bench-builds.mjs --profile=smoke --iterations=1 --warmup=0 --rspack-profile=OVERVIEW
-node scripts/bench-builds.mjs --profile=full --filter=synthetic-1024 --iterations=1 --warmup=0 --rspack-profile=ALL
+node scripts/bench-builds.mts --profile=smoke --iterations=1 --warmup=0 --rspack-profile=OVERVIEW
+node scripts/bench-builds.mts --profile=full --filter=synthetic-1024 --iterations=1 --warmup=0 --rspack-profile=ALL
 ```
 
 Trace directories are moved from fixture roots into

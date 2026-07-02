@@ -20,8 +20,8 @@ export type PluginOptions = {
 
   /**
    * The output format for server builds.
-   * When set to "module", no package.json will be emitted.
-   * @default "module"
+   * When omitted, React Router's `serverModuleFormat` selects the emitted
+   * Rsbuild format (`"esm"` -> `"module"`, `"cjs"` -> `"commonjs"`).
    */
   serverOutput?: 'module' | 'commonjs';
 
@@ -31,14 +31,24 @@ export type PluginOptions = {
   federation?: boolean;
 
   /**
-   * Opt in to Rsbuild's dev-only lazy compilation behavior.
+   * Rsbuild dev-only lazy compilation behavior.
    *
-   * React Router hydration modules remain eager so initial dev requests can
-   * load the browser manifest and route modules without lazy proxy delays.
+   * React Router's browser manifest remains eager so initial dev requests can
+   * discover browser assets without lazy proxy delays.
    *
-   * @default undefined
+   * Pass `false` to disable.
+   * @default true
    */
   lazyCompilation?: NonNullable<RsbuildConfig['dev']>['lazyCompilation'];
+
+  /**
+   * Prewarm Rspack lazy-compilation proxy modules after dev compiles.
+   * This depends on Rspack's generated lazy-compilation client shape and should
+   * be treated as experimental.
+   *
+   * @default false
+   */
+  unstableLazyCompilationPrewarm?: boolean;
 
   /**
    * Emit structured React Router plugin timing logs.

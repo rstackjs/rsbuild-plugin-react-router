@@ -6,8 +6,6 @@ import { promisify } from 'node:util';
 
 const require = createRequire(import.meta.url);
 const execFileAsync = promisify(execFile);
-const esm = await import('../dist/index.js');
-const commonjs = require('../dist/index.cjs');
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const build = {
   entry: { module: { default: () => new Response() } },
@@ -26,7 +24,13 @@ const build = {
 const collect = hooks => hook => hooks.push(hook);
 const noop = () => undefined;
 
-async function verifyRegistration(writer, reader) {
+const loadEntryPoints = async () => {
+  const esm = await import('../dist/index.js');
+  const commonjs = require('../dist/index.cjs');
+  return [esm, commonjs];
+};
+
+const verifyRegistration = async (writer, reader) => {
   const starts = [];
   const closes = [];
   const api = {
@@ -37,6 +41,7 @@ async function verifyRegistration(writer, reader) {
     modifyEnvironmentConfig: noop,
     onBeforeBuild: noop,
     onBeforeStartDevServer: collect(starts),
+    onAfterStartDevServer: noop,
     onCloseDevServer: collect(closes),
     onCloseBuild: noop,
     onAfterEnvironmentCompile: noop,
@@ -54,7 +59,6 @@ async function verifyRegistration(writer, reader) {
   assert(startHook, 'Expected a pre dev-server start hook');
   assert(closeHook, 'Expected a pre dev-server close hook');
   const start = startHook.handler;
-  const close = closeHook.handler;
   const server = {
     close: async () => undefined,
     environments: { node: { loadBundle: async () => build } },
@@ -63,15 +67,21 @@ async function verifyRegistration(writer, reader) {
   await start({ environments: {}, server });
 
   const pending = reader.loadReactRouterServerBuild(server);
-  await close();
+  for (const close of closes) {
+    if (typeof close === 'function') {
+      await close();
+    } else {
+      await close.handler?.();
+    }
+  }
   await assert.rejects(pending, /closed before a React Router build was ready/);
   await assert.rejects(
     reader.loadReactRouterServerBuild(server),
     /not registered/
   );
-}
+};
 
-async function verifyPackIncludesOriginalSource() {
+const verifyPackIncludesOriginalSource = async () => {
   const { stdout } = await execFileAsync(
     'npm',
     ['pack', '--dry-run', '--json'],
@@ -90,23 +100,28 @@ async function verifyPackIncludesOriginalSource() {
     files.has('src/templates/entry.client.tsx'),
     'Expected npm package to include source templates'
   );
-}
+};
 
-await verifyPackIncludesOriginalSource();
+const main = async () => {
+  const [esm, commonjs] = await loadEntryPoints();
+  await verifyPackIncludesOriginalSource();
+  process.chdir(
+    fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
+  );
+  await verifyRegistration(esm, commonjs);
+  await verifyRegistration(commonjs, esm);
+  assert.deepEqual(
+    await esm.resolveReactRouterServerBuild({ default: build }),
+    build
+  );
+  assert.deepEqual(
+    await commonjs.resolveReactRouterServerBuild({ default: build }),
+    build
+  );
+  console.log('ESM and CommonJS package entrypoints share runtime state.');
+};
 
-process.chdir(
-  fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
-);
-await verifyRegistration(esm, commonjs);
-await verifyRegistration(commonjs, esm);
-
-assert.deepEqual(
-  await esm.resolveReactRouterServerBuild({ default: build }),
-  build
-);
-assert.deepEqual(
-  await commonjs.resolveReactRouterServerBuild({ default: build }),
-  build
-);
-
-console.log('ESM and CommonJS package entrypoints share runtime state.');
+main().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

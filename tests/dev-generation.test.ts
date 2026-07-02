@@ -1,6 +1,7 @@
 import type { RsbuildDevServer } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { loadReactRouterServerBuild } from '../src';
+import { evaluateServerBuilds } from '../src/dev-runtime-artifacts';
 import {
   createReactRouterDevRuntime,
   type DevGraphChanges,
@@ -15,11 +16,50 @@ import {
   createBuild,
   createCompilation,
   createGraphStats,
+  createStats,
   graphIdentity,
   noKnownChanges,
 } from './dev-runtime-fixtures';
 
 describe('React Router development runtime', () => {
+  it('evaluates server builds through the Effect path', async () => {
+    const defaultBuild = createBuild('default');
+    const nestedBuild = createBuild('nested');
+    const loadBundle = rstest.fn((entryName: string) =>
+      entryName === 'nested/entry' ? Promise.resolve(nestedBuild) : defaultBuild
+    );
+    const server = {
+      environments: { node: { loadBundle } },
+    } as unknown as RsbuildDevServer;
+
+    const builds = await evaluateServerBuilds(server, [
+      'nested/entry',
+      'static/js/app',
+    ]);
+
+    expect(builds['nested/entry']).toMatchObject({ marker: 'nested' });
+    expect(builds['static/js/app']).toMatchObject({ marker: 'default' });
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts explicit paired dev stats without pretending they are Rspack MultiStats', async () => {
+    const { runtime } = createHarness(() => createBuild('build'));
+    const web = createCompilation('web');
+    const node = createCompilation('node');
+
+    runtime.beginAttempt();
+    captureWeb(runtime, web, 'paired-stats');
+    await runtime.finishAttempt(
+      { web: createStats(web), node: createStats(node) },
+      noKnownChanges,
+      graphIdentity(web, node)
+    );
+
+    await expect(runtime.load()).resolves.toMatchObject({
+      assets: { version: 'paired-stats' },
+    });
+  });
+
   it('publishes css-only removals when the route file overlaps node dependencies', async () => {
     const routePath = '/app/routes/about.tsx';
     const onCssAssetOwnershipChanged = rstest.fn();
@@ -56,6 +96,51 @@ describe('React Router development runtime', () => {
     expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
     expect(warnings).toEqual([]);
     await expect(runtime.load()).resolves.toMatchObject({
+      assets: { version: 'without-css' },
+    });
+  });
+
+  it('evaluates changed node output during css ownership removals', async () => {
+    const routePath = '/app/routes/about.tsx';
+    const onCssAssetOwnershipChanged = rstest.fn();
+    let build = createBuild('initial');
+    const { loadBundle, runtime, warnings } = createHarness(() => build, {
+      onCssAssetOwnershipChanged,
+    });
+    const firstWeb = createCompilation('web');
+    const firstNode = createCompilation('node');
+
+    runtime.beginAttempt();
+    captureWeb(runtime, firstWeb, 'with-css', {
+      routes: { 'routes/about': ['/assets/about.css'] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(firstWeb, firstNode),
+      noKnownChanges,
+      graphIdentity(firstWeb, firstNode)
+    );
+
+    build = createBuild('node-next');
+    const removedCssWeb = createCompilation('web');
+    const nextNode = createCompilation('node');
+    runtime.beginAttempt();
+    captureWeb(runtime, removedCssWeb, 'without-css', {
+      routes: { 'routes/about': [] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(removedCssWeb, nextNode),
+      {
+        web: { known: true, files: new Set([routePath]) },
+        node: { known: true, files: new Set([routePath]) },
+      },
+      graphIdentity(removedCssWeb, nextNode)
+    );
+
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
+    expect(warnings).toEqual([]);
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(runtime.load()).resolves.toMatchObject({
+      marker: 'node-next',
       assets: { version: 'without-css' },
     });
   });
@@ -340,6 +425,45 @@ describe('React Router development runtime', () => {
     });
   });
 
+  it('resolves all initial waiters from one committed generation', async () => {
+    const { loadBundle, runtime } = createHarness(() =>
+      createBuild('shared')
+    );
+    const web = createCompilation('web');
+    const node = createCompilation('node');
+
+    runtime.beginAttempt();
+    captureWeb(runtime, web, 'shared');
+    const firstWaiting = runtime.load();
+    const secondWaiting = runtime.load();
+    await runtime.finishAttempt(
+      createGraphStats(web, node),
+      noKnownChanges,
+      graphIdentity(web, node)
+    );
+
+    const [first, second] = await Promise.all([firstWaiting, secondWaiting]);
+    expect(first).toBe(second);
+    expect(loadBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects all initial waiters when the runtime closes', async () => {
+    const { errors, runtime } = createHarness(() => createBuild('closed'));
+
+    runtime.beginAttempt();
+    const firstWaiting = runtime.load();
+    const secondWaiting = runtime.load();
+    runtime.close();
+
+    await expect(firstWaiting).rejects.toThrow(
+      'development server closed before a React Router build was ready'
+    );
+    await expect(secondWaiting).rejects.toThrow(
+      'development server closed before a React Router build was ready'
+    );
+    expect(errors).toEqual([]);
+  });
+
   it('rejects initial waiters on a fatal compiler failure and recovers', async () => {
     const { loadBundle, runtime } = createHarness(() =>
       createBuild('recovered')
@@ -471,6 +595,9 @@ describe('React Router development runtime', () => {
       noKnownChanges,
       graphIdentity(firstWeb, firstNode)
     );
+    await expect
+      .poll(() => typeof resolveEvaluation, { timeout: 1000 })
+      .toBe('function');
     resolveEvaluation?.(nextBuild);
     await firstFinish;
     const committed = await runtime.load();
@@ -484,6 +611,9 @@ describe('React Router development runtime', () => {
       noKnownChanges,
       graphIdentity(staleWeb, staleNode)
     );
+    await expect
+      .poll(() => typeof rejectEvaluation, { timeout: 1000 })
+      .toBe('function');
 
     runtime.beginAttempt();
     rejectEvaluation?.(new Error('stale rejection'));
@@ -968,6 +1098,9 @@ describe('React Router development runtime', () => {
       noKnownChanges,
       graphIdentity(web, node)
     );
+    await expect
+      .poll(() => typeof resolveEvaluation, { timeout: 1000 })
+      .toBe('function');
 
     runtime.close();
     resolveEvaluation?.(createBuild('late'));

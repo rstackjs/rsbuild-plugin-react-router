@@ -1,6 +1,8 @@
 import type { Rspack } from '@rsbuild/core';
 import type {
+  DevCompileAttemptIdentity,
   DevCompilationIdentity,
+  DevRuntimeStats,
   DevGraphChanges,
   DevGraphIdentity,
 } from './dev-runtime-artifacts.js';
@@ -10,13 +12,16 @@ export type DevCompilerPair = {
   node: Rspack.Compiler;
   settledCompilations: WeakSet<Rspack.Compilation>;
   pendingAttempt?: PendingDevCompilation;
+  currentAttemptIdentity?: DevCompileAttemptIdentity;
   latestCompletedWebIdentity?: DevCompilationIdentity;
+  latestCompletedWebStats?: Rspack.Stats;
+  latestCompletedNodeStats?: Rspack.Stats;
   latestWebStart?: CompilationStart;
   latestNodeStart?: CompilationStart;
 };
 
 export type PendingDevCompilation = {
-  stats: Rspack.Stats | Rspack.MultiStats;
+  stats: DevRuntimeStats;
   changes: DevGraphChanges;
   identity: DevGraphIdentity;
   webCompilation: Rspack.Compilation;
@@ -26,6 +31,30 @@ export type PendingDevCompilation = {
 export type CompilationStart =
   | { status: 'pending' }
   | { status: 'started'; identity: DevCompilationIdentity };
+
+type CompilerPairStartSide = 'latestWebStart' | 'latestNodeStart';
+
+export const createDevCompilerPair = ({
+  web,
+  node,
+}: {
+  web: Rspack.Compiler;
+  node: Rspack.Compiler;
+}): DevCompilerPair => ({
+  web,
+  node,
+  settledCompilations: new WeakSet(),
+});
+
+export const resetDevCompilerPair = (pair: DevCompilerPair): void => {
+  pair.pendingAttempt = undefined;
+  pair.currentAttemptIdentity = undefined;
+  pair.latestCompletedWebIdentity = undefined;
+  pair.latestCompletedWebStats = undefined;
+  pair.latestCompletedNodeStats = undefined;
+  pair.latestWebStart = undefined;
+  pair.latestNodeStart = undefined;
+};
 
 export const isLatestStartedCompilation = (
   identity: DevCompilationIdentity | undefined,
@@ -37,6 +66,32 @@ export const hasPendingCompilation = (pair: DevCompilerPair): boolean =>
   pair.latestWebStart?.status === 'pending' ||
   pair.latestNodeStart?.status === 'pending';
 
+export const beginDevCompilerAttempt = (pair: DevCompilerPair): void => {
+  pair.pendingAttempt = undefined;
+  pair.currentAttemptIdentity = Symbol();
+};
+
+export const markDevCompilerPending = (
+  pair: DevCompilerPair,
+  side: CompilerPairStartSide
+): boolean => {
+  const attemptAlreadyPending = hasPendingCompilation(pair);
+  pair[side] = { status: 'pending' };
+  pair.pendingAttempt = undefined;
+  if (!attemptAlreadyPending) {
+    pair.currentAttemptIdentity = Symbol();
+  }
+  return !attemptAlreadyPending;
+};
+
+export const clearDevCompilerStart = (
+  pair: DevCompilerPair,
+  side: CompilerPairStartSide
+): void => {
+  pair[side] = undefined;
+  pair.pendingAttempt = undefined;
+};
+
 export type CompilationIdentityTracker = {
   getCompilationIdentity(
     compilation: Rspack.Compilation
@@ -44,6 +99,13 @@ export type CompilationIdentityTracker = {
   getWebIdentityForNodeCompilation(
     compilation: Rspack.Compilation
   ): DevCompilationIdentity | undefined;
+  getAttemptIdentityForCompilation(
+    compilation: Rspack.Compilation
+  ): DevCompileAttemptIdentity | undefined;
+  setAttemptIdentityForCompilation(
+    compilation: Rspack.Compilation,
+    identity: DevCompileAttemptIdentity
+  ): void;
   setWebIdentityForNodeCompilation(
     compilation: Rspack.Compilation,
     identity: DevCompilationIdentity
@@ -59,6 +121,10 @@ export const createCompilationIdentityTracker =
     const webIdentityByNodeCompilation = new WeakMap<
       Rspack.Compilation,
       DevCompilationIdentity
+    >();
+    const attemptIdentityByCompilation = new WeakMap<
+      Rspack.Compilation,
+      DevCompileAttemptIdentity
     >();
 
     return {
@@ -80,6 +146,19 @@ export const createCompilationIdentityTracker =
         compilation: Rspack.Compilation
       ): DevCompilationIdentity | undefined {
         return webIdentityByNodeCompilation.get(compilation);
+      },
+
+      getAttemptIdentityForCompilation(
+        compilation: Rspack.Compilation
+      ): DevCompileAttemptIdentity | undefined {
+        return attemptIdentityByCompilation.get(compilation);
+      },
+
+      setAttemptIdentityForCompilation(
+        compilation: Rspack.Compilation,
+        identity: DevCompileAttemptIdentity
+      ): void {
+        attemptIdentityByCompilation.set(compilation, identity);
       },
 
       setWebIdentityForNodeCompilation(

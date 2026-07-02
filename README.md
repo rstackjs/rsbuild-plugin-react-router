@@ -70,24 +70,23 @@ plugin only needs options for Rsbuild-specific behavior.
 ```ts
 pluginReactRouter({
   customServer: false,
-  serverOutput: 'module',
-  lazyCompilation: undefined,
+  lazyCompilation: true,
+  unstableLazyCompilationPrewarm: false,
   logPerformance: false,
-  parallelRouteTransform: undefined,
-  onRouteTopologyChange: undefined,
   federation: false,
 });
 ```
 
-| Option                   | Default     | Description                                                                                                                                                                                                                      |
-| ------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `customServer`           | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
-| `serverOutput`           | `'module'`  | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
-| `lazyCompilation`        | `undefined` | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
-| `logPerformance`         | `false`     | Logs structured React Router plugin timing information through the Rsbuild logger.                                                                                                                                               |
-| `parallelRouteTransform` | `undefined` | Controls worker-thread route transforms. `undefined` auto-enables workers for 256+ routes, `true` forces the default worker count, a positive integer sets the worker count, and `false` keeps transforms inline.                |
-| `onRouteTopologyChange`  | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
-| `federation`             | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
+| Option                           | Default     | Description                                                                                                                                                                                                                      |
+| -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customServer`                   | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
+| `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
+| `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
+| `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted Rspack lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                        |
+| `logPerformance`                 | `false`     | Logs structured React Router plugin timing information through the Rsbuild logger.                                                                                                                                               |
+| `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` auto-enables workers for 256+ routes, `true` forces the default worker count (0 on machines with 4 or fewer cores, where workers cost more than they save), a positive integer sets the worker count, and `false` keeps transforms inline. |
+| `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
+| `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
 
 When `federation` is enabled, configure the Module Federation plugin with
 `experiments.asyncStartup: true`. The dev server resolves async server build
@@ -235,6 +234,20 @@ Route transform source maps are generated in development only. If you enable
 Rsbuild source maps for faster local debugging, prefer a cheap JS map:
 `output.sourceMap: { js: 'cheap-module-source-map', css: false }`.
 
+Lazy compilation prewarming is disabled by default. When enabled alongside
+`lazyCompilation`, the plugin fetches emitted browser entry and route JS assets,
+extracts activation keys from Rspack's generated lazy-compilation client calls,
+and POSTs those keys to Rspack's configured lazy trigger endpoint after dev
+compiles. It does not request application routes or run route loaders. Because
+the key extraction depends on Rspack's generated client code shape, opt in with
+`unstableLazyCompilationPrewarm: true`.
+
+Subresource Integrity is disabled by default. Enable it with
+`subResourceIntegrity: true` in `react-router.config.*` when the deployed app
+should emit integrity metadata for browser scripts. The legacy
+`future.unstable_subResourceIntegrity` flag is still accepted and is normalized
+to the stable option.
+
 ### Route Configuration
 
 Routes can be defined in `app/routes.ts` using the helper functions from `@react-router/dev/routes`:
@@ -339,6 +352,11 @@ export default defineConfig(() => {
     plugins: [
       pluginReactRouter({
         customServer: true,
+        onRouteTopologyChange() {
+          console.warn('Route topology changed; restart the dev server.');
+          process.exitCode = 75;
+          setTimeout(() => process.exit(75), 0);
+        },
       }),
       pluginReact(),
     ],
@@ -346,17 +364,14 @@ export default defineConfig(() => {
 });
 ```
 
-If the server is created programmatically with `createDevServer()`, pass
-`onRouteTopologyChange` and use it to recreate that server. Rsbuild's
-`reload-server` watcher is owned by the CLI and is not installed by the
-programmatic API. The callback is a notification and is not awaited, so it can
-safely start a serialized replacement task. Always `await` the active server's
-`close()` before calling `createDevServer()` again; the plugin rejects overlapping
-or out-of-order replacement instead of closing one server from inside another
-server's startup hooks. If startup fails before returning a server, or if
-`close()` rejects, restart the process before retrying unless you can externally
-prove and force complete teardown; a fresh Rsbuild instance alone is not
-sufficient. Do not launch concurrent `createDevServer()` calls.
+Rsbuild's `reload-server` watcher is owned by the CLI and is not installed by
+the programmatic `createDevServer()` API. The sample below therefore treats
+route topology changes as a full process restart: do not call `startServer()`
+again inside the same process or mount a second dev server on the same Express
+app. If you implement in-process replacement instead, route requests through
+replaceable middleware and request-handler delegates, always `await` the active
+server's `close()` before calling `createDevServer()` again, and do not launch
+concurrent replacements.
 
 Create one server entry point (`server.js`) and let it own the React Router
 request handler in both development and production. Only the build provider
@@ -631,6 +646,22 @@ The plugin automatically:
 - Sets up development server with live reload
 - Handles route-based code splitting
 - Manages client and server builds
+
+### Benchmarking
+
+`pnpm bench:large` runs this repository's generated stress fixture for quick
+regression checks. `pnpm bench:synthetic-app` runs the embedded complex Rsbuild
+app under `benchmarks/synthetic-web-bundler-benchmark`, which adds heavier
+loader and transform contention for benchmark coverage closer to a large
+real-world application.
+
+```bash
+pnpm bench:large
+pnpm bench:synthetic-app -- --profile all --runs 2
+```
+
+The PR benchmark workflow reports production build, dev route-load, HMR/update,
+and embedded synthetic app timings in the same benchmark comment.
 
 ## React Router Framework Mode
 

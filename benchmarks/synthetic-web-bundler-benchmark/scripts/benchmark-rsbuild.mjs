@@ -20,7 +20,8 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { out, profile, runs } = parseArgs(process.argv.slice(2));
 const logReactRouterPerformance = isReactRouterPerformanceLoggingEnabled();
-const devRoutePaths = ['/', '/feature/0000', '/feature/0010', '/feature/0100'];
+const syntheticRoutes = readPositiveIntegerEnv('SYNTHETIC_ROUTES', 355);
+const devRoutePaths = createDevRoutePaths(syntheticRoutes);
 const devPortBase = 44000;
 const devTimeoutMs = readPositiveIntegerEnv(
   'SYNTHETIC_DEV_TIMEOUT_MS',
@@ -216,6 +217,13 @@ function readPositiveIntegerEnv(name, fallback) {
     throw new Error(`${name} must be a positive integer`);
   }
   return parsed;
+}
+
+function createDevRoutePaths(routeCount) {
+  const featureIndexes = [0, 10, 100]
+    .filter(index => index < routeCount)
+    .map(index => `/feature/${String(index).padStart(4, '0')}`);
+  return ['/', ...new Set(featureIndexes)];
 }
 
 function rsbuildBinary() {

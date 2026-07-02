@@ -1,7 +1,10 @@
 import { isAbsolute, relative } from 'node:path';
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
+import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
+import { getCappedPluginConcurrency } from './concurrency.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { resolveServerBuildModule } from './server-utils.js';
 
 export type ReactRouterDevManifest = ReactRouterManifestForDev;
@@ -16,6 +19,13 @@ export type ReactRouterDevManifestSet = Readonly<
 >;
 
 export type ReactRouterServerBuilds = Readonly<Record<string, ServerBuild>>;
+
+export type PairedDevStats = {
+  web: Rspack.Stats;
+  node: Rspack.Stats;
+};
+
+export type DevRuntimeStats = Rspack.Stats | Rspack.MultiStats | PairedDevStats;
 
 export type DependencySnapshot = {
   files: ReadonlySet<string>;
@@ -34,11 +44,13 @@ export type DevGraphChanges = {
 };
 
 export type DevCompilationIdentity = symbol;
+export type DevCompileAttemptIdentity = symbol;
 
 export type DevGraphIdentity = {
   web: DevCompilationIdentity | undefined;
   node: DevCompilationIdentity | undefined;
   nodeWeb: DevCompilationIdentity | undefined;
+  attempt: DevCompileAttemptIdentity | undefined;
 };
 
 export type WebArtifact = {
@@ -102,10 +114,17 @@ export const isSafeOneSidedChange = (
   return true;
 };
 
+export const isPairedDevStats = (
+  stats: DevRuntimeStats
+): stats is PairedDevStats => 'web' in stats && 'node' in stats;
+
 export const getEnvironmentStats = (
-  stats: Rspack.Stats | Rspack.MultiStats,
+  stats: DevRuntimeStats,
   name: 'web' | 'node'
 ): Rspack.Stats | undefined => {
+  if (isPairedDevStats(stats)) {
+    return stats[name];
+  }
   const children = Array.isArray((stats as Rspack.MultiStats).stats)
     ? (stats as Rspack.MultiStats).stats
     : [stats as Rspack.Stats];
@@ -115,29 +134,44 @@ export const getEnvironmentStats = (
   });
 };
 
-const evaluateServerBuild = async (
+const startServerBuildEvaluationEffect = (
   server: RsbuildDevServer,
   entryName: string
-): Promise<ServerBuild> => {
-  const loaded = await server.environments.node.loadBundle(entryName);
-  return resolveServerBuildModule(
-    loaded,
-    `Server entry ${JSON.stringify(entryName)}`
+): Effect.Effect<ServerBuild, Error, never> =>
+  tryPluginPromise(() => server.environments.node.loadBundle(entryName)).pipe(
+    Effect.flatMap(buildModule =>
+      tryPluginPromise(() =>
+        resolveServerBuildModule(
+          buildModule,
+          `Server entry ${JSON.stringify(entryName)}`
+        )
+      )
+    )
   );
-};
 
-export const evaluateServerBuilds = async (
+const evaluateServerBuildsEffect = (
   server: RsbuildDevServer,
   entryNames: readonly string[]
-): Promise<ReactRouterServerBuilds> => {
-  const evaluated = await Promise.all(
-    entryNames.map(async entryName => [
-      entryName,
-      await evaluateServerBuild(server, entryName),
-    ])
+): Effect.Effect<ReactRouterServerBuilds, Error, never> =>
+  Effect.forEach(
+    entryNames.map(entryName =>
+      startServerBuildEvaluationEffect(server, entryName).pipe(
+        Effect.map(build => [entryName, build] as const)
+      )
+    ),
+    evaluation => evaluation,
+    { concurrency: getCappedPluginConcurrency() }
+  ).pipe(
+    Effect.map(
+      evaluated => Object.fromEntries(evaluated) as Record<string, ServerBuild>
+    )
   );
-  return Object.fromEntries(evaluated) as Record<string, ServerBuild>;
-};
+
+export const evaluateServerBuilds = (
+  server: RsbuildDevServer,
+  entryNames: readonly string[]
+): Promise<ReactRouterServerBuilds> =>
+  runPluginEffect(evaluateServerBuildsEffect(server, entryNames));
 
 const assertBuildMatchesManifest = (
   entryName: string,

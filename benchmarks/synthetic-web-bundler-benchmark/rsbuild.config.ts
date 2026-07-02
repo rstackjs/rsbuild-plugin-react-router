@@ -11,21 +11,81 @@ const reactRouterLogPerformance =
   process.env.SYNTHETIC_REACT_ROUTER_LOG_PERFORMANCE === '1' ||
   process.env.SYNTHETIC_REACT_ROUTER_LOG_PERFORMANCE === 'true';
 
+const readBooleanEnv = (name: string, defaultValue: boolean) => {
+  const value = process.env[name];
+  if (value == null || value === '') {
+    return defaultValue;
+  }
+  if (value === '1' || value === 'true') {
+    return true;
+  }
+  if (value === '0' || value === 'false') {
+    return false;
+  }
+  throw new Error(`${name} must be true or false.`);
+};
+
+const parseParallelRouteTransform = () => {
+  const value = process.env.SYNTHETIC_REACT_ROUTER_PARALLEL_ROUTE_TRANSFORM;
+  if (value == null || value === '' || value === 'auto') {
+    return undefined;
+  }
+  if (value === '1' || value === 'true') {
+    return true;
+  }
+  if (value === '0' || value === 'false') {
+    return false;
+  }
+  const workerCount = Number(value);
+  if (Number.isInteger(workerCount) && workerCount > 0) {
+    return workerCount;
+  }
+  throw new Error(
+    'SYNTHETIC_REACT_ROUTER_PARALLEL_ROUTE_TRANSFORM must be auto, true, false, or a positive integer.'
+  );
+};
+
+const parseReactCompiler = () => {
+  const value = process.env.SYNTHETIC_REACT_COMPILER;
+  if (value == null || value === '' || value === 'annotation') {
+    return {
+      compilationMode: 'annotation' as const,
+      target: '19' as const,
+    };
+  }
+  if (value === '1' || value === 'true' || value === 'default') {
+    return true;
+  }
+  if (value === '0' || value === 'false') {
+    return false;
+  }
+  throw new Error(
+    'SYNTHETIC_REACT_COMPILER must be annotation, default, true, or false.'
+  );
+};
+
+const reactCompiler = parseReactCompiler();
+const babelParallel = readBooleanEnv('SYNTHETIC_BABEL_PARALLEL', true);
+const svgrParallel = readBooleanEnv('SYNTHETIC_SVGR_PARALLEL', true);
+const tailwindMinify = readBooleanEnv(
+  'SYNTHETIC_TAILWIND_MINIFY',
+  !isDevelopment
+);
+
 export default defineConfig({
   plugins: [
     pluginReactRouter({
       customServer: false,
       logPerformance: reactRouterLogPerformance,
+      parallelRouteTransform: parseParallelRouteTransform(),
     }),
     pluginReact({
-      reactCompiler: {
-        compilationMode: 'annotation',
-        target: '19',
-      },
+      reactCompiler,
       splitChunks: false,
     }),
     pluginBabel({
       include: /[/\\]app[/\\].*\.[cm]?[jt]sx?$/,
+      parallel: babelParallel,
       babelLoaderOptions(babelOptions) {
         babelOptions.plugins = [
           ...createBabelPlugins(!isDevelopment),
@@ -34,6 +94,7 @@ export default defineConfig({
       },
     }),
     pluginSvgr({
+      parallel: svgrParallel,
       svgrOptions: {
         exportType: 'default',
         svgo: true,
@@ -41,7 +102,7 @@ export default defineConfig({
     }),
     pluginTailwindcss({
       optimize: {
-        minify: !isDevelopment,
+        minify: tailwindMinify,
       },
     }),
   ],
@@ -70,8 +131,5 @@ export default defineConfig({
   output: {
     legalComments: 'none',
     minify: !isDevelopment,
-  },
-  performance: {
-    buildCache: false,
   },
 });

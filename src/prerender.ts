@@ -92,24 +92,6 @@ export const createPrerenderRoutes = (
 export const normalizePrerenderMatchPath = (path: string): string =>
   `/${path}/`.replace(/^\/\/+/, '/');
 
-export const withBuildRequest = async <T>(
-  input: string | URL,
-  init: RequestInit | undefined,
-  handle: (request: Request) => Promise<T>
-): Promise<T> => {
-  const controller = new AbortController();
-  try {
-    return await handle(
-      new Request(input, {
-        ...init,
-        signal: controller.signal,
-      })
-    );
-  } finally {
-    controller.abort();
-  }
-};
-
 export const getSsrFalsePrerenderExportErrors = ({
   routes,
   manifestRoutes,

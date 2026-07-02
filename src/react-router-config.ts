@@ -4,6 +4,9 @@ import type {
 } from '@react-router/dev/config';
 import type { NormalizedConfig } from '@rsbuild/core';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
+import * as Effect from 'effect/Effect';
+import { getCappedPluginConcurrency } from './concurrency.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
 export type BuildEndHook = {
   bivarianceHack(args: {
@@ -44,6 +47,12 @@ type RouteManifestEntry = {
 };
 
 type RouteManifest = Record<string, RouteManifestEntry>;
+
+type ResolveReactRouterConfigResult = {
+  resolved: ResolvedReactRouterConfig;
+  presets: NonNullable<Config['presets']>;
+  hasConfiguredServerModuleFormat: boolean;
+};
 
 export type ResolvedReactRouterConfig = Readonly<{
   appDirectory: string;
@@ -102,10 +111,15 @@ const mergeReactRouterConfig = (...configs: Config[]): Config => {
             buildEnd: async (
               ...args: Parameters<NonNullable<Config['buildEnd']>>
             ) => {
-              await Promise.all([
-                configA.buildEnd?.(...args),
-                configB.buildEnd?.(...args),
-              ]);
+              await runPluginEffect(
+                Effect.all(
+                  [
+                    tryPluginPromise(() => configA.buildEnd?.(...args)),
+                    tryPluginPromise(() => configB.buildEnd?.(...args)),
+                  ],
+                  { discard: true }
+                )
+              );
             },
           }
         : {}),
@@ -145,76 +159,87 @@ const normalizeSubResourceIntegrity = (config: Config): Config => {
   };
 };
 
-export const resolveReactRouterConfig = async (
+export const resolveReactRouterConfigEffect = (
   reactRouterUserConfig: Config
-): Promise<{
-  resolved: ResolvedReactRouterConfig;
-  presets: NonNullable<Config['presets']>;
-  hasConfiguredServerModuleFormat: boolean;
-}> => {
-  const presets = await Promise.all(
-    (reactRouterUserConfig.presets ?? []).map(async preset => {
-      if (!preset.name) {
-        throw new Error(
-          'React Router presets must have a `name` property defined.'
-        );
-      }
-      if (!preset.reactRouterConfig) {
-        return null;
-      }
-      const { buildEnd: _buildEnd, ...reactRouterUserConfigForPreset } =
-        reactRouterUserConfig;
-      const presetConfig = await preset.reactRouterConfig({
-        reactRouterUserConfig: reactRouterUserConfigForPreset,
-      });
-      if (!presetConfig) return null;
-      const { presets: _presets, ...rest } = presetConfig as Config;
-      return rest;
-    })
-  );
+): Effect.Effect<ResolveReactRouterConfigResult, Error, never> =>
+  Effect.gen(function* () {
+    const presets = yield* Effect.forEach(
+      reactRouterUserConfig.presets ?? [],
+      preset =>
+        Effect.gen(function* () {
+          if (!preset.name) {
+            return yield* Effect.fail(
+              new Error(
+                'React Router presets must have a `name` property defined.'
+              )
+            );
+          }
+          if (!preset.reactRouterConfig) {
+            return null;
+          }
+          const { buildEnd: _buildEnd, ...reactRouterUserConfigForPreset } =
+            reactRouterUserConfig;
+          const presetConfig = yield* tryPluginPromise(() =>
+            preset.reactRouterConfig?.({
+              reactRouterUserConfig: reactRouterUserConfigForPreset,
+            })
+          );
+          if (!presetConfig) return null;
+          const { presets: _presets, ...rest } = presetConfig as Config;
+          return rest;
+        }),
+      { concurrency: getCappedPluginConcurrency() }
+    );
 
-  const userAndPresetConfigs = mergeReactRouterConfig(
-    ...(presets.filter(Boolean) as Config[]).map(normalizeSubResourceIntegrity),
-    normalizeSubResourceIntegrity(reactRouterUserConfig)
-  );
+    const userAndPresetConfigs = mergeReactRouterConfig(
+      ...(presets.filter(Boolean) as Config[]).map(
+        normalizeSubResourceIntegrity
+      ),
+      normalizeSubResourceIntegrity(reactRouterUserConfig)
+    );
 
-  const subResourceIntegrity =
-    userAndPresetConfigs.subResourceIntegrity ??
-    userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
-    DEFAULT_CONFIG.subResourceIntegrity;
-  const resolvedFuture: FutureConfig = {
-    ...DEFAULT_CONFIG.future,
-    ...(userAndPresetConfigs.future ?? {}),
-    unstable_subResourceIntegrity: subResourceIntegrity,
-  };
-  const splitRouteModules =
-    userAndPresetConfigs.splitRouteModules ??
-    userAndPresetConfigs.future?.v8_splitRouteModules ??
-    DEFAULT_CONFIG.splitRouteModules;
-
-  let resolved: ResolvedReactRouterConfig = {
-    ...DEFAULT_CONFIG,
-    ...userAndPresetConfigs,
-    future: resolvedFuture,
-    splitRouteModules,
-    subResourceIntegrity,
-    allowedActionOrigins:
-      userAndPresetConfigs.allowedActionOrigins ??
-      DEFAULT_CONFIG.allowedActionOrigins,
-    routes: DEFAULT_CONFIG.routes,
-    unstable_routeConfig: DEFAULT_CONFIG.unstable_routeConfig,
-  };
-  if (!resolved.ssr) {
-    resolved = {
-      ...resolved,
-      serverBundles: undefined,
+    const subResourceIntegrity =
+      userAndPresetConfigs.subResourceIntegrity ??
+      userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
+      DEFAULT_CONFIG.subResourceIntegrity;
+    const resolvedFuture: FutureConfig = {
+      ...DEFAULT_CONFIG.future,
+      ...(userAndPresetConfigs.future ?? {}),
+      unstable_subResourceIntegrity: subResourceIntegrity,
     };
-  }
+    const splitRouteModules =
+      userAndPresetConfigs.splitRouteModules ??
+      userAndPresetConfigs.future?.v8_splitRouteModules ??
+      DEFAULT_CONFIG.splitRouteModules;
 
-  return {
-    resolved,
-    presets: reactRouterUserConfig.presets ?? [],
-    hasConfiguredServerModuleFormat:
-      userAndPresetConfigs.serverModuleFormat !== undefined,
-  };
-};
+    let resolved: ResolvedReactRouterConfig = {
+      ...DEFAULT_CONFIG,
+      ...userAndPresetConfigs,
+      future: resolvedFuture,
+      splitRouteModules,
+      subResourceIntegrity,
+      allowedActionOrigins:
+        userAndPresetConfigs.allowedActionOrigins ??
+        DEFAULT_CONFIG.allowedActionOrigins,
+      routes: DEFAULT_CONFIG.routes,
+      unstable_routeConfig: DEFAULT_CONFIG.unstable_routeConfig,
+    };
+    if (!resolved.ssr) {
+      resolved = {
+        ...resolved,
+        serverBundles: undefined,
+      };
+    }
+
+    return {
+      resolved,
+      presets: reactRouterUserConfig.presets ?? [],
+      hasConfiguredServerModuleFormat:
+        userAndPresetConfigs.serverModuleFormat !== undefined,
+    };
+  });
+
+export const resolveReactRouterConfig = (
+  reactRouterUserConfig: Config
+): Promise<ResolveReactRouterConfigResult> =>
+  runPluginEffect(resolveReactRouterConfigEffect(reactRouterUserConfig));

@@ -85,7 +85,7 @@ const createCompiler = (name: 'web' | 'node') => {
     compilation: Rspack.Compilation,
     predicate: (stage: number) => boolean
   ): void => {
-    const stats = { compilation } as Rspack.Stats;
+    const stats = createStats(compilation);
     for (const tap of doneTaps
       .filter(({ stage }) => predicate(stage))
       .sort((left, right) => left.stage - right.stage)) {
@@ -573,6 +573,101 @@ describe('React Router development runtime controller', () => {
     expect(loadBundle).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps last-good output when a one-sided node compile cannot evaluate', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    let build: unknown = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+    const committed = await controller.createBuildLoader()();
+
+    build = {};
+    node.setChanges(['/app/node-only.ts']);
+    callbacks.before();
+    const nextNode = node.compile();
+    await expect(callbacks.after({ stats: createStats(nextNode) })).resolves.toBe(
+      undefined
+    );
+
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(controller.createBuildLoader()()).resolves.toBe(committed);
+  });
+
+  it('publishes an initial same-attempt compile when node starts before web completes', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('parallel'));
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const waiting = controller.createBuildLoader()();
+
+    const nodeCompilation = node.compile();
+    const webCompilation = web.compile();
+    controller.captureWeb(webCompilation, createManifestSet('parallel'));
+    web.complete(webCompilation);
+    await callbacks.after({
+      stats: createGraphStats(webCompilation, nodeCompilation),
+    });
+
+    const published = await Promise.race([
+      waiting,
+      new Promise(resolve => setTimeout(() => resolve('pending'), 0)),
+    ]);
+    expect(published).toMatchObject({
+      marker: 'parallel',
+      assets: { version: 'parallel' },
+    });
+    expect(loadBundle).toHaveBeenCalledOnce();
+  });
+
+  it('publishes a same-attempt rebuild when node starts before web completes', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    const loadBuild = controller.createBuildLoader();
+
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    build = createBuild('node-b');
+    callbacks.before();
+    const nodeB = node.compile();
+    const webB = web.compile();
+    controller.captureWeb(webB, createManifestSet('web-b'));
+    web.complete(webB);
+    await callbacks.after({ stats: createGraphStats(webB, nodeB) });
+
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(loadBuild()).resolves.toMatchObject({
+      marker: 'node-b',
+      assets: { version: 'web-b' },
+    });
+  });
+
   it('waits for late done hooks before snapshotting dependencies', async () => {
     const routePath = '/app/routes.ts';
     const { callbacks, controller, loadBundle, server, warn } = createHarness();
@@ -930,8 +1025,9 @@ describe('React Router development runtime controller', () => {
     const evaluating = callbacks.after({
       stats: createGraphStats(webA, nodeA),
     });
-    await Promise.resolve();
-    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect
+      .poll(() => loadBundle.mock.calls.length, { timeout: 1000 })
+      .toBe(2);
 
     web.invalidate();
     resolveCandidate(createBuild('a'));
@@ -988,6 +1084,55 @@ describe('React Router development runtime controller', () => {
     const nodeB = node.compile();
     build = createBuild('node-b');
     await callbacks.after({ stats: createGraphStats(webB, nodeB) });
+
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(loadBuild()).resolves.toMatchObject({
+      marker: 'node-b',
+      assets: { version: 'web-b' },
+    });
+  });
+
+  it('publishes node retry stats with the latest completed web compilation', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    const loadBuild = controller.createBuildLoader();
+
+    const webBase = web.compile();
+    controller.captureWeb(webBase, createManifestSet('web-base'));
+    web.complete(webBase);
+    const nodeBase = node.compile();
+    await callbacks.after({ stats: createGraphStats(webBase, nodeBase) });
+    await expect(loadBuild()).resolves.toMatchObject({
+      marker: 'base',
+      assets: { version: 'web-base' },
+    });
+
+    callbacks.before();
+    const nodeA = node.compile();
+    web.invalidate();
+    node.invalidate();
+    const webB = web.compile();
+    controller.captureWeb(webB, createManifestSet('web-b'));
+    web.complete(webB);
+    build = createBuild('node-a');
+    await callbacks.after({ stats: createGraphStats(webB, nodeA) });
+
+    expect(loadBundle).toHaveBeenCalledOnce();
+    await expect(loadBuild()).resolves.toMatchObject({
+      marker: 'base',
+      assets: { version: 'web-base' },
+    });
+
+    const nodeB = node.compile();
+    build = createBuild('node-b');
+    await callbacks.after({ stats: createStats(nodeB) });
 
     expect(loadBundle).toHaveBeenCalledTimes(2);
     await expect(loadBuild()).resolves.toMatchObject({

@@ -1,5 +1,9 @@
 import { describe, expect, it } from '@rstest/core';
-import { resolveReactRouterConfig } from '../src/react-router-config';
+import {
+  resolveReactRouterConfig,
+  resolveReactRouterConfigEffect,
+} from '../src/react-router-config';
+import { runPluginEffect } from '../src/effect-runtime';
 import type { Config } from '../src/react-router-config';
 
 describe('resolveReactRouterConfig', () => {
@@ -24,6 +28,36 @@ describe('resolveReactRouterConfig', () => {
     });
 
     expect(result.resolved.basename).toBe('/preset');
+    await result.resolved.buildEnd?.({
+      buildManifest: { routes: {} },
+      reactRouterConfig: result.resolved,
+      viteConfig: {} as any,
+    });
+    expect(buildEndCalls).toBe(2);
+  });
+
+  it('resolves presets through the Effect config path', async () => {
+    let buildEndCalls = 0;
+    const result = await runPluginEffect(
+      resolveReactRouterConfigEffect({
+        presets: [
+          {
+            name: 'preset-a',
+            reactRouterConfig: async () => ({
+              basename: '/effect-preset',
+              buildEnd: async () => {
+                buildEndCalls += 1;
+              },
+            }),
+          },
+        ],
+        buildEnd: async () => {
+          buildEndCalls += 1;
+        },
+      })
+    );
+
+    expect(result.resolved.basename).toBe('/effect-preset');
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,

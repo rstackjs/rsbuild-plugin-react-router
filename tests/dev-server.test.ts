@@ -24,11 +24,17 @@ describe('React Router development middleware', () => {
       }
     );
     const listener = rstest.fn(
-      async (_req: IncomingMessage, _res: ServerResponse) => {
-        await requestHandler(new Request('http://localhost/'));
+      async (
+        handler: (request: Request) => Response | Promise<Response>,
+        _req: IncomingMessage,
+        _res: ServerResponse
+      ) => {
+        await handler(new Request('http://localhost/'));
       }
     );
-    const createRequestListener = rstest.fn(() => listener);
+    const createRequestListener = rstest.fn(handler =>
+      listener.bind(undefined, handler)
+    );
     const next = rstest.fn();
     const middleware = createDevServerMiddleware({
       loadBuild,
@@ -64,5 +70,30 @@ describe('React Router development middleware', () => {
     await middleware({} as IncomingMessage, {} as ServerResponse, next);
 
     expect(next).toHaveBeenCalledWith(error);
+  });
+
+  it('does not pass node-fetch client info as React Router load context', async () => {
+    const requestHandler = rstest.fn(async () => new Response());
+    const middleware = createDevServerMiddleware({
+      loadBuild: () => Promise.resolve(build),
+      createRequestHandler: () => requestHandler,
+      createRequestListener: handler => async () => {
+        await (
+          handler as (
+            request: Request,
+            client: { address: string; family: string; port: number }
+          ) => Response | Promise<Response>
+        )(new Request('http://localhost/'), {
+          address: '127.0.0.1',
+          family: 'IPv4',
+          port: 1234,
+        });
+      },
+    });
+
+    await middleware({} as IncomingMessage, {} as ServerResponse, rstest.fn());
+
+    expect(requestHandler).toHaveBeenCalledTimes(1);
+    expect(requestHandler.mock.calls[0]).toHaveLength(1);
   });
 });

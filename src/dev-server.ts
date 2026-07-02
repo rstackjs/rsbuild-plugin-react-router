@@ -42,10 +42,17 @@ export const createDevServerMiddleware = (
         dependencies.loadBuild,
         'development'
       );
-      return createRequestListener(requestHandler);
+      return createRequestListener(request => requestHandler(request));
     })();
     return listenerPromise;
   };
+
+  // Warm the handler imports now so the first request does not pay them.
+  // On failure, reset so the first real request retries and surfaces the
+  // error through the middleware's own error path.
+  void getListener().catch(() => {
+    listenerPromise = undefined;
+  });
 
   return async (req, res, next): Promise<void> => {
     try {

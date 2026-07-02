@@ -1,4 +1,7 @@
 import { relative, resolve } from 'pathe';
+import * as Effect from 'effect/Effect';
+import { getCappedPluginConcurrency } from './concurrency.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import type { Config } from './react-router-config.js';
 import type { Route } from './types.js';
 
@@ -57,11 +60,26 @@ const configRouteToBranchRoute = (route: Route) => ({
   index: route.index,
 });
 
-export const getBuildManifest = async ({
-  reactRouterConfig,
-  routes,
-  rootDirectory,
-}: {
+const validateServerBundleId = (
+  serverBundleId: string,
+  future: Required<Config>['future']
+): Error | undefined => {
+  if (future?.v8_viteEnvironmentApi) {
+    return /^[a-zA-Z0-9_]+$/.test(serverBundleId)
+      ? undefined
+      : new Error(
+          'The "serverBundles" function must only return strings containing alphanumeric characters and underscores.'
+        );
+  }
+
+  return /^[a-zA-Z0-9-_]+$/.test(serverBundleId)
+    ? undefined
+    : new Error(
+        'The "serverBundles" function must only return strings containing alphanumeric characters, hyphens and underscores.'
+      );
+};
+
+type GetBuildManifestOptions = {
   reactRouterConfig: Required<
     Pick<
       Config,
@@ -71,80 +89,99 @@ export const getBuildManifest = async ({
     Pick<Config, 'serverBundles'>;
   routes: Record<string, Route>;
   rootDirectory: string;
-}): Promise<BuildManifest | undefined> => {
-  const {
-    serverBundles,
-    appDirectory,
-    buildDirectory,
-    serverBuildFile,
-    future,
-  } = reactRouterConfig;
-
-  if (!serverBundles) {
-    return { routes };
-  }
-
-  const rootRelativeRoutes = Object.fromEntries(
-    Object.entries(routes).map(([id, route]) => {
-      const filePath = resolve(appDirectory, route.file);
-      return [
-        id,
-        { ...route, file: normalizePath(relative(rootDirectory, filePath)) },
-      ];
-    })
-  );
-
-  const serverBuildDirectory = resolve(buildDirectory, 'server');
-
-  const buildManifest: BuildManifest = {
-    routes: rootRelativeRoutes,
-    serverBundles: {},
-    routeIdToServerBundleId: {},
-  };
-
-  await Promise.all(
-    getAddressableRoutes(routes).map(async route => {
-      const branch = getRouteBranch(routes, route.id);
-      const serverBundleId = await serverBundles({
-        branch: branch.map(branchRoute =>
-          configRouteToBranchRoute({
-            ...branchRoute,
-            file: resolve(appDirectory, branchRoute.file),
-          })
-        ),
-      });
-
-      if (typeof serverBundleId !== 'string') {
-        throw new Error('The "serverBundles" function must return a string');
-      }
-
-      if (future?.v8_viteEnvironmentApi) {
-        if (!/^[a-zA-Z0-9_]+$/.test(serverBundleId)) {
-          throw new Error(
-            'The "serverBundles" function must only return strings containing alphanumeric characters and underscores.'
-          );
-        }
-      } else if (!/^[a-zA-Z0-9-_]+$/.test(serverBundleId)) {
-        throw new Error(
-          'The "serverBundles" function must only return strings containing alphanumeric characters, hyphens and underscores.'
-        );
-      }
-
-      buildManifest.routeIdToServerBundleId![route.id] = serverBundleId;
-      buildManifest.serverBundles![serverBundleId] ??= {
-        id: serverBundleId,
-        file: normalizePath(
-          relative(
-            rootDirectory,
-            resolve(serverBuildDirectory, serverBundleId, serverBuildFile)
-          )
-        ),
-      };
-    })
-  );
-
-  return buildManifest;
 };
+
+export const getBuildManifestEffect = ({
+  reactRouterConfig,
+  routes,
+  rootDirectory,
+}: GetBuildManifestOptions): Effect.Effect<
+  BuildManifest | undefined,
+  Error,
+  never
+> =>
+  Effect.gen(function* () {
+    const {
+      serverBundles,
+      appDirectory,
+      buildDirectory,
+      serverBuildFile,
+      future,
+    } = reactRouterConfig;
+
+    if (!serverBundles) {
+      return { routes };
+    }
+
+    const rootRelativeRoutes = Object.fromEntries(
+      Object.entries(routes).map(([id, route]) => {
+        const filePath = resolve(appDirectory, route.file);
+        return [
+          id,
+          { ...route, file: normalizePath(relative(rootDirectory, filePath)) },
+        ];
+      })
+    );
+
+    const serverBuildDirectory = resolve(buildDirectory, 'server');
+
+    const buildManifest: BuildManifest = {
+      routes: rootRelativeRoutes,
+      serverBundles: {},
+      routeIdToServerBundleId: {},
+    };
+
+    yield* Effect.forEach(
+      getAddressableRoutes(routes),
+      route =>
+        Effect.gen(function* () {
+          const branch = getRouteBranch(routes, route.id);
+          const serverBundleId = yield* tryPluginPromise(() =>
+            serverBundles({
+              branch: branch.map(branchRoute =>
+                configRouteToBranchRoute({
+                  ...branchRoute,
+                  file: resolve(appDirectory, branchRoute.file),
+                })
+              ),
+            })
+          );
+
+          if (typeof serverBundleId !== 'string') {
+            return yield* Effect.fail(
+              new Error('The "serverBundles" function must return a string')
+            );
+          }
+
+          const validationError = validateServerBundleId(
+            serverBundleId,
+            future
+          );
+          if (validationError) {
+            return yield* Effect.fail(validationError);
+          }
+
+          buildManifest.routeIdToServerBundleId![route.id] = serverBundleId;
+          buildManifest.serverBundles![serverBundleId] ??= {
+            id: serverBundleId,
+            file: normalizePath(
+              relative(
+                rootDirectory,
+                resolve(serverBuildDirectory, serverBundleId, serverBuildFile)
+              )
+            ),
+          };
+        }),
+      { concurrency: getCappedPluginConcurrency(), discard: true }
+    );
+
+    return buildManifest;
+  });
+
+export const getBuildManifest = (
+  options: GetBuildManifestOptions
+): Promise<BuildManifest | undefined> =>
+  runPluginEffect(getBuildManifestEffect(options));
 
 export const getRoutesByServerBundleId = (
   buildManifest: BuildManifest | undefined,

@@ -11,6 +11,7 @@ import {
 import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
+import { getDefaultConcurrency } from './concurrency.js';
 import {
   BUILD_CLIENT_ROUTE_QUERY_STRING,
   JS_EXTENSIONS,
@@ -37,7 +38,6 @@ import {
 import {
   getReactRouterManifestForDev,
   configRoutesToRouteManifest,
-  configRoutesToRouteManifestEntries,
   createReactRouterManifestStats,
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
@@ -55,14 +55,7 @@ import {
   createRouteTransformExecutor,
   shouldParallelizeRouteTransforms,
 } from './parallel-route-transforms.js';
-import {
-  createRouteTopologyWatcher,
-  createRouteManifestSnapshot,
-  ensureDevRestartMarker,
-  getRouteRestartMarkerPath,
-  mergeWatchFiles,
-  type WatchFileConfig,
-} from './route-watch.js';
+import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
   getBuildManifest,
@@ -81,14 +74,28 @@ import {
 } from './performance.js';
 import { mapVirtualModules } from './virtual-modules.js';
 import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
+import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
+import { importConfigWithWatchPaths } from './config-imports.js';
 import {
-  clearConfigImportCache,
-  collectConfigImportWatchPaths,
-} from './config-imports.js';
+  createReactRouterRouteTopology,
+  createReactRouterRouteWatchFiles,
+  registerReactRouterDevBackgroundResources,
+} from './dev-background-resources.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
+
+const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
+
+export const shouldParallelizeEnvironmentBuilds = ({
+  isBuild,
+  spareCoreCount = getDefaultConcurrency(),
+}: {
+  isBuild: boolean;
+  spareCoreCount?: number;
+}): boolean =>
+  !isBuild && spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES;
 
 type ModuleFederationPluginLike = {
   name?: string;
@@ -139,6 +146,7 @@ export const pluginReactRouter = (
   async setup(api) {
     const defaultOptions = {
       customServer: false,
+      lazyCompilation: true,
       serverOutput: 'module' as const,
     };
 
@@ -181,8 +189,6 @@ export const pluginReactRouter = (
       warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
     });
 
-    registerReactRouterTypegen(api);
-
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
     let configWatchPaths: string | string[] = configExists
@@ -197,22 +203,10 @@ export const pluginReactRouter = (
       );
     } else {
       const displayPath = relative(process.cwd(), configPath);
-      const configJiti = createJiti(process.cwd(), {
-        moduleCache: true,
-      });
-      const cacheKeysBeforeImport = new Set(Object.keys(configJiti.cache));
       try {
-        const imported = await configJiti.import<Config>(configPath, {
-          default: true,
-        });
-        const importedConfigPaths = collectConfigImportWatchPaths(
-          configPath,
-          configJiti.cache,
-          cacheKeysBeforeImport
-        );
-        if (importedConfigPaths.length > 0) {
-          configWatchPaths = [configPath, ...importedConfigPaths];
-        }
+        const { value: imported, watchPaths } =
+          await importConfigWithWatchPaths<Config>(configPath);
+        configWatchPaths = watchPaths;
         if (imported === undefined) {
           throw new Error(`${displayPath} must provide a default export`);
         }
@@ -222,21 +216,8 @@ export const pluginReactRouter = (
         reactRouterUserConfig = imported;
       } catch (error) {
         throw new Error(`Error loading ${displayPath}: ${error}`);
-      } finally {
-        clearConfigImportCache(configJiti.cache, [
-          configPath,
-          ...collectConfigImportWatchPaths(
-            configPath,
-            configJiti.cache,
-            cacheKeysBeforeImport
-          ),
-        ]);
       }
     }
-
-    const jiti = createJiti(process.cwd(), {
-      moduleCache: false,
-    });
 
     const {
       resolved: resolvedConfig,
@@ -258,6 +239,8 @@ export const pluginReactRouter = (
       splitRouteModules,
       buildEnd,
     } = resolvedConfig;
+
+    registerReactRouterTypegen(api, { appDirectory });
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
       options,
@@ -334,8 +317,13 @@ export const pluginReactRouter = (
       );
     }
 
-    const loadRouteConfig = async (): Promise<RouteConfigEntry[]> => {
-      const routeConfigExport = await jiti.import<RouteConfigEntry[]>(
+    const jiti = createJiti(process.cwd(), {
+      moduleCache: false,
+    });
+    const importRouteConfig = async (
+      importer: Pick<typeof jiti, 'import'>
+    ): Promise<RouteConfigEntry[]> => {
+      const routeConfigExport = await importer.import<RouteConfigEntry[]>(
         routesPath,
         {
           default: true,
@@ -351,7 +339,9 @@ export const pluginReactRouter = (
       }
       return validation.routeConfig;
     };
-    const routeConfig = await loadRouteConfig();
+    const loadRouteConfig = () => importRouteConfig(jiti);
+    const { value: routeConfig, watchPaths: routeConfigWatchPaths } =
+      await importConfigWithWatchPaths(routesPath, importRouteConfig);
 
     const entryClientPath = findEntryFile(
       resolve(appDirectory, 'entry.client')
@@ -384,22 +374,13 @@ export const pluginReactRouter = (
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);
-    const createRouteTopologySnapshot = (
-      routeFile: string,
-      routeConfig: RouteConfigEntry[]
-    ) =>
-      createRouteManifestSnapshot([
-        ['root', { path: '', id: 'root', file: routeFile }],
-        ...configRoutesToRouteManifestEntries(appDirectory, routeConfig),
-      ]);
-    const getWatchedRouteTopology = async (): Promise<Set<string>> => {
-      const latestRouteConfig = await loadRouteConfig();
-      const latestRootRouteFile = relative(appDirectory, getRootRoutePath());
-      return createRouteTopologySnapshot(
-        latestRootRouteFile,
-        latestRouteConfig
-      );
-    };
+    const routeTopology = createReactRouterRouteTopology({
+      appDirectory,
+      rootRouteFile,
+      routeConfig,
+      loadRouteConfig,
+      getRootRoutePath,
+    });
 
     const routes = {
       root: { path: '', id: 'root', file: rootRouteFile },
@@ -426,6 +407,9 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
+    const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
+      isBuild,
+    });
     const isPrerenderEnabled =
       prerenderConfig !== undefined && prerenderConfig !== false;
     const isSpaMode = !ssr && !isPrerenderEnabled;
@@ -453,56 +437,22 @@ export const pluginReactRouter = (
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
     const watchDirectory = resolve(appDirectory);
     const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
-    const routeTopologyWatchFiles: WatchFileConfig[] =
-      pluginOptions.onRouteTopologyChange
-        ? []
-        : [
-            {
-              paths: routesPath,
-              type: 'reload-server',
-            },
-            {
-              paths: routeRestartMarkerPath,
-              type: 'reload-server',
-            },
-          ];
-    const routeWatchFiles: WatchFileConfig[] = [
-      {
-        paths: configWatchPaths,
-        type: 'reload-server',
-      },
-      ...routeTopologyWatchFiles,
-    ];
-    let closeRouteTopologyWatcher: (() => Promise<void>) | undefined;
-
-    api.onBeforeStartDevServer(async () => {
-      await ensureDevRestartMarker(routeRestartMarkerPath);
-      closeRouteTopologyWatcher = await createRouteTopologyWatcher({
-        watchDirectory,
-        getRouteTopology: getWatchedRouteTopology,
-        initialRouteTopology: createRouteTopologySnapshot(
-          rootRouteFile,
-          routeConfig
-        ),
-        restartMarkerPath: routeRestartMarkerPath,
-        onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-        onError: error => {
-          api.logger.warn(
-            `[${PLUGIN_NAME}] Failed to watch route topology changes: ${error}`
-          );
-        },
-      });
+    const routeWatchFiles = createReactRouterRouteWatchFiles({
+      configWatchPaths,
+      routeConfigWatchPaths,
+      routeRestartMarkerPath,
+      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
     });
-
-    api.onCloseDevServer(async () => {
-      await closeRouteTopologyWatcher?.();
-      closeRouteTopologyWatcher = undefined;
-    });
-    api.onCloseBuild(async () => {
-      await routeTransformExecutor.close();
-    });
-    api.onCloseDevServer(async () => {
-      await routeTransformExecutor.close();
+    const devBackgroundResources = registerReactRouterDevBackgroundResources({
+      api,
+      isBuild,
+      lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
+      routeTransformExecutor,
+      routeRestartMarkerPath,
+      watchDirectory,
+      getRouteTopology: routeTopology.getRouteTopology,
+      initialRouteTopology: routeTopology.initialRouteTopology,
+      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
     });
 
     type ReactRouterManifest = Awaited<
@@ -526,6 +476,7 @@ export const pluginReactRouter = (
         'virtual/react-router/browser-manifest',
         () => {
           latestBrowserManifest = manifest;
+          devBackgroundResources.setManifest(manifest);
           latestBrowserManifestModuleExports = moduleExportsByRouteId;
           const baseServerManifest = {
             ...manifest,
@@ -662,31 +613,35 @@ export const pluginReactRouter = (
       }
     );
 
-    api.onAfterBuild(async ({ environments }) => {
-      await runReactRouterPrerenderBuild({
-        api,
-        hasWebEnvironment: Boolean(environments.web),
-        buildDirectory,
-        serverBuildFile,
-        ssr,
-        isPrerenderEnabled,
-        prerenderConfig,
-        prerenderPaths,
-        basename,
-        future,
-        routes,
-        latestBrowserManifest,
-        latestBrowserManifestModuleExports,
-        clientStats,
-        pluginOptions,
-        appDirectory,
-        assetPrefix,
-        routeChunkOptions,
-        buildManifest,
-        resolvedConfigWithRoutes,
-        buildEnd,
-      });
-    });
+    api.onAfterBuild(({ environments }) =>
+      runPluginEffect(
+        tryPluginPromise(() =>
+          runReactRouterPrerenderBuild({
+            api,
+            hasWebEnvironment: Boolean(environments.web),
+            buildDirectory,
+            serverBuildFile,
+            ssr,
+            isPrerenderEnabled,
+            prerenderConfig,
+            prerenderPaths,
+            basename,
+            future,
+            routes,
+            latestBrowserManifest,
+            latestBrowserManifestModuleExports,
+            clientStats,
+            pluginOptions,
+            appDirectory,
+            assetPrefix,
+            routeChunkOptions,
+            buildManifest,
+            resolvedConfigWithRoutes,
+            buildEnd,
+          })
+        )
+      )
+    );
 
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
@@ -770,13 +725,18 @@ export const pluginReactRouter = (
         serverBundleEntries,
       });
 
-      const configuredLazyCompilation =
-        pluginOptions.lazyCompilation === undefined
-          ? config.dev?.lazyCompilation
-          : pluginOptions.lazyCompilation;
+      const configuredLazyCompilation = Object.prototype.hasOwnProperty.call(
+        options,
+        'lazyCompilation'
+      )
+        ? pluginOptions.lazyCompilation
+        : (config.dev?.lazyCompilation ?? pluginOptions.lazyCompilation);
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
         entryClientPath: finalEntryClientPath,
+        prewarmReactRouterModules: Boolean(
+          pluginOptions.unstableLazyCompilationPrewarm
+        ),
       });
       const lazyCompilation =
         guardedLazyCompilation === undefined
@@ -919,7 +879,7 @@ export const pluginReactRouter = (
                   ],
                 },
                 externals: nodeExternals,
-                dependencies: ['web'],
+                ...(shouldDependOnWebCompiler ? { dependencies: ['web'] } : {}),
                 externalsType: resolvedServerOutput,
                 output: {
                   chunkFormat: resolvedServerOutput,

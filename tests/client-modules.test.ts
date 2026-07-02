@@ -5,7 +5,10 @@ import { resolve } from 'pathe';
 import { describe, expect, it } from '@rstest/core';
 import { createStubRsbuild } from '@scripts/test-helper';
 import { pluginReactRouter } from '../src';
-import { collectClientOnlyStubExportNames } from '../src/route-export-resolution';
+import {
+  collectClientOnlyStubExportNames,
+  createBundlerRouteExportResolver,
+} from '../src/route-export-resolution';
 
 describe('client-only module transforms', () => {
   const createConditionalClientPackage = async (
@@ -224,5 +227,39 @@ describe('client-only module transforms', () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  it('adapts the Rsbuild callback resolver to the route export resolver API', async () => {
+    const routeResolver = createBundlerRouteExportResolver(
+      (context, specifier, callback) => {
+        expect(context).toBe('/app/routes');
+        expect(specifier).toBe('@client/exports');
+        callback(null, '/app/generated/client-exports.ts');
+      }
+    );
+
+    await expect(
+      routeResolver('@client/exports', '/app/routes/example.client.ts')
+    ).resolves.toBe('/app/generated/client-exports.ts');
+  });
+
+  it('treats bundler resolver errors and false results as unresolved', async () => {
+    const failedResolver = createBundlerRouteExportResolver(
+      (_context, _specifier, callback) => {
+        callback(new Error('not found'));
+      }
+    );
+    const falseResolver = createBundlerRouteExportResolver(
+      (_context, _specifier, callback) => {
+        callback(null, false);
+      }
+    );
+
+    await expect(
+      failedResolver('@client/missing', '/app/routes/example.client.ts')
+    ).resolves.toBeNull();
+    await expect(
+      falseResolver('@client/false', '/app/routes/example.client.ts')
+    ).resolves.toBeNull();
   });
 });

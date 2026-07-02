@@ -380,6 +380,38 @@ describe('manifest', () => {
     }
   });
 
+  it('generates manifests through the Effect API', async () => {
+    const { root, appDir } = createTempApp(`
+      export async function loader() { return null; }
+      export default function Page() { return null; }
+    `);
+    try {
+      const { manifest, moduleExportsByRouteId } =
+        await generateReactRouterManifestForDev(
+          routes,
+          {},
+          clientStats,
+          appDir,
+          '/',
+          {
+            isBuild: true,
+            rootRouteFile: 'root.tsx',
+            splitRouteModules: false,
+          }
+        );
+
+      expect(manifest.routes['routes/page']).toMatchObject({
+        hasLoader: true,
+        hasDefaultExport: true,
+      });
+      expect(moduleExportsByRouteId['routes/page']).toEqual(
+        expect.arrayContaining(['loader', 'default'])
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('preserves dev css fallback when route analysis uses transformed code', async () => {
     const { root, appDir } = createTempApp(`
       import './page.css';
