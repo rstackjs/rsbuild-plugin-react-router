@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import * as Effect from 'effect/Effect';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
-import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { combineURLs, createRouteId } from './plugin-utils.js';
 import { SERVER_EXPORTS, CLIENT_EXPORTS } from './constants.js';
 import {
@@ -20,6 +19,20 @@ import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
 const ROUTE_ANALYSIS_CONCURRENCY = getCappedPluginConcurrency();
+
+/**
+ * Structural equivalent of `RouteConfigEntry` from `@react-router/dev/routes`,
+ * inlined so the public declaration files do not reference a devDependency
+ * (which would fail to resolve for consumers with `skipLibCheck: false`).
+ */
+export interface RouteConfigEntry {
+  id?: string;
+  path?: string;
+  index?: boolean;
+  caseSensitive?: boolean;
+  file: string;
+  children?: RouteConfigEntry[];
+}
 
 export function configRoutesToRouteManifest(
   appDirectory: string,
