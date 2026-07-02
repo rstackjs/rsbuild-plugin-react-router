@@ -56,7 +56,7 @@ describe('React Router typegen runner', () => {
     expect(execa).toHaveBeenCalledTimes(2);
   });
 
-  it('runs one-shot build typegen through npx', async () => {
+  it('runs one-shot build typegen through npx when no app directory is given', async () => {
     const execa = rstest.fn().mockResolvedValue(undefined);
     const runner = createReactRouterTypegenRunner(async () => execa);
 
@@ -67,6 +67,40 @@ describe('React Router typegen runner', () => {
       ['--yes', 'react-router', 'typegen'],
       { stdio: 'inherit' }
     );
+  });
+
+  it('spawns the react-router bin directly when resolvable from the app directory', async () => {
+    const execa = rstest.fn().mockResolvedValue(undefined);
+    const runner = createReactRouterTypegenRunner(
+      async () => execa,
+      process.cwd()
+    );
+
+    await runner.runBuild();
+
+    expect(execa).toHaveBeenCalledTimes(1);
+    const [command, args] = execa.mock.calls[0];
+    expect(command).toBe(process.execPath);
+    expect(args[0]).toMatch(/[\\/]@react-router[\\/]dev[\\/]bin\.cjs$/);
+    expect(args.slice(1)).toEqual(['typegen']);
+  });
+
+  it('falls back to npx when the react-router bin cannot be resolved', async () => {
+    const { process: watchProcess } = createProcess();
+    const execa = rstest.fn().mockReturnValue(watchProcess);
+    const runner = createReactRouterTypegenRunner(
+      async () => execa,
+      '/nonexistent/app-directory'
+    );
+
+    await runner.startWatch();
+
+    expect(execa).toHaveBeenCalledWith(
+      'npx',
+      ['--yes', 'react-router', 'typegen', '--watch'],
+      { stdio: 'inherit', detached: false, cleanup: true }
+    );
+    await runner.closeWatch();
   });
 
   it('starts dev watch after the first dev compile without blocking startup', async () => {
@@ -96,6 +130,44 @@ describe('React Router typegen runner', () => {
     afterDevCompile();
     expect(startWatch).not.toHaveBeenCalled();
     await expect.poll(() => startWatch.mock.calls.length).toBe(1);
+  });
+
+  it('defers the dev watch while compiles keep happening', async () => {
+    let afterDevCompile!: () => void;
+    const startWatch = rstest.fn().mockResolvedValue(undefined);
+    const runner: ReactRouterTypegenRunner = {
+      startWatch,
+      closeWatch: rstest.fn().mockResolvedValue(undefined),
+      runBuild: rstest.fn().mockResolvedValue(undefined),
+    };
+    const api = {
+      context: { action: 'dev' },
+      logger: { warn: rstest.fn() },
+      onAfterDevCompile: rstest.fn(callback => {
+        afterDevCompile = callback;
+      }),
+      onBeforeStartDevServer: rstest.fn(),
+      onCloseDevServer: rstest.fn(),
+      onBeforeBuild: rstest.fn(),
+    };
+
+    registerReactRouterTypegen(api as never, runner, 50);
+
+    // Compiles arriving faster than the idle delay keep pushing the start out.
+    for (let i = 0; i < 4; i += 1) {
+      afterDevCompile();
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(startWatch).not.toHaveBeenCalled();
+    }
+
+    await expect
+      .poll(() => startWatch.mock.calls.length, { timeout: 1000 })
+      .toBe(1);
+
+    // Once started, later compiles do not restart or duplicate the watch.
+    afterDevCompile();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(startWatch).toHaveBeenCalledTimes(1);
   });
 
   it('cancels delayed dev watch startup on close', async () => {

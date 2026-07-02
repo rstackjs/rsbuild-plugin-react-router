@@ -189,8 +189,6 @@ export const pluginReactRouter = (
       warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
     });
 
-    registerReactRouterTypegen(api);
-
     const configPath = findEntryFile(resolve('react-router.config'));
     const configExists = existsSync(configPath);
     let configWatchPaths: string | string[] = configExists
@@ -241,6 +239,8 @@ export const pluginReactRouter = (
       splitRouteModules,
       buildEnd,
     } = resolvedConfig;
+
+    registerReactRouterTypegen(api, undefined, undefined, appDirectory);
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
       options,
