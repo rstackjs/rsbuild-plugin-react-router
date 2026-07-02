@@ -3,7 +3,7 @@ import * as EffectDeferred from 'effect/Deferred';
 import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import {
-  evaluateServerBuildsEffect,
+  evaluateServerBuilds,
   getEnvironmentStats,
   isSafeOneSidedChange,
   pinServerBuildsToManifests,
@@ -548,9 +548,7 @@ export const createReactRouterDevRuntime = ({
 
       try {
         const buildsByEntryName = shouldEvaluateNode
-          ? await runPluginEffect(
-              evaluateServerBuildsEffect(server, buildPlan.entryNames)
-            )
+          ? await evaluateServerBuilds(server, buildPlan.entryNames)
           : previous!.buildsByEntryName;
         if (!isCurrentAttempt(attemptId)) {
           return 'ignored';

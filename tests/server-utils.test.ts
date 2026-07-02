@@ -1,8 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
 import type { ServerBuild } from 'react-router';
 import { resolveReactRouterServerBuild } from '../src';
-import { runPluginEffect } from '../src/effect-runtime';
-import { resolveReactRouterServerBuildEffect } from '../src/server-utils';
 
 const createBuild = (version: string): ServerBuild =>
   ({
@@ -110,12 +108,10 @@ describe('resolveReactRouterServerBuild', () => {
     const build = createBuild('effect');
 
     await expect(
-      runPluginEffect(
-        resolveReactRouterServerBuildEffect({
-          ...build,
-          assets: async () => build.assets,
-        })
-      )
+      resolveReactRouterServerBuild({
+        ...build,
+        assets: async () => build.assets,
+      })
     ).resolves.toMatchObject({ assets: { version: 'effect' } });
   });
 

@@ -387,7 +387,7 @@ export const getReactRouterManifestChunkNames = (
   return chunkNames;
 };
 
-export function generateReactRouterManifestForDevEffect(
+function generateReactRouterManifestForDevEffect(
   routes: Record<string, Route>,
   _options: PluginOptions,
   clientStats: ReactRouterManifestStats | undefined,
@@ -554,9 +554,23 @@ export function generateReactRouterManifestForDevEffect(
 }
 
 export async function generateReactRouterManifestForDev(
-  ...args: Parameters<typeof generateReactRouterManifestForDevEffect>
+  routes: Record<string, Route>,
+  options: PluginOptions,
+  clientStats: ReactRouterManifestStats | undefined,
+  context: string,
+  assetPrefix = '/',
+  routeChunkOptions?: RouteChunkManifestOptions
 ): Promise<ReactRouterManifestGenerationResult> {
-  return runPluginEffect(generateReactRouterManifestForDevEffect(...args));
+  return runPluginEffect(
+    generateReactRouterManifestForDevEffect(
+      routes,
+      options,
+      clientStats,
+      context,
+      assetPrefix,
+      routeChunkOptions
+    )
+  );
 }
 
 export async function getReactRouterManifestForDev(

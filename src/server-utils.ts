@@ -188,7 +188,7 @@ function resolveServerBuildCandidateEffect(
   );
 }
 
-export function resolveServerBuildModuleEffect(
+function resolveServerBuildModuleEffect(
   buildModule: unknown,
   source: string
 ): Effect.Effect<ServerBuild, Error, never> {
@@ -228,16 +228,12 @@ export function resolveServerBuildModule(
   return runPluginEffect(resolveServerBuildModuleEffect(buildModule, source));
 }
 
-export function resolveReactRouterServerBuildEffect(
-  buildModule: unknown
-): Effect.Effect<ServerBuild, Error, never> {
-  return resolveServerBuildModuleEffect(buildModule, 'Imported module');
-}
-
 export function resolveReactRouterServerBuild(
   buildModule: unknown
 ): Promise<ServerBuild> {
-  return runPluginEffect(resolveReactRouterServerBuildEffect(buildModule));
+  return runPluginEffect(
+    resolveServerBuildModuleEffect(buildModule, 'Imported module')
+  );
 }
 
 export { generateServerBuild };

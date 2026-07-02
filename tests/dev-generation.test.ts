@@ -1,14 +1,13 @@
 import type { RsbuildDevServer } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { loadReactRouterServerBuild } from '../src';
-import { evaluateServerBuildsEffect } from '../src/dev-runtime-artifacts';
+import { evaluateServerBuilds } from '../src/dev-runtime-artifacts';
 import {
   createReactRouterDevRuntime,
   type DevGraphChanges,
   registerReactRouterDevRuntime,
   unregisterReactRouterDevRuntime,
 } from '../src/dev-generation';
-import { runPluginEffect } from '../src/effect-runtime';
 import {
   captureWeb,
   createDevRuntimeHarness as createHarness,
@@ -33,9 +32,10 @@ describe('React Router development runtime', () => {
       environments: { node: { loadBundle } },
     } as unknown as RsbuildDevServer;
 
-    const builds = await runPluginEffect(
-      evaluateServerBuildsEffect(server, ['nested/entry', 'static/js/app'])
-    );
+    const builds = await evaluateServerBuilds(server, [
+      'nested/entry',
+      'static/js/app',
+    ]);
 
     expect(builds['nested/entry']).toMatchObject({ marker: 'nested' });
     expect(builds['static/js/app']).toMatchObject({ marker: 'default' });

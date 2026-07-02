@@ -2,12 +2,10 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
-import { runPluginEffect } from '../src/effect-runtime';
 import {
   createReactRouterManifestStats,
   configRoutesToRouteManifest,
   configRoutesToRouteManifestEntries,
-  generateReactRouterManifestForDevEffect,
   generateReactRouterManifestForDev,
   getReactRouterManifestForDev,
   getReactRouterManifestChunkNames,
@@ -388,8 +386,8 @@ describe('manifest', () => {
       export default function Page() { return null; }
     `);
     try {
-      const { manifest, moduleExportsByRouteId } = await runPluginEffect(
-        generateReactRouterManifestForDevEffect(
+      const { manifest, moduleExportsByRouteId } =
+        await generateReactRouterManifestForDev(
           routes,
           {},
           clientStats,
@@ -400,8 +398,7 @@ describe('manifest', () => {
             rootRouteFile: 'root.tsx',
             splitRouteModules: false,
           }
-        )
-      );
+        );
 
       expect(manifest.routes['routes/page']).toMatchObject({
         hasLoader: true,
