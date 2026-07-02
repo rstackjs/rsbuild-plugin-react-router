@@ -469,21 +469,19 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
       args.mode === 'dev'
         ? yield* tryPromise(() => {
             const devPort = args.devPortBase + benchmarkIndex * 100 + index;
-            const devCommand = withCpuLimit({
-              command: process.execPath,
-              args: [
-                rsbuildBin,
-                'dev',
-                '--config',
-                'rsbuild.config.mjs',
-                '--port',
-                String(devPort),
-              ],
-              cpuLimit: args.cpuLimit,
-            });
             return runDevServerBenchmark({
-              command: devCommand.command,
-              args: devCommand.args,
+              ...withCpuLimit({
+                command: process.execPath,
+                args: [
+                  rsbuildBin,
+                  'dev',
+                  '--config',
+                  'rsbuild.config.mjs',
+                  '--port',
+                  String(devPort),
+                ],
+                cpuLimit: args.cpuLimit,
+              }),
               cwd: fixtureRoot,
               env: {
                 ...commonEnv,

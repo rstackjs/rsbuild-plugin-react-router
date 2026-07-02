@@ -122,7 +122,7 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, runner, 0);
+    registerReactRouterTypegen(api as never, { runner, devWatchDelayMs: 0 });
 
     expect(api.onBeforeStartDevServer).not.toHaveBeenCalled();
     const result = afterDevCompile();
@@ -151,12 +151,12 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, runner, 50);
+    registerReactRouterTypegen(api as never, { runner, devWatchDelayMs: 200 });
 
     // Compiles arriving faster than the idle delay keep pushing the start out.
     for (let i = 0; i < 4; i += 1) {
       afterDevCompile();
-      await new Promise(resolve => setTimeout(resolve, 30));
+      await new Promise(resolve => setTimeout(resolve, 50));
       expect(startWatch).not.toHaveBeenCalled();
     }
 
@@ -193,7 +193,10 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, runner, 1000);
+    registerReactRouterTypegen(api as never, {
+      runner,
+      devWatchDelayMs: 1000,
+    });
 
     afterDevCompile();
     await closeDevServer();
@@ -218,7 +221,7 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, runner);
+    registerReactRouterTypegen(api as never, { runner });
 
     expect(api.onAfterDevCompile).not.toHaveBeenCalled();
     expect(api.onBeforeBuild).toHaveBeenCalled();

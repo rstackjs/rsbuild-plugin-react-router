@@ -240,7 +240,7 @@ export const pluginReactRouter = (
       buildEnd,
     } = resolvedConfig;
 
-    registerReactRouterTypegen(api, undefined, undefined, appDirectory);
+    registerReactRouterTypegen(api, { appDirectory });
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
       options,

@@ -405,7 +405,7 @@ function generateReactRouterManifestForDevEffect(
   _options: PluginOptions,
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
-  assetPrefix = '/',
+  assetPrefix: string,
   routeChunkOptions?: RouteChunkManifestOptions
 ): Effect.Effect<ReactRouterManifestGenerationResult, Error, never> {
   return Effect.gen(function* () {

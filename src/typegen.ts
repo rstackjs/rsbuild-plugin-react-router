@@ -8,7 +8,7 @@ import { createDelayedPluginTask, tryPluginPromise } from './effect-runtime.js';
 // Quiet period with no dev compiles before the typegen watch starts. Long
 // enough that route-load and HMR compile bursts (each rescheduling the task)
 // finish before the typegen process competes for CPU on small machines.
-export const TYPEGEN_IDLE_DELAY_MS = 10_000;
+const TYPEGEN_IDLE_DELAY_MS = 10_000;
 
 type Execa = typeof import('execa').execa;
 type LoadExeca = () => Promise<Execa>;
@@ -56,6 +56,8 @@ const resolveDirectTypegenCommand = (
       args: [resolve(dirname(packageJsonPath), binRelativePath)],
     };
   } catch {
+    // `@react-router/dev` is not resolvable from the app directory; the
+    // caller falls back to spawning through npx.
     return undefined;
   }
 };
@@ -127,9 +129,15 @@ export const createReactRouterTypegenRunner = (
 
 export const registerReactRouterTypegen = (
   api: RsbuildPluginAPI,
-  runner?: ReactRouterTypegenRunner,
-  devWatchDelayMs: number = TYPEGEN_IDLE_DELAY_MS,
-  appDirectory?: string
+  {
+    runner,
+    devWatchDelayMs = TYPEGEN_IDLE_DELAY_MS,
+    appDirectory,
+  }: {
+    runner?: ReactRouterTypegenRunner;
+    devWatchDelayMs?: number;
+    appDirectory?: string;
+  } = {}
 ): void => {
   const resolvedRunner =
     runner ?? createReactRouterTypegenRunner(loadDefaultExeca, appDirectory);
@@ -137,12 +145,10 @@ export const registerReactRouterTypegen = (
   const devWatchTask = createDelayedPluginTask({
     delayMs: devWatchDelayMs,
     run: () =>
-      Effect.sync(() => {
+      tryPluginPromise(() => {
         devWatchStarted = true;
-      }).pipe(
-        Effect.zipRight(tryPluginPromise(() => resolvedRunner.startWatch())),
-        Effect.asVoid
-      ),
+        return resolvedRunner.startWatch();
+      }).pipe(Effect.asVoid),
     onError(error) {
       api.logger.warn(
         `[react-router] Failed to start React Router typegen watch: ${error}`
