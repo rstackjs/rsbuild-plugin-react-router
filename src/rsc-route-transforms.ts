@@ -99,14 +99,21 @@ const createResourceQueryParams = (
 ): URLSearchParams =>
   new URLSearchParams((resourceQuery ?? '').replace(/^\?/, ''));
 
+const createRouteModuleQueryParams = (
+  resourceQuery: string | undefined
+): URLSearchParams => {
+  const params = createResourceQueryParams(resourceQuery);
+  params.delete(CLIENT_CHUNK_QUERY);
+  params.delete(SERVER_MODULE_QUERY);
+  return params;
+};
+
 const createClientRouteModuleId = (
   resourcePath: string,
   resourceQuery: string | undefined,
   value: string
 ): string => {
-  const params = createResourceQueryParams(resourceQuery);
-  params.delete(CLIENT_CHUNK_QUERY);
-  params.delete(SERVER_MODULE_QUERY);
+  const params = createRouteModuleQueryParams(resourceQuery);
   params.set(CLIENT_CHUNK_QUERY, value);
   return `${resourcePath}?${params.toString()}`;
 };
@@ -115,9 +122,7 @@ const createServerRouteModuleId = (
   resourcePath: string,
   resourceQuery: string | undefined
 ): string => {
-  const params = createResourceQueryParams(resourceQuery);
-  params.delete(CLIENT_CHUNK_QUERY);
-  params.delete(SERVER_MODULE_QUERY);
+  const params = createRouteModuleQueryParams(resourceQuery);
   params.set(SERVER_MODULE_QUERY, '');
   return `${resourcePath}?${params.toString()}`;
 };

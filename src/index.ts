@@ -86,15 +86,7 @@ const resolveAppPackagePath = (specifier: string): string | undefined => {
   }
 };
 
-const createReactRouterPackageAliases = ({
-  preserveReactRouterExports = false,
-}: {
-  preserveReactRouterExports?: boolean;
-} = {}): Record<string, string> => {
-  if (preserveReactRouterExports) {
-    return {};
-  }
-
+const createReactRouterPackageAliases = (): Record<string, string> => {
   const reactRouterPath = resolveAppPackagePath('react-router');
   const reactRouterDomPath = resolveAppPackagePath('react-router/dom');
   return {
