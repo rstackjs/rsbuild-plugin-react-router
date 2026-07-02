@@ -1,9 +1,10 @@
-import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import type { ResultPromise } from 'execa';
 import * as Effect from 'effect/Effect';
 import { createDelayedPluginTask, tryPluginPromise } from './effect-runtime.js';
+import { resolvePackageJson } from './ssr-externals.js';
 
 // Quiet period with no dev compiles before the typegen watch starts. Long
 // enough that route-load and HMR compile bursts (each rescheduling the task)
@@ -36,12 +37,14 @@ type TypegenCommand = {
 const resolveDirectTypegenCommand = (
   appDirectory: string
 ): TypegenCommand | undefined => {
+  const packageJsonPath = resolvePackageJson('@react-router/dev', appDirectory);
+  if (!packageJsonPath) {
+    // `@react-router/dev` is not resolvable from the app directory; the
+    // caller falls back to spawning through npx.
+    return undefined;
+  }
   try {
-    const requireFromApp = createRequire(resolve(appDirectory, 'package.json'));
-    const packageJsonPath = requireFromApp.resolve(
-      '@react-router/dev/package.json'
-    );
-    const packageJson = requireFromApp(packageJsonPath) as {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
       bin?: string | Record<string, string>;
     };
     const binRelativePath =
@@ -56,8 +59,6 @@ const resolveDirectTypegenCommand = (
       args: [resolve(dirname(packageJsonPath), binRelativePath)],
     };
   } catch {
-    // `@react-router/dev` is not resolvable from the app directory; the
-    // caller falls back to spawning through npx.
     return undefined;
   }
 };

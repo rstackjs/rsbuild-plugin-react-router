@@ -15,7 +15,7 @@ const REACT_ROUTER_EXTERNALS = [
 
 const requireFromHere = createRequire(import.meta.url);
 
-function resolvePackageJson(
+export function resolvePackageJson(
   name: string,
   rootDirectory: string
 ): string | null {
