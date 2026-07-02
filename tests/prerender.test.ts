@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
-import { Effect } from 'effect';
+import * as Effect from 'effect/Effect';
 import {
   createBoundedPrerenderTasksEffect,
   createBuildRequestEffect,
