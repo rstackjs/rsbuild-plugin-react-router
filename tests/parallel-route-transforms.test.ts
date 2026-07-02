@@ -125,6 +125,20 @@ describe('parallel route transforms', () => {
     expect(getDefaultWorkerCount(cpus)).toBe(workers);
   });
 
+  it.each([
+    [1, 0],
+    [2, 0],
+    [3, 1],
+    [4, 2],
+    [5, 2],
+    [8, 2],
+  ])(
+    'keeps build workers on small machines (%s CPUs -> %s workers)',
+    (cpus, workers) => {
+      expect(getDefaultWorkerCount(cpus, { isBuild: true })).toBe(workers);
+    }
+  );
+
   it.each([0, Number.NaN, 1.5])(
     'rejects invalid explicit worker count %s',
     workerCount => {

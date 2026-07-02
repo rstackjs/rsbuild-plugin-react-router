@@ -23,6 +23,7 @@ export type ParallelRouteTransformConfig =
 export type RouteTransformExecutorOptions = RouteTransformTaskOptions & {
   parallelRouteTransform?: PluginOptions['parallelRouteTransform'];
   splitRouteModules?: boolean;
+  isBuild?: boolean;
 };
 
 export type RouteTransformExecutor = {
@@ -63,15 +64,21 @@ const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const MAX_ROUTE_SOURCE_WORKER_ENTRIES = 4096;
 const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
 const DEFAULT_WORKER_COUNT_LIMIT = 2;
-// Benchmarked on a 4-core cpuset (large-355 dev fixture): a single worker
-// recovered no wall time (build 2.38s with or without it) while worker
-// startup and IPC cost ~0.5s of dev-server ready (9.09s -> 8.57s median when
-// disabled), so machines this small run route transforms inline instead.
+// Benchmarked on a 4-core cpuset: in dev (large-355 fixture) a single worker
+// recovered no wall time while worker startup and IPC cost ~0.5s of
+// dev-server ready (9.09s -> 8.57s median when disabled), so small machines
+// run dev transforms inline. Production builds are different: at 1024 routes
+// the transform volume is large enough that two workers beat inline by ~8%
+// (synthetic-1024-ssr-esm build, 4.46s inline vs 4.09s with workers), so
+// builds keep the default worker count even on small machines.
 const SMALL_MACHINE_CPU_COUNT = 4;
 
-export const getDefaultWorkerCount = (cpuCount?: number): number => {
+export const getDefaultWorkerCount = (
+  cpuCount?: number,
+  { isBuild = false }: { isBuild?: boolean } = {}
+): number => {
   const resolvedCpuCount = cpuCount ?? getAvailableCpuCount();
-  if (resolvedCpuCount <= SMALL_MACHINE_CPU_COUNT) {
+  if (!isBuild && resolvedCpuCount <= SMALL_MACHINE_CPU_COUNT) {
     return 0;
   }
   return Math.min(
@@ -84,10 +91,11 @@ export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
   routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
 
 const getConfiguredWorkerCount = (
-  parallelRouteTransform: ParallelRouteTransformConfig
+  parallelRouteTransform: ParallelRouteTransformConfig,
+  isBuild: boolean
 ): number => {
   if (parallelRouteTransform === true) {
-    return getDefaultWorkerCount();
+    return getDefaultWorkerCount(undefined, { isBuild });
   }
 
   if (!Number.isInteger(parallelRouteTransform) || parallelRouteTransform < 1) {
@@ -397,12 +405,14 @@ export const createRouteTransformExecutor = ({
   parallelRouteTransform,
   routeChunkCache,
   splitRouteModules,
+  isBuild,
 }: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
   return createRouteTransformExecutorWithWorkerFactory(
     {
       parallelRouteTransform,
       routeChunkCache,
       splitRouteModules,
+      isBuild,
     },
     createDefaultWorker
   );
@@ -413,6 +423,7 @@ const createRouteTransformExecutorWithWorkerFactory = (
     parallelRouteTransform,
     routeChunkCache,
     splitRouteModules,
+    isBuild,
   }: RouteTransformExecutorOptions = {},
   createWorker: RouteTransformWorkerFactory
 ): RouteTransformExecutor => {
@@ -424,7 +435,10 @@ const createRouteTransformExecutorWithWorkerFactory = (
     return createInlineRouteTransformExecutor(options);
   }
 
-  const workerCount = getConfiguredWorkerCount(parallelRouteTransform);
+  const workerCount = getConfiguredWorkerCount(
+    parallelRouteTransform,
+    Boolean(isBuild)
+  );
   if (workerCount < 1) {
     return createInlineRouteTransformExecutor(options);
   }

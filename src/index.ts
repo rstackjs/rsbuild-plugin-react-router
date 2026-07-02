@@ -426,6 +426,7 @@ export const pluginReactRouter = (
         shouldParallelizeRouteTransforms(routeCount),
       routeChunkCache,
       splitRouteModules: Boolean(splitRouteModules),
+      isBuild,
     });
     const routeChunkOptions = {
       splitRouteModules,
