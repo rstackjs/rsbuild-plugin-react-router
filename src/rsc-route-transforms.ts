@@ -217,10 +217,11 @@ const getRouteChunkValidation = (
   };
 };
 
-const validateRouteModuleExports = (exports: readonly string[]): void => {
+const validateRouteModuleExports = (exportNames: readonly string[]): void => {
+  const exported = new Set(exportNames);
   const errors: string[] = [];
   for (const [clientExport, serverExport] of MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS) {
-    if (exports.includes(clientExport) && exports.includes(serverExport)) {
+    if (exported.has(clientExport) && exported.has(serverExport)) {
       errors.push(`- ${clientExport} and ${serverExport}`);
     }
   }

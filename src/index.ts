@@ -786,7 +786,6 @@ const createReactRouterPlugin = (
                     },
                   }
                 : {
-                    // no query needed when federation is disabled
                     'entry.client': finalEntryClientPath,
                     'virtual/react-router/browser-manifest': {
                       import: 'virtual/react-router/browser-manifest',

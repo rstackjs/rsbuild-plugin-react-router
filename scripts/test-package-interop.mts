@@ -103,7 +103,7 @@ const verifyPackIncludesOriginalSource = async () => {
   );
 };
 
-const verifyRscPublicSurface = async (esm, commonjs) => {
+const verifyRscPublicSurface = (esm, commonjs) => {
   assert.equal(typeof esm.pluginReactRouterRSC, 'function');
   assert.equal(typeof commonjs.pluginReactRouterRSC, 'function');
   assert.match(
@@ -144,7 +144,7 @@ const verifyRscPublicSurface = async (esm, commonjs) => {
 const main = async () => {
   const [esm, commonjs] = await loadEntryPoints();
   await verifyPackIncludesOriginalSource();
-  await verifyRscPublicSurface(esm, commonjs);
+  verifyRscPublicSurface(esm, commonjs);
   process.chdir(
     fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
   );
