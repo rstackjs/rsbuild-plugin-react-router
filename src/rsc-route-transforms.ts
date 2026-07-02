@@ -10,6 +10,11 @@ import {
   type RouteChunkConfig,
   type RouteChunkExportName,
 } from './route-chunks.js';
+import {
+  RSC_CLIENT_COMPONENT_EXPORTS,
+  RSC_MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS,
+  RSC_SERVER_COMPONENT_EXPORTS,
+} from './rsc-route-exports.js';
 
 const ENSURE_CLIENT_ROUTE_MODULE_CHUNK_FOR_HMR = `
 import * as ___EnsureClientRouteModuleForHMR_REACT___ from "react";
@@ -28,18 +33,10 @@ const CLIENT_NON_COMPONENT_EXPORTS = [
 
 const CLIENT_ROUTE_EXPORTS = [
   ...CLIENT_NON_COMPONENT_EXPORTS,
-  'default',
-  'ErrorBoundary',
-  'HydrateFallback',
-  'Layout',
+  ...RSC_CLIENT_COMPONENT_EXPORTS,
 ] as const;
 
-const SERVER_COMPONENT_EXPORTS = [
-  'ServerComponent',
-  'ServerLayout',
-  'ServerHydrateFallback',
-  'ServerErrorBoundary',
-] as const;
+const SERVER_COMPONENT_EXPORTS = RSC_SERVER_COMPONENT_EXPORTS;
 
 const SERVER_ROUTE_EXPORTS = [
   ...SERVER_COMPONENT_EXPORTS,
@@ -53,12 +50,7 @@ const CLIENT_ROUTE_EXPORTS_SET = new Set<string>(CLIENT_ROUTE_EXPORTS);
 const SERVER_COMPONENT_EXPORTS_SET = new Set<string>(SERVER_COMPONENT_EXPORTS);
 const SERVER_ROUTE_EXPORTS_SET = new Set<string>(SERVER_ROUTE_EXPORTS);
 
-const MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS = new Map([
-  ['ErrorBoundary', 'ServerErrorBoundary'],
-  ['HydrateFallback', 'ServerHydrateFallback'],
-  ['Layout', 'ServerLayout'],
-  ['default', 'ServerComponent'],
-]);
+const MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS = RSC_MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS;
 
 const CLIENT_CHUNK_QUERY = 'client-route-module';
 const SERVER_MODULE_QUERY = 'server-route-module';

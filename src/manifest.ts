@@ -90,15 +90,36 @@ export function configRoutesToRouteManifestEntries(
   return routeManifestEntries;
 }
 
-type RouteChunkManifestOptions = {
+export type RouteChunkManifestOptions = {
   splitRouteModules?: boolean | 'enforce';
   rootRouteFile?: string;
   isBuild?: boolean;
   cache?: RouteChunkCache;
-  analyzeRouteModule?: (
-    routeFilePath: string,
-    route: Route
-  ) => Promise<RouteModuleAnalysis | undefined>;
+};
+
+export type RouteModuleAnalysisProvider = (
+  routeFilePath: string,
+  route: Route
+) => Promise<RouteModuleAnalysis | undefined>;
+
+export type ReactRouterManifestOptions = RouteChunkManifestOptions & {
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
+};
+
+export const createReactRouterManifestOptions = ({
+  routeChunks,
+  routeModuleAnalysis,
+}: {
+  routeChunks?: RouteChunkManifestOptions;
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
+}): ReactRouterManifestOptions | undefined => {
+  if (!routeChunks && !routeModuleAnalysis) {
+    return undefined;
+  }
+  return {
+    ...routeChunks,
+    ...(routeModuleAnalysis ? { routeModuleAnalysis } : {}),
+  };
 };
 
 export type ReactRouterManifestForDev = {
@@ -299,7 +320,7 @@ const analyzeRouteForManifestEffect = ({
   routeEntryName,
   routeFilePath,
   route,
-  analyzeRouteModule,
+  routeModuleAnalysis,
 }: {
   discoveredCssAssets: string[];
   isBuild: boolean;
@@ -308,14 +329,11 @@ const analyzeRouteForManifestEffect = ({
   routeEntryName: string;
   routeFilePath: string;
   route: Route;
-  analyzeRouteModule?: (
-    routeFilePath: string,
-    route: Route
-  ) => Promise<RouteModuleAnalysis | undefined>;
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
 }): Effect.Effect<RouteManifestAnalysis, Error, never> =>
   tryPluginPromise(async () => {
     const { code, exports: exportNames } =
-      (await analyzeRouteModule?.(routeFilePath, route)) ??
+      (await routeModuleAnalysis?.(routeFilePath, route)) ??
       (await getRouteModuleAnalysis(routeFilePath));
     const cssAssets =
       !isBuild && discoveredCssAssets.length === 0 && CSS_IMPORT_RE.test(code)
@@ -421,19 +439,19 @@ function generateReactRouterManifestForDevEffect(
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix: string,
-  routeChunkOptions?: RouteChunkManifestOptions
+  manifestOptions?: ReactRouterManifestOptions
 ): Effect.Effect<ReactRouterManifestGenerationResult, Error, never> {
   return Effect.gen(function* () {
     const result: Record<string, RouteManifestItem> = {};
-    const splitRouteModules = routeChunkOptions?.splitRouteModules ?? false;
+    const splitRouteModules = manifestOptions?.splitRouteModules ?? false;
     const enforceSplitRouteModules = splitRouteModules === 'enforce';
-    const isBuild = routeChunkOptions?.isBuild ?? false;
+    const isBuild = manifestOptions?.isBuild ?? false;
     const routeChunkConfig: RouteChunkConfig | null =
-      splitRouteModules && routeChunkOptions?.rootRouteFile
+      splitRouteModules && manifestOptions?.rootRouteFile
         ? {
             splitRouteModules,
             appDirectory: context,
-            rootRouteFile: routeChunkOptions.rootRouteFile,
+            rootRouteFile: manifestOptions.rootRouteFile,
           }
         : null;
 
@@ -454,12 +472,12 @@ function generateReactRouterManifestForDevEffect(
           const routeAnalysis = yield* analyzeRouteForManifestEffect({
             discoveredCssAssets,
             isBuild,
-            routeChunkCache: routeChunkOptions?.cache,
+            routeChunkCache: manifestOptions?.cache,
             routeChunkConfig,
             routeEntryName,
             routeFilePath,
             route,
-            analyzeRouteModule: routeChunkOptions?.analyzeRouteModule,
+            routeModuleAnalysis: manifestOptions?.routeModuleAnalysis,
           });
 
           const hasClientAction = routeAnalysis.exports.has(
@@ -589,7 +607,7 @@ export async function generateReactRouterManifestForDev(
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix = '/',
-  routeChunkOptions?: RouteChunkManifestOptions
+  manifestOptions?: ReactRouterManifestOptions
 ): Promise<ReactRouterManifestGenerationResult> {
   return runPluginEffect(
     generateReactRouterManifestForDevEffect(
@@ -598,7 +616,7 @@ export async function generateReactRouterManifestForDev(
       clientStats,
       context,
       assetPrefix,
-      routeChunkOptions
+      manifestOptions
     )
   );
 }

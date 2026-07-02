@@ -1,11 +1,13 @@
 import type { Route, PluginOptions } from './types.js';
 import type { RsbuildPluginAPI, Rspack } from '@rsbuild/core';
 import {
+  createReactRouterManifestOptions,
   createReactRouterManifestStats,
   generateReactRouterManifestForDev,
   getReactRouterManifestChunkNames,
   getReactRouterManifestForDev,
   getReactRouterManifestPath,
+  type RouteModuleAnalysisProvider,
 } from './manifest.js';
 import { combineURLs } from './plugin-utils.js';
 import jsesc from 'jsesc';
@@ -36,6 +38,7 @@ type ModifyBrowserManifestOptions = {
   subResourceIntegrity?: boolean;
   future?: { unstable_subResourceIntegrity?: boolean };
   manifestChunkNames?: ReadonlySet<string>;
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
   onManifest?: (
     manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
     sri: Record<string, string> | true | undefined,
@@ -132,8 +135,8 @@ export function registerModifyBrowserManifestAssets(
     );
   const finalizeSri = Boolean(
     routeChunkOptions?.isBuild &&
-      (options?.subResourceIntegrity ??
-        options?.future?.unstable_subResourceIntegrity)
+    (options?.subResourceIntegrity ??
+      options?.future?.unstable_subResourceIntegrity)
   );
   const generatedManifests = finalizeSri
     ? new WeakMap<Rspack.Compilation, GeneratedManifest>()
@@ -154,7 +157,10 @@ export function registerModifyBrowserManifestAssets(
           stats,
           appDirectory,
           currentAssetPrefix,
-          routeChunkOptions
+          createReactRouterManifestOptions({
+            routeChunks: routeChunkOptions,
+            routeModuleAnalysis: options?.routeModuleAnalysis,
+          })
         );
       const manifestForBrowser = finalizeSri
         ? { ...manifest, sri: true as const }

@@ -13,9 +13,11 @@ import { dirname, relative, resolve } from 'pathe';
 import { PLUGIN_NAME } from './constants.js';
 import { getBuildManifest } from './build-manifest.js';
 import {
+  createReactRouterManifestOptions,
   generateReactRouterManifestForDev,
   getReactRouterManifestForDev,
   type ReactRouterManifestStats,
+  type RouteModuleAnalysisProvider,
   type RouteManifestModuleExports,
 } from './manifest.js';
 import {
@@ -74,6 +76,7 @@ type RunReactRouterPrerenderBuildOptions = {
   appDirectory: string;
   assetPrefix: string;
   routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
   buildManifest: Awaited<ReturnType<typeof getBuildManifest>>;
   resolvedConfigWithRoutes: ResolvedReactRouterConfig;
   buildEnd: Config['buildEnd'];
@@ -589,6 +592,7 @@ export const runReactRouterPrerenderBuild = async (
     appDirectory,
     assetPrefix,
     routeChunkOptions,
+    routeModuleAnalysis,
     buildManifest,
     resolvedConfigWithRoutes,
     buildEnd,
@@ -632,7 +636,10 @@ export const runReactRouterPrerenderBuild = async (
               clientStats,
               appDirectory,
               assetPrefix,
-              routeChunkOptions
+              createReactRouterManifestOptions({
+                routeChunks: routeChunkOptions,
+                routeModuleAnalysis,
+              })
             );
         assertValidSsrFalsePrerenderExports({
           routes,

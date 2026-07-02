@@ -439,7 +439,7 @@ describe('manifest', () => {
             isBuild: true,
             rootRouteFile: 'root.tsx',
             splitRouteModules: false,
-            analyzeRouteModule: async routeFilePath =>
+            routeModuleAnalysis: async routeFilePath =>
               routeFilePath.endsWith('page.mdx')
                 ? {
                     code: `

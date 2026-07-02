@@ -3,7 +3,9 @@ import jsesc from 'jsesc';
 import { relative } from 'pathe';
 import { PLUGIN_NAME } from './constants.js';
 import {
+  createReactRouterManifestOptions,
   getReactRouterManifestForDev,
+  type RouteModuleAnalysisProvider,
   type ReactRouterManifestStats,
 } from './manifest.js';
 import type { RouteTransformExecutor } from './parallel-route-transforms.js';
@@ -35,6 +37,7 @@ type RegisterBuildOutputTransformsOptions = {
   appDirectory: string;
   getAssetPrefix: () => string;
   routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
   routeTransformExecutor: RouteTransformExecutor;
   routeByFilePath: Map<string, Route>;
   routeChunkConfig: RouteChunkConfig;
@@ -61,6 +64,7 @@ export const registerBuildOutputTransforms = ({
   appDirectory,
   getAssetPrefix,
   routeChunkOptions,
+  routeModuleAnalysis,
   routeTransformExecutor,
   routeByFilePath,
   routeChunkConfig,
@@ -157,7 +161,10 @@ export const registerBuildOutputTransforms = ({
               getClientStats(),
               appDirectory,
               getAssetPrefix(),
-              routeChunkOptions
+              createReactRouterManifestOptions({
+                routeChunks: routeChunkOptions,
+                routeModuleAnalysis,
+              })
             ));
           return {
             code: `export default ${jsesc(manifest, { es6: true })};`,

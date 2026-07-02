@@ -1,5 +1,9 @@
 import { resolve } from 'pathe';
 import type { Route } from './types.js';
+import {
+  describeRscRouteExportConflict,
+  RSC_ROUTE_COMPONENT_EXPORTS,
+} from './rsc-route-exports.js';
 
 const js = String.raw;
 
@@ -69,6 +73,25 @@ const appendRoute = (
   return code;
 };
 
+const createComponentResolutionCode = (): string =>
+  RSC_ROUTE_COMPONENT_EXPORTS.map(
+    ({ routeProperty, clientExport, serverExport }) => {
+      const clientKey = JSON.stringify(clientExport);
+      const serverKey = JSON.stringify(serverExport);
+      const error = describeRscRouteExportConflict(clientExport, serverExport);
+      return js`
+    let ${routeProperty};
+    if (${clientKey} in mod && mod[${clientKey}]) {
+      if (${serverKey} in mod && mod[${serverKey}]) {
+        throw new Error(${JSON.stringify(error)});
+      }
+      ${routeProperty} = mod[${clientKey}];
+    } else if (${serverKey} in mod && mod[${serverKey}]) {
+      ${routeProperty} = mod[${serverKey}];
+    }`;
+    }
+  ).join('\n');
+
 export const createRscRouteConfig = ({
   appDirectory,
   routes,
@@ -76,46 +99,12 @@ export const createRscRouteConfig = ({
   appDirectory: string;
   routes: Record<string, Route>;
 }): string => {
+  const componentResolutionCode = createComponentResolutionCode();
   let code = js`
 function frameworkRoute(lazy) {
   return async () => {
     const mod = await lazy();
-    let Component;
-    let Layout;
-    let ErrorBoundary;
-    let HydrateFallback;
-    if ("default" in mod && mod.default) {
-      if ("ServerComponent" in mod && mod.ServerComponent) {
-        throw new Error("Module cannot have both a default export and a ServerComponent export");
-      }
-      Component = mod.default;
-    } else if ("ServerComponent" in mod && mod.ServerComponent) {
-      Component = mod.ServerComponent;
-    }
-    if ("Layout" in mod && mod.Layout) {
-      if ("ServerLayout" in mod && mod.ServerLayout) {
-        throw new Error("Module cannot have both a Layout export and a ServerLayout export");
-      }
-      Layout = mod.Layout;
-    } else if ("ServerLayout" in mod && mod.ServerLayout) {
-      Layout = mod.ServerLayout;
-    }
-    if ("ErrorBoundary" in mod && mod.ErrorBoundary) {
-      if ("ServerErrorBoundary" in mod && mod.ServerErrorBoundary) {
-        throw new Error("Module cannot have both an ErrorBoundary export and a ServerErrorBoundary export");
-      }
-      ErrorBoundary = mod.ErrorBoundary;
-    } else if ("ServerErrorBoundary" in mod && mod.ServerErrorBoundary) {
-      ErrorBoundary = mod.ServerErrorBoundary;
-    }
-    if ("HydrateFallback" in mod && mod.HydrateFallback) {
-      if ("ServerHydrateFallback" in mod && mod.ServerHydrateFallback) {
-        throw new Error("Module cannot have both a HydrateFallback export and a ServerHydrateFallback export");
-      }
-      HydrateFallback = mod.HydrateFallback;
-    } else if ("ServerHydrateFallback" in mod && mod.ServerHydrateFallback) {
-      HydrateFallback = mod.ServerHydrateFallback;
-    }
+${componentResolutionCode}
 
     const {
       action,
