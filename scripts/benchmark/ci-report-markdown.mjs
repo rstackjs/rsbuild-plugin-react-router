@@ -176,6 +176,7 @@ export const renderBenchmarkComment = report => {
   lines.push(
     '',
     `Profile: \`${report.profile ?? 'unknown'}\`; mode: \`${report.mode ?? 'unknown'}\`; iterations: \`${report.iterations ?? 'unknown'}\`; warmup: \`${report.warmup ?? 'unknown'}\`.`,
+    'The uploaded benchmark artifact includes `diagnostics/summary.md` and `diagnostics/summary.json` with runner metadata, per-run timing samples, CPU/RSS samples, and plugin timing hot spots.',
     ...(report.runUrl ? [`[Workflow run](${report.runUrl})`] : []),
     ''
   );

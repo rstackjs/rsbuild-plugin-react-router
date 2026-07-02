@@ -26,6 +26,7 @@ jobs:
       BENCHMARK_ITERATIONS: '10'
       BENCHMARK_WARMUP: '0'
       BENCHMARK_DEV_ROUTES: auto
+      BENCHMARK_LOG_PERFORMANCE: '1'
       BENCHMARK_HISTORY_BRANCH: benchmark-results
       SYNTHETIC_BENCHMARK_PROFILE: all
       SYNTHETIC_BENCHMARK_RUNS: '2'
@@ -117,7 +118,8 @@ jobs:
             ) }}-${{ env.BENCHMARK_PROFILE }}-${{ env.BENCHMARK_BUILD_ITERATIONS }}-${{
             env.BENCHMARK_LARGE_ITERATIONS }}-${{ env.BENCHMARK_MODE }}-${{
             env.BENCHMARK_ITERATIONS }}-${{ env.BENCHMARK_WARMUP }}-${{
-            env.BENCHMARK_DEV_ROUTES }}-${{ env.SYNTHETIC_BENCHMARK_PROFILE }}-${{
+            env.BENCHMARK_DEV_ROUTES }}-${{ env.BENCHMARK_LOG_PERFORMANCE }}-${{
+            env.SYNTHETIC_BENCHMARK_PROFILE }}-${{
             env.SYNTHETIC_BENCHMARK_RUNS }}
 
       - name: Validate cached base benchmark results
@@ -146,6 +148,7 @@ jobs:
             --warmup "$BENCHMARK_WARMUP" \
             --clean build \
             --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
             --out "$GITHUB_WORKSPACE/benchmark-output/build/base"
 
       - name: Benchmark head production build
@@ -159,6 +162,7 @@ jobs:
             --warmup "$BENCHMARK_WARMUP" \
             --clean build \
             --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
             --out "$GITHUB_WORKSPACE/benchmark-output/build/head"
 
       - name: Benchmark base dev
@@ -176,6 +180,7 @@ jobs:
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
             --out "$GITHUB_WORKSPACE/benchmark-output/dev/base"
 
       - name: Benchmark head dev
@@ -190,6 +195,7 @@ jobs:
             --dev-routes "$BENCHMARK_DEV_ROUTES" \
             --clean build \
             --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
             --out "$GITHUB_WORKSPACE/benchmark-output/dev/head"
 
       - name: Benchmark embedded synthetic app with base plugin
@@ -243,6 +249,13 @@ jobs:
                 --synthetic-base "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json" \
                 --synthetic-head "$GITHUB_WORKSPACE/benchmark-output/synthetic/head/latest.json"
             fi)
+
+      - name: Generate benchmark diagnostics
+        working-directory: head
+        run: |
+          node scripts/benchmark/ci-diagnostics.mjs \
+            --root "$GITHUB_WORKSPACE/benchmark-output" \
+            --out "$GITHUB_WORKSPACE/benchmark-output/diagnostics"
 
       - name: Upload benchmark artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
