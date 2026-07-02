@@ -5,7 +5,7 @@ import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-import { resolveServerBuildModule } from './server-utils.js';
+import { resolveServerBuildModuleEffect } from './server-build-resolution.js';
 
 export type ReactRouterDevManifest = ReactRouterManifestForDev;
 
@@ -140,11 +140,9 @@ const startServerBuildEvaluationEffect = (
 ): Effect.Effect<ServerBuild, Error, never> =>
   tryPluginPromise(() => server.environments.node.loadBundle(entryName)).pipe(
     Effect.flatMap(buildModule =>
-      tryPluginPromise(() =>
-        resolveServerBuildModule(
-          buildModule,
-          `Server entry ${JSON.stringify(entryName)}`
-        )
+      resolveServerBuildModuleEffect(
+        buildModule,
+        `Server entry ${JSON.stringify(entryName)}`
       )
     )
   );
