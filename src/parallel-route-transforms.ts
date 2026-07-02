@@ -63,20 +63,21 @@ const MAX_WORKER_SOURCE_CACHE_ENTRIES = 2048;
 const MAX_ROUTE_SOURCE_WORKER_ENTRIES = 4096;
 const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
 const DEFAULT_WORKER_COUNT_LIMIT = 2;
-const SMALL_MACHINE_WORKER_COUNT_LIMIT = 1;
+// Benchmarked on a 4-core cpuset (large-355 dev fixture): a single worker
+// recovered no wall time (build 2.38s with or without it) while worker
+// startup and IPC cost ~0.5s of dev-server ready (9.09s -> 8.57s median when
+// disabled), so machines this small run route transforms inline instead.
 const SMALL_MACHINE_CPU_COUNT = 4;
 
 export const getDefaultWorkerCount = (cpuCount?: number): number => {
   const resolvedCpuCount = cpuCount ?? getAvailableCpuCount();
-  const workerCount = getDefaultConcurrency(resolvedCpuCount);
-  if (workerCount < 1) {
+  if (resolvedCpuCount <= SMALL_MACHINE_CPU_COUNT) {
     return 0;
   }
-  const workerLimit =
-    resolvedCpuCount <= SMALL_MACHINE_CPU_COUNT
-      ? SMALL_MACHINE_WORKER_COUNT_LIMIT
-      : DEFAULT_WORKER_COUNT_LIMIT;
-  return Math.min(workerCount, workerLimit);
+  return Math.min(
+    getDefaultConcurrency(resolvedCpuCount),
+    DEFAULT_WORKER_COUNT_LIMIT
+  );
 };
 
 export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
