@@ -293,7 +293,7 @@ export const runDevServerBenchmark = async ({
         }
       }
 
-      if (updateFile && updateRoutePaths.length > 0) {
+      if (updateFile) {
         let restoreUpdateFile = null;
         const updateStartedAt = performance.now();
         const baselineCounts = new Map(readyCounts);
@@ -305,16 +305,18 @@ export const runDevServerBenchmark = async ({
           await waitForNextReady(baselineCounts);
           updateMs = performance.now() - updateStartedAt;
 
-          const updateRouteStartedAt = performance.now();
-          updateRouteRequests = await fetchDevRoutes({
-            origin,
-            routePaths: updateRoutePaths,
-            timeoutMs: routeTimeoutMs,
-            retryDelayMs: routeRetryDelayMs,
-          });
-          updateRouteTotalMs = performance.now() - updateRouteStartedAt;
-          if (updateRouteRequests.some(request => !request.ok)) {
-            statusAfterReady = 1;
+          if (updateRoutePaths.length > 0) {
+            const updateRouteStartedAt = performance.now();
+            updateRouteRequests = await fetchDevRoutes({
+              origin,
+              routePaths: updateRoutePaths,
+              timeoutMs: routeTimeoutMs,
+              retryDelayMs: routeRetryDelayMs,
+            });
+            updateRouteTotalMs = performance.now() - updateRouteStartedAt;
+            if (updateRouteRequests.some(request => !request.ok)) {
+              statusAfterReady = 1;
+            }
           }
         } catch (error) {
           statusAfterReady = 1;

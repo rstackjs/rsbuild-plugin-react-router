@@ -415,6 +415,7 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
       benchmark,
       benchmarkIndex,
       devRoutePaths,
+      devUpdateRoutePaths,
       fixtureResult,
       fixtureRoot,
       measuredIterations,
@@ -500,7 +501,7 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
               routePaths: devRoutePaths,
               routeTimeoutMs: args.devRouteTimeoutMs,
               updateFile: fixtureResult.updateFile,
-              updateRoutePaths: fixtureResult.updateRoutePaths ?? ['/'],
+              updateRoutePaths: devUpdateRoutePaths,
               timeoutMs: args.devTimeoutMs,
             });
           })
@@ -591,9 +592,12 @@ const runBenchmark = ({
   Effect.gen(function* () {
     const measuredIterations = getMeasuredIterationCount(benchmark, args);
     const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
+    // Profile entries can pin dev-route behavior (e.g. `devRoutes: 'none'`
+    // for SPA fixtures, which serve no HTML document per route in dev).
+    const devRoutesValue = benchmark.devRoutes ?? args.devRoutes;
     const devRoutePaths =
       args.mode === 'dev'
-        ? resolveDevRoutePaths(args.devRoutes, benchmark)
+        ? resolveDevRoutePaths(devRoutesValue, benchmark)
         : [];
     const fixtureResult = yield* tryPromise(() =>
       generateSyntheticFixture({
@@ -609,11 +613,16 @@ const runBenchmark = ({
       })
     );
     const totalRuns = args.warmup + measuredIterations;
+    const devUpdateRoutePaths =
+      args.mode === 'dev' && devRoutesValue !== 'none'
+        ? (fixtureResult.updateRoutePaths ?? ['/'])
+        : [];
     const benchmarkContext = {
       args,
       benchmark,
       benchmarkIndex,
       devRoutePaths,
+      devUpdateRoutePaths,
       fixtureResult,
       fixtureRoot,
       measuredIterations,

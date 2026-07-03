@@ -7,7 +7,16 @@ export const profiles = {
       routeCount: 256,
       variant: 'ssr-esm-split',
     },
-    { id: 'synthetic-256-spa', routeCount: 256, variant: 'spa' },
+    {
+      id: 'synthetic-256-spa',
+      routeCount: 256,
+      variant: 'spa',
+      // SPA fixtures (`ssr: false`) have no dev-server HTML document for
+      // route paths: the plugin registers no SSR middleware in dev and all
+      // web entries disable HTML generation, so every route fetch would 404.
+      // Measure dev readiness and update rebuilds only.
+      devRoutes: 'none',
+    },
     {
       id: 'synthetic-256-sourcemaps',
       routeCount: 256,
