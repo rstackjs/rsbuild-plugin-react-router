@@ -11,6 +11,13 @@ test.describe('SPA Mode dev server', () => {
     expect(response?.status()).toBe(200);
     expect(response?.headers()['content-type']).toContain('text/html');
 
+    // The shell carries the SPA hydration payload.
+    const html = (await response?.text()) ?? '';
+    expect(html).toContain('window.__reactRouterContext');
+    expect(html).toContain('"isSpaMode":true');
+    expect(html).toContain('"ssr":false');
+    expect(html).toContain('entry.client.js');
+
     // The page hydrates and renders the home route client-side.
     await expect(
       page.locator('h1:has-text("Welcome to React Router")')
@@ -28,16 +35,6 @@ test.describe('SPA Mode dev server', () => {
     await expect(
       page.locator('h1:has-text("Getting Started")')
     ).toBeVisible();
-  });
-
-  test('document responses contain SPA hydration data', async ({ page }) => {
-    const response = await page.goto('/');
-    const html = (await response?.text()) ?? '';
-
-    expect(html).toContain('window.__reactRouterContext');
-    expect(html).toContain('"isSpaMode":true');
-    expect(html).toContain('"ssr":false');
-    expect(html).toContain('entry.client.js');
   });
 
   test('performs client-side navigation after hydration', async ({ page }) => {

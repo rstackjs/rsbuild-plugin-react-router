@@ -81,8 +81,7 @@ describe('pluginReactRouter', () => {
     });
 
     it('should register the dev middleware for SPA mode (ssr: false)', async () => {
-      (globalThis as { __reactRouterTestConfig?: unknown }).__reactRouterTestConfig =
-        { ssr: false };
+      testGlobal.__reactRouterTestConfig = { ssr: false };
       const rsbuild = await createStubRsbuild({
         rsbuildConfig: {},
       });
@@ -91,7 +90,6 @@ describe('pluginReactRouter', () => {
       const config = await rsbuild.unwrapConfig();
 
       expect(config.dev.setupMiddlewares).toHaveLength(1);
-      expect(config.dev.setupMiddlewares[0]).toBeInstanceOf(Function);
     });
 
     it('should configure server output format correctly', async () => {

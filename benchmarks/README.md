@@ -63,13 +63,6 @@ node scripts/bench-builds.mts --profile=large --mode=dev --dev-routes=/,/route-0
 Numeric route indexes are ordinal benchmark positions: `0` is `/`, and `1` is
 the first non-index generated route for that fixture.
 
-Profile entries can pin dev-route behavior with a `devRoutes` field that takes
-precedence over the CLI flag. SPA fixtures (`ssr: false`) set
-`devRoutes: 'none'` because the dev server has no HTML document to serve for
-route paths (no SSR middleware, and all web entries disable HTML generation),
-so those fixtures measure dev readiness and update rebuild timings without
-issuing route requests.
-
 Route requests automatically add `--experimental-vm-modules` to `NODE_OPTIONS`
 for SSR ESM evaluation.
 

@@ -594,12 +594,9 @@ const runBenchmark = ({
   Effect.gen(function* () {
     const measuredIterations = getMeasuredIterationCount(benchmark, args);
     const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
-    // Profile entries can pin dev-route behavior (`devRoutes: 'none'` skips
-    // per-route fetches for a fixture).
-    const devRoutesValue = benchmark.devRoutes ?? args.devRoutes;
     const devRoutePaths =
       args.mode === 'dev'
-        ? resolveDevRoutePaths(devRoutesValue, benchmark)
+        ? resolveDevRoutePaths(args.devRoutes, benchmark)
         : [];
     const fixtureResult = yield* tryPromise(() =>
       generateSyntheticFixture({
@@ -616,7 +613,7 @@ const runBenchmark = ({
     );
     const totalRuns = args.warmup + measuredIterations;
     const devUpdateRoutePaths =
-      args.mode === 'dev' && devRoutesValue !== 'none'
+      args.mode === 'dev' && args.devRoutes !== 'none'
         ? (fixtureResult.updateRoutePaths ?? ['/'])
         : [];
     const benchmarkContext = {
