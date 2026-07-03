@@ -1,8 +1,11 @@
 # React Router Framework Tests
 
-This folder contains the React Router upstream framework-mode test corpus,
-synced from a pinned upstream commit and adapted to exercise
-`rsbuild-plugin-react-router`.
+This folder contains the React Router framework-mode test corpus. It
+originates from a pinned commit of upstream React Router, but it is
+**repo-owned** and permanently adapted to exercise
+`rsbuild-plugin-react-router`. The upstream sha recorded in `UPSTREAM.json`
+documents provenance only; refreshing the corpus from upstream is a manual,
+deliberate act, never an automatic overwrite.
 
 ## Pinned upstream
 
@@ -17,12 +20,13 @@ lives in two places:
   `syncedAt`, `sourceDirs`, `fileCount`, `adapterOwnedFiles`, and
   `corpusVerified`.
 
-Everything under `integration/` and `react-router-dev/__tests__/` except the
-adapter-owned files listed in `UPSTREAM.json` is **generated** from the pinned
-upstream sha and must not be hand-edited. Hand edits will be flagged (and
-overwritten in the working tree) by the next sync. If `corpusVerified` is
-`false` in `UPSTREAM.json`, the checked-in corpus currently carries local
-deviations from the pinned sha outside the overlay; see the `note` field.
+Everything under `integration/` and `react-router-dev/__tests__/` derives
+from the pinned upstream sha, but the checked-in tree is authoritative: it
+carries deliberate local adaptations (see `corpusVerified` and the `note`
+field in `UPSTREAM.json`, and "Vite artifact excision" below). The sync
+script is a comparison/refresh aid against the pin, not an enforcement
+mechanism — running it overwrites local adaptations in the working tree, so
+review the diff and restore intentional changes.
 
 ## Syncing
 
@@ -87,6 +91,19 @@ upstream test suite does. Execution is redirected through
 Do not add a local ignore list for Rsbuild gaps. Upstream `test.skip` and
 `test.fixme` calls should remain intact, but otherwise unsupported cases should
 fail visibly.
+
+## Vite artifact excision
+
+The corpus carries no inert Vite artifacts: the checked-in fixture/template
+`vite.config.*` files are deleted, and `vite`, `@vitejs/*`, and Vite-plugin
+dependencies (`vite-tsconfig-paths`, `@vanilla-extract/vite-plugin`,
+`@cloudflare/vite-plugin`) are stripped from corpus `package.json` files.
+Upstream test file names (`vite-*-test.ts`) and Vite references embedded in
+fixture template strings are intentionally kept for comparability with
+upstream; the adapter rewrites embedded `vite.config.*` fixture entries into
+`rsbuild.config.ts` before anything executes. `vite-env-only` is kept: fixture
+app code imports `vite-env-only/macros`, and the adapter installs it in every
+materialized fixture.
 
 ## Commands
 
