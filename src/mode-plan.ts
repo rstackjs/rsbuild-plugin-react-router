@@ -79,43 +79,53 @@ export type RscModePlan = CommonModePlan & {
 
 export type ReactRouterModePlan = ClassicModePlan | RscModePlan;
 
-type CreateReactRouterModePlanOptions = {
+// Fields both mode planners need. Mode-specific inputs live on the
+// per-mode option types below so each planner owns only what it uses.
+type ModePlanContext = {
   api: RsbuildPluginAPI;
-  allowedActionOriginsForBuild: string[] | undefined;
   appDirectory: string;
-  assetsBuildDirectory: string;
   basename: string;
-  buildDirectory: string;
+  customServer: boolean;
+  isBuild: boolean;
+  prerenderConfig: Config['prerender'];
+  routeConfig: RouteConfigEntry[];
+  routeDiscovery: Config['routeDiscovery'];
+  routes: Record<string, Route>;
+  rootRouteFile: string;
+  ssr: boolean;
+};
+
+type CreateClassicModePlanOptions = ModePlanContext & {
+  allowedActionOriginsForBuild: string[] | undefined;
+  assetsBuildDirectory: string;
   defaultEntryName: string;
   entryServerPath: string;
   federation?: boolean;
   finalEntryClientPath: string;
-  finalEntryRscClientPath: string;
-  finalEntryRscPath: string;
   future: Config['future'];
   hasServerApp: boolean;
-  isBuild: boolean;
-  isRscMode: boolean;
-  outputClientPath: string;
-  pluginName: string;
-  pluginOptions: PluginOptions & {
-    customServer: boolean;
-    parallelRouteTransform?: PluginOptions['parallelRouteTransform'];
-  };
-  prerenderConfig: Config['prerender'];
+  parallelRouteTransform?: PluginOptions['parallelRouteTransform'];
   reactRouterConfig: ResolvedReactRouterConfig;
   routeChunkCache: RouteChunkCache;
-  routeConfig: RouteConfigEntry[];
   routeCount: number;
-  routeDiscovery: Config['routeDiscovery'];
-  routes: Record<string, Route>;
-  rootRouteFile: string;
   serverAppPath: string;
-  serverBuildFile: string | undefined;
   shouldDependOnWebCompiler: boolean;
   splitRouteModules: Config['splitRouteModules'];
-  ssr: boolean;
 };
+
+type CreateRscModePlanOptions = ModePlanContext & {
+  buildDirectory: string;
+  finalEntryRscClientPath: string;
+  finalEntryRscPath: string;
+  outputClientPath: string;
+  pluginName: string;
+  serverBuildFile: string | undefined;
+};
+
+type CreateReactRouterModePlanOptions = CreateClassicModePlanOptions &
+  CreateRscModePlanOptions & {
+    isRscMode: boolean;
+  };
 
 const RSC_LAYERS = rspack.experiments.rsc.Layers;
 
@@ -128,26 +138,121 @@ const createReactRouterPackageAliases = (): Record<string, string> => {
   };
 };
 
-export const createReactRouterModePlan = async ({
+const createRscModePlan = async ({
+  api,
+  appDirectory,
+  basename,
+  buildDirectory,
+  customServer,
+  finalEntryRscClientPath,
+  finalEntryRscPath,
+  isBuild,
+  outputClientPath,
+  pluginName,
+  prerenderConfig,
+  routeConfig,
+  routeDiscovery,
+  routes,
+  rootRouteFile,
+  serverBuildFile,
+  ssr,
+}: CreateRscModePlanOptions): Promise<RscModePlan> => {
+  const rscServerEntryName = (serverBuildFile || 'index.js').replace(
+    /\.js$/,
+    ''
+  );
+  const prerenderPaths = await resolvePrerenderPaths(
+    prerenderConfig,
+    ssr,
+    routeConfig,
+    {
+      logWarning: true,
+      warn: message => api.logger.warn(message),
+    }
+  );
+  return {
+    kind: 'rsc',
+    prerenderPaths,
+    routeChunkConfig: {
+      splitRouteModules: false,
+      appDirectory,
+      rootRouteFile,
+    },
+    routeTransformExecutor: undefined,
+    routeChunkOptions: undefined,
+    manifestChunkNames: new Set<string>(['index']),
+    webEntries: {
+      index: {
+        import: finalEntryRscClientPath,
+        html: false,
+      },
+    },
+    nodeEntries: {
+      [rscServerEntryName]: {
+        import: finalEntryRscPath,
+        layer: RSC_LAYERS.rsc,
+      },
+    },
+    createVirtualModules: (publicPath: string) =>
+      createReactRouterRscVirtualModules({
+        appDirectory,
+        basename,
+        buildDirectory,
+        isBuild,
+        outputClientPath,
+        publicPath,
+        routeDiscovery,
+        routes,
+        ssr,
+      }),
+    createResolveConfig: (rootPath: string) => ({
+      modules: [resolve(rootPath, 'node_modules'), 'node_modules'],
+      alias: createReactRouterRscResolveAliases(rootPath),
+    }),
+    server:
+      !customServer && ssr
+        ? {
+            setup: createReactRouterRscDevServerSetup({
+              entryName: rscServerEntryName,
+              pluginName,
+            }),
+          }
+        : undefined,
+    setupMiddlewares: [],
+    webExternalsType: undefined,
+    webOutput: {
+      chunkFormat: 'array-push',
+      chunkLoading: 'jsonp',
+      workerChunkLoading: 'import-scripts',
+      wasmLoading: 'fetch',
+      module: false,
+    },
+    webOptimization: {
+      mangleExports: false,
+      splitChunks: false,
+      usedExports: false,
+      runtimeChunk: false,
+    },
+    nodeExternals: undefined,
+    nodeDependencies: {},
+  };
+};
+
+const createClassicModePlan = async ({
   api,
   allowedActionOriginsForBuild,
   appDirectory,
   assetsBuildDirectory,
   basename,
-  buildDirectory,
+  customServer,
   defaultEntryName,
   entryServerPath,
   federation,
   finalEntryClientPath,
-  finalEntryRscClientPath,
-  finalEntryRscPath,
   future,
   hasServerApp,
   isBuild,
-  isRscMode,
-  outputClientPath,
-  pluginName,
-  pluginOptions,
+  parallelRouteTransform,
   prerenderConfig,
   reactRouterConfig,
   routeChunkCache,
@@ -157,93 +262,10 @@ export const createReactRouterModePlan = async ({
   routes,
   rootRouteFile,
   serverAppPath,
-  serverBuildFile,
   shouldDependOnWebCompiler,
   splitRouteModules,
   ssr,
-}: CreateReactRouterModePlanOptions): Promise<ReactRouterModePlan> => {
-  if (isRscMode) {
-    const rscServerEntryName = (serverBuildFile || 'index.js').replace(
-      /\.js$/,
-      ''
-    );
-    const prerenderPaths = await resolvePrerenderPaths(
-      prerenderConfig,
-      ssr,
-      routeConfig,
-      {
-        logWarning: true,
-        warn: message => api.logger.warn(message),
-      }
-    );
-    return {
-      kind: 'rsc',
-      prerenderPaths,
-      routeChunkConfig: {
-        splitRouteModules: false,
-        appDirectory,
-        rootRouteFile,
-      },
-      routeTransformExecutor: undefined,
-      routeChunkOptions: undefined,
-      manifestChunkNames: new Set<string>(['index']),
-      webEntries: {
-        index: {
-          import: finalEntryRscClientPath,
-          html: false,
-        },
-      },
-      nodeEntries: {
-        [rscServerEntryName]: {
-          import: finalEntryRscPath,
-          layer: RSC_LAYERS.rsc,
-        },
-      },
-      createVirtualModules: (publicPath: string) =>
-        createReactRouterRscVirtualModules({
-          appDirectory,
-          basename,
-          buildDirectory,
-          isBuild,
-          outputClientPath,
-          publicPath,
-          routeDiscovery,
-          routes,
-          ssr,
-        }),
-      createResolveConfig: (rootPath: string) => ({
-        modules: [resolve(rootPath, 'node_modules'), 'node_modules'],
-        alias: createReactRouterRscResolveAliases(rootPath),
-      }),
-      server:
-        !pluginOptions.customServer && ssr
-          ? {
-              setup: createReactRouterRscDevServerSetup({
-                entryName: rscServerEntryName,
-                pluginName,
-              }),
-            }
-          : undefined,
-      setupMiddlewares: [],
-      webExternalsType: undefined,
-      webOutput: {
-        chunkFormat: 'array-push',
-        chunkLoading: 'jsonp',
-        workerChunkLoading: 'import-scripts',
-        wasmLoading: 'fetch',
-        module: false,
-      },
-      webOptimization: {
-        mangleExports: false,
-        splitChunks: false,
-        usedExports: false,
-        runtimeChunk: false,
-      },
-      nodeExternals: undefined,
-      nodeDependencies: {},
-    };
-  }
-
+}: CreateClassicModePlanOptions): Promise<ClassicModePlan> => {
   const routeChunkConfig: RouteChunkConfig = {
     splitRouteModules,
     appDirectory,
@@ -251,8 +273,7 @@ export const createReactRouterModePlan = async ({
   };
   const routeTransformExecutor = createRouteTransformExecutor({
     parallelRouteTransform:
-      pluginOptions.parallelRouteTransform ??
-      shouldParallelizeRouteTransforms(routeCount),
+      parallelRouteTransform ?? shouldParallelizeRouteTransforms(routeCount),
     routeChunkCache,
     splitRouteModules: Boolean(splitRouteModules),
     isBuild,
@@ -326,7 +347,7 @@ export const createReactRouterModePlan = async ({
         : undefined,
     server: undefined,
     setupMiddlewares:
-      pluginOptions.customServer || !ssr
+      customServer || !ssr
         ? []
         : [
             (middlewares: Parameters<RsbuildDevSetupMiddleware>[0]) => {
@@ -358,3 +379,10 @@ export const createReactRouterModePlan = async ({
       : {},
   };
 };
+
+export const createReactRouterModePlan = (
+  options: CreateReactRouterModePlanOptions
+): Promise<ReactRouterModePlan> =>
+  options.isRscMode
+    ? createRscModePlan(options)
+    : createClassicModePlan(options);
