@@ -1927,13 +1927,17 @@ test.describe("single-fetch", () => {
   test("supports a basename", async ({ page }) => {
     let fixture = await createFixture({
       files: {
-        "vite.config.ts": js`
-          import { reactRouter } from "@react-router/dev/vite";
+        "rsbuild.config.ts": js`
+          import { defineConfig } from "@rsbuild/core";
+          import { pluginReact } from "@rsbuild/plugin-react";
+          import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-          export default {
-            base: "/base/",
-            plugins: [reactRouter()]
-          }
+          // Vite 'base: "/base/"' is intentionally not mapped to an rsbuild
+          // asset prefix: react-router-serve serves assets from the dist root
+          // and React Router's basename covers the routing this test asserts.
+          export default defineConfig({
+            plugins: [pluginReact(), pluginReactRouter()],
+          });
         `,
         "react-router.config.ts": reactRouterConfig({
           basename: "/base/",
@@ -2020,7 +2024,7 @@ test.describe("single-fetch", () => {
   }) => {
     let port = await getPort();
     let cwd = await createProject({
-      "vite.config.js": await viteConfig.basic({ port }),
+      "rsbuild.config.ts": await viteConfig.basic({ port }),
       "server.mjs": EXPRESS_SERVER({
         port,
         customLogic: js`

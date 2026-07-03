@@ -10,7 +10,7 @@ const templateName = "rsc-vite-framework" as const satisfies TemplateName;
 test.describe("Vite HMR & HDR (RSC)", () => {
   test("vite dev", async ({ page, dev }) => {
     let files: Files = async ({ port }) => ({
-      "vite.config.js": await viteConfig.basic({ port, templateName }),
+      "rsbuild.config.ts": await viteConfig.basic({ port, templateName }),
       "app/routes/hmr/route.tsx": `
         // imports
         import { Mounted } from "./route.client";

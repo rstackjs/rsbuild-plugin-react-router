@@ -216,7 +216,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "vite.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await viteConfig.basic({
                 port,
                 templateName,
                 vanillaExtract: true,
@@ -258,7 +258,7 @@ test.describe("Vite CSS", () => {
               "react-router.config.ts": reactRouterConfig({
                 basename: base,
               }),
-              "vite.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await viteConfig.basic({
                 port,
                 base,
                 templateName,
@@ -298,7 +298,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "vite.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await viteConfig.basic({
                 port,
                 templateName,
                 vanillaExtract: true,
@@ -338,7 +338,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "vite.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await viteConfig.basic({
                 port,
                 templateName,
                 vanillaExtract: true,
@@ -348,13 +348,8 @@ test.describe("Vite CSS", () => {
             templateName,
           );
 
-          let edit = createEditor(cwd);
-          await edit("package.json", (contents) =>
-            contents.replace(
-              '"sideEffects": false',
-              '"sideEffects": ["*.css.ts"]',
-            ),
-          );
+          // Note: fixtures already declare sideEffects: ["*.css.ts"], which
+          // upstream applied here via a package.json edit.
 
           let { stderr, status } = build({
             cwd,
@@ -407,7 +402,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "vite.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await viteConfig.basic({
                 port,
                 templateName,
                 cssCodeSplit: false,
@@ -418,13 +413,8 @@ test.describe("Vite CSS", () => {
             templateName,
           );
 
-          let edit = createEditor(cwd);
-          await edit("package.json", (contents) =>
-            contents.replace(
-              '"sideEffects": false',
-              '"sideEffects": ["*.css.ts"]',
-            ),
-          );
+          // Note: fixtures already declare sideEffects: ["*.css.ts"], which
+          // upstream applied here via a package.json edit.
 
           let { stderr, status } = build({
             cwd,

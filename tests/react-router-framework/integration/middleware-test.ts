@@ -42,10 +42,16 @@ test.describe("Middleware", () => {
             ssr: false,
             splitRouteModules: false,
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
-            export default defineConfig({ build: { manifest: true, minify: false }, plugins: [reactRouter()] });
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
+
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            export default defineConfig({
+              output: { minify: false }, // Vite: build.minify
+              plugins: [pluginReact(), pluginReactRouter()],
+            });
           `,
           "app/context.ts": js`
             import { createContext } from 'react-router'
@@ -369,13 +375,15 @@ test.describe("Middleware", () => {
           "react-router.config.ts": reactRouterConfig({
             ssr: false,
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true, minify: false },
-              plugins: [reactRouter()],
+              output: { minify: false }, // Vite: build.minify
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/context.ts": js`
@@ -466,12 +474,15 @@ test.describe("Middleware", () => {
           "react-router.config.ts": reactRouterConfig({
             splitRouteModules: false,
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
+
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true, minify: false },
-              plugins: [reactRouter()],
+              output: { minify: false }, // Vite: build.minify
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/context.ts": js`
@@ -771,13 +782,15 @@ test.describe("Middleware", () => {
       let fixture = await createFixture({
         files: {
           "react-router.config.ts": reactRouterConfig(),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true, minify: false },
-              plugins: [reactRouter()],
+              output: { minify: false }, // Vite: build.minify
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/context.ts": js`
@@ -891,13 +904,15 @@ test.describe("Middleware", () => {
       let fixture = await createFixture({
         files: {
           "react-router.config.ts": reactRouterConfig(),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true, minify: false },
-              plugins: [reactRouter()],
+              output: { minify: false }, // Vite: build.minify
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/context.ts": js`
@@ -1054,13 +1069,15 @@ test.describe("Middleware", () => {
       fixture = await createFixture({
         files: {
           "react-router.config.ts": reactRouterConfig(),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true, minify: false },
-              plugins: [reactRouter()],
+              output: { minify: false }, // Vite: build.minify
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/context.ts": js`
@@ -1148,10 +1165,16 @@ test.describe("Middleware", () => {
       fixture = await createFixture({
         files: {
           "react-router.config.ts": reactRouterConfig(),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
-            export default defineConfig({ build: { manifest: true, minify: false }, plugins: [reactRouter()] });
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
+
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            export default defineConfig({
+              output: { minify: false }, // Vite: build.minify
+              plugins: [pluginReact(), pluginReactRouter()],
+            });
           `,
           "app/context.ts": js`
             import { createContext } from 'react-router'
@@ -1974,15 +1997,16 @@ test.describe("Middleware", () => {
         {
           files: {
             "react-router.config.ts": reactRouterConfig(),
-            "vite.config.ts": js`
-              import { defineConfig } from "vite";
-              import { reactRouter } from "@react-router/dev/vite";
+            "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-              export default defineConfig({
-                build: { manifest: true },
-                plugins: [reactRouter()],
-              });
-            `,
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            export default defineConfig({
+              plugins: [pluginReact(), pluginReactRouter()],
+            });
+          `,
             "app/entry.server.tsx": js`
               import { PassThrough } from "node:stream";
 

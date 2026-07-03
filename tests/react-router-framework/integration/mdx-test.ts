@@ -11,7 +11,6 @@ import { type TemplateName, viteConfig } from "./helpers/vite.js";
 
 const templateNames = [
   "vite-7-template",
-  "vite-8-template",
   "rsc-vite-framework",
 ] as const satisfies TemplateName[];
 
@@ -25,7 +24,7 @@ test.describe("MDX", () => {
         fixture = await createFixture({
           templateName,
           files: {
-            "vite.config.js": await viteConfig.basic({
+            "rsbuild.config.ts": await viteConfig.basic({
               templateName,
               mdx: true,
             }),

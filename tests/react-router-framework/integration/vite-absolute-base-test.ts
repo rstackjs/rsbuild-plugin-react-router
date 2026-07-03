@@ -1,19 +1,14 @@
 import { expect } from "@playwright/test";
-import dedent from "dedent";
 
 import type { Files } from "./helpers/vite.js";
 import { test, viteConfig } from "./helpers/vite.js";
 
 let files: Files = async ({ port }) => ({
-  "vite.config.ts": dedent`
-    import { reactRouter } from "@react-router/dev/vite";
-
-    export default {
-      base: "http://localhost:${port}/",
-      ${await viteConfig.server({ port })}
-      plugins: [reactRouter()],
-    }
-  `,
+  // Vite absolute-URL `base` -> rsbuild dev/output asset prefixes
+  "rsbuild.config.ts": await viteConfig.basic({
+    port,
+    base: `http://localhost:${port}/`,
+  }),
   "app/routes/_index.tsx": `
     export default () => <h1 data-title>This should work</h1>;
   `,

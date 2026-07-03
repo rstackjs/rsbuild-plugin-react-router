@@ -19,9 +19,6 @@ const fixtures = [
     templateName: "vite-7-template",
   },
   {
-    templateName: "vite-8-template",
-  },
-  {
     templateName: "rsc-vite-framework",
   },
 ] as const satisfies ReadonlyArray<{
@@ -32,7 +29,7 @@ test.describe("Vite dev", () => {
   for (const { templateName } of fixtures) {
     test.describe(`template: ${templateName}`, () => {
       const files: Files = async ({ port }) => ({
-        "vite.config.ts": await viteConfig.basic({
+        "rsbuild.config.ts": await viteConfig.basic({
           port,
           templateName,
           mdx: true,
@@ -502,7 +499,7 @@ test.describe("Vite dev", () => {
       "react-router.config.ts": reactRouterConfig({
         future: { unstable_optimizeDeps: true },
       }),
-      "vite.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await viteConfig.basic({
         port,
         templateName: "rsc-vite-framework",
       }),

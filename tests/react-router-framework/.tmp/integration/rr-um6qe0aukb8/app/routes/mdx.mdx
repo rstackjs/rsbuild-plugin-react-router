@@ -1,0 +1,34 @@
+
+import { useEffect, useState } from "react";
+import { useLoaderData } from "react-router";
+
+import { serverOnly1, serverOnly2 } from "../utils.server";
+
+export const loader = () => {
+  return {
+    serverOnly1,
+    content: "MDX route content from loader",
+  }
+}
+
+export const action = () => {
+  console.log(serverOnly2)
+  return null
+}
+
+export function MdxComponent() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const { content } = useLoaderData();
+  const text = content + (mounted
+    ? ": mounted"
+    : ": not mounted");
+  return <div data-mdx-route>{text}</div>
+}
+
+## MDX Route
+
+<MdxComponent />
+              

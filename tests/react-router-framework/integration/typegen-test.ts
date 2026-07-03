@@ -7,21 +7,21 @@ import { test } from "./helpers/fixtures";
 import { reactRouterConfig } from "./helpers/vite";
 
 const viteConfig = ({ rsc }: { rsc: boolean }) => {
-  const reactRouterImportSpecifier = rsc
-    ? "unstable_reactRouterRSC as reactRouter"
-    : "reactRouter";
+  const routerPlugin = rsc ? "pluginReactRouterRSC" : "pluginReactRouter";
   return tsx`
-    import { ${reactRouterImportSpecifier} } from "@react-router/dev/vite";
+    import { defineConfig } from "@rsbuild/core";
+    import { pluginReact } from "@rsbuild/plugin-react";
+    import { ${routerPlugin} } from "rsbuild-plugin-react-router";
 
-    export default {
-      plugins: [reactRouter()],
-    };
+    export default defineConfig({
+      plugins: [pluginReact(), ${routerPlugin}()],
+    });
   `;
 };
 
 test.use({
   files: {
-    "vite.config.ts": viteConfig({ rsc: false }),
+    "rsbuild.config.ts": viteConfig({ rsc: false }),
     "app/expect-type.ts": tsx`
       export type Expect<T extends true> = T
 
@@ -686,7 +686,7 @@ test.describe("typegen", () => {
     test.describe("ServerComponent export", () => {
       test("when RSC Framework Mode plugin is present", async ({ edit, $ }) => {
         await edit({
-          "vite.config.ts": viteConfig({ rsc: true }),
+          "rsbuild.config.ts": viteConfig({ rsc: true }),
           "app/routes.ts": tsx`
             import { type RouteConfig, route } from "@react-router/dev/routes";
 
@@ -850,7 +850,7 @@ test.describe("typegen", () => {
 
       test("when RSC Framework Mode plugin is present", async ({ edit, $ }) => {
         await edit({
-          "vite.config.ts": viteConfig({ rsc: true }),
+          "rsbuild.config.ts": viteConfig({ rsc: true }),
           ...clientFirstRouteFiles,
         });
         await $("pnpm typecheck");
@@ -861,7 +861,7 @@ test.describe("typegen", () => {
         $,
       }) => {
         await edit({
-          "vite.config.ts": viteConfig({ rsc: false }),
+          "rsbuild.config.ts": viteConfig({ rsc: false }),
           ...clientFirstRouteFiles,
         });
         await $("pnpm typecheck");

@@ -214,15 +214,18 @@ test.describe("Vite / non-route / server-only module referenced by client", () =
 
 test.describe("Vite / server-only escape hatch", async () => {
   let files: Files = async ({ port }) => ({
-    "vite.config.ts": dedent`
-      import { reactRouter } from "@react-router/dev/vite";
-      import { envOnlyMacros } from "vite-env-only";
-      import tsconfigPaths from "vite-tsconfig-paths";
+    "rsbuild.config.ts": dedent`
+      import { defineConfig } from "@rsbuild/core";
+      import { pluginReact } from "@rsbuild/plugin-react";
+      import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-      export default {
+      // Dropped Vite-only plugins: vite-env-only (serverOnly$ macro
+      // transform) has no rsbuild equivalent; vite-tsconfig-paths is
+      // unnecessary because rsbuild resolves tsconfig "paths" natively.
+      export default defineConfig({
         ${await viteConfig.server({ port })}
-        plugins: [reactRouter(), envOnlyMacros(), tsconfigPaths()],
-      }
+        plugins: [pluginReact(), pluginReactRouter()],
+      });
     `,
     "app/utils.server.ts": serverOnlyModule,
     "app/.server/utils.ts": serverOnlyModule,

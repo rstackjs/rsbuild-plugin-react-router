@@ -86,15 +86,17 @@ templates.forEach((template) => {
       test.skip(template.name.includes("rsc"), "RSC is not supported");
 
       await edit({
-        "vite.config.ts": tsx`
-          import { defineConfig } from "vite";
-          import { reactRouter } from "@react-router/dev/vite";
-          import mdx from "@mdx-js/rollup";
+        "rsbuild.config.ts": tsx`
+          import { defineConfig } from "@rsbuild/core";
+          import { pluginMdx } from "@rsbuild/plugin-mdx";
+          import { pluginReact } from "@rsbuild/plugin-react";
+          import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
           export default defineConfig({
             plugins: [
-              mdx(),
-              reactRouter(),
+              pluginReact(),
+              pluginMdx(),
+              pluginReactRouter(),
             ],
           });
         `,

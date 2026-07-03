@@ -21,8 +21,6 @@ import {
   normalizeFixtureFiles,
   reactRouterServeBin,
   rsbuildBin,
-  rsbuildConfig,
-  rsbuildRscConfig,
 } from "./rsbuild-adapter.js";
 
 const nodeRequire = createRequire(import.meta.url);
@@ -53,7 +51,6 @@ export const reactRouterConfig = (
 
 type ViteConfigServerArgs = {
   port: number;
-  fsAllow?: string[];
 };
 
 type ViteConfigBuildArgs = {
@@ -65,7 +62,6 @@ type ViteConfigBuildArgs = {
 type ViteConfigBaseArgs = {
   templateName?: TemplateName;
   base?: string;
-  envDir?: string;
   mdx?: boolean;
   vanillaExtract?: boolean;
 };
@@ -77,39 +73,136 @@ type ViteConfigArgs = (
   ViteConfigBuildArgs &
   ViteConfigBaseArgs;
 
+const configSection = (name: string, entries: string[]) =>
+  entries.length > 0
+    ? [`${name}: {`, ...entries.map((entry) => `  ${entry}`), `},`]
+    : [];
+
+const CSS_CODE_SPLIT_NOTE =
+  '// Vite "build.cssCodeSplit: false" is not mapped: rsbuild always extracts CSS and these fixtures only assert that styles are applied.';
+
+/**
+ * Emits rsbuild.config.ts contents for test fixtures. (The `viteConfig` name
+ * is kept until call sites are renamed in a later phase.)
+ *
+ * Vite -> rsbuild option mappings used by the corpus:
+ * - `base` -> `output.assetPrefix`. We intentionally do not use rsbuild
+ *   `server.base` (React Router's `basename` handles route prefixing and the
+ *   plugin's dev SSR middleware serves all paths) and do not set
+ *   `dev.assetPrefix` (the plugin's dev manifest does not apply it yet).
+ * - `server.port` + `strictPort` -> `server.port` + `server.strictPort`
+ * - `build.assetsInlineLimit` -> `output.dataUriLimit`
+ * - `build.assetsDir` -> `output.distPath.assets`
+ * - vanilla-extract Vite plugin -> `@vanilla-extract/webpack-plugin` via
+ *   `tools.rspack`
+ * - MDX rollup plugin -> `@rsbuild/plugin-mdx`
+ *
+ * Intentionally unmapped Vite options:
+ * - `server.hmr.port`: rsbuild serves the HMR websocket on the dev server port
+ * - `server.fs.allow`: Vite-only static file serving restriction
+ * - `build.cssCodeSplit`: see CSS_CODE_SPLIT_NOTE
+ * - `vite-tsconfig-paths`: rsbuild resolves tsconfig `paths` natively
+ */
 export const viteConfig = {
-  server: async (args: ViteConfigServerArgs) => {
-    let { port, fsAllow } = args;
-    let hmrPort = await getPort();
-    let text = dedent`
+  // Emits the `server` section of an rsbuild config object literal so tests
+  // can compose their own rsbuild.config.ts strings.
+  server: async ({ port }: ViteConfigServerArgs) => {
+    return dedent`
       server: {
         port: ${port},
         strictPort: true,
-        hmr: { port: ${hmrPort} },
-        fs: { allow: ${fsAllow ? JSON.stringify(fsAllow) : "undefined"} }
       },
     `;
-    return text;
   },
+  // Emits the `output` section of an rsbuild config object literal.
   build: ({
     assetsInlineLimit,
     assetsDir,
     cssCodeSplit,
   }: ViteConfigBuildArgs = {}) => {
-    return dedent`
-      build: {
-        assetsInlineLimit: ${assetsInlineLimit ?? "undefined"},
-        assetsDir: ${assetsDir ? `"${assetsDir}"` : "undefined"},
-        cssCodeSplit: ${
-          cssCodeSplit !== undefined ? cssCodeSplit : "undefined"
-        },
-      },
-    `;
+    return [
+      ...configSection("output", [
+        ...(assetsInlineLimit !== undefined
+          ? [`dataUriLimit: ${assetsInlineLimit}, // Vite: build.assetsInlineLimit`]
+          : []),
+        ...(assetsDir !== undefined
+          ? [
+              `distPath: { assets: ${JSON.stringify(assetsDir)} }, // Vite: build.assetsDir`,
+            ]
+          : []),
+      ]),
+      ...(cssCodeSplit === false ? [CSS_CODE_SPLIT_NOTE] : []),
+    ].join("\n");
   },
-  basic: async (args: ViteConfigArgs) => {
-    return args.templateName?.includes("rsc")
-      ? rsbuildRscConfig({ port: args.port, base: args.base })
-      : rsbuildConfig({ port: args.port, base: args.base });
+  // Emits a complete rsbuild.config.ts.
+  basic: async (args: ViteConfigArgs = {}) => {
+    const isRsc = args.templateName?.includes("rsc") ?? false;
+    const routerPlugin = isRsc ? "pluginReactRouterRSC" : "pluginReactRouter";
+
+    const imports = [
+      `import { defineConfig } from "@rsbuild/core";`,
+      ...(args.mdx ? [`import { pluginMdx } from "@rsbuild/plugin-mdx";`] : []),
+      `import { pluginReact } from "@rsbuild/plugin-react";`,
+      `import { ${routerPlugin} } from "rsbuild-plugin-react-router";`,
+      ...(args.vanillaExtract
+        ? [
+            `import { VanillaExtractPlugin } from "@vanilla-extract/webpack-plugin";`,
+          ]
+        : []),
+    ];
+
+    const config = [
+      ...configSection("server", [
+        ...(args.port !== undefined
+          ? [`port: ${args.port},`, `strictPort: true,`]
+          : []),
+      ]),
+      // Note: `dev.assetPrefix` is intentionally NOT set for `base`. The
+      // plugin's dev-server manifest/SSR links do not currently apply a dev
+      // asset prefix, so setting it breaks dev-mode asset loading.
+      ...configSection("output", [
+        ...(args.base !== undefined
+          ? [`assetPrefix: ${JSON.stringify(args.base)}, // Vite: base`]
+          : []),
+        ...(args.assetsInlineLimit !== undefined
+          ? [`dataUriLimit: ${args.assetsInlineLimit}, // Vite: build.assetsInlineLimit`]
+          : []),
+        ...(args.assetsDir !== undefined
+          ? [
+              `distPath: { assets: ${JSON.stringify(args.assetsDir)} }, // Vite: build.assetsDir`,
+            ]
+          : []),
+      ]),
+      ...(args.vanillaExtract
+        ? [
+            `// vanilla-extract via @vanilla-extract/webpack-plugin.`,
+            `// - identifiers: "debug" keeps class names deterministic across the`,
+            `//   client and server compilations (SSR markup must match client CSS).`,
+            `// - realContentHash is disabled because the plugin's browser manifest`,
+            `//   captures asset names before rspack's real-content-hash rename.`,
+            `// - optimization.sideEffects is disabled so side-effect-only .css.ts`,
+            `//   imports (compiled to virtual CSS imports) survive the fixture's`,
+            `//   "sideEffects": false package flag.`,
+            `tools: {`,
+            `  rspack: {`,
+            `    plugins: [new VanillaExtractPlugin({ identifiers: "debug" })],`,
+            `    optimization: { realContentHash: false, sideEffects: false },`,
+            `  },`,
+            `},`,
+          ]
+        : []),
+      ...(args.cssCodeSplit === false ? [CSS_CODE_SPLIT_NOTE] : []),
+      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${routerPlugin}()],`,
+    ];
+
+    return [
+      ...imports,
+      "",
+      "export default defineConfig({",
+      ...config.map((line) => `  ${line}`),
+      "});",
+      "",
+    ].join("\n");
   },
 };
 
@@ -173,7 +266,6 @@ export const EXPRESS_SERVER = (args: {
 
 type FrameworkModeViteMajorTemplateName =
   | "vite-7-template"
-  | "vite-8-template"
   | "vite-plugin-cloudflare-template";
 
 type FrameworkModeRscTemplateName = "rsc-vite-framework";
@@ -188,9 +280,11 @@ export type TemplateName =
   | FrameworkModeCloudflareTemplateName
   | RscBundlerTemplateName;
 
+// Collapsed from the upstream Vite 7/Vite 8 template pair: the Vite major
+// version split is meaningless for rsbuild, so suites parameterized over
+// these templates run once.
 export const viteMajorTemplates = [
   { templateName: "vite-7-template", templateDisplayName: "Vite 7" },
-  { templateName: "vite-8-template", templateDisplayName: "Vite 8" },
 ] as const satisfies Array<{
   templateName: FrameworkModeViteMajorTemplateName;
   templateDisplayName: string;

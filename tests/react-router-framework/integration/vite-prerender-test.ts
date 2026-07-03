@@ -26,17 +26,16 @@ let files = {
   "react-router.config.ts": reactRouterConfig({
     prerender: true,
   }),
-  "vite.config.ts": js`
-    import { defineConfig } from "vite";
-    import { reactRouter } from "@react-router/dev/vite";
+  "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-    export default defineConfig({
-      build: { manifest: true },
-      plugins: [
-        reactRouter()
-      ],
-    });
-  `,
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            export default defineConfig({
+              plugins: [pluginReact(), pluginReactRouter()],
+            });
+          `,
   "app/root.tsx": js`
     import * as React from "react";
     import { Link, Links, Meta, Outlet, Scripts, useRouteError } from "react-router";
@@ -256,15 +255,14 @@ test.describe(`Prerendering`, () => {
               },
             }
           `,
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [
-                reactRouter()
-              ],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
         },
@@ -355,15 +353,14 @@ test.describe(`Prerendering`, () => {
               },
             }
           `,
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [
-                reactRouter()
-              ],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
         },
@@ -405,13 +402,14 @@ test.describe(`Prerendering`, () => {
               },
             }
           `,
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [reactRouter()],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/routes/$slug.tsx": js`
@@ -462,7 +460,7 @@ test.describe(`Prerendering`, () => {
           "react-router.config.ts": reactRouterConfig({
             prerender: true,
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": files["app/root.tsx"],
           "app/routes/_index.tsx": files["app/routes/_index.tsx"],
           "app/routes/action.tsx": js`
@@ -593,15 +591,14 @@ test.describe(`Prerendering`, () => {
               },
             }
           `,
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [
-                reactRouter()
-              ],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
         },
@@ -643,15 +640,14 @@ test.describe(`Prerendering`, () => {
               concurrency: 2,
             },
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [
-                reactRouter()
-              ],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
         },
@@ -694,13 +690,14 @@ test.describe(`Prerendering`, () => {
             // Don't prerender the /not-prerendered route
             prerender: ["/", "/about"],
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [reactRouter()],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/routes/about.tsx": js`
@@ -750,13 +747,14 @@ test.describe(`Prerendering`, () => {
           "react-router.config.ts": reactRouterConfig({
             prerender: ["/", "/about"],
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [reactRouter()],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/routes/about.tsx": js`
@@ -803,13 +801,14 @@ test.describe(`Prerendering`, () => {
           "react-router.config.ts": reactRouterConfig({
             prerender: ["/", "/utf8-prerendered"],
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [reactRouter()],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/routes/utf8-prerendered.tsx": js`
@@ -886,13 +885,14 @@ test.describe(`Prerendering`, () => {
           "react-router.config.ts": reactRouterConfig({
             prerender: ["/", "/parent", "/parent/child"],
           }),
-          "vite.config.ts": js`
-            import { defineConfig } from "vite";
-            import { reactRouter } from "@react-router/dev/vite";
+          "rsbuild.config.ts": js`
+            import { defineConfig } from "@rsbuild/core";
+            import { pluginReact } from "@rsbuild/plugin-react";
+            import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              build: { manifest: true },
-              plugins: [reactRouter()],
+              plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
           "app/routes/parent.tsx": js`
@@ -1067,7 +1067,7 @@ test.describe(`Prerendering`, () => {
             ssr: false,
             prerender: true,
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": files["app/root.tsx"],
           "app/routes/_index.tsx": files["app/routes/_index.tsx"],
           "app/routes/$slug.tsx": js`
@@ -1117,7 +1117,7 @@ test.describe(`Prerendering`, () => {
             ssr: false,
             prerender: ["/"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": files["app/root.tsx"],
           "app/routes/_index.tsx": files["app/routes/_index.tsx"],
           "app/routes/page.tsx": js`
@@ -1186,7 +1186,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": files["app/root.tsx"],
           "app/routes/_index.tsx": files["app/routes/_index.tsx"],
           "app/routes/page.tsx": js`
@@ -1239,7 +1239,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/page"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -1380,7 +1380,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/", "/page"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -1521,7 +1521,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/page"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -1674,7 +1674,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/", "/page"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -1827,7 +1827,7 @@ test.describe(`Prerendering`, () => {
             ssr: false,
             prerender: ["/", "/parent"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -1960,7 +1960,7 @@ test.describe(`Prerendering`, () => {
             ssr: false,
             prerender: ["/", "/parent/child"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -2092,7 +2092,7 @@ test.describe(`Prerendering`, () => {
             ssr: false,
             prerender: ["/", "/parent"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -2240,7 +2240,7 @@ test.describe(`Prerendering`, () => {
             ssr: false,
             prerender: ["/", "/parent/child"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -2380,7 +2380,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/", "/page", "/param/1", "/param/2"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Link, Outlet, Scripts, useNavigation } from "react-router";
@@ -2482,7 +2482,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/", "/page", "/ページ"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Link, Outlet, Scripts } from "react-router";
@@ -2564,7 +2564,7 @@ test.describe(`Prerendering`, () => {
             ssr: false, // turn off fog of war since we're serving with a static server
             prerender: ["/param/1"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Link, Outlet, Scripts, useNavigation } from "react-router";
@@ -2639,7 +2639,7 @@ test.describe(`Prerendering`, () => {
             ssr: false,
             prerender: ["/", "/parent"],
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Link, Outlet, Scripts } from "react-router";
@@ -2789,7 +2789,7 @@ test.describe(`Prerendering`, () => {
             prerender: ["/page"],
             basename: "/base",
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";
@@ -2932,7 +2932,7 @@ test.describe(`Prerendering`, () => {
             prerender: ["/", "/page"],
             basename: "/base",
           }),
-          "vite.config.ts": files["vite.config.ts"],
+          "rsbuild.config.ts": files["rsbuild.config.ts"],
           "app/root.tsx": js`
             import * as React from "react";
             import { Outlet, Scripts } from "react-router";

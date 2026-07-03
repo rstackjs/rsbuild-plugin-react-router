@@ -1,0 +1,45 @@
+{
+  "name": "integration-vite-7-template",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": ["*.css.ts"],
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_OPTIONS=\"--experimental-vm-modules --experimental-global-webcrypto\" rsbuild dev --host localhost",
+    "build": "rsbuild build",
+    "start": "HOST=127.0.0.1 react-router-serve ./build/server/static/js/app.js",
+    "typecheck": "react-router typegen && tsc"
+  },
+  "dependencies": {
+    "@remix-run/node-fetch-server": "^0.13.3",
+    "@react-router/express": "^8.0.1",
+    "@react-router/node": "^8.0.1",
+    "@react-router/serve": "^8.0.1",
+    "@vanilla-extract/css": "^1.20.1",
+    "express": "^4.22.2",
+    "isbot": "^5.1.40",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router": "^8.0.1",
+    "serialize-javascript": "^6.0.1"
+  },
+  "devDependencies": {
+    "@react-router/dev": "^8.0.1",
+    "@react-router/fs-routes": "^8.0.1",
+    "@react-router/remix-routes-option-adapter": "^8.0.1",
+    "@rsbuild/core": "2.1.0",
+    "@rsbuild/plugin-mdx": "^1.1.3",
+    "@rsbuild/plugin-react": "2.1.0",
+    "@types/node": "^25.0.10",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "@vanilla-extract/webpack-plugin": "^2.3.27",
+    "rsbuild": "npm:@rsbuild/core@2.1.0",
+    "rsbuild-plugin-react-router": "file:/home/zack/projects/rsbuild-plugin-react-router",
+    "typescript": "^5.9.3",
+    "vite-env-only": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

@@ -3,7 +3,10 @@ import dedent from "dedent";
 
 import { createProject, build, reactRouterConfig } from "./helpers/vite.js";
 
-test.describe("Vite plugin order validation", () => {
+// Skipped: plugin-order validation is @react-router/dev/vite behavior;
+// rsbuild-plugin-react-router registers its companion plugins itself and has
+// no equivalent ordering check to assert against.
+test.describe.skip("Vite plugin order validation", () => {
   test("Framework Mode with MDX plugin after React Router plugin", async () => {
     let cwd = await createProject({
       "vite.config.ts": dedent`

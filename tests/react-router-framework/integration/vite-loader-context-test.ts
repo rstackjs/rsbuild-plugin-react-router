@@ -10,7 +10,7 @@ let stop: () => void;
 test.beforeAll(async () => {
   port = await getPort();
   cwd = await createProject({
-    "vite.config.js": await viteConfig.basic({ port }),
+    "rsbuild.config.ts": await viteConfig.basic({ port }),
     "app/context.ts": String.raw`
       import { createContext } from "react-router";
       export const valueContext = createContext<string>();

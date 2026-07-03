@@ -809,13 +809,14 @@ test.describe("SPA Mode", () => {
                 ssr: false,
                 splitRouteModules,
               }),
-              "vite.config.ts": js`
-                import { defineConfig } from "vite";
-                import { reactRouter } from "@react-router/dev/vite";
+              "rsbuild.config.ts": js`
+                import { defineConfig } from "@rsbuild/core";
+                import { pluginReact } from "@rsbuild/plugin-react";
+                import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
                 export default defineConfig({
-                  build: { manifest: true },
-                  plugins: [reactRouter()],
+                  output: { manifest: true }, // Vite: build.manifest
+                  plugins: [pluginReact(), pluginReactRouter()],
                 });
               `,
               "public/styles-root.css": css`
@@ -1162,11 +1163,17 @@ test.describe("SPA Mode", () => {
         });
 
         test("only generates client Vite manifest", () => {
-          let viteManifestFiles = fs.readdirSync(
-            path.join(fixture.projectDir, "build", "client", ".vite"),
-          );
-
-          expect(viteManifestFiles).toEqual(["manifest.json"]);
+          // rsbuild emits manifest.json at the environment's dist root
+          expect(
+            fs.existsSync(
+              path.join(fixture.projectDir, "build", "client", "manifest.json"),
+            ),
+          ).toBe(true);
+          expect(
+            fs.existsSync(
+              path.join(fixture.projectDir, "build", "server", "manifest.json"),
+            ),
+          ).toBe(false);
         });
       });
     });
@@ -1181,13 +1188,14 @@ test.describe("SPA Mode", () => {
         "react-router.config.ts": reactRouterConfig({
           ssr: false,
         }),
-        "vite.config.ts": js`
-          import { defineConfig } from "vite";
-          import { reactRouter } from "@react-router/dev/vite";
+        "rsbuild.config.ts": js`
+          import { defineConfig } from "@rsbuild/core";
+          import { pluginReact } from "@rsbuild/plugin-react";
+          import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
+          // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
           export default defineConfig({
-            build: { manifest: true },
-            plugins: [reactRouter()],
+            plugins: [pluginReact(), pluginReactRouter()],
           });
         `,
         "app/routeImportTracker.ts": js`

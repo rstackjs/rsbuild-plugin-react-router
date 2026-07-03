@@ -137,7 +137,9 @@ const files = {
                   "export const keys = " + JSON.stringify(Object.keys(buildEndArgs)) + ";",
                   "export const buildManifest = " + serializeJs(buildManifest, { space: 2, unsafe: true }) + ";",
                   "export const reactRouterConfig = " + serializeJs(reactRouterConfig, { space: 2, unsafe: true }) + ";",
-                  "export const assetsDir = " + JSON.stringify(viteConfig.build.assetsDir) + ";",
+                  // buildEnd receives the normalized rsbuild config; Vite's
+                  // build.assetsDir maps to output.distPath.assets
+                  "export const assetsDir = " + JSON.stringify(viteConfig.output.distPath.assets) + ";",
                   "export const futureFlags = " + JSON.stringify(reactRouterConfig.future) + ";",
                   "export const splitRouteModules = " + JSON.stringify(reactRouterConfig.splitRouteModules) + ";",
                 ].join("\n"),
@@ -149,7 +151,7 @@ const files = {
       ],
     }
   `),
-  "vite.config.ts": await viteConfig.basic({
+  "rsbuild.config.ts": await viteConfig.basic({
     assetsDir: "custom-assets-dir",
   }),
 };

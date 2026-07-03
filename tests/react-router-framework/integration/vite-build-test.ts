@@ -30,10 +30,11 @@ test.describe("Build", () => {
                 ENV_VAR_FROM_DOTENV_FILE=true
               `,
             "react-router.config.ts": reactRouterConfig(),
-            "vite.config.ts": js`
-                import { defineConfig } from "vite";
-                import { reactRouter } from "@react-router/dev/vite";
-                import mdx from "@mdx-js/rollup";
+            "rsbuild.config.ts": js`
+                import { defineConfig } from "@rsbuild/core";
+                import { pluginMdx } from "@rsbuild/plugin-mdx";
+                import { pluginReact } from "@rsbuild/plugin-react";
+                import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
                 export default defineConfig({
                   ${await viteConfig.server({ port })}
@@ -41,8 +42,9 @@ test.describe("Build", () => {
                     assetsInlineLimit: 0,
                   })}
                   plugins: [
-                    mdx(),
-                    reactRouter(),
+                    pluginReact(),
+                    pluginMdx(),
+                    pluginReactRouter(),
                   ],
                 });
               `,
@@ -296,7 +298,8 @@ test.describe("Build", () => {
         });
 
         await page.getByRole("link", { name: "txtUrl" }).click();
-        await page.waitForURL("**/assets/test-*.txt");
+        // rsbuild emits static assets as static/assets/[name].[hash][ext]
+        await page.waitForURL("**/static/assets/test.*.txt");
         await expect(page.getByText("test")).toBeVisible();
         expect(pageErrors).toEqual([]);
       });
@@ -312,7 +315,8 @@ test.describe("Build", () => {
         });
 
         await page.getByRole("link", { name: "cssUrl" }).click();
-        await page.waitForURL("**/assets/test-*.css");
+        // rsbuild emits ?url CSS files as static assets
+        await page.waitForURL("**/static/assets/test.*.css");
         await expect(page.getByText(".test{")).toBeVisible();
         expect(pageErrors).toEqual([]);
       });
@@ -332,10 +336,17 @@ test.describe("Build", () => {
       });
 
       test("removes assets (other than code-split JS) and CSS files from SSR build", async () => {
-        let assetFiles = globSync("build/server/assets/**/*", { cwd });
-        let [asset, ...rest] = assetFiles;
-        expect(rest).toEqual([]); // Provide more useful test output if this fails
-        expect(asset).toMatch(/ssr-code-split-lib-.*\.js/);
+        // rsbuild layout: server chunks live under build/server/static/js.
+        // Assert no CSS or other static assets leak into the SSR build.
+        let nonJsFiles = globSync("build/server/static/**/*.*", { cwd }).filter(
+          (file) => !/\.js(\.map)?$/.test(file),
+        );
+        expect(nonJsFiles).toEqual([]);
+        // Code-split JS emitted by the SSR build is allowed
+        let codeSplitFiles = globSync("build/server/static/js/async/**/*.js", {
+          cwd,
+        });
+        expect(codeSplitFiles.length).toBeGreaterThanOrEqual(1);
       });
 
       test("supports code-split CSS", async ({ page }) => {

@@ -14,9 +14,9 @@ test.describe("Vite preview", () => {
   test("serves built app with vite preview", async ({ vitePreview, page }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "vite.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await viteConfig.basic({
         port,
-        templateName: "vite-8-template",
+        templateName: "vite-7-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -78,7 +78,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-8-template");
+    const { port } = await vitePreview(files, "vite-7-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });
@@ -95,9 +95,9 @@ test.describe("Vite preview", () => {
   test("handles navigation between routes", async ({ vitePreview, page }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "vite.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await viteConfig.basic({
         port,
-        templateName: "vite-8-template",
+        templateName: "vite-7-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts, Link } from "react-router";
@@ -143,7 +143,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-8-template");
+    const { port } = await vitePreview(files, "vite-7-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });
@@ -169,9 +169,9 @@ test.describe("Vite preview", () => {
   test("handles loader data correctly", async ({ vitePreview, page }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "vite.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await viteConfig.basic({
         port,
-        templateName: "vite-8-template",
+        templateName: "vite-7-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -219,7 +219,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-8-template");
+    const { port } = await vitePreview(files, "vite-7-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });
@@ -244,9 +244,9 @@ test.describe("Vite preview", () => {
   }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "vite.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await viteConfig.basic({
         port,
-        templateName: "vite-8-template",
+        templateName: "vite-7-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -295,7 +295,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-8-template");
+    const { port } = await vitePreview(files, "vite-7-template");
     await page.goto(`http://localhost:${port}/products/123`, {
       waitUntil: "networkidle",
     });
@@ -318,9 +318,9 @@ test.describe("Vite preview", () => {
       "react-router.config.ts": reactRouterConfig({
         ssr: false,
       }),
-      "vite.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await viteConfig.basic({
         port,
-        templateName: "vite-8-template",
+        templateName: "vite-7-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -365,7 +365,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-8-template");
+    const { port } = await vitePreview(files, "vite-7-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });

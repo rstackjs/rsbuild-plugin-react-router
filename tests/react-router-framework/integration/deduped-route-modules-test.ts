@@ -23,7 +23,7 @@ test.describe("Deduped route modules", () => {
         fixture = await createFixture({
           templateName,
           files: {
-            "vite.config.js": await viteConfig.basic({
+            "rsbuild.config.ts": await viteConfig.basic({
               templateName,
             }),
             "app/routes/client-first.a.tsx": `

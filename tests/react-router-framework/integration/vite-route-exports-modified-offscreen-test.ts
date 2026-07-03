@@ -49,7 +49,7 @@ test.describe(async () => {
   test.beforeAll(async () => {
     port = await getPort();
     cwd = await createProject({
-      "vite.config.js": await viteConfig.basic({ port }),
+      "rsbuild.config.ts": await viteConfig.basic({ port }),
       ...files,
     });
     stop = await dev({ cwd, port });

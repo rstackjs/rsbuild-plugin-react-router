@@ -63,13 +63,15 @@ test.describe(() => {
           },
         }
       `),
-      "vite.config.ts": dedent(js`
-        import { reactRouter } from "@react-router/dev/vite";
+      "rsbuild.config.ts": dedent(js`
+        import { defineConfig } from "@rsbuild/core";
+        import { pluginReact } from "@rsbuild/plugin-react";
+        import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-        export default {
-          build: { manifest: true },
-          plugins: [reactRouter()],
-        }
+        export default defineConfig({
+          output: { manifest: true }, // Vite: build.manifest
+          plugins: [pluginReact(), pluginReactRouter()],
+        });
       `),
       ...files,
     });
@@ -78,15 +80,13 @@ test.describe(() => {
   });
 
   test("Vite / manifests enabled / Vite manifests", () => {
-    let viteManifestFilesClient = fs.readdirSync(
-      path.join(cwd, "build", "client", ".vite"),
+    // rsbuild emits manifest.json at each environment's dist root
+    expect(fs.existsSync(path.join(cwd, "build", "client", "manifest.json"))).toBe(
+      true,
     );
-    expect(viteManifestFilesClient).toEqual(["manifest.json"]);
-
-    let viteManifestFilesServer = fs.readdirSync(
-      path.join(cwd, "build", "server", ".vite"),
+    expect(fs.existsSync(path.join(cwd, "build", "server", "manifest.json"))).toBe(
+      true,
     );
-    expect(viteManifestFilesServer).toEqual(["manifest.json"]);
   });
 
   test("Vite / manifests enabled / React Router build manifest", async () => {
@@ -126,7 +126,7 @@ test.describe(() => {
 
   test.beforeAll(async () => {
     cwd = await createProject({
-      "vite.config.ts": await viteConfig.basic({ port: await getPort() }),
+      "rsbuild.config.ts": await viteConfig.basic({ port: await getPort() }),
       ...files,
     });
 
@@ -134,10 +134,10 @@ test.describe(() => {
   });
 
   test("Vite / manifest disabled / Vite manifests", () => {
-    let manifestDirClient = path.join(cwd, "build", "client", ".vite");
-    expect(fs.existsSync(manifestDirClient)).toBe(false);
+    let manifestClient = path.join(cwd, "build", "client", "manifest.json");
+    expect(fs.existsSync(manifestClient)).toBe(false);
 
-    let manifestDirServer = path.join(cwd, "build", "server", ".vite");
-    expect(fs.existsSync(manifestDirServer)).toBe(false);
+    let manifestServer = path.join(cwd, "build", "server", "manifest.json");
+    expect(fs.existsSync(manifestServer)).toBe(false);
   });
 });

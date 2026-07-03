@@ -63,11 +63,20 @@ export const normalizeFixtureFiles = <T>(
 
   for (const [filename, contents] of Object.entries(files)) {
     if (/^vite\.config\.[cm]?[jt]s$/.test(filename)) {
-      normalized["rsbuild.config.ts"] =
+      // Safety net only: the corpus should author rsbuild.config.ts directly.
+      const passthrough =
         typeof contents === "string" &&
-        contents.includes("rsbuild-plugin-react-router")
-          ? contents
-          : ((isRscConfig ? rsbuildRscConfig() : rsbuildConfig()) as T);
+        contents.includes("rsbuild-plugin-react-router");
+      console.warn(
+        `[rsbuild-adapter] Intercepted Vite config fixture "${filename}"` +
+          (passthrough
+            ? " (renamed to rsbuild.config.ts)."
+            : " and replaced it with a generic rsbuild config; per-test bundler options were DISCARDED.") +
+          " Author rsbuild.config.ts in the test fixture instead.",
+      );
+      normalized["rsbuild.config.ts"] = passthrough
+        ? contents
+        : ((isRscConfig ? rsbuildRscConfig() : rsbuildConfig()) as T);
       continue;
     }
     normalized[filename] = contents;
@@ -111,7 +120,18 @@ export function installFixtureProject(projectDir: string) {
     return;
   }
 
-  const install = spawnSync("pnpm", ["install", "--ignore-workspace", "--silent"], {
+  const install = spawnSync(
+    "pnpm",
+    [
+      "install",
+      "--ignore-workspace",
+      "--silent",
+      // Fail fast on flaky registry connections instead of hanging the
+      // synchronous spawn (and with it the whole Playwright worker).
+      "--fetch-timeout=60000",
+      "--fetch-retries=3",
+    ],
+    {
     cwd: projectDir,
     env: {
       ...process.env,
@@ -166,6 +186,7 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       "@types/node": "^25.0.10",
       "@types/react": "^19.2.10",
       "@types/react-dom": "^19.2.3",
+      "@vanilla-extract/webpack-plugin": "^2.3.27",
       rsbuild: "npm:@rsbuild/core@2.1.0",
       "rsbuild-plugin-react-router": `file:${repoRoot}`,
       ...(isRscTemplate ? { "rsbuild-plugin-rsc": "^0.1.1" } : {}),

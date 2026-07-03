@@ -498,8 +498,10 @@ export async function createFixtureProject(
   await mkdir(projectDir, { recursive: true });
   await cp(integrationTemplateDir, projectDir, { recursive: true });
 
-  let hasViteConfig = Object.keys(init.files ?? {}).some((filename) =>
-    filename.startsWith("vite.config."),
+  let hasBundlerConfig = Object.keys(init.files ?? {}).some(
+    (filename) =>
+      filename.startsWith("rsbuild.config.") ||
+      filename.startsWith("vite.config."),
   );
 
   let hasReactRouterConfig = Object.keys(init.files ?? {}).some((filename) =>
@@ -510,7 +512,7 @@ export async function createFixtureProject(
 
   await writeTestFiles(
     normalizeFixtureFiles({
-      ...(hasViteConfig
+      ...(hasBundlerConfig
         ? {}
         : {
             "rsbuild.config.ts": await viteConfig.basic({

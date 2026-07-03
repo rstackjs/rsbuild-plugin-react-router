@@ -10,47 +10,24 @@ test("ignores external server environments without skipping React Router build h
   let cwd = await createProject(
     {
       "react-router.config.ts": reactRouterConfig(),
-      "vite.config.ts": js`
-        import { defineConfig } from "vite";
-        import { reactRouter } from "@react-router/dev/vite";
-
-        function extraServerEnvironment() {
-          return {
-            name: "extra-server-environment",
-            config() {
-              return {
-                environments: {
-                  externalServerEnv: {
-                    consumer: "server",
-                    build: {
-                      rollupOptions: { input: "./external-server-env.ts" },
-                    },
-                  },
-                },
-                builder: {
-                  sharedConfigBuild: true,
-                  sharedPlugins: true,
-                  async buildApp(builder) {
-                    // External build orchestrators can introduce additional
-                    // server environments that React Router should ignore.
-                    await builder.build(builder.environments.client);
-                    await builder.build(builder.environments.ssr);
-                    await builder.build(builder.environments.externalServerEnv);
-                  },
-                },
-              };
-            },
-          };
-        }
+      "rsbuild.config.ts": js`
+        import { defineConfig } from "@rsbuild/core";
+        import { pluginReact } from "@rsbuild/plugin-react";
+        import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
         export default defineConfig({
-          build: {
-            assetsInlineLimit: 0,
+          // External build orchestrators can introduce additional server
+          // environments that React Router should ignore.
+          environments: {
+            externalServerEnv: {
+              output: { target: "node" },
+              source: { entry: { index: "./external-server-env.ts" } },
+            },
           },
-          plugins: [
-            reactRouter(),
-            extraServerEnvironment(),
-          ],
+          output: {
+            dataUriLimit: 0, // Vite: build.assetsInlineLimit
+          },
+          plugins: [pluginReact(), pluginReactRouter()],
         });
       `,
       "app/root.tsx": js`
@@ -110,9 +87,10 @@ test("ignores external server environments without skipping React Router build h
 
   expect(stderr.toString().trim()).toBeFalsy();
   expect(status).toBe(0);
+  // rsbuild emits static assets as static/assets/[name].[hash][ext]
   expect(
     fs
-      .readdirSync(path.join(cwd, "build/client/assets"))
-      .filter((file) => /^test-.*\.txt$/.test(file)).length,
+      .readdirSync(path.join(cwd, "build/client/static/assets"))
+      .filter((file) => /^test\..*\.txt$/.test(file)).length,
   ).toBe(1);
 });

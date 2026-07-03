@@ -5,7 +5,7 @@ import { test, viteConfig } from "./helpers/vite.js";
 const js = String.raw;
 
 const files: Files = async ({ port }) => ({
-  "vite.config.ts": await viteConfig.basic({ port }),
+  "rsbuild.config.ts": await viteConfig.basic({ port }),
   "app/entry.server.tsx": js`
     import { PassThrough } from "node:stream";
 

@@ -162,14 +162,16 @@ test.describe("Server bundles", () => {
             }
           }
         `),
-        "vite.config.ts": dedent(js`
-          import { reactRouter } from "@react-router/dev/vite";
+        "rsbuild.config.ts": dedent(js`
+          import { defineConfig } from "@rsbuild/core";
+          import { pluginReact } from "@rsbuild/plugin-react";
+          import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-          export default {
+          // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+          export default defineConfig({
             ${await viteConfig.server({ port })}
-            build: { manifest: true },
-            plugins: [reactRouter()]
-          }
+            plugins: [pluginReact(), pluginReactRouter()],
+          });
         `),
         ...files,
       },

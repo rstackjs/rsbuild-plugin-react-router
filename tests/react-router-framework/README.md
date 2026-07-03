@@ -98,11 +98,17 @@ The corpus carries no inert Vite artifacts: the checked-in fixture/template
 `vite.config.*` files are deleted, and `vite`, `@vitejs/*`, and Vite-plugin
 dependencies (`vite-tsconfig-paths`, `@vanilla-extract/vite-plugin`,
 `@cloudflare/vite-plugin`) are stripped from corpus `package.json` files.
-Upstream test file names (`vite-*-test.ts`) and Vite references embedded in
-fixture template strings are intentionally kept for comparability with
-upstream; the adapter rewrites embedded `vite.config.*` fixture entries into
-`rsbuild.config.ts` before anything executes. `vite-env-only` is kept: fixture
-app code imports `vite-env-only/macros`, and the adapter installs it in every
+Upstream test file names (`vite-*-test.ts`) are intentionally kept for
+comparability with upstream. Tests author `rsbuild.config.ts` fixtures
+directly: the `viteConfig` helper factory in `integration/helpers/vite.ts`
+emits rsbuild config text (see its doc comment for the Vite -> rsbuild option
+mappings), and inline fixture configs are written as rsbuild configs with
+comments marking dropped Vite-only options. The adapter's `vite.config.*`
+interception remains only as a safety net and `console.warn`s loudly when it
+fires — new tests must not rely on it. The upstream `vite-7-template` /
+`vite-8-template` pair is collapsed into a single `vite-7-template` (the Vite
+major split is meaningless for rsbuild). `vite-env-only` is kept: fixture app
+code imports `vite-env-only/macros`, and the adapter installs it in every
 materialized fixture.
 
 ## Commands
