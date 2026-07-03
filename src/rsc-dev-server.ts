@@ -24,26 +24,29 @@ type RscDevServerSetupOptions = {
   pluginName: string;
 };
 
-const shouldBypassRscDevRequest = (request: {
-  method?: string;
+/**
+ * Decides whether a dev-server request should skip the RSC request handler
+ * and fall through to the rest of the middleware chain.
+ *
+ * Only Rsbuild-internal endpoints (`/__rsbuild_*`, e.g. HMR web socket
+ * fallbacks) are bypassed. Everything else — any method, any pathname,
+ * with or without a file extension — is handled by the RSC server build,
+ * matching production where the RSC server handles every request.
+ *
+ * Static assets need no bypass here: the RSC middleware is registered via
+ * the callback returned from `server.setup`, which Rsbuild invokes only
+ * after its built-in middlewares (compiled assets, public dir) are
+ * registered. A request that reaches this middleware was already declined
+ * by static asset serving.
+ */
+export const shouldBypassRscDevRequest = (request: {
   url?: string;
 }): boolean => {
   if (!request.url) {
     return true;
   }
-  if (request.method !== 'GET' && request.method !== 'POST') {
-    return true;
-  }
-
-  const url = new URL(request.url, 'http://localhost');
-  const pathname = url.pathname;
-  if (pathname.startsWith('/__rsbuild_')) {
-    return true;
-  }
-  if (pathname.endsWith('.rsc') || pathname.endsWith('.manifest')) {
-    return false;
-  }
-  return pathname !== '/' && /\.[a-z0-9]+$/i.test(pathname);
+  const { pathname } = new URL(request.url, 'http://localhost');
+  return pathname.startsWith('/__rsbuild_');
 };
 
 export function createReactRouterRscDevServerSetup({
@@ -64,12 +67,21 @@ export function createReactRouterRscDevServerSetup({
       return handler(request);
     });
 
-    server.middlewares.use((req, res, next) => {
-      if (shouldBypassRscDevRequest(req)) {
-        next();
-        return;
-      }
-      Promise.resolve(listener(req, res)).catch(next);
-    });
+    // Register the RSC middleware in the callback returned from
+    // `server.setup`. Rsbuild runs middlewares registered synchronously in
+    // `setup` BEFORE its built-ins, but runs returned callbacks AFTER
+    // built-in middlewares (compiled assets, public dir) are registered.
+    // Registering here makes the RSC handler the fallback for every request
+    // that static asset serving did not handle — the same routing semantics
+    // as production, where the RSC server handles everything.
+    return () => {
+      server.middlewares.use((req, res, next) => {
+        if (shouldBypassRscDevRequest(req)) {
+          next();
+          return;
+        }
+        Promise.resolve(listener(req, res)).catch(next);
+      });
+    };
   };
 }
