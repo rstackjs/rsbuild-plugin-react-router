@@ -1,8 +1,34 @@
 import type { RsbuildPlugin } from '@rsbuild/core';
 import { getPackageVersion } from './plugin-utils.js';
+import type { Config } from './react-router-config.js';
 import type { PluginOptions } from './types.js';
 
 type RscPluginOptions = Exclude<NonNullable<PluginOptions['rsc']>, boolean>;
+
+// Mirrors upstream @react-router/dev's RSC-mode validateConfig: these
+// options have no effect in RSC framework mode, so reject them loudly
+// instead of silently dropping them.
+export const assertReactRouterRscConfigSupport = ({
+  pluginName,
+  userConfig,
+}: {
+  pluginName: string;
+  userConfig: Config;
+}): void => {
+  const unsupported: string[] = [];
+  if (userConfig.buildEnd) unsupported.push('buildEnd');
+  if (userConfig.presets?.length) unsupported.push('presets');
+  if (userConfig.serverBundles) unsupported.push('serverBundles');
+  if (userConfig.subResourceIntegrity) unsupported.push('subResourceIntegrity');
+  if (unsupported.length) {
+    throw new Error(
+      `[${pluginName}] RSC Framework Mode does not currently support the ` +
+        `following React Router config:\n${unsupported
+          .map(option => ` - ${option}`)
+          .join('\n')}\n`
+    );
+  }
+};
 
 const supportsReactRouterRsc = (version: string | undefined): boolean => {
   const match = version?.match(/^(\d+)\.(\d+)\./);

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import {
+  assertReactRouterRscConfigSupport,
   assertReactRouterRscSupport,
   createReactRouterRscResolveAliases,
   createReactRouterRscVirtualModules,
@@ -27,6 +28,7 @@ describe('RSC support helpers', () => {
 
   it('creates only RSC virtual modules with normalized bootstrap scripts', () => {
     const modules = createReactRouterRscVirtualModules({
+      allowedActionOrigins: ['https://app.example.com'],
       appDirectory: '/repo/app',
       basename: '/',
       buildDirectory: '/repo/build',
@@ -51,6 +53,31 @@ describe('RSC support helpers', () => {
     expect(
       modules['virtual/react-router/unstable_rsc/inject-hmr-runtime']
     ).toContain('rsc:update');
+    expect(
+      modules['virtual/react-router/unstable_rsc/allowed-action-origins']
+    ).toBe('export default ["https://app.example.com"];');
+  });
+
+  it('rejects config options RSC framework mode does not support', () => {
+    expect(() =>
+      assertReactRouterRscConfigSupport({
+        pluginName: 'test-plugin',
+        userConfig: {
+          buildEnd: async () => {},
+          serverBundles: () => 'bundle',
+          subResourceIntegrity: true,
+        },
+      })
+    ).toThrow(
+      /does not currently support[\s\S]*- buildEnd[\s\S]*- serverBundles[\s\S]*- subResourceIntegrity/
+    );
+
+    expect(() =>
+      assertReactRouterRscConfigSupport({
+        pluginName: 'test-plugin',
+        userConfig: { ssr: true, basename: '/app' },
+      })
+    ).not.toThrow();
   });
 
   it('rejects React Router versions before the RSC export surface', () => {

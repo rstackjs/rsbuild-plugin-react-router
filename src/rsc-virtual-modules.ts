@@ -12,11 +12,13 @@ const RSC_VIRTUAL_ALIAS_IDS = [
   'route-discovery',
   'inject-hmr-runtime',
   'basename',
+  'allowed-action-origins',
   'react-router-serve-config',
   'bootstrap-scripts',
 ] as const;
 
 type RscVirtualModulesOptions = {
+  allowedActionOrigins: string[] | undefined;
   appDirectory: string;
   basename: string;
   buildDirectory: string;
@@ -48,6 +50,7 @@ export const createReactRouterRscResolveAliases = (
 });
 
 export const createReactRouterRscVirtualModules = ({
+  allowedActionOrigins,
   appDirectory,
   basename,
   buildDirectory,
@@ -86,6 +89,9 @@ export const createReactRouterRscVirtualModules = ({
       : '',
     'virtual/react-router/unstable_rsc/basename': `export default ${JSON.stringify(
       basename
+    )};`,
+    'virtual/react-router/unstable_rsc/allowed-action-origins': `export default ${JSON.stringify(
+      allowedActionOrigins
     )};`,
     'virtual/react-router/unstable_rsc/react-router-serve-config': `export default ${JSON.stringify(
       {

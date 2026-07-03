@@ -82,6 +82,7 @@ export type ReactRouterModePlan = ClassicModePlan | RscModePlan;
 // Fields both mode planners need. Mode-specific inputs live on the
 // per-mode option types below so each planner owns only what it uses.
 type ModePlanContext = {
+  allowedActionOriginsForBuild: string[] | undefined;
   api: RsbuildPluginAPI;
   appDirectory: string;
   basename: string;
@@ -96,7 +97,6 @@ type ModePlanContext = {
 };
 
 type CreateClassicModePlanOptions = ModePlanContext & {
-  allowedActionOriginsForBuild: string[] | undefined;
   assetsBuildDirectory: string;
   defaultEntryName: string;
   entryServerPath: string;
@@ -139,6 +139,7 @@ const createReactRouterPackageAliases = (): Record<string, string> => {
 };
 
 const createRscModePlan = async ({
+  allowedActionOriginsForBuild,
   api,
   appDirectory,
   basename,
@@ -195,6 +196,7 @@ const createRscModePlan = async ({
     },
     createVirtualModules: (publicPath: string) =>
       createReactRouterRscVirtualModules({
+        allowedActionOrigins: allowedActionOriginsForBuild,
         appDirectory,
         basename,
         buildDirectory,

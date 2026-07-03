@@ -55,6 +55,7 @@ import {
   registerReactRouterDevBackgroundResources,
 } from './dev-background-resources.js';
 import {
+  assertReactRouterRscConfigSupport,
   assertReactRouterRscSupport,
   registerReactRouterRscRouteTransforms,
   setupReactRouterRscPlugin,
@@ -288,6 +289,10 @@ export const pluginReactRouter = (
       assertReactRouterRscSupport({
         pluginName: PLUGIN_NAME,
         resolvePackagePath: resolveAppPackagePath,
+      });
+      assertReactRouterRscConfigSupport({
+        pluginName: PLUGIN_NAME,
+        userConfig: reactRouterUserConfig,
       });
       await setupReactRouterRscPlugin({
         api,

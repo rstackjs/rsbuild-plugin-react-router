@@ -14,6 +14,7 @@ import {
 import routes from 'virtual/react-router/unstable_rsc/routes';
 import routeDiscovery from 'virtual/react-router/unstable_rsc/route-discovery';
 import basename from 'virtual/react-router/unstable_rsc/basename';
+import allowedActionOrigins from 'virtual/react-router/unstable_rsc/allowed-action-origins';
 import unstable_reactRouterServeConfig from 'virtual/react-router/unstable_rsc/react-router-serve-config';
 import bootstrapScripts from 'virtual/react-router/unstable_rsc/bootstrap-scripts';
 import { generateHTML } from './entry.rsc.ssr.js';
@@ -32,6 +33,7 @@ export function fetchServer(
   requestContext?: RouterContextProvider
 ): Promise<Response> {
   return matchRSCServerRequest({
+    allowedActionOrigins,
     basename,
     createTemporaryReferenceSet,
     decodeAction,
