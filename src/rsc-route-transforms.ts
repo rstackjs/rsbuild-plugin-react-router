@@ -86,14 +86,6 @@ type RscRouteExportPlan = {
   clientTargetFor(exportName: string): string;
 };
 
-const hasQuery = (resourceQuery: string | undefined, key: string): boolean =>
-  createResourceQueryParams(resourceQuery).has(key);
-
-const getQueryValue = (
-  resourceQuery: string | undefined,
-  key: string
-): string | null => createResourceQueryParams(resourceQuery).get(key);
-
 const createResourceQueryParams = (
   resourceQuery: string | undefined
 ): URLSearchParams =>
@@ -156,7 +148,8 @@ const resolveRscRouteTransformTarget = ({
   RscRouteTransformOptions,
   'resourceQuery' | 'isServerEnvironment'
 >): RscRouteTransformTarget => {
-  const clientRouteChunk = getQueryValue(resourceQuery, CLIENT_CHUNK_QUERY);
+  const params = createResourceQueryParams(resourceQuery);
+  const clientRouteChunk = params.get(CLIENT_CHUNK_QUERY);
   if (clientRouteChunk) {
     return {
       kind: 'client-route-module',
@@ -164,7 +157,7 @@ const resolveRscRouteTransformTarget = ({
     };
   }
 
-  if (hasQuery(resourceQuery, SERVER_MODULE_QUERY)) {
+  if (params.has(SERVER_MODULE_QUERY)) {
     return { kind: 'server-route-module' };
   }
 
@@ -206,20 +199,13 @@ const getRouteChunkValidation = (
   routeChunks: ReturnType<typeof getRouteChunks>
 ): Record<RouteChunkExportName, boolean> => {
   const exports = new Set(exportNames);
-  return {
-    clientAction:
-      !exports.has('clientAction') ||
-      routeChunks.hasRouteChunkByExportName.clientAction,
-    clientLoader:
-      !exports.has('clientLoader') ||
-      routeChunks.hasRouteChunkByExportName.clientLoader,
-    clientMiddleware:
-      !exports.has('clientMiddleware') ||
-      routeChunks.hasRouteChunkByExportName.clientMiddleware,
-    HydrateFallback:
-      !exports.has('HydrateFallback') ||
-      routeChunks.hasRouteChunkByExportName.HydrateFallback,
-  };
+  return Object.fromEntries(
+    routeChunkExportNames.map(exportName => [
+      exportName,
+      !exports.has(exportName) ||
+        routeChunks.hasRouteChunkByExportName[exportName],
+    ])
+  ) as Record<RouteChunkExportName, boolean>;
 };
 
 const validateRouteModuleExports = (exportNames: readonly string[]): void => {

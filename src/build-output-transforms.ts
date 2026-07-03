@@ -5,6 +5,8 @@ import { PLUGIN_NAME } from './constants.js';
 import {
   createReactRouterManifestOptions,
   getReactRouterManifestForDev,
+  type ReactRouterManifestForDev as ReactRouterManifest,
+  type RouteChunkManifestOptions,
   type RouteModuleAnalysisProvider,
   type ReactRouterManifestStats,
 } from './manifest.js';
@@ -19,10 +21,6 @@ import {
   type RouteModuleAnalysis,
 } from './export-utils.js';
 
-type ReactRouterManifest = Awaited<
-  ReturnType<typeof getReactRouterManifestForDev>
->;
-
 type RegisterBuildOutputTransformsOptions = {
   api: RsbuildPluginAPI;
   resolvedServerOutput: 'module' | 'commonjs';
@@ -36,7 +34,7 @@ type RegisterBuildOutputTransformsOptions = {
   getClientStats: () => ReactRouterManifestStats | undefined;
   appDirectory: string;
   getAssetPrefix: () => string;
-  routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
+  routeChunkOptions: RouteChunkManifestOptions | undefined;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
   routeTransformExecutor: RouteTransformExecutor;
   routeByFilePath: Map<string, Route>;

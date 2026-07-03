@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
@@ -10,7 +9,11 @@ import { relative, resolve } from 'pathe';
 import { getDefaultConcurrency } from './concurrency.js';
 import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
-import { findEntryFile, normalizeAssetPrefix } from './plugin-utils.js';
+import {
+  findEntryFile,
+  normalizeAssetPrefix,
+  resolveAppPackagePath,
+} from './plugin-utils.js';
 import { resolveReactRouterEntryPaths } from './entry-paths.js';
 import { registerReactRouterEnvironmentOutput } from './environment-output.js';
 import type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
@@ -23,9 +26,9 @@ import {
   type ResolvedReactRouterConfig,
 } from './react-router-config.js';
 import {
-  getReactRouterManifestForDev,
   configRoutesToRouteManifest,
   createReactRouterManifestStats,
+  type ReactRouterManifestForDev as ReactRouterManifest,
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
 } from './manifest.js';
@@ -62,15 +65,6 @@ export { resolveReactRouterServerBuild };
 export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
 
 const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
-const requireFromApp = createRequire(resolve(process.cwd(), 'package.json'));
-
-const resolveAppPackagePath = (specifier: string): string | undefined => {
-  try {
-    return requireFromApp.resolve(specifier);
-  } catch {
-    return undefined;
-  }
-};
 
 type ReactRouterPresetResolvedConfig = Parameters<
   NonNullable<
@@ -92,10 +86,7 @@ const cssUrlAssetExtensions =
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
 
-export const pluginReactRouter = (options: PluginOptions = {}): RsbuildPlugin =>
-  createReactRouterPlugin(options);
-
-const createReactRouterPlugin = (
+export const pluginReactRouter = (
   options: PluginOptions = {}
 ): RsbuildPlugin => ({
   name: PLUGIN_NAME,
@@ -302,10 +293,7 @@ const createReactRouterPlugin = (
         entryRscPath: finalEntryRscPath,
         entrySsrPath: finalEntryRscSsrPath,
         pluginName: PLUGIN_NAME,
-        rsc:
-          pluginOptions.rsc && pluginOptions.rsc !== true
-            ? pluginOptions.rsc
-            : true,
+        rsc: typeof pluginOptions.rsc === 'object' ? pluginOptions.rsc : {},
       });
     }
 
@@ -378,9 +366,6 @@ const createReactRouterPlugin = (
       routeRestartMarkerPath,
       onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
     });
-    type ReactRouterManifest = Awaited<
-      ReturnType<typeof getReactRouterManifestForDev>
-    >;
     let latestBrowserManifest: ReactRouterManifest | null = null;
     let latestBrowserManifestModuleExports: RouteManifestModuleExports = {};
     let latestServerManifest: ReactRouterManifest | null = null;
@@ -790,7 +775,7 @@ const createReactRouterPlugin = (
 
 export const pluginReactRouterRSC = (
   options: ReactRouterRSCPluginOptions = {}
-): RsbuildPlugin | RsbuildPlugin[] =>
+): RsbuildPlugin =>
   pluginReactRouter({
     ...options,
     rsc: options.rsc ?? true,

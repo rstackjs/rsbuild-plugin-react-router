@@ -1,28 +1,8 @@
-import { readFileSync } from 'node:fs';
 import type { RsbuildPlugin } from '@rsbuild/core';
+import { getPackageVersion } from './plugin-utils.js';
 import type { PluginOptions } from './types.js';
 
 type RscPluginOptions = Exclude<NonNullable<PluginOptions['rsc']>, boolean>;
-
-const getPackageVersion = (
-  packageName: string,
-  resolvePackagePath: (specifier: string) => string | undefined
-): string | undefined => {
-  const packageJsonPath = resolvePackagePath(`${packageName}/package.json`);
-  if (!packageJsonPath) {
-    return undefined;
-  }
-  try {
-    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
-      version?: unknown;
-    };
-    return typeof packageJson.version === 'string'
-      ? packageJson.version
-      : undefined;
-  } catch {
-    return undefined;
-  }
-};
 
 const supportsReactRouterRsc = (version: string | undefined): boolean => {
   const match = version?.match(/^(\d+)\.(\d+)\./);
@@ -74,7 +54,7 @@ export const setupReactRouterRscPlugin = async ({
   entryRscPath: string;
   entrySsrPath: string;
   pluginName: string;
-  rsc: true | RscPluginOptions;
+  rsc: RscPluginOptions;
 }): Promise<void> => {
   const { PLUGIN_RSC_NAME, pluginRSC } = await import('rsbuild-plugin-rsc');
   if (api.isPluginExists(PLUGIN_RSC_NAME)) {
@@ -85,9 +65,8 @@ export const setupReactRouterRscPlugin = async ({
     return;
   }
 
-  const userRscOptions: RscPluginOptions = rsc === true ? {} : rsc;
   await pluginRSC({
-    ...userRscOptions,
+    ...rsc,
     environments: {
       server: 'node',
       client: 'web',
@@ -95,7 +74,7 @@ export const setupReactRouterRscPlugin = async ({
     layers: {
       rsc: [entryRscPath],
       ssr: [entrySsrPath],
-      ...userRscOptions.layers,
+      ...rsc.layers,
     },
   }).setup(api);
 };

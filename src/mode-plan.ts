@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module';
 import type {
   RsbuildConfig,
   RsbuildEntryDescription,
@@ -15,6 +14,7 @@ import type {
 import type { RouteChunkCache, RouteChunkConfig } from './route-chunks.js';
 import type { PluginOptions, Route } from './types.js';
 import { createDevServerMiddleware } from './dev-server.js';
+import { resolveAppPackagePath } from './plugin-utils.js';
 import {
   createRouteTransformExecutor,
   shouldParallelizeRouteTransforms,
@@ -51,8 +51,8 @@ type CommonModePlan = {
   server: RsbuildConfig['server'] | undefined;
   setupMiddlewares: RsbuildDevSetupMiddlewares;
   webExternalsType: 'module' | undefined;
-  webOutput: Record<string, unknown>;
-  webOptimization: Record<string, unknown>;
+  webOutput: NonNullable<Rspack.Configuration['output']>;
+  webOptimization: NonNullable<Rspack.Configuration['optimization']>;
   nodeExternals: string[] | undefined;
   nodeDependencies: { dependencies?: string[] };
 };
@@ -115,16 +115,7 @@ type CreateReactRouterModePlanOptions = {
   ssr: boolean;
 };
 
-const requireFromApp = createRequire(resolve(process.cwd(), 'package.json'));
 const RSC_LAYERS = rspack.experiments.rsc.Layers;
-
-const resolveAppPackagePath = (specifier: string): string | undefined => {
-  try {
-    return requireFromApp.resolve(specifier);
-  } catch {
-    return undefined;
-  }
-};
 
 const createReactRouterPackageAliases = (): Record<string, string> => {
   const reactRouterPath = resolveAppPackagePath('react-router');
@@ -169,12 +160,11 @@ export const createReactRouterModePlan = async ({
   splitRouteModules,
   ssr,
 }: CreateReactRouterModePlanOptions): Promise<ReactRouterModePlan> => {
-  const rscServerEntryName = (serverBuildFile || 'index.js').replace(
-    /\.js$/,
-    ''
-  );
-
   if (isRscMode) {
+    const rscServerEntryName = (serverBuildFile || 'index.js').replace(
+      /\.js$/,
+      ''
+    );
     return {
       kind: 'rsc',
       routeChunkConfig: {
@@ -225,17 +215,17 @@ export const createReactRouterModePlan = async ({
       setupMiddlewares: [],
       webExternalsType: undefined,
       webOutput: {
-        chunkFormat: 'array-push' as const,
-        chunkLoading: 'jsonp' as const,
-        workerChunkLoading: 'import-scripts' as const,
-        wasmLoading: 'fetch' as const,
+        chunkFormat: 'array-push',
+        chunkLoading: 'jsonp',
+        workerChunkLoading: 'import-scripts',
+        wasmLoading: 'fetch',
         module: false,
       },
       webOptimization: {
-        mangleExports: false as const,
-        splitChunks: false as const,
-        usedExports: false as const,
-        runtimeChunk: false as const,
+        mangleExports: false,
+        splitChunks: false,
+        usedExports: false,
+        runtimeChunk: false,
       },
       nodeExternals: undefined,
       nodeDependencies: {},
@@ -337,16 +327,16 @@ export const createReactRouterModePlan = async ({
           ],
     webExternalsType: 'module',
     webOutput: {
-      chunkFormat: 'module' as const,
-      chunkLoading: 'import' as const,
-      workerChunkLoading: 'import' as const,
-      wasmLoading: 'fetch' as const,
-      library: { type: 'module' as const },
+      chunkFormat: 'module',
+      chunkLoading: 'import',
+      workerChunkLoading: 'import',
+      wasmLoading: 'fetch',
+      library: { type: 'module' },
       module: true,
     },
     webOptimization: {
-      avoidEntryIife: true as const,
-      runtimeChunk: 'single' as const,
+      avoidEntryIife: true,
+      runtimeChunk: 'single',
     },
     nodeExternals: Array.from(
       new Set(['express', ...getSsrExternals(process.cwd())])

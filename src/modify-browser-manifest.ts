@@ -5,8 +5,10 @@ import {
   createReactRouterManifestStats,
   generateReactRouterManifestForDev,
   getReactRouterManifestChunkNames,
-  getReactRouterManifestForDev,
   getReactRouterManifestPath,
+  type ReactRouterManifestForDev as ReactRouterManifest,
+  type RouteChunkManifestOptions,
+  type RouteManifestModuleExports,
   type RouteModuleAnalysisProvider,
 } from './manifest.js';
 import { combineURLs } from './plugin-utils.js';
@@ -40,11 +42,9 @@ type ModifyBrowserManifestOptions = {
   manifestChunkNames?: ReadonlySet<string>;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
   onManifest?: (
-    manifest: Awaited<ReturnType<typeof getReactRouterManifestForDev>>,
+    manifest: ReactRouterManifest,
     sri: Record<string, string> | true | undefined,
-    moduleExportsByRouteId: Awaited<
-      ReturnType<typeof generateReactRouterManifestForDev>
-    >['moduleExportsByRouteId'],
+    moduleExportsByRouteId: RouteManifestModuleExports,
     context: {
       compilation: Rspack.Compilation;
       manifestStats: ReturnType<typeof createReactRouterManifestStats>;
@@ -54,12 +54,6 @@ type ModifyBrowserManifestOptions = {
 
 type ProcessAssetsApi = Pick<RsbuildPluginAPI, 'processAssets'>;
 type AssetPrefixInput = string | (() => string);
-type ReactRouterManifest = Awaited<
-  ReturnType<typeof getReactRouterManifestForDev>
->;
-type RouteManifestModuleExports = Awaited<
-  ReturnType<typeof generateReactRouterManifestForDev>
->['moduleExportsByRouteId'];
 type GeneratedManifest = {
   manifest: ReactRouterManifest;
   moduleExportsByRouteId: RouteManifestModuleExports;
@@ -122,7 +116,7 @@ export function registerModifyBrowserManifestAssets(
   pluginOptions: PluginOptions,
   appDirectory: string,
   assetPrefix: AssetPrefixInput = '/',
-  routeChunkOptions?: Parameters<typeof getReactRouterManifestForDev>[5],
+  routeChunkOptions?: RouteChunkManifestOptions,
   options?: ModifyBrowserManifestOptions
 ): void {
   const getAssetPrefix =

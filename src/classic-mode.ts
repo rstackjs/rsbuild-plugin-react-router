@@ -192,21 +192,24 @@ export const createClassicVirtualModules = ({
   routesByServerBundleId,
   ssr,
 }: CreateClassicVirtualModulesOptions): Record<string, string> => {
+  const serverBuildOptions = {
+    entryServerPath,
+    assetsBuildDirectory,
+    basename,
+    appDirectory,
+    ssr,
+    federation,
+    future,
+    allowedActionOrigins,
+    prerender: prerenderPaths,
+    routeDiscovery,
+    publicPath,
+  };
   const bundleVirtualModules = Object.fromEntries(
     Object.entries(routesByServerBundleId).map(([bundleId, bundleRoutes]) => [
       `virtual/react-router/server-build-${bundleId}`,
       generateServerBuild(bundleRoutes, {
-        entryServerPath,
-        assetsBuildDirectory,
-        basename,
-        appDirectory,
-        ssr,
-        federation,
-        future,
-        allowedActionOrigins,
-        prerender: prerenderPaths,
-        routeDiscovery,
-        publicPath,
+        ...serverBuildOptions,
         serverManifestId: `virtual/react-router/server-manifest-${bundleId}`,
       }),
     ])
@@ -226,19 +229,10 @@ export const createClassicVirtualModules = ({
   return {
     'virtual/react-router/browser-manifest': 'export default {};',
     'virtual/react-router/server-manifest': 'export default {};',
-    'virtual/react-router/server-build': generateServerBuild(routes, {
-      entryServerPath,
-      assetsBuildDirectory,
-      basename,
-      appDirectory,
-      ssr,
-      federation,
-      future,
-      allowedActionOrigins,
-      prerender: prerenderPaths,
-      routeDiscovery,
-      publicPath,
-    }),
+    'virtual/react-router/server-build': generateServerBuild(
+      routes,
+      serverBuildOptions
+    ),
     ...bundleVirtualModules,
     ...bundleManifestModules,
     'virtual/react-router/with-props': generateWithProps(),

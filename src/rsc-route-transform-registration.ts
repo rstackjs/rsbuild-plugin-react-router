@@ -18,6 +18,23 @@ type RscRouteTransformProfiler = {
 const mdxRoutePattern = /\.mdx?$/i;
 const RSC_ROUTE_TRANSFORM_LOADER = 'react-router-rsc-route-transform';
 
+// Structural types for the compiler surface the transform plugin touches.
+// Rspack's own types do not expose the `childCompiler` compilation hook or
+// the custom property the loader reads, so we describe just what we use.
+type RscTransformCarrier<Transform> = {
+  __reactRouterRscRouteTransform?: Transform;
+};
+type TapHook<Value> = {
+  tap(name: string, handler: (value: Value) => void): void;
+};
+type RscTransformCompiler<Transform> = RscTransformCarrier<Transform> & {
+  hooks: {
+    thisCompilation: TapHook<{
+      hooks: { childCompiler: TapHook<RscTransformCarrier<Transform>> };
+    }>;
+  };
+};
+
 const getRscRouteTransformLoaderPath = (): string =>
   join(
     dirname(fileURLToPath(import.meta.url)),
@@ -84,28 +101,7 @@ export const registerReactRouterRscRouteTransforms = ({
 
     chain.plugin(`${RSC_ROUTE_TRANSFORM_LOADER}-${environment.name}`).use(
       class ReactRouterRscRouteTransformPlugin {
-        apply(compiler: {
-          __reactRouterRscRouteTransform?: typeof transformRoute;
-          hooks: {
-            thisCompilation: {
-              tap(
-                name: string,
-                handler: (compilation: {
-                  hooks: {
-                    childCompiler: {
-                      tap(
-                        name: string,
-                        handler: (childCompiler: {
-                          __reactRouterRscRouteTransform?: typeof transformRoute;
-                        }) => void
-                      ): void;
-                    };
-                  };
-                }) => void
-              ): void;
-            };
-          };
-        }) {
+        apply(compiler: RscTransformCompiler<typeof transformRoute>) {
           compiler.__reactRouterRscRouteTransform = transformRoute;
           compiler.hooks.thisCompilation.tap(
             RSC_ROUTE_TRANSFORM_LOADER,

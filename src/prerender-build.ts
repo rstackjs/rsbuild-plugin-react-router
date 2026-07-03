@@ -15,8 +15,9 @@ import { getBuildManifest } from './build-manifest.js';
 import {
   createReactRouterManifestOptions,
   generateReactRouterManifestForDev,
-  getReactRouterManifestForDev,
+  type ReactRouterManifestForDev as ReactRouterManifest,
   type ReactRouterManifestStats,
+  type RouteChunkManifestOptions,
   type RouteModuleAnalysisProvider,
   type RouteManifestModuleExports,
 } from './manifest.js';
@@ -33,10 +34,6 @@ import type {
 import { resolveServerBuildModule } from './server-utils.js';
 import type { PluginOptions, Route } from './types.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-
-type ReactRouterManifest = Awaited<
-  ReturnType<typeof getReactRouterManifestForDev>
->;
 
 type BuildRouteModule = {
   loader?: unknown;
@@ -75,7 +72,7 @@ type RunReactRouterPrerenderBuildOptions = {
   pluginOptions: PluginOptions;
   appDirectory: string;
   assetPrefix: string;
-  routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
+  routeChunkOptions: RouteChunkManifestOptions | undefined;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
   buildManifest: Awaited<ReturnType<typeof getBuildManifest>>;
   resolvedConfigWithRoutes: ResolvedReactRouterConfig;

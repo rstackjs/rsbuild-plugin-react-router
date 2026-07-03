@@ -2,14 +2,12 @@ import type {
   BuildManifest as ReactRouterBuildManifest,
   Config as ReactRouterConfig,
 } from '@react-router/dev/config';
-import { createRequire } from 'node:module';
 import type { NormalizedConfig } from '@rsbuild/core';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-
-const require = createRequire(import.meta.url);
+import { getPackageVersion } from './plugin-utils.js';
 
 export type BuildEndHook = {
   bivarianceHack(args: {
@@ -71,18 +69,8 @@ type ResolveReactRouterConfigResult = {
   hasConfiguredServerModuleFormat: boolean;
 };
 
-const getInstalledReactRouterVersion = (): string | undefined => {
-  try {
-    return (
-      require('react-router/package.json') as { version?: string | undefined }
-    ).version;
-  } catch {
-    return undefined;
-  }
-};
-
 export const getDefaultTrailingSlashAwareDataRequests = (
-  reactRouterVersion: string | undefined = getInstalledReactRouterVersion()
+  reactRouterVersion: string | undefined = getPackageVersion('react-router')
 ): boolean => {
   const major = Number(reactRouterVersion?.split('.')[0]);
   return Number.isInteger(major) && major >= 8;
