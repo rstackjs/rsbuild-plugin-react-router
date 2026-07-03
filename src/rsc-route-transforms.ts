@@ -76,6 +76,16 @@ type RscRouteTransformTarget =
   | { kind: 'server-route-entry' }
   | { kind: 'client-route-entry' };
 
+type RscRouteExportPlan = {
+  exportNames: readonly string[];
+  exportNameSet: ReadonlySet<string>;
+  routeChunks: ReturnType<typeof getRouteChunks>;
+  sharedClientTarget: string;
+  serverTarget: string;
+  needsDefaultRootErrorBoundary: boolean;
+  clientTargetFor(exportName: string): string;
+};
+
 const hasQuery = (resourceQuery: string | undefined, key: string): boolean =>
   createResourceQueryParams(resourceQuery).has(key);
 
@@ -233,38 +243,72 @@ const validateRouteModuleExports = (exportNames: readonly string[]): void => {
   }
 };
 
-const createClientRouteEntry = async ({
-  code,
-  resourcePath,
-  resourceQuery,
-  isRootRoute,
-  routeId,
-  routeChunkCache,
-  routeChunkConfig,
-}: RscRouteTransformOptions): Promise<RscRouteTransformResult> => {
-  const exportNames = await getExportNames(code);
-  validateRouteModuleExports(exportNames);
-  const routeChunks = getRouteChunks({
-    code,
-    resourcePath,
-    isRootRoute,
-    routeChunkCache,
-  });
-  let needsReactImport = false;
+const createRscRouteExportPlan = async (
+  options: RscRouteTransformOptions
+): Promise<RscRouteExportPlan> => {
+  const exportNames = await getExportNames(options.code);
+  const exportNameSet = new Set(exportNames);
+  const routeChunks = getRouteChunks(options);
+  const sharedClientTarget = createClientRouteModuleId(
+    options.resourcePath,
+    options.resourceQuery,
+    'shared'
+  );
+  const serverTarget = createServerRouteModuleId(
+    options.resourcePath,
+    options.resourceQuery
+  );
 
-  const reexports = exportNames
-    .filter(exportName => !isServerRouteExport(exportName))
-    .map(exportName => {
+  return {
+    exportNames,
+    exportNameSet,
+    routeChunks,
+    sharedClientTarget,
+    serverTarget,
+    needsDefaultRootErrorBoundary:
+      options.isRootRoute &&
+      !exportNameSet.has('ErrorBoundary') &&
+      !exportNameSet.has('ServerErrorBoundary'),
+    clientTargetFor(exportName) {
       const chunkName = routeChunks.hasRouteChunkByExportName[
         exportName as RouteChunkExportName
       ]
         ? exportName
         : 'shared';
-      const target = createClientRouteModuleId(
-        resourcePath,
-        resourceQuery,
+      return createClientRouteModuleId(
+        options.resourcePath,
+        options.resourceQuery,
         chunkName
       );
+    },
+  };
+};
+
+const validateRscRouteExportPlan = (
+  plan: RscRouteExportPlan,
+  options: RscRouteTransformOptions
+): void => {
+  validateRouteModuleExports(plan.exportNames);
+  if (shouldSplitRouteModules(options)) {
+    validateRouteChunks({
+      config: options.routeChunkConfig,
+      id: options.routeId,
+      valid: getRouteChunkValidation(plan.exportNames, plan.routeChunks),
+    });
+  }
+};
+
+const createClientRouteEntry = async (
+  options: RscRouteTransformOptions
+): Promise<RscRouteTransformResult> => {
+  const plan = await createRscRouteExportPlan(options);
+  validateRscRouteExportPlan(plan, options);
+  let needsReactImport = false;
+
+  const reexports = plan.exportNames
+    .filter(exportName => !isServerRouteExport(exportName))
+    .map(exportName => {
+      const target = plan.clientTargetFor(exportName);
       if (exportName === 'HydrateFallback') {
         needsReactImport = true;
         return `export const HydrateFallback = React.lazy(() => import(${JSON.stringify(
@@ -283,14 +327,6 @@ const createClientRouteEntry = async ({
       return createReexport(exportName, target);
     });
 
-  if (shouldSplitRouteModules({ isRootRoute, routeChunkConfig })) {
-    validateRouteChunks({
-      config: routeChunkConfig,
-      id: routeId,
-      valid: getRouteChunkValidation(exportNames, routeChunks),
-    });
-  }
-
   return {
     code: `"use client";\n${
       needsReactImport ? 'import * as React from "react";\n' : ''
@@ -299,57 +335,24 @@ const createClientRouteEntry = async ({
   };
 };
 
-const createServerRouteEntry = async ({
-  code,
-  resourcePath,
-  resourceQuery,
-  isRootRoute,
-  routeId,
-  routeChunkCache,
-  routeChunkConfig,
-}: RscRouteTransformOptions): Promise<RscRouteTransformResult> => {
-  const exportNames = await getExportNames(code);
-  validateRouteModuleExports(exportNames);
-  const routeChunks = getRouteChunks({
-    code,
-    resourcePath,
-    isRootRoute,
-    routeChunkCache,
-  });
-
-  const clientTarget = createClientRouteModuleId(
-    resourcePath,
-    resourceQuery,
-    'shared'
-  );
-  const serverTarget = createServerRouteModuleId(resourcePath, resourceQuery);
+const createServerRouteEntry = async (
+  options: RscRouteTransformOptions
+): Promise<RscRouteTransformResult> => {
+  const plan = await createRscRouteExportPlan(options);
+  validateRscRouteExportPlan(plan, options);
   const lines: string[] = [];
   let needsReactImport = false;
-  const needsDefaultRootErrorBoundary =
-    isRootRoute &&
-    !exportNames.includes('ErrorBoundary') &&
-    !exportNames.includes('ServerErrorBoundary');
 
-  for (const exportName of exportNames) {
+  for (const exportName of plan.exportNames) {
     if (isClientRouteExport(exportName)) {
-      const chunkName = routeChunks.hasRouteChunkByExportName[
-        exportName as RouteChunkExportName
-      ]
-        ? exportName
-        : 'shared';
-      const target = createClientRouteModuleId(
-        resourcePath,
-        resourceQuery,
-        chunkName
-      );
-      lines.push(createReexport(exportName, target));
+      lines.push(createReexport(exportName, plan.clientTargetFor(exportName)));
       continue;
     }
     if (isServerComponentExport(exportName)) {
       needsReactImport = true;
       lines.push(
         `import { ${exportName} as ${exportName}WithoutClientChunk } from ${JSON.stringify(
-          serverTarget
+          plan.serverTarget
         )};`
       );
       lines.push(`export function ${exportName}(props) {`);
@@ -364,26 +367,18 @@ const createServerRouteEntry = async ({
       lines.push('}');
       continue;
     }
-    lines.push(createReexport(exportName, serverTarget));
+    lines.push(createReexport(exportName, plan.serverTarget));
   }
 
-  if (needsDefaultRootErrorBoundary) {
+  if (plan.needsDefaultRootErrorBoundary) {
     lines.push(
-      `export { ErrorBoundary } from ${JSON.stringify(clientTarget)};`
+      `export { ErrorBoundary } from ${JSON.stringify(plan.sharedClientTarget)};`
     );
-  }
-
-  if (shouldSplitRouteModules({ isRootRoute, routeChunkConfig })) {
-    validateRouteChunks({
-      config: routeChunkConfig,
-      id: routeId,
-      valid: getRouteChunkValidation(exportNames, routeChunks),
-    });
   }
 
   const prefix = needsReactImport
     ? `import * as React from "react";\nimport { EnsureClientRouteModuleForHMR___ } from ${JSON.stringify(
-        clientTarget
+        plan.sharedClientTarget
       )};\n`
     : '';
   return {
@@ -399,14 +394,13 @@ const createClientRouteModule = async (
   options: RscRouteTransformOptions
 ): Promise<RscRouteTransformResult> => {
   const ast = parse(code, { sourceType: 'module' });
-  const exportNames = new Set(await getExportNames(code));
-  const routeChunks = getRouteChunks(options);
+  const plan = await createRscRouteExportPlan(options);
   const exportsToRemove =
     clientRouteChunk === 'shared'
-      ? [...SERVER_ROUTE_EXPORTS, ...routeChunks.chunkedExports]
+      ? [...SERVER_ROUTE_EXPORTS, ...plan.routeChunks.chunkedExports]
       : [
           ...SERVER_ROUTE_EXPORTS,
-          ...Array.from(exportNames).filter(
+          ...plan.exportNames.filter(
             exportName => exportName !== clientRouteChunk
           ),
         ];
@@ -421,14 +415,10 @@ const createClientRouteModule = async (
   });
   let clientModuleCode = `"use client";\n${generated.code}`;
 
-  if (
-    clientRouteChunk === 'shared' &&
-    options.isRootRoute &&
-    !exportNames.has('ErrorBoundary') &&
-    !exportNames.has('ServerErrorBoundary')
-  ) {
+  if (clientRouteChunk === 'shared' && plan.needsDefaultRootErrorBoundary) {
     const hasRootLayout =
-      exportNames.has('Layout') || exportNames.has('ServerLayout');
+      plan.exportNameSet.has('Layout') ||
+      plan.exportNameSet.has('ServerLayout');
     clientModuleCode += `\nimport { createElement as __rr_createElement } from "react";\n`;
     clientModuleCode += `export function ErrorBoundary() {\n`;
     clientModuleCode += `  return __rr_createElement(${JSON.stringify(

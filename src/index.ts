@@ -3,20 +3,13 @@ import { createRequire } from 'node:module';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import {
-  rspack,
-  type RsbuildEntryDescription,
-  type RsbuildConfig,
-  type RsbuildPlugin,
-  type Rspack,
-} from '@rsbuild/core';
+import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
 import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
-import { createDevServerMiddleware } from './dev-server.js';
 import { findEntryFile, normalizeAssetPrefix } from './plugin-utils.js';
 import { resolveReactRouterEntryPaths } from './entry-paths.js';
 import { registerReactRouterEnvironmentOutput } from './environment-output.js';
@@ -39,17 +32,11 @@ import {
 import type { RouteModuleAnalysis } from './export-utils.js';
 import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
 import { registerBuildOutputTransforms } from './build-output-transforms.js';
-import { type RouteChunkCache, type RouteChunkConfig } from './route-chunks.js';
-import {
-  createRouteTransformExecutor,
-  shouldParallelizeRouteTransforms,
-} from './parallel-route-transforms.js';
+import { type RouteChunkCache } from './route-chunks.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
-import { createReactRouterNodeEntries } from './server-build-plan.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
-import { getSsrExternals } from './ssr-externals.js';
 import {
   createReactRouterPerformanceProfiler,
   roundMs,
@@ -64,18 +51,11 @@ import {
   registerReactRouterDevBackgroundResources,
 } from './dev-background-resources.js';
 import {
-  createClassicBuildArtifacts,
-  createClassicVirtualModules,
-  createClassicWebRouteEntries,
-} from './classic-mode.js';
-import {
   assertReactRouterRscSupport,
-  createReactRouterRscDevServerSetup,
-  createReactRouterRscResolveAliases,
-  createReactRouterRscVirtualModules,
   registerReactRouterRscRouteTransforms,
   setupReactRouterRscPlugin,
 } from './rsc-support.js';
+import { createReactRouterModePlan } from './mode-plan.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -92,27 +72,11 @@ const resolveAppPackagePath = (specifier: string): string | undefined => {
   }
 };
 
-const createReactRouterPackageAliases = (): Record<string, string> => {
-  const reactRouterPath = resolveAppPackagePath('react-router');
-  const reactRouterDomPath = resolveAppPackagePath('react-router/dom');
-  return {
-    ...(reactRouterPath ? { 'react-router$': reactRouterPath } : {}),
-    ...(reactRouterDomPath ? { 'react-router/dom$': reactRouterDomPath } : {}),
-  };
-};
-
 type ReactRouterPresetResolvedConfig = Parameters<
   NonNullable<
     NonNullable<Config['presets']>[number]['reactRouterConfigResolved']
   >
 >[0]['reactRouterConfig'];
-type RsbuildDevSetupMiddlewares = NonNullable<
-  NonNullable<RsbuildConfig['dev']>['setupMiddlewares']
->;
-type RsbuildDevSetupMiddleware = Extract<
-  RsbuildDevSetupMiddlewares,
-  unknown[]
->[number];
 
 export const shouldParallelizeEnvironmentBuilds = ({
   isBuild,
@@ -130,8 +94,6 @@ const urlAssetResourceQuery =
 
 export const pluginReactRouter = (options: PluginOptions = {}): RsbuildPlugin =>
   createReactRouterPlugin(options);
-
-const RSC_LAYERS = rspack.experiments.rsc.Layers;
 
 const createReactRouterPlugin = (
   options: PluginOptions = {}
@@ -157,10 +119,6 @@ const createReactRouterPlugin = (
       enabled: logPerformance,
       log: message => api.logger.info(message),
     });
-    const nodeExternals = Array.from(
-      new Set(['express', ...getSsrExternals(process.cwd())])
-    );
-
     let assetPrefix = '/';
 
     // Best-effort configuration validation (upstream: validate-plugin-order).
@@ -435,193 +393,43 @@ const createReactRouterPlugin = (
         route,
       ])
     );
-    const rscServerEntryName = (serverBuildFile || 'index.js').replace(
-      /\.js$/,
-      ''
-    );
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
 
-    const modePlan = isRscMode
-      ? {
-          kind: 'rsc' as const,
-          routeChunkConfig: {
-            splitRouteModules: false,
-            appDirectory,
-            rootRouteFile,
-          } satisfies RouteChunkConfig,
-          routeTransformExecutor: undefined,
-          routeChunkOptions: undefined,
-          manifestChunkNames: new Set<string>(['index']),
-          webEntries: {
-            index: {
-              import: finalEntryRscClientPath,
-              html: false,
-            },
-          } satisfies Record<string, RsbuildEntryDescription>,
-          nodeEntries: {
-            [rscServerEntryName]: {
-              import: finalEntryRscPath,
-              layer: RSC_LAYERS.rsc,
-            },
-          } satisfies Record<string, RsbuildEntryDescription>,
-          createVirtualModules: (publicPath: string) =>
-            createReactRouterRscVirtualModules({
-              appDirectory,
-              basename,
-              buildDirectory,
-              isBuild,
-              outputClientPath,
-              publicPath,
-              routeDiscovery,
-              routes,
-              ssr,
-            }),
-          createResolveConfig: (rootPath: string) => ({
-            modules: [resolve(rootPath, 'node_modules'), 'node_modules'],
-            alias: createReactRouterRscResolveAliases(rootPath),
-          }),
-          server:
-            !pluginOptions.customServer && ssr
-              ? {
-                  setup: createReactRouterRscDevServerSetup({
-                    entryName: rscServerEntryName,
-                    pluginName: PLUGIN_NAME,
-                  }),
-                }
-              : undefined,
-          setupMiddlewares: [],
-          webExternalsType: undefined,
-          webOutput: {
-            chunkFormat: 'array-push' as const,
-            chunkLoading: 'jsonp' as const,
-            workerChunkLoading: 'import-scripts' as const,
-            wasmLoading: 'fetch' as const,
-            module: false,
-          },
-          webOptimization: {
-            mangleExports: false as const,
-            splitChunks: false as const,
-            usedExports: false as const,
-            runtimeChunk: false as const,
-          },
-          nodeExternals: undefined,
-          nodeDependencies: {},
-        }
-      : await (async () => {
-          const routeChunkConfig: RouteChunkConfig = {
-            splitRouteModules,
-            appDirectory,
-            rootRouteFile,
-          };
-          const routeTransformExecutor = createRouteTransformExecutor({
-            parallelRouteTransform:
-              pluginOptions.parallelRouteTransform ??
-              shouldParallelizeRouteTransforms(routeCount),
-            routeChunkCache,
-            splitRouteModules: Boolean(splitRouteModules),
-            isBuild,
-          });
-          const routeChunkOptions = {
-            splitRouteModules,
-            rootRouteFile,
-            isBuild,
-            cache: routeChunkCache,
-          };
-          const { manifestChunkNames, webRouteEntries } =
-            createClassicWebRouteEntries({
-              appDirectory,
-              isBuild,
-              routes,
-              splitRouteModules: Boolean(splitRouteModules),
-            });
-          const artifacts = await createClassicBuildArtifacts({
-            api,
-            defaultEntryName: devServerBuildEntryName,
-            isBuild,
-            prerenderConfig,
-            reactRouterConfig: resolvedConfigWithRoutes,
-            routeConfig,
-            routes,
-            rootDirectory: process.cwd(),
-            ssr,
-          });
-          const reactRouterAliases = createReactRouterPackageAliases();
-          return {
-            kind: 'classic' as const,
-            artifacts,
-            routeChunkConfig,
-            routeTransformExecutor,
-            routeChunkOptions,
-            manifestChunkNames,
-            webEntries: {
-              'entry.client': finalEntryClientPath,
-              'virtual/react-router/browser-manifest': {
-                import: 'virtual/react-router/browser-manifest',
-                html: false,
-              },
-              ...webRouteEntries,
-            } satisfies Record<string, string | RsbuildEntryDescription>,
-            nodeEntries: createReactRouterNodeEntries({
-              hasServerApp,
-              isBuild,
-              serverAppPath,
-              entryServerPath: finalEntryServerPath,
-              defaultEntryName: devServerBuildEntryName,
-              serverBundleEntries: artifacts.serverBundleEntries,
-            }),
-            createVirtualModules: (publicPath: string) =>
-              createClassicVirtualModules({
-                allowedActionOrigins: allowedActionOriginsForBuild,
-                appDirectory,
-                assetsBuildDirectory,
-                basename,
-                entryServerPath: finalEntryServerPath,
-                federation: options.federation,
-                future,
-                prerenderPaths: artifacts.prerenderPaths,
-                publicPath,
-                routeDiscovery,
-                routes,
-                routesByServerBundleId: artifacts.routesByServerBundleId,
-                ssr,
-              }),
-            createResolveConfig: () =>
-              Object.keys(reactRouterAliases).length > 0
-                ? { alias: reactRouterAliases }
-                : undefined,
-            server: undefined,
-            setupMiddlewares:
-              pluginOptions.customServer || !ssr
-                ? []
-                : [
-                    (middlewares: Parameters<RsbuildDevSetupMiddleware>[0]) => {
-                      middlewares.push(
-                        createDevServerMiddleware({
-                          loadBuild: artifacts.devRuntime.createBuildLoader(),
-                        })
-                      );
-                    },
-                  ],
-            webExternalsType: 'module' as const,
-            webOutput: {
-              chunkFormat: 'module' as const,
-              chunkLoading: 'import' as const,
-              workerChunkLoading: 'import' as const,
-              wasmLoading: 'fetch' as const,
-              library: { type: 'module' as const },
-              module: true,
-            },
-            webOptimization: {
-              avoidEntryIife: true as const,
-              runtimeChunk: 'single' as const,
-            },
-            nodeExternals,
-            nodeDependencies: shouldDependOnWebCompiler
-              ? { dependencies: ['web'] }
-              : {},
-          };
-        })();
+    const modePlan = await createReactRouterModePlan({
+      api,
+      allowedActionOriginsForBuild,
+      appDirectory,
+      assetsBuildDirectory,
+      basename,
+      buildDirectory,
+      defaultEntryName: devServerBuildEntryName,
+      entryServerPath: finalEntryServerPath,
+      federation: options.federation,
+      finalEntryClientPath,
+      finalEntryRscClientPath,
+      finalEntryRscPath,
+      future,
+      hasServerApp,
+      isBuild,
+      isRscMode,
+      outputClientPath,
+      pluginName: PLUGIN_NAME,
+      pluginOptions,
+      prerenderConfig,
+      reactRouterConfig: resolvedConfigWithRoutes,
+      routeChunkCache,
+      routeConfig,
+      routeCount,
+      routeDiscovery,
+      routes,
+      rootRouteFile,
+      serverAppPath,
+      serverBuildFile,
+      shouldDependOnWebCompiler,
+      splitRouteModules,
+      ssr,
+    });
 
     const { manifestChunkNames } = modePlan;
 

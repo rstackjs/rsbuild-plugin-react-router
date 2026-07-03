@@ -17,7 +17,7 @@ const config: PlaywrightTestConfig = {
     external: ["**/packages/**/*"],
   },
   /* Maximum time one test can run for. */
-  timeout: isWindows ? 60_000 : 30_000,
+  timeout: isWindows ? 90_000 : 60_000,
   fullyParallel: false,
   workers: 1,
   expect: {

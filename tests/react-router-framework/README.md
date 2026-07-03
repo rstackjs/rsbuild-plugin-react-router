@@ -9,8 +9,32 @@ to exercise `rsbuild-plugin-react-router`.
 - `react-router-dev/__tests__/` is copied from
   `/home/zack/projects/react-router/packages/react-router-dev/__tests__`.
 
-Keep upstream test files as close to source as practical so the suite can be
-refreshed by copying those folders again.
+Refresh the corpus with the managed sync script instead of hand-copying files:
+
+```sh
+REACT_ROUTER_REPO=/path/to/react-router pnpm sync:react-router-framework-tests
+```
+
+The script copies the upstream test directories, preserves the Rsbuild adapter
+overlay listed below, and normalizes upstream `workspace:*` / `catalog:`
+dependency protocols to package versions that can install outside the React
+Router monorepo.
+
+To re-apply only dependency protocol normalization to the checked-in corpus:
+
+```sh
+pnpm sync:react-router-framework-tests -- --normalize-only
+```
+
+Adapter-owned files preserved by the sync:
+
+- `README.md`
+- `integration/helpers/rsbuild-adapter.ts`
+- `integration/helpers/create-fixture.ts`
+- `integration/helpers/express.ts`
+- `integration/helpers/fixtures.ts`
+- `integration/helpers/vite.ts`
+- `integration/playwright.config.ts`
 
 ## Rsbuild Adapter
 

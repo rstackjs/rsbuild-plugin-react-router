@@ -80,6 +80,7 @@
     "test:package-interop": "node scripts/test-package-interop.mts",
     "test:react-router-framework": "pnpm build && playwright test --config tests/react-router-framework/integration/playwright.config.ts",
     "test:react-router-framework:smoke": "pnpm build && playwright test --config tests/react-router-framework/integration/playwright.config.ts use-route-test.ts loader-test.ts",
+    "sync:react-router-framework-tests": "node scripts/sync-react-router-framework-tests.mjs",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\"",
     "changeset": "changeset",
