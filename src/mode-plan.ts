@@ -87,6 +87,7 @@ type ModePlanContext = {
   appDirectory: string;
   basename: string;
   customServer: boolean;
+  splitRouteModules: Config['splitRouteModules'];
   isBuild: boolean;
   prerenderConfig: Config['prerender'];
   routeConfig: RouteConfigEntry[];
@@ -110,7 +111,6 @@ type CreateClassicModePlanOptions = ModePlanContext & {
   routeCount: number;
   serverAppPath: string;
   shouldDependOnWebCompiler: boolean;
-  splitRouteModules: Config['splitRouteModules'];
 };
 
 type CreateRscModePlanOptions = ModePlanContext & {
@@ -156,6 +156,7 @@ const createRscModePlan = async ({
   routes,
   rootRouteFile,
   serverBuildFile,
+  splitRouteModules,
   ssr,
 }: CreateRscModePlanOptions): Promise<RscModePlan> => {
   const rscServerEntryName = (serverBuildFile || 'index.js').replace(
@@ -174,8 +175,10 @@ const createRscModePlan = async ({
   return {
     kind: 'rsc',
     prerenderPaths,
+    // RSC route chunking is content-detected; the config value only gates
+    // 'enforce' validation, matching upstream's RSC vite plugin.
     routeChunkConfig: {
-      splitRouteModules: false,
+      splitRouteModules,
       appDirectory,
       rootRouteFile,
     },
