@@ -19,6 +19,7 @@ import {
   createRouteTransformExecutor,
   shouldParallelizeRouteTransforms,
 } from './parallel-route-transforms.js';
+import { resolvePrerenderPaths } from './prerender.js';
 import { createReactRouterNodeEntries } from './server-build-plan.js';
 import { getSsrExternals } from './ssr-externals.js';
 import {
@@ -71,6 +72,7 @@ export type ClassicModePlan = CommonModePlan & {
 
 export type RscModePlan = CommonModePlan & {
   kind: 'rsc';
+  prerenderPaths: string[];
   routeTransformExecutor: undefined;
   routeChunkOptions: undefined;
 };
@@ -165,8 +167,18 @@ export const createReactRouterModePlan = async ({
       /\.js$/,
       ''
     );
+    const prerenderPaths = await resolvePrerenderPaths(
+      prerenderConfig,
+      ssr,
+      routeConfig,
+      {
+        logWarning: true,
+        warn: message => api.logger.warn(message),
+      }
+    );
     return {
       kind: 'rsc',
+      prerenderPaths,
       routeChunkConfig: {
         splitRouteModules: false,
         appDirectory,

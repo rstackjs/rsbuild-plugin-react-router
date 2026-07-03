@@ -20,6 +20,7 @@ import type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
 import { resolveReactRouterServerBuild } from './server-utils.js';
 import { validatePrerenderConfig } from './prerender.js';
 import { runReactRouterPrerenderBuild } from './prerender-build.js';
+import { runReactRouterRscPrerenderBuild } from './rsc-prerender.js';
 import {
   resolveReactRouterConfig,
   resolveRouteDiscoveryConfig,
@@ -539,6 +540,23 @@ export const pluginReactRouter = (
               buildManifest: modePlan.artifacts.buildManifest,
               resolvedConfigWithRoutes,
               buildEnd,
+            })
+          )
+        )
+      );
+    } else {
+      api.onAfterBuild(({ environments }) =>
+        runPluginEffect(
+          tryPluginPromise(() =>
+            runReactRouterRscPrerenderBuild({
+              api,
+              hasWebEnvironment: Boolean(environments.web),
+              buildDirectory,
+              serverBuildFile,
+              ssr,
+              prerenderConfig,
+              prerenderPaths: modePlan.prerenderPaths,
+              basename,
             })
           )
         )
