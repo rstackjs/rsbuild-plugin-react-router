@@ -495,8 +495,10 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
                     }
                   : {}),
               },
-              readyEnvironments:
-                benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
+              // SPA dev route serving goes through the node server build
+              // (the dev middleware renders the SPA shell from it), so wait
+              // for both environments before fetching routes.
+              readyEnvironments: ['web', 'node'],
               origin: `http://localhost:${devPort}`,
               routePaths: devRoutePaths,
               routeTimeoutMs: args.devRouteTimeoutMs,
@@ -592,8 +594,8 @@ const runBenchmark = ({
   Effect.gen(function* () {
     const measuredIterations = getMeasuredIterationCount(benchmark, args);
     const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
-    // Profile entries can pin dev-route behavior (e.g. `devRoutes: 'none'`
-    // for SPA fixtures, which serve no HTML document per route in dev).
+    // Profile entries can pin dev-route behavior (`devRoutes: 'none'` skips
+    // per-route fetches for a fixture).
     const devRoutesValue = benchmark.devRoutes ?? args.devRoutes;
     const devRoutePaths =
       args.mode === 'dev'
