@@ -36,10 +36,8 @@ const CLIENT_ROUTE_EXPORTS = [
   ...RSC_CLIENT_COMPONENT_EXPORTS,
 ] as const;
 
-const SERVER_COMPONENT_EXPORTS = RSC_SERVER_COMPONENT_EXPORTS;
-
 const SERVER_ROUTE_EXPORTS = [
-  ...SERVER_COMPONENT_EXPORTS,
+  ...RSC_SERVER_COMPONENT_EXPORTS,
   'loader',
   'action',
   'middleware',
@@ -47,10 +45,10 @@ const SERVER_ROUTE_EXPORTS = [
 ] as const;
 
 const CLIENT_ROUTE_EXPORTS_SET = new Set<string>(CLIENT_ROUTE_EXPORTS);
-const SERVER_COMPONENT_EXPORTS_SET = new Set<string>(SERVER_COMPONENT_EXPORTS);
+const SERVER_COMPONENT_EXPORTS_SET = new Set<string>(
+  RSC_SERVER_COMPONENT_EXPORTS
+);
 const SERVER_ROUTE_EXPORTS_SET = new Set<string>(SERVER_ROUTE_EXPORTS);
-
-const MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS = RSC_MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS;
 
 const CLIENT_CHUNK_QUERY = 'client-route-module';
 const SERVER_MODULE_QUERY = 'server-route-module';
@@ -127,6 +125,11 @@ const isServerRouteExport = (name: string): boolean =>
 
 const isServerComponentExport = (name: string): boolean =>
   SERVER_COMPONENT_EXPORTS_SET.has(name);
+
+const createReexport = (exportName: string, target: string): string =>
+  exportName === 'default'
+    ? `export { default } from ${JSON.stringify(target)};`
+    : `export { ${exportName} } from ${JSON.stringify(target)};`;
 
 const shouldSplitRouteModules = ({
   isRootRoute,
@@ -212,7 +215,10 @@ const getRouteChunkValidation = (
 const validateRouteModuleExports = (exportNames: readonly string[]): void => {
   const exported = new Set(exportNames);
   const errors: string[] = [];
-  for (const [clientExport, serverExport] of MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS) {
+  for (const [
+    clientExport,
+    serverExport,
+  ] of RSC_MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS) {
     if (exported.has(clientExport) && exported.has(serverExport)) {
       errors.push(`- ${clientExport} and ${serverExport}`);
     }
@@ -259,9 +265,6 @@ const createClientRouteEntry = async ({
         resourceQuery,
         chunkName
       );
-      if (exportName === 'default') {
-        return `export { default } from ${JSON.stringify(target)};`;
-      }
       if (exportName === 'HydrateFallback') {
         needsReactImport = true;
         return `export const HydrateFallback = React.lazy(() => import(${JSON.stringify(
@@ -277,7 +280,7 @@ const createClientRouteEntry = async ({
           target
         )}).then(mod => mod.${exportName}(...args));`;
       }
-      return `export { ${exportName} } from ${JSON.stringify(target)};`;
+      return createReexport(exportName, target);
     });
 
   if (shouldSplitRouteModules({ isRootRoute, routeChunkConfig })) {
@@ -339,11 +342,7 @@ const createServerRouteEntry = async ({
         resourceQuery,
         chunkName
       );
-      lines.push(
-        exportName === 'default'
-          ? `export { default } from ${JSON.stringify(target)};`
-          : `export { ${exportName} } from ${JSON.stringify(target)};`
-      );
+      lines.push(createReexport(exportName, target));
       continue;
     }
     if (isServerComponentExport(exportName)) {
@@ -365,15 +364,7 @@ const createServerRouteEntry = async ({
       lines.push('}');
       continue;
     }
-    if (isServerRouteExport(exportName)) {
-      lines.push(
-        `export { ${exportName} } from ${JSON.stringify(serverTarget)};`
-      );
-      continue;
-    }
-    lines.push(
-      `export { ${exportName} } from ${JSON.stringify(serverTarget)};`
-    );
+    lines.push(createReexport(exportName, serverTarget));
   }
 
   if (needsDefaultRootErrorBoundary) {

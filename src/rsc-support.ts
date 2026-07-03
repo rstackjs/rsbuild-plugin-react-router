@@ -64,6 +64,11 @@ type RscRouteTransformProfiler = {
   ): Promise<T>;
 };
 
+type RscDevServerSetupOptions = {
+  entryName: string;
+  pluginName: string;
+};
+
 const mdxRoutePattern = /\.mdx?$/i;
 const RSC_ROUTE_TRANSFORM_LOADER = 'react-router-rsc-route-transform';
 
@@ -265,13 +270,10 @@ export const createReactRouterRscVirtualModules = ({
   };
 };
 
-export const createReactRouterRscDevServerSetup = ({
+export function createReactRouterRscDevServerSetup({
   entryName,
   pluginName,
-}: {
-  entryName: string;
-  pluginName: string;
-}): RscDevServerSetup => {
+}: RscDevServerSetupOptions): RscDevServerSetup {
   return ({ server }) => {
     const devServer = server as unknown as RscDevServer;
     const listener = createRequestListener(async request => {
@@ -294,7 +296,7 @@ export const createReactRouterRscDevServerSetup = ({
       Promise.resolve(listener(req, res)).catch(next);
     });
   };
-};
+}
 
 export const registerReactRouterRscRouteTransforms = ({
   api,
