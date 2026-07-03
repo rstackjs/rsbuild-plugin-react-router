@@ -495,9 +495,11 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
                     }
                   : {}),
               },
-              // SPA dev route serving goes through the node server build
-              // (the dev middleware renders the SPA shell from it), so wait
-              // for both environments before fetching routes.
+              // The plugin builds `web` + `node` dev environments for every
+              // fixture variant. SPA (`ssr:false`) fixtures need `node` too:
+              // the dev middleware renders the SPA shell from the node server
+              // build, so route fetches would race an unfinished node compile
+              // if we only waited for `web`.
               readyEnvironments: ['web', 'node'],
               origin: `http://localhost:${devPort}`,
               routePaths: devRoutePaths,

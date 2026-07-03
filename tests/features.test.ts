@@ -65,21 +65,6 @@ describe('pluginReactRouter', () => {
       );
     });
 
-    it('should not register the dev server middleware in SPA mode', async () => {
-      testGlobal.__reactRouterTestConfig = { ssr: false };
-      const rsbuild = await createStubRsbuild({
-        rsbuildConfig: {},
-      });
-
-      rsbuild.addPlugins([pluginReactRouter()]);
-      const config = await rsbuild.unwrapConfig();
-
-      expect(config.dev.setupMiddlewares).toBeUndefined();
-      expect(getServerSetupNames(config)).not.toContain(
-        'reactRouterDevServerSetup'
-      );
-    });
-
     it('should register the dev middleware for SPA mode (ssr: false)', async () => {
       testGlobal.__reactRouterTestConfig = { ssr: false };
       const rsbuild = await createStubRsbuild({
@@ -89,7 +74,7 @@ describe('pluginReactRouter', () => {
       rsbuild.addPlugins([pluginReactRouter()]);
       const config = await rsbuild.unwrapConfig();
 
-      expect(config.dev.setupMiddlewares).toHaveLength(1);
+      expect(config.server.setup).toHaveLength(1);
     });
 
     it('should configure server output format correctly', async () => {

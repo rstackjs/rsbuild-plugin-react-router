@@ -2,7 +2,13 @@ import { spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 
-const READY_LOG_PATTERN = /ready\s+built in .*?\((web|node)\)/gi;
+// Rsbuild 2.x announces per-environment readiness with a trailing
+// `(<environment>)` token, e.g. `ready   built in 0.51s (node)` /
+// `ready   built in 0.74s (web)`. The environment name is captured
+// generically (any identifier); which environments to wait for is decided by
+// the caller via `readyEnvironments`.
+const READY_LOG_PATTERN = /ready\s+built in .*?\(([\w:-]+)\)/gi;
+
 const MAX_CAPTURED_OUTPUT_CHARS = 128 * 1024;
 
 export const appendNodeOption = (value, option) => {
@@ -170,6 +176,9 @@ export const runDevServerBenchmark = async ({
   cwd,
   env = {},
   shell = process.platform === 'win32',
+  // The exact set of environments that must print a ready line before startup
+  // is considered complete. The caller derives this from the fixture (the
+  // plugin builds `web` + `node` dev environments for both ssr and spa apps).
   readyEnvironments,
   origin,
   routePaths = [],
@@ -361,6 +370,28 @@ export const runDevServerBenchmark = async ({
 
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
+      // Fail loudly about *why* we timed out: report which expected
+      // environments never printed a ready line vs. which did, so a renamed
+      // or removed dev environment surfaces as an actionable message instead
+      // of an opaque hang.
+      if (!ready) {
+        const awaiting = [...requiredReady].filter(
+          environment => !readyCounts.has(environment)
+        );
+        const seen = [...readyCounts.keys()];
+        appendError(
+          new Error(
+            `Dev server did not become ready within ${timeoutMs} ms. ` +
+              `Awaiting ready lines for environment(s): ` +
+              `[${awaiting.join(', ')}]. ` +
+              `Environments observed ready: [${seen.join(', ') || '(none)'}]. ` +
+              `Readiness is matched against rsbuild ` +
+              `"ready built in ... (<env>)" lines; if the plugin renamed a ` +
+              `dev environment, update the expected environments in ` +
+              `scripts/bench-builds.mts.`
+          )
+        );
+      }
       stopChild();
     }, timeoutMs);
     timeoutTimer.unref?.();
