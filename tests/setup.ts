@@ -105,7 +105,6 @@ rstest.mock('@scripts/test-helper', () => ({
         hmr: true,
         liveReload: true,
         writeToDisk: false,
-        setupMiddlewares: [],
       },
       environments: {
         web: {

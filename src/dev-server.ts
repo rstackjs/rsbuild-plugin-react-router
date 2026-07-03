@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { RsbuildConfig } from '@rsbuild/core';
 import type { ServerBuild } from 'react-router';
+
+export type ServerSetup = Exclude<
+  NonNullable<NonNullable<RsbuildConfig['server']>['setup']>,
+  unknown[]
+>;
 
 export type DevServerMiddleware = (
   req: IncomingMessage,
@@ -63,3 +69,20 @@ export const createDevServerMiddleware = (
     }
   };
 };
+
+export const createReactRouterDevServerSetup = ({
+  loadBuild,
+}: {
+  loadBuild: BuildProvider;
+}): ServerSetup =>
+  function reactRouterDevServerSetup(context) {
+    if (context.action !== 'dev') {
+      return;
+    }
+    // The returned callback runs after Rsbuild registers its built-in
+    // middlewares, so static assets are served before the React Router
+    // request handler.
+    return () => {
+      context.server.middlewares.use(createDevServerMiddleware({ loadBuild }));
+    };
+  };
