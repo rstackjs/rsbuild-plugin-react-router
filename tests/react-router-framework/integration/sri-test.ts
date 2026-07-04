@@ -6,7 +6,7 @@ import {
   js,
 } from "./helpers/create-fixture.js";
 import type { AppFixture, Fixture } from "./helpers/create-fixture.js";
-import { reactRouterConfig } from "./helpers/vite.js";
+import { reactRouterConfig } from "./helpers/rsbuild.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
 
 test.describe("CSub-Resource Integrity", () => {

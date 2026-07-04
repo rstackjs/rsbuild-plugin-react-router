@@ -1,14 +1,14 @@
 import { expect } from "@playwright/test";
 
-import { test } from "../helpers/vite";
+import { test } from "../helpers/rsbuild";
 import { js, validateRSCHtml } from "./utils";
 
 test.describe("RSC Framework", () => {
   test("serves document responses with React Server Components payloads", async ({
     page,
-    vitePreview,
+    rsbuildPreview,
   }) => {
-    let { port } = await vitePreview(
+    let { port } = await rsbuildPreview(
       async () => ({
         "app/root.tsx": js`
           import { Links, Meta, Outlet } from "react-router";
@@ -39,7 +39,7 @@ test.describe("RSC Framework", () => {
           }
         `,
       }),
-      "rsc-vite-framework",
+      "rsc-framework",
     );
 
     await page.goto(`http://localhost:${port}/`);

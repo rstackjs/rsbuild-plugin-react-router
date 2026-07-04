@@ -5,11 +5,11 @@ import getPort from "get-port";
 import * as Express from "./helpers/express";
 import { test } from "./helpers/fixtures";
 import * as Stream from "./helpers/stream";
-import { viteMajorTemplates, getTemplates } from "./helpers/templates";
+import { bundlerTemplates, getTemplates } from "./helpers/templates";
 
 const templates = [
-  ...viteMajorTemplates,
-  ...getTemplates(["rsc-vite-framework"]),
+  ...bundlerTemplates,
+  ...getTemplates(["rsc-framework"]),
 ];
 
 test.use({
@@ -50,7 +50,7 @@ const envs = [
   { name: "custom env dir", path: "custom-env-dir/.env" },
 ];
 
-test.describe("Vite .env", () => {
+test.describe(".env", () => {
   templates.forEach((template) => {
     test.describe(`template: ${template.displayName}`, () => {
       const isRsc = template.name.startsWith("rsc-");

@@ -26,7 +26,7 @@ function getColor(page: Page, selector: string) {
     .evaluate((el) => window.getComputedStyle(el).color);
 }
 
-test.describe("Vite CSS lazy loading", () => {
+test.describe("CSS lazy loading", () => {
   let fixture: Fixture;
   let appFixture: AppFixture;
 

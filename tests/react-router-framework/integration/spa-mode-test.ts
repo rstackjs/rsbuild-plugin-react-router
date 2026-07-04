@@ -10,7 +10,7 @@ import {
 } from "./helpers/create-fixture.js";
 import type { Fixture, AppFixture } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
-import { createProject, build, reactRouterConfig } from "./helpers/vite.js";
+import { createProject, build, reactRouterConfig } from "./helpers/rsbuild.js";
 
 test.describe("SPA Mode", () => {
   let fixture: Fixture;
@@ -1162,7 +1162,7 @@ test.describe("SPA Mode", () => {
           );
         });
 
-        test("only generates client Vite manifest", () => {
+        test("only generates client build manifest", () => {
           // rsbuild emits manifest.json at the environment's dist root
           expect(
             fs.existsSync(

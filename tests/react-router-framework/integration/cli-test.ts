@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import dedent from "dedent";
 import semver from "semver";
 
-import { createProject } from "./helpers/vite";
+import { createProject } from "./helpers/rsbuild";
 
 const nodeBin = process.argv[0];
 const reactRouterBin = "node_modules/@react-router/dev/dist/cli/index.js";
@@ -149,7 +149,7 @@ test.describe("cli", () => {
     });
 
     test("rsc generates entry.{ssr,rsc,client}.tsx in the app directory", async () => {
-      const cwd = await createProject({}, "rsc-vite-framework");
+      const cwd = await createProject({}, "rsc-framework");
       let entrySSRFile = path.join(cwd, "app", "entry.ssr.tsx");
       let entryRSCFile = path.join(cwd, "app", "entry.rsc.tsx");
       let entryClientFile = path.join(cwd, "app", "entry.client.tsx");

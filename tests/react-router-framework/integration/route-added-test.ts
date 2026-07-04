@@ -3,7 +3,7 @@ import path from "node:path";
 import { test, expect } from "@playwright/test";
 import getPort from "get-port";
 
-import { createProject, dev, viteConfig } from "./helpers/vite.js";
+import { createProject, dev, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const files = {
   "app/routes/_index.tsx": String.raw`
@@ -31,14 +31,14 @@ test.describe(async () => {
   test.beforeAll(async () => {
     port = await getPort();
     cwd = await createProject({
-      "rsbuild.config.ts": await viteConfig.basic({ port }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
       ...files,
     });
     stop = await dev({ cwd, port });
   });
   test.afterAll(() => stop());
 
-  test("Vite / dev / route added", async ({ page, browserName }) => {
+  test("dev / route added", async ({ page, browserName }) => {
     test.skip(
       browserName === "webkit",
       "Safari caches too aggressively, browser manifest is cached with old routes",

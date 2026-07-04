@@ -1,0 +1,16 @@
+import { useLoaderData } from "react-router";
+
+export const loader = () => {
+  return {
+    content: "MDX route content from loader",
+  }
+}
+
+export function MdxComponent() {
+  const { content } = useLoaderData();
+  return <div data-mdx-route>{content}</div>
+}
+
+## MDX Route
+
+<MdxComponent />

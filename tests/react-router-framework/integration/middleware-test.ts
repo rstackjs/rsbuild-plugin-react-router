@@ -17,7 +17,7 @@ import {
   js,
 } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
-import { reactRouterConfig } from "./helpers/vite.js";
+import { reactRouterConfig } from "./helpers/rsbuild.js";
 
 test.describe("Middleware", () => {
   let originalConsoleError = console.error;

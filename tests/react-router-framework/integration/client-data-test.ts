@@ -8,11 +8,11 @@ import {
 } from "./helpers/create-fixture.js";
 import type { AppFixture } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
-import { type TemplateName, reactRouterConfig } from "./helpers/vite.js";
+import { type TemplateName, reactRouterConfig } from "./helpers/rsbuild.js";
 
 const templateNames = [
-  "vite-7-template",
-  "rsc-vite-framework",
+  "rsbuild-template",
+  "rsc-framework",
 ] as const satisfies TemplateName[];
 
 test.describe("Client Data", () => {

@@ -19,7 +19,7 @@ import type {
 import type { createRequestHandler as createExpressRequestHandler } from "@react-router/express";
 import { createReadableStreamFromReadable } from "@react-router/node";
 
-import { type TemplateName, viteConfig, reactRouterConfig } from "./vite.js";
+import { type TemplateName, rsbuildConfig, reactRouterConfig } from "./rsbuild.js";
 import {
   finalizeFixtureProject,
   installFixtureProject,
@@ -129,7 +129,7 @@ export function json(value: JsonObject) {
   return JSON.stringify(value, null, 2);
 }
 
-const defaultTemplateName = "vite-7-template" satisfies TemplateName;
+const defaultTemplateName = "rsbuild-template" satisfies TemplateName;
 
 export async function createFixture(init: FixtureInit, mode?: ServerMode) {
   let templateName = init.templateName ?? defaultTemplateName;
@@ -137,7 +137,7 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
   let buildPath = url.pathToFileURL(
     path.join(
       projectDir,
-      templateName === "rsc-vite-framework"
+      templateName === "rsc-framework"
         ? "build/server/index.js"
         : "build/server/static/js/app.js",
     ),
@@ -236,7 +236,7 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
   let build: ServerBuild | null = null;
   type RequestHandler = (request: Request) => Promise<Response>;
   let handler: RequestHandler;
-  if (templateName === "rsc-vite-framework") {
+  if (templateName === "rsc-framework") {
     handler = (await import(buildPath))?.default?.fetch;
     if (typeof handler !== "function") {
       throw new Error(
@@ -319,7 +319,7 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
 }
 
 /**
- * @deprecated Use `integration/helpers/vite.ts`'s `test` instead
+ * @deprecated Use `integration/helpers/rsbuild.ts`'s `test` instead
  *
  * This implementation sometimes runs a request handler in memory, forcing tests to manually manage stdout/stderr
  * which has caused many integration tests to leak noisy logs for expected errors.
@@ -515,7 +515,7 @@ export async function createFixtureProject(
       ...(hasBundlerConfig
         ? {}
         : {
-            "rsbuild.config.ts": await viteConfig.basic({
+            "rsbuild.config.ts": await rsbuildConfig.basic({
               port,
               templateName,
             }),

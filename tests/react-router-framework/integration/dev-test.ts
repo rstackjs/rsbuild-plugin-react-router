@@ -5,31 +5,31 @@ import { expect } from "@playwright/test";
 import dedent from "dedent";
 
 import {
-  viteConfig,
+  rsbuildConfig,
   test,
   type TemplateName,
   type Files,
   reactRouterConfig,
-} from "./helpers/vite.js";
+} from "./helpers/rsbuild.js";
 
 const tsx = dedent;
 
 const fixtures = [
   {
-    templateName: "vite-7-template",
+    templateName: "rsbuild-template",
   },
   {
-    templateName: "rsc-vite-framework",
+    templateName: "rsc-framework",
   },
 ] as const satisfies ReadonlyArray<{
   templateName: TemplateName;
 }>;
 
-test.describe("Vite dev", () => {
+test.describe("rsbuild dev", () => {
   for (const { templateName } of fixtures) {
     test.describe(`template: ${templateName}`, () => {
       const files: Files = async ({ port }) => ({
-        "rsbuild.config.ts": await viteConfig.basic({
+        "rsbuild.config.ts": await rsbuildConfig.basic({
           port,
           templateName,
           mdx: true,
@@ -499,9 +499,9 @@ test.describe("Vite dev", () => {
       "react-router.config.ts": reactRouterConfig({
         future: { unstable_optimizeDeps: true },
       }),
-      "rsbuild.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await rsbuildConfig.basic({
         port,
-        templateName: "rsc-vite-framework",
+        templateName: "rsc-framework",
       }),
       "app/routes/_index.tsx": tsx`
         import { readServerSecret } from "rsc-server-only-package";
@@ -527,7 +527,7 @@ test.describe("Vite dev", () => {
       `,
     });
 
-    let { cwd, port } = await dev(files, "rsc-vite-framework");
+    let { cwd, port } = await dev(files, "rsc-framework");
 
     await page.goto(`http://localhost:${port}/`);
     await expect(page.locator("[data-route]")).toHaveText("Index route");

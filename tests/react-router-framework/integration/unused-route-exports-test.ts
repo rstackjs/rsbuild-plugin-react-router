@@ -1,9 +1,9 @@
 import * as path from "node:path";
 import { test, expect } from "@playwright/test";
 
-import { createProject, grep, build } from "./helpers/vite.js";
+import { createProject, grep, build } from "./helpers/rsbuild.js";
 
-test("Vite / dead-code elimination for unused route exports", async () => {
+test("dead-code elimination for unused route exports", async () => {
   let cwd = await createProject({
     "app/routes/custom-route-exports.tsx": String.raw`
       const unusedMessage = "ROUTE_EXPORT_THAT_ISNT_USED";

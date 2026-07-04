@@ -49,29 +49,29 @@ export const reactRouterConfig = (
   `;
 };
 
-type ViteConfigServerArgs = {
+type RsbuildConfigServerArgs = {
   port: number;
 };
 
-type ViteConfigBuildArgs = {
+type RsbuildConfigBuildArgs = {
   assetsInlineLimit?: number;
   assetsDir?: string;
   cssCodeSplit?: boolean;
 };
 
-type ViteConfigBaseArgs = {
+type RsbuildConfigBaseArgs = {
   templateName?: TemplateName;
   base?: string;
   mdx?: boolean;
   vanillaExtract?: boolean;
 };
 
-type ViteConfigArgs = (
-  | ViteConfigServerArgs
-  | { [K in keyof ViteConfigServerArgs]?: never }
+type RsbuildConfigArgs = (
+  | RsbuildConfigServerArgs
+  | { [K in keyof RsbuildConfigServerArgs]?: never }
 ) &
-  ViteConfigBuildArgs &
-  ViteConfigBaseArgs;
+  RsbuildConfigBuildArgs &
+  RsbuildConfigBaseArgs;
 
 const configSection = (name: string, entries: string[]) =>
   entries.length > 0
@@ -82,14 +82,12 @@ const CSS_CODE_SPLIT_NOTE =
   '// Vite "build.cssCodeSplit: false" is not mapped: rsbuild always extracts CSS and these fixtures only assert that styles are applied.';
 
 /**
- * Emits rsbuild.config.ts contents for test fixtures. (The `viteConfig` name
- * is kept until call sites are renamed in a later phase.)
+ * Emits rsbuild.config.ts contents for test fixtures.
  *
  * Vite -> rsbuild option mappings used by the corpus:
- * - `base` -> `output.assetPrefix`. We intentionally do not use rsbuild
- *   `server.base` (React Router's `basename` handles route prefixing and the
- *   plugin's dev SSR middleware serves all paths) and do not set
- *   `dev.assetPrefix` (the plugin's dev manifest does not apply it yet).
+ * - `base` -> `output.assetPrefix` + `dev.assetPrefix`. We intentionally do
+ *   not use rsbuild `server.base` (React Router's `basename` handles route
+ *   prefixing and the plugin's dev SSR middleware serves all paths).
  * - `server.port` + `strictPort` -> `server.port` + `server.strictPort`
  * - `build.assetsInlineLimit` -> `output.dataUriLimit`
  * - `build.assetsDir` -> `output.distPath.assets`
@@ -103,10 +101,10 @@ const CSS_CODE_SPLIT_NOTE =
  * - `build.cssCodeSplit`: see CSS_CODE_SPLIT_NOTE
  * - `vite-tsconfig-paths`: rsbuild resolves tsconfig `paths` natively
  */
-export const viteConfig = {
+export const rsbuildConfig = {
   // Emits the `server` section of an rsbuild config object literal so tests
   // can compose their own rsbuild.config.ts strings.
-  server: async ({ port }: ViteConfigServerArgs) => {
+  server: async ({ port }: RsbuildConfigServerArgs) => {
     return dedent`
       server: {
         port: ${port},
@@ -119,7 +117,7 @@ export const viteConfig = {
     assetsInlineLimit,
     assetsDir,
     cssCodeSplit,
-  }: ViteConfigBuildArgs = {}) => {
+  }: RsbuildConfigBuildArgs = {}) => {
     return [
       ...configSection("output", [
         ...(assetsInlineLimit !== undefined
@@ -135,7 +133,7 @@ export const viteConfig = {
     ].join("\n");
   },
   // Emits a complete rsbuild.config.ts.
-  basic: async (args: ViteConfigArgs = {}) => {
+  basic: async (args: RsbuildConfigArgs = {}) => {
     const isRsc = args.templateName?.includes("rsc") ?? false;
     const routerPlugin = isRsc ? "pluginReactRouterRSC" : "pluginReactRouter";
 
@@ -157,9 +155,11 @@ export const viteConfig = {
           ? [`port: ${args.port},`, `strictPort: true,`]
           : []),
       ]),
-      // Note: `dev.assetPrefix` is intentionally NOT set for `base`. The
-      // plugin's dev-server manifest/SSR links do not currently apply a dev
-      // asset prefix, so setting it breaks dev-mode asset loading.
+      ...configSection("dev", [
+        ...(args.base !== undefined
+          ? [`assetPrefix: ${JSON.stringify(args.base)}, // Vite: base (dev)`]
+          : []),
+      ]),
       ...configSection("output", [
         ...(args.base !== undefined
           ? [`assetPrefix: ${JSON.stringify(args.base)}, // Vite: base`]
@@ -178,15 +178,13 @@ export const viteConfig = {
             `// vanilla-extract via @vanilla-extract/webpack-plugin.`,
             `// - identifiers: "debug" keeps class names deterministic across the`,
             `//   client and server compilations (SSR markup must match client CSS).`,
-            `// - realContentHash is disabled because the plugin's browser manifest`,
-            `//   captures asset names before rspack's real-content-hash rename.`,
             `// - optimization.sideEffects is disabled so side-effect-only .css.ts`,
             `//   imports (compiled to virtual CSS imports) survive the fixture's`,
             `//   "sideEffects": false package flag.`,
             `tools: {`,
             `  rspack: {`,
             `    plugins: [new VanillaExtractPlugin({ identifiers: "debug" })],`,
-            `    optimization: { realContentHash: false, sideEffects: false },`,
+            `    optimization: { sideEffects: false },`,
             `  },`,
             `},`,
           ]
@@ -264,18 +262,18 @@ export const EXPRESS_SERVER = (args: {
   `;
 };
 
-type FrameworkModeViteMajorTemplateName =
-  | "vite-7-template"
+type FrameworkModeBundlerTemplateName =
+  | "rsbuild-template"
   | "vite-plugin-cloudflare-template";
 
-type FrameworkModeRscTemplateName = "rsc-vite-framework";
+type FrameworkModeRscTemplateName = "rsc-framework";
 
 type FrameworkModeCloudflareTemplateName = "vite-plugin-cloudflare-template";
 
-export type RscBundlerTemplateName = "rsc-vite";
+export type RscBundlerTemplateName = "rsc-preview";
 
 export type TemplateName =
-  | FrameworkModeViteMajorTemplateName
+  | FrameworkModeBundlerTemplateName
   | FrameworkModeRscTemplateName
   | FrameworkModeCloudflareTemplateName
   | RscBundlerTemplateName;
@@ -283,15 +281,15 @@ export type TemplateName =
 // Collapsed from the upstream Vite 7/Vite 8 template pair: the Vite major
 // version split is meaningless for rsbuild, so suites parameterized over
 // these templates run once.
-export const viteMajorTemplates = [
-  { templateName: "vite-7-template", templateDisplayName: "Vite 7" },
+export const bundlerTemplates = [
+  { templateName: "rsbuild-template", templateDisplayName: "rsbuild" },
 ] as const satisfies Array<{
-  templateName: FrameworkModeViteMajorTemplateName;
+  templateName: FrameworkModeBundlerTemplateName;
   templateDisplayName: string;
 }>;
 
 export const rscBundlerTemplates = [
-  { templateName: "rsc-vite", templateDisplayName: "RSC (Vite)" },
+  { templateName: "rsc-preview", templateDisplayName: "RSC (rsbuild)" },
 ] as const satisfies Array<{
   templateName: RscBundlerTemplateName;
   templateDisplayName: string;
@@ -299,7 +297,7 @@ export const rscBundlerTemplates = [
 
 export async function createProject(
   files: Record<string, string> = {},
-  templateName: TemplateName = "vite-7-template",
+  templateName: TemplateName = "rsbuild-template",
 ) {
   let projectName = `rr-${Math.random().toString(32).slice(2)}`;
   let projectDir = path.join(TMP_DIR, projectName);
@@ -441,7 +439,7 @@ export const createDev =
 export const dev = createDev([rsbuildBin, "dev", "--host", "localhost"]);
 export const customDev = createDev(["./server.mjs"]);
 
-export const vitePreview = async ({
+export const rsbuildPreview = async ({
   cwd,
   port,
 }: {
@@ -453,7 +451,7 @@ export const vitePreview = async ({
 
 // Used for testing errors thrown on build when we don't want to start and
 // wait for the server
-export const viteDevCmd = ({ cwd }: { cwd: string }) => {
+export const rsbuildDevCmd = ({ cwd }: { cwd: string }) => {
   let nodeBin = process.argv[0];
   installFixtureProject(cwd);
   // `rsbuild dev` is a persistent server and never exits on its own
@@ -495,7 +493,7 @@ type Fixtures = {
     port: number;
     cwd: string;
   }>;
-  vitePreview: (
+  rsbuildPreview: (
     files: Files,
     templateName?: TemplateName,
   ) => Promise<{
@@ -550,14 +548,14 @@ export const test = base.extend<Fixtures>({
     stop?.();
   },
   // eslint-disable-next-line no-empty-pattern
-  vitePreview: async ({}, use) => {
+  rsbuildPreview: async ({}, use) => {
     let stop: (() => unknown) | undefined;
     await use(async (files, template) => {
       let port = await getPort();
       let cwd = await createProject(await files({ port }), template);
       let result = build({ cwd });
       expect(result.status, formatBuildFailure(result)).toBe(0);
-      stop = await vitePreview({ cwd, port });
+      stop = await rsbuildPreview({ cwd, port });
       return { port, cwd };
     });
     stop?.();

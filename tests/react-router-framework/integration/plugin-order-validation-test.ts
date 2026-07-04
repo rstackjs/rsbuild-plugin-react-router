@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import dedent from "dedent";
 
-import { createProject, build, reactRouterConfig } from "./helpers/vite.js";
+import { createProject, build, reactRouterConfig } from "./helpers/rsbuild.js";
 
 // Skipped: plugin-order validation is @react-router/dev/vite behavior;
 // rsbuild-plugin-react-router registers its companion plugins itself and has
@@ -49,7 +49,7 @@ test.describe.skip("Vite plugin order validation", () => {
         `,
         "react-router.config.ts": reactRouterConfig(),
       },
-      "rsc-vite-framework",
+      "rsc-framework",
     );
 
     let buildResult = build({ cwd });
@@ -76,7 +76,7 @@ test.describe.skip("Vite plugin order validation", () => {
         `,
         "react-router.config.ts": reactRouterConfig(),
       },
-      "rsc-vite-framework",
+      "rsc-framework",
     );
 
     let buildResult = build({ cwd });

@@ -7,18 +7,18 @@ import {
   createProject,
   customDev,
   build,
-  viteConfig,
+  rsbuildConfig,
   dev,
-  viteDevCmd,
+  rsbuildDevCmd,
   reactRouterServe,
   reactRouterConfig,
   type TemplateName,
-} from "./helpers/vite.js";
+} from "./helpers/rsbuild.js";
 import { js } from "./helpers/create-fixture.js";
 
 const templateNames = [
-  "vite-7-template",
-  "rsc-vite-framework",
+  "rsbuild-template",
+  "rsc-framework",
 ] as const satisfies TemplateName[];
 
 const sharedFiles = {
@@ -77,7 +77,7 @@ async function configFiles({
     "react-router.config.ts": reactRouterConfig({
       basename: basename !== "/" ? basename : undefined,
     }),
-    "rsbuild.config.ts": await viteConfig.basic({
+    "rsbuild.config.ts": await rsbuildConfig.basic({
       port,
       base,
       templateName,
@@ -149,10 +149,10 @@ const customServerFile = ({
   }
 };
 
-test.describe("Vite base + React Router basename", () => {
+test.describe("base + React Router basename", () => {
   for (const templateName of templateNames) {
     test.describe(`template: ${templateName}`, () => {
-      test.describe("Vite dev", () => {
+      test.describe("rsbuild dev", () => {
         let port: number;
         let cwd: string;
         let stop: () => unknown;
@@ -228,7 +228,7 @@ test.describe("Vite base + React Router basename", () => {
             basename: "/notmybase/",
             startServer: false,
           });
-          let proc = await viteDevCmd({ cwd });
+          let proc = await rsbuildDevCmd({ cwd });
           expect(proc.stderr.toString()).toMatch(
             "When using the React Router `basename` and the Vite `base` config, the " +
               "`basename` config must begin with `base` for the default Vite dev server.",
@@ -373,7 +373,7 @@ test.describe("Vite base + React Router basename", () => {
         });
       });
 
-      test.describe("vite build", () => {
+      test.describe("build", () => {
         let port: number;
         let cwd: string;
         let stop: () => unknown;
@@ -511,7 +511,7 @@ test.describe("Vite base + React Router basename", () => {
           page,
         }) => {
           test.skip(
-            templateName === "rsc-vite-framework",
+            templateName === "rsc-framework",
             "I'm not sure the use-case for this and can't find anything. If you ever need this file an issue and we will revisit.",
           );
           port = await getPort();

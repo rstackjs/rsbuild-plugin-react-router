@@ -3,14 +3,14 @@ import { expect } from "@playwright/test";
 import stripAnsi from "strip-ansi";
 import dedent from "dedent";
 
-import type { Files } from "./helpers/vite.js";
+import type { Files } from "./helpers/rsbuild.js";
 import {
   test,
   createProject,
   grep,
   build,
-  viteConfig,
-} from "./helpers/vite.js";
+  rsbuildConfig,
+} from "./helpers/rsbuild.js";
 
 let serverOnlyModule = `
   export const serverOnly = "SERVER_ONLY";
@@ -38,7 +38,7 @@ let tsconfig = (aliases: Record<string, string[]>) => `
   }
 `;
 
-test("Vite / dead-code elimination for server exports", async () => {
+test("dead-code elimination for server exports", async () => {
   let cwd = await createProject({
     "app/utils.server.ts": serverOnlyModule,
     "app/.server/utils.ts": serverOnlyModule,
@@ -76,7 +76,7 @@ test("Vite / dead-code elimination for server exports", async () => {
   expect(lines).toHaveLength(0);
 });
 
-test.describe("Vite / route / server-only module referenced by client", () => {
+test.describe("route / server-only module referenced by client", () => {
   let matrix = [
     { type: "file", path: "app/utils.server.ts", specifier: `~/utils.server` },
     { type: "dir", path: "app/.server/utils.ts", specifier: `~/.server/utils` },
@@ -152,7 +152,7 @@ test.describe("Vite / route / server-only module referenced by client", () => {
   }
 });
 
-test.describe("Vite / non-route / server-only module referenced by client", () => {
+test.describe("non-route / server-only module referenced by client", () => {
   let matrix = [
     { type: "file", path: "app/utils.server.ts", specifier: `~/utils.server` },
     { type: "dir", path: "app/.server/utils.ts", specifier: `~/.server/utils` },
@@ -212,7 +212,7 @@ test.describe("Vite / non-route / server-only module referenced by client", () =
   }
 });
 
-test.describe("Vite / server-only escape hatch", async () => {
+test.describe("server-only escape hatch", async () => {
   let files: Files = async ({ port }) => ({
     "rsbuild.config.ts": dedent`
       import { defineConfig } from "@rsbuild/core";
@@ -223,7 +223,7 @@ test.describe("Vite / server-only escape hatch", async () => {
       // transform) has no rsbuild equivalent; vite-tsconfig-paths is
       // unnecessary because rsbuild resolves tsconfig "paths" natively.
       export default defineConfig({
-        ${await viteConfig.server({ port })}
+        ${await rsbuildConfig.server({ port })}
         plugins: [pluginReact(), pluginReactRouter()],
       });
     `,
@@ -245,7 +245,7 @@ test.describe("Vite / server-only escape hatch", async () => {
     `,
   });
 
-  test("vite dev", async ({ page, dev }) => {
+  test("rsbuild dev", async ({ page, dev }) => {
     let { port } = await dev(files);
 
     await page.goto(`http://localhost:${port}/`, {
@@ -255,7 +255,7 @@ test.describe("Vite / server-only escape hatch", async () => {
     expect(page.errors).toEqual([]);
   });
 
-  test("vite build + react-router-serve", async ({
+  test("build + react-router-serve", async ({
     page,
     reactRouterServe,
   }) => {

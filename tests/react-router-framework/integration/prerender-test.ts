@@ -11,12 +11,12 @@ import {
 } from "./helpers/create-fixture.js";
 import type { Fixture, AppFixture } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
-import { build, createProject, reactRouterConfig } from "./helpers/vite.js";
+import { build, createProject, reactRouterConfig } from "./helpers/rsbuild.js";
 
 let createFixture = (...args: Parameters<typeof _createFixture>) =>
   _createFixture(
     {
-      templateName: args[0].templateName ?? "vite-7-template",
+      templateName: args[0].templateName ?? "rsbuild-template",
       ...args[0],
     },
     args[1],

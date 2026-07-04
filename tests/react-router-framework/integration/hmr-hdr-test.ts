@@ -6,12 +6,12 @@ import dedent from "dedent";
 import * as Express from "./helpers/express";
 import { test } from "./helpers/fixtures";
 import * as Stream from "./helpers/stream";
-import { viteMajorTemplates } from "./helpers/templates";
+import { bundlerTemplates } from "./helpers/templates";
 
 const tsx = dedent;
 const mdx = dedent;
 
-const templates = [...viteMajorTemplates];
+const templates = [...bundlerTemplates];
 
 // RSC Framework HMR/HDR behavior is covered in integration/vite-hmr-hdr-rsc-test.ts.
 
@@ -51,7 +51,7 @@ templates.forEach((template) => {
       },
     });
 
-    test("vite dev", async ({ page, edit, $ }) => {
+    test("rsbuild dev", async ({ page, edit, $ }) => {
       const port = await getPort();
       const url = `http://localhost:${port}`;
 

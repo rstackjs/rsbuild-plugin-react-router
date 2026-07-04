@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import getPort from "get-port";
 
-import { createProject, customDev, viteConfig } from "./helpers/vite.js";
+import { createProject, customDev, rsbuildConfig } from "./helpers/rsbuild.js";
 
 let port: number;
 let cwd: string;
@@ -10,7 +10,7 @@ let stop: () => void;
 test.beforeAll(async () => {
   port = await getPort();
   cwd = await createProject({
-    "rsbuild.config.ts": await viteConfig.basic({ port }),
+    "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
     "app/context.ts": String.raw`
       import { createContext } from "react-router";
       export const valueContext = createContext<string>();
@@ -68,7 +68,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(() => stop());
 
-test("Vite / Load context / express", async ({ page }) => {
+test("Load context / express", async ({ page }) => {
   let pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
 

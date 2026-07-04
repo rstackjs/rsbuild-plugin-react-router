@@ -78,9 +78,10 @@ listed in `adapterOwnedPaths` in
 mirrored into `UPSTREAM.json` as `adapterOwnedFiles` on every sync. They are
 preserved across syncs.
 
-The copied integration harness still has Vite-oriented names because the
-upstream test suite does. Execution is redirected through
-`integration/helpers/rsbuild-adapter.ts` and the patched helper files:
+The copied integration harness has been renamed from its upstream
+Vite-oriented names to rsbuild-flavored names (see "Renames" below).
+Execution is redirected through `integration/helpers/rsbuild-adapter.ts` and
+the patched helper files:
 
 - fixture projects get `rsbuild.config.ts`, not `vite.config.ts`
 - builds run `@rsbuild/core`
@@ -98,18 +99,43 @@ The corpus carries no inert Vite artifacts: the checked-in fixture/template
 `vite.config.*` files are deleted, and `vite`, `@vitejs/*`, and Vite-plugin
 dependencies (`vite-tsconfig-paths`, `@vanilla-extract/vite-plugin`,
 `@cloudflare/vite-plugin`) are stripped from corpus `package.json` files.
-Upstream test file names (`vite-*-test.ts`) are intentionally kept for
-comparability with upstream. Tests author `rsbuild.config.ts` fixtures
-directly: the `viteConfig` helper factory in `integration/helpers/vite.ts`
-emits rsbuild config text (see its doc comment for the Vite -> rsbuild option
-mappings), and inline fixture configs are written as rsbuild configs with
-comments marking dropped Vite-only options. The adapter's `vite.config.*`
-interception remains only as a safety net and `console.warn`s loudly when it
-fires — new tests must not rely on it. The upstream `vite-7-template` /
-`vite-8-template` pair is collapsed into a single `vite-7-template` (the Vite
-major split is meaningless for rsbuild). `vite-env-only` is kept: fixture app
-code imports `vite-env-only/macros`, and the adapter installs it in every
-materialized fixture.
+Tests author `rsbuild.config.ts` fixtures directly: the `rsbuildConfig` helper
+factory in `integration/helpers/rsbuild.ts` (formerly `viteConfig` in
+`helpers/vite.ts`) emits rsbuild config text (see its doc comment for the
+Vite -> rsbuild option mappings), and inline fixture configs are written as
+rsbuild configs with comments marking dropped Vite-only options. The adapter's
+`vite.config.*` interception remains only as a safety net and `console.warn`s
+loudly when it fires — new tests must not rely on it. The upstream
+`vite-7-template` / `vite-8-template` pair is collapsed into a single template,
+renamed to `rsbuild-template` (the Vite major split is meaningless for
+rsbuild). `vite-env-only` is kept: fixture app code imports
+`vite-env-only/macros`, and the adapter installs it in every materialized
+fixture.
+
+## Renames
+
+Because this corpus is repo-owned rather than a verbatim upstream mirror, the
+upstream Vite-oriented filenames, directory names, helper exports, and
+describe/test titles that are misleading under rsbuild have been renamed to
+rsbuild-flavored names via `git mv` (history preserved). The complete
+upstream-path -> corpus-path map lives in `UPSTREAM.json` under `renames`,
+alongside a `renamesNote` documenting the helper-export renames (e.g.
+`viteConfig` -> `rsbuildConfig`, `viteMajorTemplates` -> `bundlerTemplates`)
+and the title renames. Notable moves:
+
+- `integration/vite-*-test.ts` -> `integration/*-test.ts` (drop the `vite-`
+  prefix)
+- `integration/helpers/vite.ts` -> `integration/helpers/rsbuild.ts`
+- `integration/helpers/vite-7-template` -> `integration/helpers/rsbuild-template`
+- `integration/helpers/rsc-vite` -> `integration/helpers/rsc-preview`
+- `integration/helpers/rsc-vite-framework` -> `integration/helpers/rsc-framework`
+
+Two `describe.skip`ed Vite-only suites keep their Vite names because they
+document genuinely Vite-only behavior in their skip reasons:
+`integration/plugin-order-validation-test.ts` and
+`integration/plugin-cloudflare-test.ts`. The RSC preview/framework fixtures
+still reference real `@vitejs/plugin-rsc` runtime packages and `vite/client`
+types — those are actual dependencies, not naming, and are left as-is.
 
 ## Commands
 

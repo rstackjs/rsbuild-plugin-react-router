@@ -6,9 +6,9 @@ import {
   createProject,
   build,
   reactRouterServe,
-  viteConfig,
+  rsbuildConfig,
   reactRouterConfig,
-} from "./helpers/vite.js";
+} from "./helpers/rsbuild.js";
 
 const js = String.raw;
 
@@ -258,7 +258,7 @@ test.describe("Split route modules", async () => {
       port = await getPort();
       cwd = await createProject({
         "react-router.config.ts": reactRouterConfig(),
-        "rsbuild.config.ts": await viteConfig.basic({ port }),
+        "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
         ...files,
       });
       build({ cwd });
@@ -365,7 +365,7 @@ test.describe("Split route modules", async () => {
         "react-router.config.ts": reactRouterConfig({
           splitRouteModules,
         }),
-        "rsbuild.config.ts": await viteConfig.basic({ port }),
+        "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
         ...files,
       });
       build({ cwd });
@@ -456,7 +456,7 @@ test.describe("Split route modules", async () => {
           "react-router.config.ts": reactRouterConfig({
             splitRouteModules,
           }),
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           // Make unsplittable routes valid so the build can pass
           "app/routes/unsplittable.tsx": "export default function(){}",
           "app/routes/mixed.tsx": "export default function(){}",
@@ -476,7 +476,7 @@ test.describe("Split route modules", async () => {
           "react-router.config.ts": reactRouterConfig({
             splitRouteModules,
           }),
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           "app/root.tsx": js`
             import { Outlet } from "react-router";
             export const clientLoader = () => null;
@@ -504,7 +504,7 @@ test.describe("Split route modules", async () => {
           "react-router.config.ts": reactRouterConfig({
             splitRouteModules,
           }),
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           "app/root.tsx": js`
             import { Outlet } from "react-router";
             const shared = null;
@@ -533,7 +533,7 @@ test.describe("Split route modules", async () => {
           "react-router.config.ts": reactRouterConfig({
             splitRouteModules,
           }),
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           ...files,
           // Ensure we're only testing the mixed route
           "app/routes/unsplittable.tsx": "export default function(){}",

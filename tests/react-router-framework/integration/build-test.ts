@@ -8,10 +8,10 @@ import {
   build,
   reactRouterServe,
   reactRouterConfig,
-  viteConfig,
+  rsbuildConfig,
   grep,
-  viteMajorTemplates,
-} from "./helpers/vite.js";
+  bundlerTemplates,
+} from "./helpers/rsbuild.js";
 
 let port: number;
 let cwd: string;
@@ -20,7 +20,7 @@ let stop: () => void;
 const js = String.raw;
 
 test.describe("Build", () => {
-  viteMajorTemplates.forEach(({ templateName, templateDisplayName }) => {
+  bundlerTemplates.forEach(({ templateName, templateDisplayName }) => {
     test.describe(templateDisplayName, () => {
       test.beforeAll(async () => {
         port = await getPort();
@@ -37,8 +37,8 @@ test.describe("Build", () => {
                 import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
                 export default defineConfig({
-                  ${await viteConfig.server({ port })}
-                  ${viteConfig.build({
+                  ${await rsbuildConfig.server({ port })}
+                  ${rsbuildConfig.build({
                     assetsInlineLimit: 0,
                   })}
                   plugins: [

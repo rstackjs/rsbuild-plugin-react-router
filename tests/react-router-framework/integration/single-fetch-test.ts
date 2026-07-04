@@ -15,8 +15,8 @@ import {
   createProject,
   customDev,
   reactRouterConfig,
-  viteConfig,
-} from "./helpers/vite.js";
+  rsbuildConfig,
+} from "./helpers/rsbuild.js";
 import getPort from "get-port";
 
 const ISO_DATE = "2024-03-12T12:00:00.000Z";
@@ -2024,7 +2024,7 @@ test.describe("single-fetch", () => {
   }) => {
     let port = await getPort();
     let cwd = await createProject({
-      "rsbuild.config.ts": await viteConfig.basic({ port }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
       "server.mjs": EXPRESS_SERVER({
         port,
         customLogic: js`

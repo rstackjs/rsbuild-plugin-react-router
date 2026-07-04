@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { test, expect } from "@playwright/test";
 
-import { createProject, grep, build } from "./helpers/vite.js";
+import { createProject, grep, build } from "./helpers/rsbuild.js";
 
 let files = {
   "app/utils.client.ts": String.raw`
@@ -14,7 +14,7 @@ let files = {
   `,
 };
 
-test("Vite / client code excluded from server bundle", async () => {
+test("client code excluded from server bundle", async () => {
   let cwd = await createProject({
     ...files,
     "app/routes/dot-client-imports.tsx": String.raw`

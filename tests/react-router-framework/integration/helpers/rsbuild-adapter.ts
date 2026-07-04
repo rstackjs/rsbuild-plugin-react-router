@@ -5,7 +5,7 @@ import url from "node:url";
 import path from "pathe";
 import stripIndent from "strip-indent";
 
-import type { TemplateName } from "./vite.js";
+import type { TemplateName } from "./rsbuild.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");

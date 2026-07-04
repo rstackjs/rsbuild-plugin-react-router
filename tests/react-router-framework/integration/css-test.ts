@@ -11,10 +11,10 @@ import {
   customDev,
   EXPRESS_SERVER,
   reactRouterConfig,
-  viteConfig,
-  viteMajorTemplates,
+  rsbuildConfig,
+  bundlerTemplates,
   type TemplateName,
-} from "./helpers/vite.js";
+} from "./helpers/rsbuild.js";
 
 const js = String.raw;
 const css = String.raw;
@@ -23,10 +23,10 @@ const PADDING = "20px";
 const NEW_PADDING = "30px";
 
 const fixtures = [
-  ...viteMajorTemplates,
+  ...bundlerTemplates,
   // TODO: Figure out why this is failing. It works outside the integration tests.
   // {
-  //   templateName: "rsc-vite-framework",
+  //   templateName: "rsc-framework",
   //   templateDisplayName: "RSC Vite Framework",
   // },
 ] as const satisfies ReadonlyArray<{
@@ -203,10 +203,10 @@ const files = ({ templateName }: { templateName: TemplateName }) => ({
   ),
 });
 
-test.describe("Vite CSS", () => {
+test.describe("CSS", () => {
   fixtures.forEach(({ templateName, templateDisplayName }) => {
     test.describe(templateDisplayName, () => {
-      test.describe("vite dev", async () => {
+      test.describe("rsbuild dev", async () => {
         let port: number;
         let cwd: string;
         let stop: () => void;
@@ -216,7 +216,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "rsbuild.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await rsbuildConfig.basic({
                 port,
                 templateName,
                 vanillaExtract: true,
@@ -245,7 +245,7 @@ test.describe("Vite CSS", () => {
         });
       });
 
-      test.describe("vite dev with custom base", async () => {
+      test.describe("rsbuild dev with custom base", async () => {
         let port: number;
         let cwd: string;
         let stop: () => void;
@@ -258,7 +258,7 @@ test.describe("Vite CSS", () => {
               "react-router.config.ts": reactRouterConfig({
                 basename: base,
               }),
-              "rsbuild.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await rsbuildConfig.basic({
                 port,
                 base,
                 templateName,
@@ -298,7 +298,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "rsbuild.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await rsbuildConfig.basic({
                 port,
                 templateName,
                 vanillaExtract: true,
@@ -328,7 +328,7 @@ test.describe("Vite CSS", () => {
         });
       });
 
-      test.describe("vite build", async () => {
+      test.describe("build", async () => {
         let port: number;
         let cwd: string;
         let stop: () => void;
@@ -338,7 +338,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "rsbuild.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await rsbuildConfig.basic({
                 port,
                 templateName,
                 vanillaExtract: true,
@@ -387,7 +387,7 @@ test.describe("Vite CSS", () => {
         });
       });
 
-      test.describe("vite build with CSS code splitting disabled", async () => {
+      test.describe("build with CSS code splitting disabled", async () => {
         test.fixme(
           templateName.includes("rsc"),
           "RSC Framework mode doesn't support disabling CSS code splitting yet (likely due to @vitejs/plugin-rsc)",
@@ -402,7 +402,7 @@ test.describe("Vite CSS", () => {
           cwd = await createProject(
             {
               "react-router.config.ts": reactRouterConfig(),
-              "rsbuild.config.ts": await viteConfig.basic({
+              "rsbuild.config.ts": await rsbuildConfig.basic({
                 port,
                 templateName,
                 cssCodeSplit: false,

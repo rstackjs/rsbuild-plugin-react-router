@@ -5,7 +5,7 @@ import {
   type TemplateName,
   createDev,
   createProject,
-} from "../helpers/vite.js";
+} from "../helpers/rsbuild.js";
 import { rsbuildBin } from "../helpers/rsbuild-adapter.js";
 
 export const js = String.raw;
@@ -24,7 +24,7 @@ export type Implementation = {
 export const implementations: Implementation[] = [
   {
     name: "rsbuild",
-    template: "rsc-vite",
+    template: "rsc-preview",
     build: ({ cwd }: { cwd: string }) => spawnSync("pnpm", ["build"], { cwd }),
     run: ({ cwd, port }) =>
       createDev(["server.js", "-p", String(port)])({

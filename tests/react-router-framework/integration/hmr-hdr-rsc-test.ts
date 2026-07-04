@@ -2,15 +2,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "@playwright/test";
 
-import type { Files, TemplateName } from "./helpers/vite.js";
-import { test, createEditor, viteConfig } from "./helpers/vite.js";
+import type { Files, TemplateName } from "./helpers/rsbuild.js";
+import { test, createEditor, rsbuildConfig } from "./helpers/rsbuild.js";
 
-const templateName = "rsc-vite-framework" as const satisfies TemplateName;
+const templateName = "rsc-framework" as const satisfies TemplateName;
 
-test.describe("Vite HMR & HDR (RSC)", () => {
-  test("vite dev", async ({ page, dev }) => {
+test.describe("HMR & HDR (RSC)", () => {
+  test("rsbuild dev", async ({ page, dev }) => {
     let files: Files = async ({ port }) => ({
-      "rsbuild.config.ts": await viteConfig.basic({ port, templateName }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({ port, templateName }),
       "app/routes/hmr/route.tsx": `
         // imports
         import { Mounted } from "./route.client";

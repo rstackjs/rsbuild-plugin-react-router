@@ -45,9 +45,73 @@ export const adapterOwnedPaths = [
   'integration/helpers/create-fixture.ts',
   'integration/helpers/express.ts',
   'integration/helpers/fixtures.ts',
-  'integration/helpers/vite.ts',
+  'integration/helpers/rsbuild.ts',
   'integration/playwright.config.ts',
 ];
+
+/**
+ * Corpus renames applied on top of the upstream layout. Keys are the upstream
+ * path (as it appears in a fresh sync of the pinned ref, relative to the corpus
+ * root); values are the corpus path they now live at. These are hand-maintained
+ * because the corpus is repo-owned and rsbuild-adapted: upstream filenames and
+ * directory names that say "vite" are misleading under rsbuild, so they were
+ * renamed to rsbuild-flavored names via `git mv` (history preserved). This map
+ * is exported into UPSTREAM.json as `renames` so the provenance of each moved
+ * path stays discoverable. A separate repurpose of this sync script is planned;
+ * for now the map is descriptive metadata only (the sync flow does not consume
+ * it to move files).
+ */
+export const corpusRenames = {
+  // Earlier collapse: the upstream Vite 7 / Vite 8 template pair was merged into
+  // a single template (the Vite major split is meaningless for rsbuild), then
+  // that template was renamed to an rsbuild-flavored name below.
+  'integration/helpers/vite-8-template': 'integration/helpers/vite-7-template',
+
+  // Infrastructure renames (files + directories).
+  'integration/helpers/vite.ts': 'integration/helpers/rsbuild.ts',
+  'integration/helpers/vite-7-template': 'integration/helpers/rsbuild-template',
+  'integration/helpers/rsc-vite': 'integration/helpers/rsc-preview',
+  'integration/helpers/rsc-vite-framework': 'integration/helpers/rsc-framework',
+
+  // Framework-mode integration test files: drop the misleading `vite-` prefix.
+  'integration/vite-absolute-base-test.ts': 'integration/absolute-base-test.ts',
+  'integration/vite-basename-test.ts': 'integration/basename-test.ts',
+  'integration/vite-build-test.ts': 'integration/build-test.ts',
+  'integration/vite-css-lazy-loading-test.ts':
+    'integration/css-lazy-loading-test.ts',
+  'integration/vite-css-test.ts': 'integration/css-test.ts',
+  'integration/vite-dev-custom-entry-test.ts':
+    'integration/dev-custom-entry-test.ts',
+  'integration/vite-dev-test.ts': 'integration/dev-test.ts',
+  'integration/vite-dot-client-test.ts': 'integration/dot-client-test.ts',
+  'integration/vite-dot-server-test.ts': 'integration/dot-server-test.ts',
+  'integration/vite-dotenv-test.ts': 'integration/dotenv-test.ts',
+  'integration/vite-extra-server-environment-test.ts':
+    'integration/extra-server-environment-test.ts',
+  'integration/vite-hmr-hdr-rsc-test.ts': 'integration/hmr-hdr-rsc-test.ts',
+  'integration/vite-hmr-hdr-test.ts': 'integration/hmr-hdr-test.ts',
+  'integration/vite-loader-context-test.ts':
+    'integration/loader-context-test.ts',
+  'integration/vite-manifests-test.ts': 'integration/manifests-test.ts',
+  'integration/vite-node-env-test.ts': 'integration/node-env-test.ts',
+  'integration/vite-plugin-cloudflare-test.ts':
+    'integration/plugin-cloudflare-test.ts',
+  'integration/vite-plugin-order-validation-test.ts':
+    'integration/plugin-order-validation-test.ts',
+  'integration/vite-prerender-test.ts': 'integration/prerender-test.ts',
+  'integration/vite-presets-test.ts': 'integration/presets-test.ts',
+  'integration/vite-preview-test.ts': 'integration/preview-test.ts',
+  'integration/vite-route-added-test.ts': 'integration/route-added-test.ts',
+  'integration/vite-route-exports-modified-offscreen-test.ts':
+    'integration/route-exports-modified-offscreen-test.ts',
+  'integration/vite-server-bundles-test.ts':
+    'integration/server-bundles-test.ts',
+  'integration/vite-server-fs-allow-test.ts':
+    'integration/server-fs-allow-test.ts',
+  'integration/vite-spa-mode-test.ts': 'integration/spa-mode-test.ts',
+  'integration/vite-unused-route-exports-test.ts':
+    'integration/unused-route-exports-test.ts',
+};
 
 const defaultSource = '/home/zack/projects/react-router';
 const sourceRoot = path.resolve(
@@ -269,6 +333,7 @@ const writeManifest = async ref => {
     sourceDirs: sourceDirs.map(([source]) => source),
     fileCount,
     adapterOwnedFiles: adapterOwnedPaths,
+    renames: corpusRenames,
     corpusVerified,
   };
   if (!corpusVerified) {

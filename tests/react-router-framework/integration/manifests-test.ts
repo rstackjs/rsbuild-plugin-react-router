@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 import getPort from "get-port";
 import dedent from "dedent";
 
-import { createProject, build, viteConfig } from "./helpers/vite.js";
+import { createProject, build, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const js = String.raw;
 
@@ -79,7 +79,7 @@ test.describe(() => {
     build({ cwd });
   });
 
-  test("Vite / manifests enabled / Vite manifests", () => {
+  test("manifests enabled / Build manifests", () => {
     // rsbuild emits manifest.json at each environment's dist root
     expect(fs.existsSync(path.join(cwd, "build", "client", "manifest.json"))).toBe(
       true,
@@ -89,7 +89,7 @@ test.describe(() => {
     );
   });
 
-  test("Vite / manifests enabled / React Router build manifest", async () => {
+  test("manifests enabled / React Router build manifest", async () => {
     let manifestPath = path.join(cwd, "build", "test-manifest.json");
     expect(JSON.parse(fs.readFileSync(manifestPath, "utf8"))).toEqual({
       routes: {
@@ -126,14 +126,14 @@ test.describe(() => {
 
   test.beforeAll(async () => {
     cwd = await createProject({
-      "rsbuild.config.ts": await viteConfig.basic({ port: await getPort() }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({ port: await getPort() }),
       ...files,
     });
 
     build({ cwd });
   });
 
-  test("Vite / manifest disabled / Vite manifests", () => {
+  test("manifest disabled / Build manifests", () => {
     let manifestClient = path.join(cwd, "build", "client", "manifest.json");
     expect(fs.existsSync(manifestClient)).toBe(false);
 

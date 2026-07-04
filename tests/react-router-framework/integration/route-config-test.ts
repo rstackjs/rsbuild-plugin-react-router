@@ -7,15 +7,15 @@ import {
   createProject,
   build,
   test,
-  viteConfig,
+  rsbuildConfig,
   createEditor,
-  viteMajorTemplates,
-} from "./helpers/vite.js";
+  bundlerTemplates,
+} from "./helpers/rsbuild.js";
 
 const js = String.raw;
 
 test.describe("route config", () => {
-  viteMajorTemplates.forEach(({ templateName, templateDisplayName }) => {
+  bundlerTemplates.forEach(({ templateName, templateDisplayName }) => {
     test.describe(templateDisplayName, () => {
       // Skip everywhere except chromium
       test.skip(({ browserName }) => browserName !== "chromium");
@@ -46,7 +46,7 @@ test.describe("route config", () => {
         dev,
       }) => {
         let files: Files = async ({ port }) => ({
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           "app/routes.ts": `export default INVALID(`,
         });
         let devError: Error | undefined;
@@ -65,7 +65,7 @@ test.describe("route config", () => {
         dev,
       }) => {
         let files: Files = async ({ port }) => ({
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           "app/routes.ts": js`
             import { type RouteConfig, index } from "@react-router/dev/routes";
 
@@ -123,7 +123,7 @@ test.describe("route config", () => {
         dev,
       }) => {
         let files: Files = async ({ port }) => ({
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           "app/routes.ts": js`
             export { default } from "./actual-routes";
           `,
@@ -184,7 +184,7 @@ test.describe("route config", () => {
         dev,
       }) => {
         let files: Files = async ({ port }) => ({
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           "app/routes.ts": js`
             import { type RouteConfig, index } from "@react-router/dev/routes";
 
@@ -248,7 +248,7 @@ test.describe("route config", () => {
 
       test("supports absolute route file paths", async ({ page, dev }) => {
         let files: Files = async ({ port }) => ({
-          "rsbuild.config.ts": await viteConfig.basic({ port }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
           "app/routes.ts": js`
             import path from "node:path";
             import { type RouteConfig, index } from "@react-router/dev/routes";

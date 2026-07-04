@@ -12,7 +12,7 @@ import {
 } from "execa";
 import * as Path from "pathe";
 
-import type { TemplateName } from "./vite.js";
+import type { TemplateName } from "./rsbuild.js";
 import {
   finalizeFixtureProject,
   installFixtureProject,
@@ -61,7 +61,7 @@ export const test = base.extend<{
     buffer: { stdout: string; stderr: string };
   };
 }>({
-  template: ["vite-7-template", { option: true }],
+  template: ["rsbuild-template", { option: true }],
   files: [{}, { option: true }],
   page: async ({ page }, use) => {
     page.errors = [];

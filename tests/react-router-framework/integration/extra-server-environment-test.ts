@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import * as fs from "node:fs";
 import path from "node:path";
 
-import { build, createProject, reactRouterConfig } from "./helpers/vite.js";
+import { build, createProject, reactRouterConfig } from "./helpers/rsbuild.js";
 
 const js = String.raw;
 
@@ -80,7 +80,7 @@ test("ignores external server environments without skipping React Router build h
         };
       `,
     },
-    "vite-7-template",
+    "rsbuild-template",
   );
 
   let { status, stderr } = build({ cwd });

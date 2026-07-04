@@ -6,8 +6,8 @@ import {
   dev,
   build,
   reactRouterServe,
-  viteConfig,
-} from "./helpers/vite.js";
+  rsbuildConfig,
+} from "./helpers/rsbuild.js";
 
 let files = {
   "app/routes/node_env.tsx": String.raw`
@@ -25,7 +25,7 @@ test.describe(async () => {
   test.beforeAll(async () => {
     port = await getPort();
     cwd = await createProject({
-      "rsbuild.config.ts": await viteConfig.basic({ port: port }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({ port: port }),
       ...files,
     });
   });
@@ -36,7 +36,7 @@ test.describe(async () => {
     });
     test.afterAll(() => stop());
 
-    test("Vite / NODE_ENV / dev", async ({ page }) => {
+    test("NODE_ENV / dev", async ({ page }) => {
       let pageErrors: unknown[] = [];
       page.on("pageerror", (error) => pageErrors.push(error));
 
@@ -61,7 +61,7 @@ test.describe(async () => {
     });
     test.afterAll(() => stop());
 
-    test("Vite / NODE_ENV / build", async ({ page }) => {
+    test("NODE_ENV / build", async ({ page }) => {
       let pageErrors: unknown[] = [];
       page.on("pageerror", (error) => pageErrors.push(error));
 

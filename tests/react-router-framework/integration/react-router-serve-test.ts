@@ -7,11 +7,11 @@ import {
   createFixture,
   js,
 } from "./helpers/create-fixture.js";
-import { type TemplateName } from "./helpers/vite.js";
+import { type TemplateName } from "./helpers/rsbuild.js";
 
 const templateNames = [
-  "vite-7-template",
-  "rsc-vite-framework",
+  "rsbuild-template",
+  "rsc-framework",
 ] as const satisfies TemplateName[];
 
 test.describe("react-router-serve", () => {

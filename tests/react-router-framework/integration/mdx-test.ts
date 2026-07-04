@@ -7,11 +7,11 @@ import {
 } from "./helpers/create-fixture.js";
 import type { Fixture, AppFixture } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
-import { type TemplateName, viteConfig } from "./helpers/vite.js";
+import { type TemplateName, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const templateNames = [
-  "vite-7-template",
-  "rsc-vite-framework",
+  "rsbuild-template",
+  "rsc-framework",
 ] as const satisfies TemplateName[];
 
 test.describe("MDX", () => {
@@ -24,7 +24,7 @@ test.describe("MDX", () => {
         fixture = await createFixture({
           templateName,
           files: {
-            "rsbuild.config.ts": await viteConfig.basic({
+            "rsbuild.config.ts": await rsbuildConfig.basic({
               templateName,
               mdx: true,
             }),

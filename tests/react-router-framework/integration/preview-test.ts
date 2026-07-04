@@ -3,20 +3,20 @@ import dedent from "dedent";
 
 import {
   reactRouterConfig,
-  viteConfig,
+  rsbuildConfig,
   test,
   type Files,
-} from "./helpers/vite.js";
+} from "./helpers/rsbuild.js";
 
 const tsx = dedent;
 
-test.describe("Vite preview", () => {
-  test("serves built app with vite preview", async ({ vitePreview, page }) => {
+test.describe("rsbuild preview", () => {
+  test("serves built app with rsbuild preview", async ({ rsbuildPreview, page }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "rsbuild.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await rsbuildConfig.basic({
         port,
-        templateName: "vite-7-template",
+        templateName: "rsbuild-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -78,7 +78,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-7-template");
+    const { port } = await rsbuildPreview(files, "rsbuild-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });
@@ -92,12 +92,12 @@ test.describe("Vite preview", () => {
     );
   });
 
-  test("handles navigation between routes", async ({ vitePreview, page }) => {
+  test("handles navigation between routes", async ({ rsbuildPreview, page }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "rsbuild.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await rsbuildConfig.basic({
         port,
-        templateName: "vite-7-template",
+        templateName: "rsbuild-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts, Link } from "react-router";
@@ -143,7 +143,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-7-template");
+    const { port } = await rsbuildPreview(files, "rsbuild-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });
@@ -166,12 +166,12 @@ test.describe("Vite preview", () => {
     await expect(page.locator("#index [data-title]")).toHaveText("Index");
   });
 
-  test("handles loader data correctly", async ({ vitePreview, page }) => {
+  test("handles loader data correctly", async ({ rsbuildPreview, page }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "rsbuild.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await rsbuildConfig.basic({
         port,
-        templateName: "vite-7-template",
+        templateName: "rsbuild-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -219,7 +219,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-7-template");
+    const { port } = await rsbuildPreview(files, "rsbuild-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });
@@ -239,14 +239,14 @@ test.describe("Vite preview", () => {
   });
 
   test("handles direct navigation to dynamic routes", async ({
-    vitePreview,
+    rsbuildPreview,
     page,
   }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig(),
-      "rsbuild.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await rsbuildConfig.basic({
         port,
-        templateName: "vite-7-template",
+        templateName: "rsbuild-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -295,7 +295,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-7-template");
+    const { port } = await rsbuildPreview(files, "rsbuild-template");
     await page.goto(`http://localhost:${port}/products/123`, {
       waitUntil: "networkidle",
     });
@@ -310,17 +310,17 @@ test.describe("Vite preview", () => {
     );
   });
 
-  test("serves SPA mode app with vite preview", async ({
-    vitePreview,
+  test("serves SPA mode app with rsbuild preview", async ({
+    rsbuildPreview,
     page,
   }) => {
     const files: Files = async ({ port }) => ({
       "react-router.config.ts": reactRouterConfig({
         ssr: false,
       }),
-      "rsbuild.config.ts": await viteConfig.basic({
+      "rsbuild.config.ts": await rsbuildConfig.basic({
         port,
-        templateName: "vite-7-template",
+        templateName: "rsbuild-template",
       }),
       "app/root.tsx": tsx`
         import { Links, Meta, Outlet, Scripts } from "react-router";
@@ -365,7 +365,7 @@ test.describe("Vite preview", () => {
       `,
     });
 
-    const { port } = await vitePreview(files, "vite-7-template");
+    const { port } = await rsbuildPreview(files, "rsbuild-template");
     await page.goto(`http://localhost:${port}/`, {
       waitUntil: "networkidle",
     });

@@ -1,11 +1,11 @@
 import { expect } from "@playwright/test";
 
-import type { Files } from "./helpers/vite.js";
-import { test, viteConfig } from "./helpers/vite.js";
+import type { Files } from "./helpers/rsbuild.js";
+import { test, rsbuildConfig } from "./helpers/rsbuild.js";
 
 let files: Files = async ({ port }) => ({
   // Vite absolute-URL `base` -> rsbuild dev/output asset prefixes
-  "rsbuild.config.ts": await viteConfig.basic({
+  "rsbuild.config.ts": await rsbuildConfig.basic({
     port,
     base: `http://localhost:${port}/`,
   }),
@@ -14,7 +14,7 @@ let files: Files = async ({ port }) => ({
   `,
 });
 
-test("Vite absolute base / dev", async ({ page, dev }) => {
+test("absolute base / dev", async ({ page, dev }) => {
   let { port } = await dev(files);
 
   await page.goto(`http://localhost:${port}/`, {
@@ -24,7 +24,7 @@ test("Vite absolute base / dev", async ({ page, dev }) => {
   expect(page.errors).toEqual([]);
 });
 
-test("Vite absolute base / build", async ({ page, reactRouterServe }) => {
+test("absolute base / build", async ({ page, reactRouterServe }) => {
   let { port } = await reactRouterServe(files);
 
   await page.goto(`http://localhost:${port}/`, {

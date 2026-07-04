@@ -12,7 +12,7 @@ import type {
   AppFixture,
 } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
-import { type TemplateName, viteMajorTemplates } from "./helpers/vite.js";
+import { type TemplateName, bundlerTemplates } from "./helpers/rsbuild.js";
 
 type PrefetchType = "intent" | "render" | "none" | "viewport";
 
@@ -150,7 +150,7 @@ async function expectOnlyModulePreloads(page: Page, hrefs: string[]) {
 }
 
 test.describe("prefetch", () => {
-  viteMajorTemplates.forEach(({ templateName, templateDisplayName }) => {
+  bundlerTemplates.forEach(({ templateName, templateDisplayName }) => {
     test.describe(templateDisplayName, () => {
       test.describe("prefetch=none", () => {
         let fixture: Fixture;

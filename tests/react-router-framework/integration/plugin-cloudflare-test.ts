@@ -2,7 +2,7 @@ import { expect } from "@playwright/test";
 import dedent from "dedent";
 import getPort from "get-port";
 
-import { type Files, test, viteConfig } from "./helpers/vite.js";
+import { type Files, test, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const tsx = dedent;
 const css = dedent;
@@ -20,7 +20,7 @@ function defineFiles({
     import { reactRouter } from "@react-router/dev/vite";
 
     export default defineConfig({
-      ${await viteConfig.server({ port })}
+      ${await rsbuildConfig.server({ port })}
       plugins: [
         cloudflare({
           inspectorPort: ${inspectorPort},

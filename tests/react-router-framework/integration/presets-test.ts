@@ -8,9 +8,9 @@ import {
   build,
   test,
   createProject,
-  viteMajorTemplates,
-  viteConfig,
-} from "./helpers/vite.js";
+  bundlerTemplates,
+  rsbuildConfig,
+} from "./helpers/rsbuild.js";
 
 const js = String.raw;
 const normalizePath = (pathname: string) => pathname.replace(/\\/g, "/");
@@ -129,7 +129,7 @@ const files = {
           name: "test-preset",
           reactRouterConfig: async () => ({
             async buildEnd(buildEndArgs) {
-              let { viteConfig, buildManifest, reactRouterConfig } = buildEndArgs;
+              let { rsbuildConfig, buildManifest, reactRouterConfig } = buildEndArgs;
 
               await fs.writeFile(
                 "BUILD_END_META.js",
@@ -139,7 +139,7 @@ const files = {
                   "export const reactRouterConfig = " + serializeJs(reactRouterConfig, { space: 2, unsafe: true }) + ";",
                   // buildEnd receives the normalized rsbuild config; Vite's
                   // build.assetsDir maps to output.distPath.assets
-                  "export const assetsDir = " + JSON.stringify(viteConfig.output.distPath.assets) + ";",
+                  "export const assetsDir = " + JSON.stringify(rsbuildConfig.output.distPath.assets) + ";",
                   "export const futureFlags = " + JSON.stringify(reactRouterConfig.future) + ";",
                   "export const splitRouteModules = " + JSON.stringify(reactRouterConfig.splitRouteModules) + ";",
                 ].join("\n"),
@@ -151,13 +151,13 @@ const files = {
       ],
     }
   `),
-  "rsbuild.config.ts": await viteConfig.basic({
+  "rsbuild.config.ts": await rsbuildConfig.basic({
     assetsDir: "custom-assets-dir",
   }),
 };
 
-test.describe("Vite / presets", async () => {
-  viteMajorTemplates.forEach(({ templateName, templateDisplayName }) => {
+test.describe("presets", async () => {
+  bundlerTemplates.forEach(({ templateName, templateDisplayName }) => {
     test(templateDisplayName, async () => {
       let cwd = await createProject(files, templateName);
       let { status, stderr } = build({ cwd });
@@ -223,7 +223,7 @@ test.describe("Vite / presets", async () => {
       expect(buildEndArgsMeta.keys).toEqual([
         "buildManifest",
         "reactRouterConfig",
-        "viteConfig",
+        "rsbuildConfig",
       ]);
 
       // Smoke test the resolved config

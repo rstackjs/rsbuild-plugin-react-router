@@ -9,8 +9,8 @@ import {
   dev,
   build,
   reactRouterServe,
-  viteConfig,
-} from "./helpers/vite.js";
+  rsbuildConfig,
+} from "./helpers/rsbuild.js";
 
 const js = String.raw;
 
@@ -169,13 +169,13 @@ test.describe("Server bundles", () => {
 
           // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
           export default defineConfig({
-            ${await viteConfig.server({ port })}
+            ${await rsbuildConfig.server({ port })}
             plugins: [pluginReact(), pluginReactRouter()],
           });
         `),
         ...files,
       },
-      "vite-7-template",
+      "rsbuild-template",
     );
   });
 

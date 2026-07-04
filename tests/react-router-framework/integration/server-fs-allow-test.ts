@@ -5,8 +5,8 @@ import {
   createProject,
   customDev,
   EXPRESS_SERVER,
-  viteConfig,
-} from "./helpers/vite.js";
+  rsbuildConfig,
+} from "./helpers/rsbuild.js";
 
 let files = {
   "app/routes/test-route.tsx": String.raw`
@@ -27,7 +27,7 @@ test.describe.skip(async () => {
   test.beforeAll(async () => {
     port = await getPort();
     cwd = await createProject({
-      "rsbuild.config.ts": await viteConfig.basic({ port }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
       "server.mjs": EXPRESS_SERVER({ port }),
       ...files,
     });
@@ -35,7 +35,7 @@ test.describe.skip(async () => {
   });
   test.afterAll(() => stop());
 
-  test("Vite / server.fs.allow / works with basic allow list", async ({
+  test("server.fs.allow / works with basic allow list", async ({
     page,
   }) => {
     let pageErrors: unknown[] = [];

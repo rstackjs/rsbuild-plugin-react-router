@@ -5,8 +5,8 @@ import {
   createProject,
   createEditor,
   dev,
-  viteConfig,
-} from "./helpers/vite.js";
+  rsbuildConfig,
+} from "./helpers/rsbuild.js";
 
 const files = {
   "app/routes/_index.tsx": String.raw`
@@ -49,14 +49,14 @@ test.describe(async () => {
   test.beforeAll(async () => {
     port = await getPort();
     cwd = await createProject({
-      "rsbuild.config.ts": await viteConfig.basic({ port }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
       ...files,
     });
     stop = await dev({ cwd, port });
   });
   test.afterAll(() => stop());
 
-  test("Vite / dev / route exports modified offscreen", async ({
+  test("dev / route exports modified offscreen", async ({
     page,
     context,
     browserName,

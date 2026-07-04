@@ -1,11 +1,11 @@
 import { expect } from "@playwright/test";
-import type { Files } from "./helpers/vite.js";
-import { test, viteConfig } from "./helpers/vite.js";
+import type { Files } from "./helpers/rsbuild.js";
+import { test, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const js = String.raw;
 
 const files: Files = async ({ port }) => ({
-  "rsbuild.config.ts": await viteConfig.basic({ port }),
+  "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
   "app/entry.server.tsx": js`
     import { PassThrough } from "node:stream";
 
@@ -91,7 +91,7 @@ const files: Files = async ({ port }) => ({
   `,
 });
 
-test.describe("Vite custom entry dev", () => {
+test.describe("rsbuild custom entry dev", () => {
   // Ensure libraries/consumers can perform an instanceof check on the request
   test("request instanceof Request", async ({ request, dev }) => {
     let { port } = await dev(files);

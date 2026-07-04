@@ -7,11 +7,11 @@ import {
 } from "./helpers/create-fixture.js";
 import type { Fixture, AppFixture } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
-import { type TemplateName } from "./helpers/vite.js";
+import { type TemplateName } from "./helpers/rsbuild.js";
 
 const templateNames = [
-  "vite-7-template",
-  "rsc-vite-framework",
+  "rsbuild-template",
+  "rsc-framework",
 ] as const satisfies TemplateName[];
 
 let ROOT_BOUNDARY_TEXT = "ROOT_TEXT" as const;

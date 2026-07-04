@@ -2,8 +2,8 @@ import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { js } from "../helpers/create-fixture";
-import type { TemplateName, Files } from "../helpers/vite";
-import { reactRouterConfig, test } from "../helpers/vite";
+import type { TemplateName, Files } from "../helpers/rsbuild";
+import { reactRouterConfig, test } from "../helpers/rsbuild";
 
 type PrerenderPaths =
   | boolean
@@ -29,7 +29,7 @@ function prerender({
   links,
   prerender = true,
   ssr,
-  vitePreview,
+  rsbuildPreview,
 }: {
   files?: Files;
   links?: string[];
@@ -40,7 +40,7 @@ function prerender({
         concurrency?: number;
       };
   ssr?: boolean;
-  vitePreview: (
+  rsbuildPreview: (
     files: Files,
     templateName?: TemplateName | undefined,
   ) => Promise<{
@@ -48,7 +48,7 @@ function prerender({
     cwd: string;
   }>;
 }) {
-  return vitePreview(async (args) => {
+  return rsbuildPreview(async (args) => {
     return {
       "react-router.config.ts": reactRouterConfig({ prerender, ssr }),
       "app/root.tsx": js`
@@ -94,7 +94,7 @@ function prerender({
       "app/routes/_index.tsx": simplePage("index"),
       ...(await files?.(args)),
     };
-  }, "rsc-vite-framework");
+  }, "rsc-framework");
 }
 
 async function assertPrerendered(page: Page, expectedPrerender = true) {
@@ -105,10 +105,10 @@ async function assertPrerendered(page: Page, expectedPrerender = true) {
 }
 
 test.describe("rsc prerender", () => {
-  test("prerenders single route", async ({ page, vitePreview }) => {
+  test("prerenders single route", async ({ page, rsbuildPreview }) => {
     const { port } = await prerender({
       links: ["/", "/404/not-found"],
-      vitePreview,
+      rsbuildPreview,
     });
     const baseUrl = `http://localhost:${port}`;
 
@@ -130,14 +130,14 @@ test.describe("rsc prerender", () => {
     expect(index2).toBe("index");
   });
 
-  test("prerenders dynamic route", async ({ page, vitePreview }) => {
+  test("prerenders dynamic route", async ({ page, rsbuildPreview }) => {
     const { port } = await prerender({
       files: async () => ({
         "app/routes/products.$slug.tsx": simplePage("product"),
       }),
       links: ["/", "/products/1", "/products/2"],
       prerender: ["/", "/products/1"],
-      vitePreview,
+      rsbuildPreview,
     });
     const baseUrl = `http://localhost:${port}`;
 
@@ -162,11 +162,11 @@ test.describe("rsc prerender", () => {
     expect(index2).toBe("index");
   });
 
-  test("prerenders single page app", async ({ page, vitePreview }) => {
+  test("prerenders single page app", async ({ page, rsbuildPreview }) => {
     const { port } = await prerender({
       links: ["/", "/404/not-found"],
       ssr: false,
-      vitePreview,
+      rsbuildPreview,
     });
     const baseUrl = `http://localhost:${port}`;
 
