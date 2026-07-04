@@ -13,7 +13,7 @@ const mdx = dedent;
 
 const templates = [...bundlerTemplates];
 
-// RSC Framework HMR/HDR behavior is covered in integration/vite-hmr-hdr-rsc-test.ts.
+// RSC Framework HMR/HDR behavior is covered in integration/hmr-hdr-rsc-test.ts.
 
 templates.forEach((template) => {
   const isRsc = template.name.startsWith("rsc-");
