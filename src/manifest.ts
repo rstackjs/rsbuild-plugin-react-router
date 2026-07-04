@@ -473,7 +473,11 @@ const createRouteManifestItem = ({
     ),
     hasDefaultExport: routeAnalysis.exports.has('default'),
     hasErrorBoundary: routeAnalysis.exports.has(CLIENT_EXPORTS.ErrorBoundary),
-    imports: jsAssets.map(asset => combineURLs(assetPrefix, asset)),
+    // `module` is `jsAssets[0]`; exclude it from `imports` so the browser
+    // manifest does not list the route's own module twice (upstream excludes
+    // the entry chunk's own file from its imports list). Otherwise prefetch
+    // link computations produce duplicate modulepreload hrefs.
+    imports: jsAssets.slice(1).map(asset => combineURLs(assetPrefix, asset)),
     css: routeAnalysis.cssAssets.map(asset => combineURLs(assetPrefix, asset)),
   };
 };
@@ -573,7 +577,12 @@ function generateReactRouterManifestForDevEffect(
     const fingerprintedValues = {
       entry: {
         module: combineURLs(assetPrefix, entryJsAssets[0] || ''),
-        imports: entryJsAssets.map(asset => combineURLs(assetPrefix, asset)),
+        // Exclude the entry's own module (`entryJsAssets[0]`) from imports so it
+        // is not listed twice, matching upstream where `imports` holds only the
+        // chunk's dependency imports.
+        imports: entryJsAssets
+          .slice(1)
+          .map(asset => combineURLs(assetPrefix, asset)),
         css: entryCssAssets.map(asset => combineURLs(assetPrefix, asset)),
       },
       routes: result,

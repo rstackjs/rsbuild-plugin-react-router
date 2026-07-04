@@ -592,12 +592,16 @@ describe('modify browser manifest plugin', () => {
 
       expect(manifest).toMatchObject({
         entry: {
-          imports: ['/static/js/entry.client.js'],
+          // The entry's own module is excluded from imports (upstream parity),
+          // and transitive entrypoint JS (vendor.js) is not added as a preload.
+          imports: [],
           css: ['/static/css/reset.css', '/static/css/route.css'],
         },
       });
-      expect((manifest as { entry: { imports: string[] } }).entry.imports).not
-        .toContain('/static/js/vendor.js');
+      const entryImports = (manifest as { entry: { imports: string[] } }).entry
+        .imports;
+      expect(entryImports).not.toContain('/static/js/vendor.js');
+      expect(entryImports).not.toContain('/static/js/entry.client.js');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

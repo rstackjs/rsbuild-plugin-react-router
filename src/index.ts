@@ -258,12 +258,14 @@ export const pluginReactRouter = (
     (globalThis as any).__reactRouterAppDirectory = resolve(appDirectory);
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
     if (!existsSync(routesPath)) {
-      throw new Error(
-        `Route config file not found at "${relative(
-          process.cwd(),
-          routesPath
-        )}".`
+      // `findEntryFile` falls back to a `.tsx` path when no route config file
+      // exists, but upstream always reports the canonical `routes.ts` path in
+      // this error, so build the display path from that basename directly.
+      const missingRoutesPath = relative(
+        process.cwd(),
+        resolve(appDirectory, 'routes.ts')
       );
+      throw new Error(`Route config file not found at "${missingRoutesPath}".`);
     }
 
     const jiti = createJiti(process.cwd(), {
@@ -272,15 +274,33 @@ export const pluginReactRouter = (
     const importRouteConfig = async (
       importer: Pick<typeof jiti, 'import'>
     ): Promise<RouteConfigEntry[]> => {
-      const routeConfigExport = await importer.import<RouteConfigEntry[]>(
-        routesPath,
-        {
-          default: true,
-        }
-      );
-      const routeConfigValue = await routeConfigExport;
+      // Upstream reports the route config path relative to the app directory
+      // (e.g. "routes.ts"), not the project root.
+      const routeConfigFile = relative(resolve(appDirectory), routesPath);
+      let routeConfigValue: RouteConfigEntry[];
+      try {
+        const routeConfigExport = await importer.import<RouteConfigEntry[]>(
+          routesPath,
+          {
+            default: true,
+          }
+        );
+        routeConfigValue = await routeConfigExport;
+      } catch (error) {
+        // Match upstream: import/evaluation failures (e.g. syntax errors) are
+        // reported as an invalid route config rather than a raw loader error.
+        throw new Error(
+          [
+            `Route config in "${routeConfigFile}" is invalid.`,
+            '',
+            error instanceof Error
+              ? (error.stack ?? error.message)
+              : String(error),
+          ].join('\n')
+        );
+      }
       const validation = validateRouteConfig({
-        routeConfigFile: relative(process.cwd(), routesPath),
+        routeConfigFile,
         routeConfig: routeConfigValue,
       });
       if (!validation.valid) {

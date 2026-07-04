@@ -412,6 +412,52 @@ describe('manifest', () => {
     }
   });
 
+  it('excludes each module from its own imports list', async () => {
+    const { root, appDir } = createTempApp(`
+      export async function loader() { return null; }
+      export default function Page() { return null; }
+    `);
+    try {
+      // Each chunk lists its own file first, followed by shared dependency
+      // chunks. The route/entry `module` is that first file, so `imports`
+      // must not list it again (upstream excludes the entry chunk's own file).
+      const statsWithSharedImports = {
+        assetsByChunkName: {
+          'entry.client': [
+            'static/js/entry.client.js',
+            'static/js/shared.js',
+          ],
+          root: ['static/js/root.js'],
+          'routes/page': ['static/js/routes/page.js', 'static/js/shared.js'],
+        },
+      };
+
+      const { manifest } = await generateReactRouterManifestForDev(
+        routes,
+        {},
+        statsWithSharedImports,
+        appDir,
+        '/',
+        {
+          isBuild: true,
+          rootRouteFile: 'root.tsx',
+          splitRouteModules: false,
+        }
+      );
+
+      const routeItem = manifest.routes['routes/page'];
+      expect(routeItem.module).toBe('/static/js/routes/page.js');
+      expect(routeItem.imports).toEqual(['/static/js/shared.js']);
+      expect(routeItem.imports).not.toContain(routeItem.module);
+
+      expect(manifest.entry.module).toBe('/static/js/entry.client.js');
+      expect(manifest.entry.imports).toEqual(['/static/js/shared.js']);
+      expect(manifest.entry.imports).not.toContain(manifest.entry.module);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('uses transformed route analysis for non-JavaScript route modules', async () => {
     const { root, appDir } = createTempApp(`
       import { MdxComponent } from '../components/mdx';

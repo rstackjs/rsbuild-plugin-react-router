@@ -74,8 +74,10 @@ describe('prerender helpers', () => {
 
   it('resolves prerender: true to static paths', async () => {
     let warnCalls = 0;
-    const warn = () => {
+    const messages: string[] = [];
+    const warn = (message: string) => {
       warnCalls += 1;
+      messages.push(message);
     };
     const paths = await resolvePrerenderPaths(true, false, routes, {
       logWarning: true,
@@ -85,6 +87,18 @@ describe('prerender helpers', () => {
     expect(paths).toContain('/about');
     expect(paths).not.toContain('/users/:id');
     expect(warnCalls).toBe(1);
+    // Message text must match upstream verbatim so downstream tooling and the
+    // integration corpus can assert against it.
+    expect(messages[0]).toBe(
+      [
+        '⚠️ Paths with dynamic/splat params cannot be prerendered when ' +
+          'using `prerender: true`. You may want to use the `prerender()` ' +
+          'API to prerender the following paths:',
+        '  - /users/:id',
+        '  - /users/:id/settings',
+        '  - /docs/*',
+      ].join('\n')
+    );
   });
 
   it('resolves prerender function results', async () => {
@@ -353,7 +367,12 @@ describe('prerender helpers', () => {
     ]);
   });
 
-  it('reports root loaders for unprerendered ssr:false descendants', () => {
+  it('allows a root loader alongside unprerendered ssr:false descendants', () => {
+    // Upstream (vite/plugin.ts validateSsrFalsePrerenderExports) exempts the
+    // root route from the ancestor-loader check: the root loader always runs to
+    // render the app shell and root is part of the prerender set whenever any
+    // path is prerendered. A root loader must not be flagged just because a
+    // sibling/descendant route is not prerendered.
     const manifestRoutes = {
       root: {
         id: 'root',
@@ -382,7 +401,38 @@ describe('prerender helpers', () => {
         routeExports: {},
         prerenderPaths: ['/about'],
       })
-    ).toEqual([expect.stringContaining('`root` when pre-rendering')]);
+    ).toEqual([]);
+  });
+
+  it('reports non-root parent loaders for unprerendered ssr:false descendants', () => {
+    // Matches upstream "Errors on loader functions in parent routes with
+    // non-pre-rendered children": a loader on a non-root ancestor of a
+    // non-prerendered route is still invalid.
+    const manifestRoutes = {
+      root: { id: 'root', file: 'root.tsx', path: '' },
+      a: {
+        id: 'a',
+        parentId: 'root',
+        file: 'routes/a.tsx',
+        path: 'a',
+        hasLoader: true,
+      },
+      'a.b': {
+        id: 'a.b',
+        parentId: 'a',
+        file: 'routes/a.b.tsx',
+        path: 'b',
+      },
+    };
+
+    expect(
+      getSsrFalsePrerenderExportErrors({
+        routes: manifestRoutes,
+        manifestRoutes,
+        routeExports: {},
+        prerenderPaths: ['/a'],
+      })
+    ).toEqual([expect.stringContaining('`a` when pre-rendering')]);
   });
 
   it('validates stable prerender concurrency config', () => {

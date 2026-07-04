@@ -145,11 +145,17 @@ export const getSsrFalsePrerenderExportErrors = ({
         );
       }
 
+      // A loader on an ancestor route is only invalid when the ancestor is not
+      // itself fully prerendered. The root route is exempt: its loader always
+      // runs to render the app shell and it is always part of the prerender set
+      // whenever any path is prerendered, so upstream never flags it here.
       let parentRoute =
-        route.parentId && manifestRoutes[route.parentId]
+        route.parentId &&
+        route.parentId !== 'root' &&
+        manifestRoutes[route.parentId]
           ? manifestRoutes[route.parentId]
           : null;
-      while (parentRoute) {
+      while (parentRoute && parentRoute.id !== 'root') {
         if (parentRoute.hasLoader && !parentRoute.hasClientLoader) {
           errors.push(
             `Prerender: 1 invalid route export in \`${parentRoute.id}\` when ` +
@@ -158,7 +164,9 @@ export const getSsrFalsePrerenderExportErrors = ({
           );
         }
         parentRoute =
-          parentRoute.parentId && manifestRoutes[parentRoute.parentId]
+          parentRoute.parentId &&
+          parentRoute.parentId !== 'root' &&
+          manifestRoutes[parentRoute.parentId]
             ? manifestRoutes[parentRoute.parentId]
             : null;
       }
@@ -249,8 +257,9 @@ export const resolvePrerenderPaths = async (
         });
       warn(
         [
-          'Warning: Paths with dynamic/splat params cannot be prerendered when using `prerender: true`.',
-          'You may want to use the `prerender()` API to prerender the following paths:',
+          '⚠️ Paths with dynamic/splat params cannot be prerendered when ' +
+            'using `prerender: true`. You may want to use the `prerender()` ' +
+            'API to prerender the following paths:',
           ...paramRoutes.map(path => `  - ${path}`),
         ].join('\n')
       );

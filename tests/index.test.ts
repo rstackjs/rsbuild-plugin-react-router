@@ -236,6 +236,31 @@ describe('pluginReactRouter', () => {
     }
   });
 
+  it('reports the canonical routes.ts path when the route config is missing', async () => {
+    const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(path => {
+      const filePath = String(path);
+      // Route config file is absent for every probed extension.
+      if (/app[\\/]routes\.[cm]?[jt]sx?$/.test(filePath)) {
+        return false;
+      }
+      return true;
+    });
+
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+
+      await expect(rsbuild.unwrapConfig()).rejects.toThrow(
+        /Route config file not found at ".*app[\\/]routes\.ts"\./
+      );
+    } finally {
+      existsSync.mockReturnValue(true);
+    }
+  });
+
   it('reloads the dev server when imported config helpers change', async () => {
     const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(path => {
       const filePath = String(path);
@@ -690,9 +715,12 @@ describe('pluginReactRouter', () => {
     expect(webConfig.output.module).toBe(true);
 
     const webEntries = config.environments?.web?.source?.entry;
-    expect(webEntries['entry.client']).toEqual(
-      expect.stringMatching(/entry\.client/)
-    );
+    // entry.client must set `html: false` so rsbuild does not emit a stray
+    // entry.client.html into build/client.
+    expect(webEntries['entry.client']).toMatchObject({
+      import: expect.stringMatching(/entry\.client/),
+      html: false,
+    });
     expect(webEntries['virtual/react-router/browser-manifest']).toEqual({
       import: 'virtual/react-router/browser-manifest',
       html: false,
