@@ -1,1 +1,0 @@
-export const indirect = "indirect 2"
