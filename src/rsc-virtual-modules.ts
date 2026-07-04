@@ -1,11 +1,15 @@
 import { relative, resolve } from 'pathe';
 import type { Config } from './react-router-config.js';
 import type { Route } from './types.js';
+import { normalizeAssetPrefix } from './plugin-utils.js';
 import { getVirtualModuleFilePath } from './virtual-modules.js';
 import {
   createRscInternalClientModule,
   createRscRouteConfig,
 } from './rsc-route-config.js';
+
+const defaultExport = (value: unknown): string =>
+  `export default ${JSON.stringify(value)};`;
 
 const RSC_VIRTUAL_ALIAS_IDS = [
   'routes',
@@ -65,18 +69,16 @@ export const createReactRouterRscVirtualModules = ({
     resolve(buildDirectory, 'server'),
     outputClientPath
   );
-  const bootstrapPublicPath = publicPath.endsWith('/')
-    ? publicPath
-    : `${publicPath}/`;
+  const bootstrapPublicPath = normalizeAssetPrefix(publicPath);
 
   return {
     'virtual/react-router/unstable_rsc/routes': createRscRouteConfig({
       appDirectory,
       routes,
     }),
-    'virtual/react-router/unstable_rsc/route-discovery': `export default ${JSON.stringify(
+    'virtual/react-router/unstable_rsc/route-discovery': defaultExport(
       ssr === false ? { mode: 'initial' } : (routeDiscovery ?? { mode: 'lazy' })
-    )};`,
+    ),
     'virtual/react-router/unstable_rsc/inject-hmr-runtime': !isBuild
       ? `if (import.meta.webpackHot) {
   import.meta.webpackHot.accept();
@@ -87,21 +89,17 @@ export const createReactRouterRscVirtualModules = ({
   });
 }`
       : '',
-    'virtual/react-router/unstable_rsc/basename': `export default ${JSON.stringify(
-      basename
-    )};`,
-    'virtual/react-router/unstable_rsc/allowed-action-origins': `export default ${JSON.stringify(
-      allowedActionOrigins
-    )};`,
-    'virtual/react-router/unstable_rsc/react-router-serve-config': `export default ${JSON.stringify(
-      {
+    'virtual/react-router/unstable_rsc/basename': defaultExport(basename),
+    'virtual/react-router/unstable_rsc/allowed-action-origins':
+      defaultExport(allowedActionOrigins),
+    'virtual/react-router/unstable_rsc/react-router-serve-config':
+      defaultExport({
         assetsBuildDirectory: rscAssetsBuildDirectory,
         publicPath,
-      }
-    )};`,
-    'virtual/react-router/unstable_rsc/bootstrap-scripts': `export default ${JSON.stringify(
-      [`${bootstrapPublicPath}static/js/index.js`]
-    )};`,
+      }),
+    'virtual/react-router/unstable_rsc/bootstrap-scripts': defaultExport([
+      `${bootstrapPublicPath}static/js/index.js`,
+    ]),
     'virtual/react-router/rsc-internal-client': createRscInternalClientModule(),
   };
 };

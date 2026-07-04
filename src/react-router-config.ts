@@ -7,7 +7,7 @@ import type { RouteConfigEntry } from '@react-router/dev/routes';
 import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-import { getPackageVersion } from './plugin-utils.js';
+import { getPackageVersion, parseVersionMajorMinor } from './plugin-utils.js';
 
 export type BuildEndHook = {
   bivarianceHack(args: {
@@ -71,10 +71,7 @@ type ResolveReactRouterConfigResult = {
 
 export const getDefaultTrailingSlashAwareDataRequests = (
   reactRouterVersion: string | undefined = getPackageVersion('react-router')
-): boolean => {
-  const major = Number(reactRouterVersion?.split('.')[0]);
-  return Number.isInteger(major) && major >= 8;
-};
+): boolean => (parseVersionMajorMinor(reactRouterVersion)?.major ?? 0) >= 8;
 
 export const resolveRouteDiscoveryConfig = ({
   ssr,

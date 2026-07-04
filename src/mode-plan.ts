@@ -74,8 +74,6 @@ export type ClassicModePlan = CommonModePlan & {
 export type RscModePlan = CommonModePlan & {
   kind: 'rsc';
   prerenderPaths: string[];
-  routeTransformExecutor: undefined;
-  routeChunkOptions: undefined;
 };
 
 export type ReactRouterModePlan = ClassicModePlan | RscModePlan;
@@ -184,8 +182,6 @@ const createRscModePlan = async ({
       appDirectory,
       rootRouteFile,
     },
-    routeTransformExecutor: undefined,
-    routeChunkOptions: undefined,
     manifestChunkNames: new Set<string>(['index']),
     webEntries: {
       index: {
@@ -308,12 +304,7 @@ const createClassicModePlan = async ({
     routes,
     rootDirectory: process.cwd(),
     ssr,
-    devHmr: devHmr
-      ? {
-          enabled: devHmr.enabled,
-          onNodeRebuildCommitted: devHmr.onNodeRebuildCommitted,
-        }
-      : undefined,
+    devHmr,
   });
   const reactRouterAliases = createReactRouterPackageAliases();
   return {
@@ -356,10 +347,7 @@ const createClassicModePlan = async ({
         routesByServerBundleId: artifacts.routesByServerBundleId,
         ssr,
       }),
-    createResolveConfig: () =>
-      Object.keys(reactRouterAliases).length > 0
-        ? { alias: reactRouterAliases }
-        : undefined,
+    createResolveConfig: () => ({ alias: reactRouterAliases }),
     server: undefined,
     setupMiddlewares:
       customServer || !ssr

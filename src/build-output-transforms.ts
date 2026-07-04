@@ -96,7 +96,6 @@ export const registerBuildOutputTransforms = ({
   const transformRouteModule = async (
     args: Parameters<TransformHandler>[0]
   ) => {
-    rememberRouteModuleAnalysis(args);
     return performanceProfiler.record(
       args.environment?.name,
       'route:module',
@@ -145,6 +144,7 @@ export const registerBuildOutputTransforms = ({
   // static files, mirroring upstream React Router's Vite plugin. This runs for
   // every node compilation, so it also covers `serverBundles` (multiple node
   // outputs) and dev mode (where `writeToDisk` is enabled).
+  const relocatedDestinations = new Set<string>();
   api.processAssets(
     { stage: 'report', targets: ['node'] },
     async ({ compilation }) => {
@@ -156,6 +156,7 @@ export const registerBuildOutputTransforms = ({
           relocateServerAssetsToClient({
             compilation: compilation as unknown as RelocatableAssetCompilation,
             outputClientPath,
+            relocatedDestinations,
           })
       );
     }

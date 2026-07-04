@@ -119,12 +119,19 @@ export interface RelocateServerAssetsResult {
 export const relocateServerAssetsToClient = async ({
   compilation,
   outputClientPath,
+  relocatedDestinations,
   existsSyncFn = existsSync,
   mkdirFn = (dir: string) => mkdir(dir, { recursive: true }),
   writeFileFn = writeFile,
 }: {
   compilation: RelocatableAssetCompilation;
   outputClientPath: string;
+  /**
+   * Destinations already handled by a previous compilation (dev rebuilds,
+   * serverBundles). Content-hashed names make path identity content identity,
+   * so cached destinations skip the blocking exists/write syscalls entirely.
+   */
+  relocatedDestinations?: Set<string>;
   existsSyncFn?: (path: string) => boolean;
   mkdirFn?: (dir: string) => Promise<unknown>;
   writeFileFn?: (path: string, data: Buffer) => Promise<void>;
@@ -135,13 +142,14 @@ export const relocateServerAssetsToClient = async ({
 
   for (const asset of assets) {
     const destination = join(outputClientPath, asset.name);
-    if (existsSyncFn(destination)) {
+    if (relocatedDestinations?.has(destination) || existsSyncFn(destination)) {
       skipped.push(asset.name);
     } else {
       await mkdirFn(dirname(destination));
       await writeFileFn(destination, asset.source.buffer());
       written.push(asset.name);
     }
+    relocatedDestinations?.add(destination);
     // Remove the static asset from the server build so it is not shipped
     // twice. Code-split JavaScript is not collected, so it stays.
     compilation.deleteAsset(asset.name);

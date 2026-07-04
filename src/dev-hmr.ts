@@ -37,11 +37,11 @@ export const resolveReactRefreshRuntimePath = (
     );
     return resolveFrom(refreshPluginEntry, 'react-refresh/runtime');
   } catch {
-    // Fall through to a direct resolution below.
-  }
-  try {
-    return resolveFrom(rootPackageJson, 'react-refresh/runtime');
-  } catch {
+    // No fallback resolution: a bare `react-refresh/runtime` resolve from the
+    // app root can bind a DIFFERENT physical instance than the one
+    // @rspack/plugin-react-refresh injected into the browser graph, making
+    // refresh registration a silent no-op. Treat the runtime as unavailable
+    // instead - callers fall back to the previous full-reload behavior.
     return undefined;
   }
 };
@@ -75,9 +75,13 @@ export const createDevHdrRevisionSignal = ({
   onError?: (error: Error) => void;
 }): DevHdrRevisionSignal => {
   let revision = 0;
+  let dirEnsured = false;
   const write = (): void => {
     try {
-      mkdirSync(dirname(filePath), { recursive: true });
+      if (!dirEnsured) {
+        mkdirSync(dirname(filePath), { recursive: true });
+        dirEnsured = true;
+      }
       writeFileSync(filePath, hdrRevisionModuleContent(revision));
     } catch (error) {
       onError?.(error instanceof Error ? error : new Error(String(error)));

@@ -134,7 +134,6 @@ export const pluginReactRouter = (
           }
           api.logger.warn(issue.message);
         }
-        assetPrefix = normalizeAssetPrefix(config.output?.assetPrefix);
         return config;
       },
     });
@@ -482,7 +481,10 @@ export const pluginReactRouter = (
       api,
       isBuild,
       lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor: modePlan.routeTransformExecutor,
+      routeTransformExecutor:
+        modePlan.kind === 'classic'
+          ? modePlan.routeTransformExecutor
+          : undefined,
       routeRestartMarkerPath,
       watchDirectory,
       getRouteTopology: routeTopology.getRouteTopology,
@@ -630,8 +632,12 @@ export const pluginReactRouter = (
     };
 
     api.modifyRsbuildConfig(async (config, { mergeRsbuildConfig }) => {
-      assetPrefix = normalizeAssetPrefix(config.output?.assetPrefix);
-      const vmodPlugin = createVirtualModulePlugin(assetPrefix);
+      // The virtual server build embeds `output.assetPrefix` as its runtime
+      // publicPath; the shared `assetPrefix` variable is owned exclusively by
+      // the `onBeforeCreateCompiler` resolver above (per-mode effective value).
+      const vmodPlugin = createVirtualModulePlugin(
+        normalizeAssetPrefix(config.output?.assetPrefix)
+      );
       const useAsyncNodeChunkLoading =
         options.federation && resolvedServerOutput === 'commonjs';
       let nodeChunkLoading: 'import' | 'async-node' | 'require' = 'require';

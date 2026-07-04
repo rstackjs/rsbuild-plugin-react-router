@@ -1,5 +1,5 @@
 import type { RsbuildPlugin } from '@rsbuild/core';
-import { getPackageVersion } from './plugin-utils.js';
+import { getPackageVersion, parseVersionMajorMinor } from './plugin-utils.js';
 import type { Config } from './react-router-config.js';
 import type { PluginOptions } from './types.js';
 
@@ -31,13 +31,11 @@ export const assertReactRouterRscConfigSupport = ({
 };
 
 const supportsReactRouterRsc = (version: string | undefined): boolean => {
-  const match = version?.match(/^(\d+)\.(\d+)\./);
-  if (!match) {
+  const parsed = parseVersionMajorMinor(version);
+  if (!parsed) {
     return false;
   }
-  const major = Number(match[1]);
-  const minor = Number(match[2]);
-  return major >= 8 || (major === 7 && minor >= 18);
+  return parsed.major >= 8 || (parsed.major === 7 && parsed.minor >= 18);
 };
 
 export const assertReactRouterRscSupport = ({

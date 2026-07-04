@@ -15,12 +15,29 @@ export const resolveAppPackagePath = (
   }
 };
 
+export const parseVersionMajorMinor = (
+  version: string | undefined
+): { major: number; minor: number } | undefined => {
+  const match = version?.match(/^(\d+)\.(\d+)\./);
+  if (!match) {
+    return undefined;
+  }
+  return { major: Number(match[1]), minor: Number(match[2]) };
+};
+
+const packageVersionCache = new Map<string, string | undefined>();
+
 export const getPackageVersion = (
   packageName: string,
   resolvePackagePath: (
     specifier: string
   ) => string | undefined = resolveAppPackagePath
 ): string | undefined => {
+  // Only default resolution is cached; injected resolvers (tests) stay live.
+  const cacheable = resolvePackagePath === resolveAppPackagePath;
+  if (cacheable && packageVersionCache.has(packageName)) {
+    return packageVersionCache.get(packageName);
+  }
   const packageJsonPath = resolvePackagePath(`${packageName}/package.json`);
   if (!packageJsonPath) {
     return undefined;
@@ -29,10 +46,16 @@ export const getPackageVersion = (
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
       version?: unknown;
     };
-    return typeof packageJson.version === 'string'
-      ? packageJson.version
-      : undefined;
+    const version =
+      typeof packageJson.version === 'string' ? packageJson.version : undefined;
+    if (cacheable) {
+      packageVersionCache.set(packageName, version);
+    }
+    return version;
   } catch {
+    if (cacheable) {
+      packageVersionCache.set(packageName, undefined);
+    }
     return undefined;
   }
 };

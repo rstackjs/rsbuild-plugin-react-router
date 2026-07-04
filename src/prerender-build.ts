@@ -10,7 +10,7 @@ import {
   type ServerBuild,
 } from 'react-router';
 import { dirname, relative, resolve } from 'pathe';
-import { PLUGIN_NAME } from './constants.js';
+import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import { getBuildManifest } from './build-manifest.js';
 import {
   createReactRouterManifestOptions,
@@ -348,7 +348,7 @@ const handleSpaMode = async ({
       const html = await response.text();
       const isPrerenderSpaFallback = build.prerender?.includes('/');
       const filename = isPrerenderSpaFallback
-        ? '__spa-fallback.html'
+        ? SPA_FALLBACK_HTML_FILE
         : 'index.html';
 
       if (response.status !== 200) {

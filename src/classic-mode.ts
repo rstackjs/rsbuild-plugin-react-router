@@ -7,7 +7,10 @@ import {
   getRoutesByServerBundleId,
 } from './build-manifest.js';
 import { BUILD_CLIENT_ROUTE_QUERY_STRING } from './constants.js';
-import { DEV_HMR_RUNTIME_MODULE_ID } from './dev-hmr.js';
+import {
+  DEV_HMR_RUNTIME_MODULE_ID,
+  type DevHmrPlanOptions,
+} from './dev-hmr.js';
 import {
   createReactRouterDevRuntimeController,
   type ReactRouterDevRuntimeController,
@@ -67,10 +70,7 @@ type CreateClassicBuildArtifactsOptions = {
   routes: Record<string, Route>;
   rootDirectory: string;
   ssr: boolean;
-  devHmr?: {
-    enabled: boolean;
-    onNodeRebuildCommitted?: () => void;
-  };
+  devHmr?: DevHmrPlanOptions;
 };
 
 export type ClassicBuildArtifacts = {

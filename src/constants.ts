@@ -89,3 +89,6 @@ export const CLIENT_EXPORTS = {
   meta: 'meta',
   shouldRevalidate: 'shouldRevalidate',
 } as const;
+
+// SPA-mode prerender fallback document, served when no prerendered page matches.
+export const SPA_FALLBACK_HTML_FILE = '__spa-fallback.html';

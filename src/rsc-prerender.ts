@@ -3,11 +3,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import { dirname, relative, resolve } from 'pathe';
-import { PLUGIN_NAME } from './constants.js';
+import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import {
   createBoundedPrerenderTasksEffect,
   withBuildRequest,
 } from './prerender-build.js';
+import { normalizeAssetPrefix } from './plugin-utils.js';
 import { getPrerenderConcurrency } from './prerender.js';
 import type { Config } from './react-router-config.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
@@ -29,7 +30,7 @@ import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
  * how classic mode prerenders through `createRequestHandler`.
  */
 
-export const SPA_FALLBACK_REQUEST_PATH = '/__spa-fallback.html';
+export const SPA_FALLBACK_REQUEST_PATH: string = `/${SPA_FALLBACK_HTML_FILE}`;
 
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 
@@ -51,12 +52,9 @@ type RunReactRouterRscPrerenderBuildOptions = {
   basename: string;
 };
 
-export const normalizeRscPrerenderBasename = (basename: string): string => {
-  if (!basename || basename === '/') {
-    return '/';
-  }
-  return basename.endsWith('/') ? basename : `${basename}/`;
-};
+// Same empty/'auto'/trailing-slash semantics as asset prefixes.
+export const normalizeRscPrerenderBasename: (basename: string) => string =
+  normalizeAssetPrefix;
 
 /**
  * The request paths to prerender: the resolved prerender paths joined with
@@ -101,7 +99,7 @@ export const extractRscFlightData = (html: string): string | null => {
 
 export const getRscHtmlFilePath = (pathname: string): string => {
   if (pathname === SPA_FALLBACK_REQUEST_PATH) {
-    return '__spa-fallback.html';
+    return SPA_FALLBACK_HTML_FILE;
   }
   return `${pathname.endsWith('/') ? pathname : `${pathname}/`}index.html`;
 };

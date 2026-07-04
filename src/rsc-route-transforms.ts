@@ -1,4 +1,5 @@
 import { generate, parse } from './yuku.js';
+import { CLIENT_NON_COMPONENT_EXPORTS } from './constants.js';
 import { getExportNames } from './export-utils.js';
 import { removeExports, removeUnusedImports } from './route-export-pruning.js';
 import {
@@ -20,16 +21,6 @@ const ENSURE_CLIENT_ROUTE_MODULE_CHUNK_FOR_HMR = `
 import * as ___EnsureClientRouteModuleForHMR_REACT___ from "react";
 export function EnsureClientRouteModuleForHMR___() { return ___EnsureClientRouteModuleForHMR_REACT___.createElement(___EnsureClientRouteModuleForHMR_REACT___.Fragment, null) }
 `;
-
-const CLIENT_NON_COMPONENT_EXPORTS = [
-  'clientAction',
-  'clientLoader',
-  'clientMiddleware',
-  'handle',
-  'meta',
-  'links',
-  'shouldRevalidate',
-] as const;
 
 const CLIENT_ROUTE_EXPORTS = [
   ...CLIENT_NON_COMPONENT_EXPORTS,
