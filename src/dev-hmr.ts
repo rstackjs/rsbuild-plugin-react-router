@@ -46,7 +46,7 @@ export const resolveReactRefreshRuntimePath = (
   }
 };
 
-export const hdrRevisionModuleContent = (revision: number): string =>
+const hdrRevisionModuleContent = (revision: number): string =>
   `export default ${revision};\n`;
 
 /**

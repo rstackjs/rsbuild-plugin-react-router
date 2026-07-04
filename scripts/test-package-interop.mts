@@ -42,6 +42,8 @@ const verifyRegistration = async (writer, reader) => {
     modifyEnvironmentConfig: noop,
     onBeforeBuild: noop,
     onBeforeCreateCompiler: noop,
+    modifyBundlerChain: noop,
+    isPluginExists: () => false,
     onBeforeStartDevServer: collect(starts),
     onAfterStartDevServer: noop,
     onCloseDevServer: collect(closes),
