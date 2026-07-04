@@ -456,9 +456,15 @@ export const vitePreview = async ({
 export const viteDevCmd = ({ cwd }: { cwd: string }) => {
   let nodeBin = process.argv[0];
   installFixtureProject(cwd);
+  // `rsbuild dev` is a persistent server and never exits on its own
+  // (unlike Vite's validate-and-exit startup failures this helper was
+  // written for). The timeout guard keeps an assumed-to-exit spawn from
+  // blocking a whole suite run indefinitely.
   return spawnSync(nodeBin, [rsbuildBin, "dev"], {
     cwd,
     env: { ...process.env },
+    timeout: 30_000,
+    killSignal: "SIGTERM",
   });
 };
 
