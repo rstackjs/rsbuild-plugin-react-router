@@ -41,6 +41,7 @@ const verifyRegistration = async (writer, reader) => {
     modifyRsbuildConfig: noop,
     modifyEnvironmentConfig: noop,
     onBeforeBuild: noop,
+    onBeforeCreateCompiler: noop,
     onBeforeStartDevServer: collect(starts),
     onAfterStartDevServer: noop,
     onCloseDevServer: collect(closes),
