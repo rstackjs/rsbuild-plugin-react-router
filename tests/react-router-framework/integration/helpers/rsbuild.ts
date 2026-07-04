@@ -216,6 +216,7 @@ export const EXPRESS_SERVER = (args: {
       import express from "express";
 
       const app = express();
+      let devServer;
 
       ${args?.customLogic || ""}
 
@@ -224,11 +225,22 @@ export const EXPRESS_SERVER = (args: {
         let build = (await import("./build/server/index.js")).default;
         app.all("*", createRequestListener(build.fetch));
       } else {
-        throw new Error("Custom RSC dev servers need an Rsbuild dev-server adapter");
+        // Rsbuild dev-server adapter (RSC): the plugin attaches its RSC dev
+        // request handler to the dev server's middleware chain, so delegating
+        // to \`devServer.middlewares\` serves RSC documents, assets, and HMR.
+        const { createRsbuild, loadConfig } = await import("@rsbuild/core");
+        const { content } = await loadConfig();
+        const rsbuild = await createRsbuild({ rsbuildConfig: content });
+        devServer = await rsbuild.createDevServer();
+        app.use(devServer.middlewares);
       }
 
       const port = ${args.port};
-      app.listen(port, () => console.log('http://localhost:' + port));
+      const server = app.listen(port, () => {
+        console.log('http://localhost:' + port);
+        devServer?.afterListen();
+      });
+      devServer?.connectWebSocket({ server });
     `;
   }
 
@@ -237,28 +249,43 @@ export const EXPRESS_SERVER = (args: {
     import express from "express";
 
     const app = express();
+    let devServer;
 
     if (process.env.NODE_ENV === "production") {
       app.use(
         "/assets",
         express.static("build/client/assets", { immutable: true, maxAge: "1y" })
       );
+      app.use(express.static("build/client", { maxAge: "1h" }));
+
+      ${args?.customLogic || ""}
+
+      app.all(
+        "*",
+        createRequestHandler({
+          build: await import("./build/server/static/js/app.js"),
+        })
+      );
     } else {
-      throw new Error("Custom dev servers need an Rsbuild dev-server adapter");
+      // Rsbuild dev-server adapter: boot the plugin's dev server
+      // programmatically and delegate asset serving, HMR, and SSR document
+      // handling to its middleware (mirrors helpers/express.ts).
+      const { createRsbuild, loadConfig } = await import("@rsbuild/core");
+      const { content } = await loadConfig();
+      const rsbuild = await createRsbuild({ rsbuildConfig: content });
+      devServer = await rsbuild.createDevServer();
+
+      ${args?.customLogic || ""}
+
+      app.use(devServer.middlewares);
     }
-    app.use(express.static("build/client", { maxAge: "1h" }));
-
-    ${args?.customLogic || ""}
-
-    app.all(
-      "*",
-      createRequestHandler({
-        build: await import("./build/server/static/js/app.js"),
-      })
-    );
 
     const port = ${args.port};
-    app.listen(port, () => console.log('http://localhost:' + port));
+    const server = app.listen(port, () => {
+      console.log('http://localhost:' + port);
+      devServer?.afterListen();
+    });
+    devServer?.connectWebSocket({ server });
   `;
 };
 
@@ -446,7 +473,109 @@ export const rsbuildPreview = async ({
   cwd: string;
   port: number;
 }) => {
+  // SPA-mode (`ssr: false`) builds have no server bundle
+  // (`build/server/static/js/app.js`); there is only a static
+  // `build/client` directory. `react-router-serve` cannot serve those, so
+  // fall back to a static file server with an SPA fallback to `index.html`,
+  // mirroring upstream's `ssr: false` preview handling.
+  let serverBundlePath = path.join(cwd, "build/server/static/js/app.js");
+  let clientIndexPath = path.join(cwd, "build/client/index.html");
+  if (!existsSync(serverBundlePath) && existsSync(clientIndexPath)) {
+    return spaStaticPreview({ cwd, port });
+  }
   return reactRouterServe({ cwd, port });
+};
+
+// Serves a SPA-mode (`ssr: false`) build's `build/client` directory over HTTP,
+// falling back to `index.html` for unmatched routes so client-side routing
+// resolves on hard navigations/reloads.
+const spaStaticPreview = async ({
+  cwd,
+  port,
+}: {
+  cwd: string;
+  port: number;
+}) => {
+  let { createServer } = await import("node:http");
+  let { readFile: read } = await import("node:fs/promises");
+  let clientDir = path.join(cwd, "build/client");
+
+  const contentTypes: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".map": "application/json; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+  };
+
+  const server = createServer(async (req, res) => {
+    try {
+      let pathname = decodeURIComponent(
+        new URL(req.url ?? "/", "http://localhost").pathname,
+      );
+      let relativePath = pathname.replace(/^\/+/, "");
+      let candidate = path.join(clientDir, relativePath);
+      // Prevent path traversal outside the client directory.
+      if (!candidate.startsWith(clientDir)) {
+        res.statusCode = 403;
+        res.end("Forbidden");
+        return;
+      }
+
+      let filePath: string | null = null;
+      if (relativePath && existsSync(candidate) && !candidate.endsWith("/")) {
+        filePath = candidate;
+      } else if (existsSync(path.join(candidate, "index.html"))) {
+        filePath = path.join(candidate, "index.html");
+      } else if (path.extname(relativePath)) {
+        // A missing asset (has a file extension) must 404 rather than fall
+        // back to index.html — otherwise the browser receives HTML for a
+        // script/style request and never settles the network.
+        res.statusCode = 404;
+        res.end("Not found");
+        return;
+      } else {
+        // SPA fallback: serve the root document for client-routed paths.
+        filePath = path.join(clientDir, "index.html");
+      }
+
+      let body = await read(filePath);
+      res.statusCode = 200;
+      res.setHeader(
+        "Content-Type",
+        contentTypes[path.extname(filePath)] ?? "application/octet-stream",
+      );
+      res.end(body);
+    } catch (error) {
+      res.statusCode = 500;
+      res.end(String(error));
+    }
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.on("error", reject);
+    server.listen(port, "localhost", () => resolve());
+  });
+
+  await waitOn({
+    resources: [`http://localhost:${port}/`],
+    timeout: platform() === "win32" ? 20000 : 10000,
+  });
+
+  return () =>
+    new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
 };
 
 // Used for testing errors thrown on build when we don't want to start and

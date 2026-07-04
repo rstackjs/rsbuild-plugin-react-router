@@ -45,6 +45,7 @@ export function rsc() {
     const hmrPort = process.env.HMR_PORT ?? 3001
 
     const app = express();
+    let devServer;
 
     if (process.env.NODE_ENV === "production") {
       app.use(
@@ -53,9 +54,21 @@ export function rsc() {
       );
       app.all("*", createRequestListener((await import("./build/server/index.js")).default.fetch));
     } else {
-      throw new Error("Custom RSC dev servers need an Rsbuild dev-server adapter");
+      // Rsbuild dev-server adapter (RSC): the plugin attaches its RSC dev
+      // request handler to the dev server's middleware chain (see
+      // createReactRouterRscDevServerSetup), so delegating to
+      // \`devServer.middlewares\` serves RSC documents, assets, and HMR.
+      const { createRsbuild, loadConfig } = await import("@rsbuild/core");
+      const { content } = await loadConfig();
+      const rsbuild = await createRsbuild({ rsbuildConfig: content });
+      devServer = await rsbuild.createDevServer();
+      app.use(devServer.middlewares);
     }
 
-    app.listen(port, () => console.log('http://localhost:' + port));
+    const server = app.listen(port, () => {
+      console.log('http://localhost:' + port);
+      devServer?.afterListen();
+    });
+    devServer?.connectWebSocket({ server });
   `;
 }

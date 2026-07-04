@@ -16,6 +16,7 @@ import type {
   createRequestHandler,
   UNSAFE_decodeViaTurboStream,
 } from "react-router";
+import { UNSAFE_SingleFetchRedirectSymbol as HarnessSingleFetchRedirectSymbol } from "react-router";
 import type { createRequestHandler as createExpressRequestHandler } from "@react-router/express";
 import { createReadableStreamFromReadable } from "@react-router/node";
 
@@ -48,6 +49,30 @@ type ReactRouterExpressRuntime = {
 async function importFixtureModule<T>(projectDir: string, specifier: string) {
   const require = createRequire(path.join(projectDir, "package.json"));
   return import(url.pathToFileURL(require.resolve(specifier)).href) as Promise<T>;
+}
+
+// The single-fetch data is decoded with the FIXTURE's copy of react-router
+// (resolved from the fixture's node_modules), whose
+// `Symbol("SingleFetchRedirect")` is a distinct instance from the one the test
+// files import from the HARNESS's react-router. Symbol keys compare by
+// identity, so `.toEqual` fails with "serializes to the same string". Re-key any
+// decoded single-fetch redirect entry onto the harness symbol so assertions that
+// use the harness-imported `UNSAFE_SingleFetchRedirectSymbol` match.
+function normalizeSingleFetchRedirectSymbol(value: unknown): unknown {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  const record = value as Record<PropertyKey, unknown>;
+  for (const symbol of Object.getOwnPropertySymbols(record)) {
+    if (
+      symbol !== HarnessSingleFetchRedirectSymbol &&
+      symbol.description === HarnessSingleFetchRedirectSymbol.description
+    ) {
+      record[HarnessSingleFetchRedirectSymbol] = record[symbol];
+      delete record[symbol];
+    }
+  }
+  return record;
 }
 
 export async function spawnTestServer({
@@ -220,9 +245,10 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
           status: 200,
           statusText: "OK",
           headers: new Headers(),
-          data: (
-            await reactRouterRuntime.UNSAFE_decodeViaTurboStream(stream, global)
-          ).value,
+          data: normalizeSingleFetchRedirectSymbol(
+            (await reactRouterRuntime.UNSAFE_decodeViaTurboStream(stream, global))
+              .value,
+          ),
         };
       },
       postDocument: () => {
@@ -279,12 +305,14 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
       statusText: response.statusText,
       headers: response.headers,
       data: response.body
-        ? (
-            await reactRouterRuntime.UNSAFE_decodeViaTurboStream(
-              response.body!,
-              global,
-            )
-          ).value
+        ? normalizeSingleFetchRedirectSymbol(
+            (
+              await reactRouterRuntime.UNSAFE_decodeViaTurboStream(
+                response.body!,
+                global,
+              )
+            ).value,
+          )
         : null,
     };
   };

@@ -105,6 +105,7 @@ const customServerFile = ({
       import express from "express";
 
       const app = express();
+      let devServer;
       if (process.env.NODE_ENV === "production") {
         app.use("${base}", express.static("build/client"));
         app.all(
@@ -112,7 +113,14 @@ const customServerFile = ({
           createRequestListener((await import("./build/server/index.js")).default.fetch),
         );
       } else {
-        throw new Error("Custom RSC dev servers need an Rsbuild dev-server adapter");
+        // Rsbuild dev-server adapter (RSC): the plugin attaches its RSC dev
+        // request handler to the dev server's middleware chain, so delegating
+        // to \`devServer.middlewares\` serves RSC documents, assets, and HMR.
+        const { createRsbuild, loadConfig } = await import("@rsbuild/core");
+        const { content } = await loadConfig();
+        const rsbuild = await createRsbuild({ rsbuildConfig: content });
+        devServer = await rsbuild.createDevServer();
+        app.use(devServer.middlewares);
       }
       app.get("*", (_req, res) => {
         res.setHeader("content-type", "text/html")
@@ -120,7 +128,11 @@ const customServerFile = ({
       });
 
       const port = ${port};
-      app.listen(port, () => console.log('http://localhost:' + port));
+      const server = app.listen(port, () => {
+        console.log('http://localhost:' + port);
+        devServer?.afterListen();
+      });
+      devServer?.connectWebSocket({ server });
     `;
   } else {
     return js`
@@ -128,23 +140,36 @@ const customServerFile = ({
       import express from "express";
 
       const app = express();
-      if (process.env.NODE_ENV !== "production") {
-        throw new Error("Custom dev servers need an Rsbuild dev-server adapter");
+      let devServer;
+      if (process.env.NODE_ENV === "production") {
+        app.use("${base}", express.static("build/client"));
+        app.all(
+          "${basename}*",
+          createRequestHandler({
+            build: await import("./build/server/index.js"),
+          })
+        );
+      } else {
+        // Rsbuild dev-server adapter: boot the plugin's dev server
+        // programmatically and delegate asset serving, HMR, and SSR document
+        // handling to its middleware (mirrors helpers/express.ts).
+        const { createRsbuild, loadConfig } = await import("@rsbuild/core");
+        const { content } = await loadConfig();
+        const rsbuild = await createRsbuild({ rsbuildConfig: content });
+        devServer = await rsbuild.createDevServer();
+        app.use(devServer.middlewares);
       }
-      app.use("${base}", express.static("build/client"));
-      app.all(
-        "${basename}*",
-        createRequestHandler({
-          build: await import("./build/server/index.js"),
-        })
-      );
       app.get("*", (_req, res) => {
         res.setHeader("content-type", "text/html")
         res.end('React Router app is at <a href="${basename}">${basename}</a>');
       });
 
       const port = ${port};
-      app.listen(port, () => console.log('http://localhost:' + port));
+      const server = app.listen(port, () => {
+        console.log('http://localhost:' + port);
+        devServer?.afterListen();
+      });
+      devServer?.connectWebSocket({ server });
     `;
   }
 };
