@@ -262,7 +262,11 @@ const hasRouteManifestMetadataChanges = (
       const nextRoute = nextRoutes[routeId];
       if (
         !nextRoute ||
-        !hasSameRouteMetadata(previousRoute, nextRoute, includeHmrPatchableFlags)
+        !hasSameRouteMetadata(
+          previousRoute,
+          nextRoute,
+          includeHmrPatchableFlags
+        )
       ) {
         return true;
       }
