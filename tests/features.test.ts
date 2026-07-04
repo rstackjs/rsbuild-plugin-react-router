@@ -267,6 +267,19 @@ describe('pluginReactRouter', () => {
       expect(getRules('node').some(hasUrlAssetRule)).toBe(true);
     });
 
+    it('routes server code-split chunks to static/js/async so they stay under the server build', async () => {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      expect(
+        config.environments?.node?.tools?.rspack?.output?.chunkFilename
+      ).toBe('static/js/async/[name].js');
+    });
+
     it('should emit package.json for node environment', async () => {
       const rsbuild = await createStubRsbuild({
         rsbuildConfig: {},

@@ -159,8 +159,11 @@ export function registerModifyBrowserManifestAssets(
     // With SRI, integrity hashes are only available once the compilation has
     // finalized asset hashes, so collect them at this (report) stage.
     const sri = withSri
-      ? (collectSubresourceIntegrity(undefined, compilation, currentAssetPrefix) ??
-        true)
+      ? (collectSubresourceIntegrity(
+          undefined,
+          compilation,
+          currentAssetPrefix
+        ) ?? true)
       : undefined;
     const manifestForBrowser: ReactRouterManifest =
       sri !== undefined ? { ...manifest, sri } : manifest;
@@ -213,17 +216,15 @@ export function registerModifyBrowserManifestAssets(
     // generation and emission to the `report` stage
     // (PROCESS_ASSETS_STAGE_REPORT = 5000), which runs after the rename (and
     // after SRI integrity hashes are finalized).
-    api.processAssets(
-      { stage: 'report', environments: ['web'] },
-      context => buildAndEmitManifest(context, { withSri: finalizeSri })
+    api.processAssets({ stage: 'report', environments: ['web'] }, context =>
+      buildAndEmitManifest(context, { withSri: finalizeSri })
     );
     return;
   }
 
   // Dev has no `realContentHash` pass; generate the manifest at `additions` so
   // the browser-manifest placeholder is populated as early as possible.
-  api.processAssets(
-    { stage: 'additions', environments: ['web'] },
-    context => buildAndEmitManifest(context, { withSri: false })
+  api.processAssets({ stage: 'additions', environments: ['web'] }, context =>
+    buildAndEmitManifest(context, { withSri: false })
   );
 }

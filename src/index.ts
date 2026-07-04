@@ -753,6 +753,27 @@ export const pluginReactRouter = (
               target: config.environments?.node?.output?.target || 'node',
               filename: {
                 js: '[name].js',
+                // On the server, `emitCss` is disabled (the default for node
+                // targets), so the only CSS emitted is from `.css?url` imports
+                // handled by Rsbuild's `cssUrlLoader`. That loader joins this
+                // template onto `distPath.css` (`static/css`), so a leading
+                // `../assets/` redirects server-only `.css?url` files to
+                // `static/assets/` — the same directory (and flat basename
+                // layout) as other `?url` assets, and where the SSR-only asset
+                // relocation step moves them. The default `[name]` for a
+                // `.css?url` import is the source-relative path (e.g.
+                // `app/assets/test`); a function collapses it to the basename so
+                // the emitted file is `static/assets/test.<hash>.css`, matching
+                // `asset/resource` outputs. The content is still
+                // postcss-processed (the loader imports the compiled module
+                // before emitting), so returned URLs resolve to processed
+                // stylesheets in `build/client`.
+                css: (pathData: Rspack.PathData) => {
+                  const sourceName = pathData.chunk?.name ?? '[name]';
+                  const baseName =
+                    sourceName.split(/[\\/]/).pop() || sourceName;
+                  return `../assets/${baseName}.[contenthash:10].css`;
+                },
               },
             },
             tools: {
@@ -776,6 +797,14 @@ export const pluginReactRouter = (
                   workerChunkLoading: nodeChunkLoading,
                   wasmLoading: 'fetch',
                   module: resolvedServerOutput === 'module',
+                  // Node entries carry their `static/js/` prefix in the entry
+                  // name, so the top-level `filename` is `[name].js`. That also
+                  // makes async chunks default to `[name].js` at the server
+                  // build root. Give server code-split chunks the same
+                  // `static/js/async/` home the web build uses so they stay
+                  // under `build/server/static/js/` instead of leaking to the
+                  // output root.
+                  chunkFilename: 'static/js/async/[name].js',
                 },
               },
             },
@@ -844,6 +873,7 @@ export const pluginReactRouter = (
         ssr,
         isSpaMode,
         rootRoutePath,
+        outputClientPath,
         devHmrEnabled,
         onRouteModuleAnalysis: rememberRouteModuleAnalysis,
       });

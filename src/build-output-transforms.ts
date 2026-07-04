@@ -20,6 +20,10 @@ import {
   analyzeRouteModuleCode,
   type RouteModuleAnalysis,
 } from './export-utils.js';
+import {
+  relocateServerAssetsToClient,
+  type RelocatableAssetCompilation,
+} from './ssr-asset-relocation.js';
 
 type RegisterBuildOutputTransformsOptions = {
   api: RsbuildPluginAPI;
@@ -44,6 +48,7 @@ type RegisterBuildOutputTransformsOptions = {
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
+  outputClientPath: string;
   devHmrEnabled?: boolean;
   onRouteModuleAnalysis?: (
     resourcePath: string,
@@ -72,6 +77,7 @@ export const registerBuildOutputTransforms = ({
   ssr,
   isSpaMode,
   rootRoutePath,
+  outputClientPath,
   devHmrEnabled,
   onRouteModuleAnalysis,
 }: RegisterBuildOutputTransformsOptions): void => {
@@ -127,6 +133,31 @@ export const registerBuildOutputTransforms = ({
       } else {
         compilation.emitAsset(packageJsonPath, source);
       }
+    }
+  );
+
+  // Relocate server-only static assets (`?url` imports, `.css?url` files, and
+  // other `asset/resource` outputs referenced only by loaders or `.server`
+  // modules) into the client build. The loader returns the asset URL to the
+  // client, which fetches it from `build/client` at runtime, so the file must
+  // exist there even though only the node compilation referenced it. The
+  // assets are also stripped from the server build to avoid shipping duplicate
+  // static files, mirroring upstream React Router's Vite plugin. This runs for
+  // every node compilation, so it also covers `serverBundles` (multiple node
+  // outputs) and dev mode (where `writeToDisk` is enabled).
+  api.processAssets(
+    { stage: 'report', targets: ['node'] },
+    async ({ compilation }) => {
+      await performanceProfiler.record(
+        'node',
+        'assets:relocate-ssr-only',
+        'ssr-only-assets',
+        () =>
+          relocateServerAssetsToClient({
+            compilation: compilation as unknown as RelocatableAssetCompilation,
+            outputClientPath,
+          })
+      );
     }
   );
 
