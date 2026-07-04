@@ -96,6 +96,15 @@ export const test = base.extend<{
       env: {
         NO_COLOR: "1",
         FORCE_COLOR: "0",
+        // The Rsbuild dev runtime evaluates ESM server bundles with vm
+        // modules, so directly spawned dev servers (e.g. `node server.mjs`)
+        // need the same flags the template `dev` script sets.
+        NODE_OPTIONS: [
+          process.env.NODE_OPTIONS,
+          "--experimental-vm-modules --experimental-global-webcrypto",
+        ]
+          .filter(Boolean)
+          .join(" "),
       },
       reject: false,
     });

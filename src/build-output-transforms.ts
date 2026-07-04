@@ -44,6 +44,7 @@ type RegisterBuildOutputTransformsOptions = {
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
+  devHmrEnabled?: boolean;
   onRouteModuleAnalysis?: (
     resourcePath: string,
     analysis: RouteModuleAnalysis
@@ -71,6 +72,7 @@ export const registerBuildOutputTransforms = ({
   ssr,
   isSpaMode,
   rootRoutePath,
+  devHmrEnabled,
   onRouteModuleAnalysis,
 }: RegisterBuildOutputTransformsOptions): void => {
   const rememberRouteModuleAnalysis = (
@@ -107,6 +109,7 @@ export const registerBuildOutputTransforms = ({
           isBuild,
           isSpaMode,
           rootRoutePath,
+          devHmr: devHmrEnabled,
         })
     );
   };
@@ -190,6 +193,8 @@ export const registerBuildOutputTransforms = ({
             environmentName: args.environment?.name,
             isBuild,
             routeChunkConfig,
+            routeId: routeByFilePath.get(args.resourcePath)?.id,
+            devHmr: devHmrEnabled,
           })
       );
     }

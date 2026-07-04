@@ -7,6 +7,7 @@ import {
   getRoutesByServerBundleId,
 } from './build-manifest.js';
 import { BUILD_CLIENT_ROUTE_QUERY_STRING } from './constants.js';
+import { DEV_HMR_RUNTIME_MODULE_ID } from './dev-hmr.js';
 import {
   createReactRouterDevRuntimeController,
   type ReactRouterDevRuntimeController,
@@ -38,6 +39,7 @@ type CreateClassicVirtualModulesOptions = {
   appDirectory: string;
   assetsBuildDirectory: string;
   basename: string;
+  devHmrRuntimeModule?: string;
   entryServerPath: string;
   federation?: boolean;
   future: Config['future'];
@@ -65,6 +67,10 @@ type CreateClassicBuildArtifactsOptions = {
   routes: Record<string, Route>;
   rootDirectory: string;
   ssr: boolean;
+  devHmr?: {
+    enabled: boolean;
+    onNodeRebuildCommitted?: () => void;
+  };
 };
 
 export type ClassicBuildArtifacts = {
@@ -85,6 +91,7 @@ export const createClassicBuildArtifacts = async ({
   routes,
   rootDirectory,
   ssr,
+  devHmr,
 }: CreateClassicBuildArtifactsOptions): Promise<ClassicBuildArtifacts> => {
   const buildManifest = await getBuildManifest({
     reactRouterConfig,
@@ -116,6 +123,8 @@ export const createClassicBuildArtifacts = async ({
       api,
       isBuild,
       buildPlan: serverBuildPlan,
+      clientPatchesRouteMetadata: devHmr?.enabled,
+      onNodeRebuildCommitted: devHmr?.onNodeRebuildCommitted,
     }),
     prerenderPaths,
     routesByServerBundleId,
@@ -182,6 +191,7 @@ export const createClassicVirtualModules = ({
   appDirectory,
   assetsBuildDirectory,
   basename,
+  devHmrRuntimeModule,
   entryServerPath,
   federation,
   future,
@@ -236,5 +246,8 @@ export const createClassicVirtualModules = ({
     ...bundleVirtualModules,
     ...bundleManifestModules,
     'virtual/react-router/with-props': generateWithProps(),
+    ...(devHmrRuntimeModule !== undefined
+      ? { [DEV_HMR_RUNTIME_MODULE_ID]: devHmrRuntimeModule }
+      : {}),
   };
 };

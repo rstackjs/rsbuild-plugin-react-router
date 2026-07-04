@@ -55,6 +55,16 @@ type CreateControllerOptions = {
   api: RsbuildPluginAPI;
   isBuild: boolean;
   buildPlan: ReactRouterDevBuildPlan;
+  /**
+   * The browser HMR runtime patches route manifest metadata (loader/action
+   * flags) in place, so metadata-only changes no longer need a full reload.
+   */
+  clientPatchesRouteMetadata?: boolean;
+  /**
+   * Invoked after a development attempt commits a re-evaluated node build for
+   * changed server files. Used to signal hot data revalidation to the client.
+   */
+  onNodeRebuildCommitted?: () => void;
 };
 
 const escapeHtml = (value: string): string =>
@@ -69,6 +79,8 @@ export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
   buildPlan,
+  clientPatchesRouteMetadata,
+  onNodeRebuildCommitted,
 }: CreateControllerOptions): ReactRouterDevRuntimeController => {
   if (isBuild) {
     return {
@@ -144,11 +156,19 @@ export const createReactRouterDevRuntimeController = ({
     ).pipe(
       Effect.flatMap(result =>
         tryPluginSync(() => {
-          if (
-            result === 'retry-node' &&
-            sessions.getActiveBinding()?.id === binding.id
-          ) {
+          if (sessions.getActiveBinding()?.id !== binding.id) {
+            return;
+          }
+          if (result === 'retry-node') {
             pair.node.watching?.invalidate();
+            return;
+          }
+          if (
+            result === 'committed' &&
+            changes.node.known &&
+            changes.node.files.size > 0
+          ) {
+            onNodeRebuildCommitted?.();
           }
         })
       ),
@@ -245,6 +265,7 @@ export const createReactRouterDevRuntimeController = ({
       const runtime = createReactRouterDevRuntime({
         server,
         buildPlan,
+        clientPatchesRouteMetadata,
         onEvaluationError(error) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;

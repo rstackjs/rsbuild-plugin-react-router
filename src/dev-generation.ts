@@ -75,6 +75,12 @@ type CreateReactRouterDevRuntimeOptions = {
   onCssAssetOwnershipChanged?: (change: 'removed' | 'restored') => void;
   onRouteManifestChanged?: () => void;
   onWarning?: (message: string) => void;
+  /**
+   * When the browser HMR runtime patches route metadata flags (hasLoader and
+   * friends) in place, flag-only manifest changes no longer require the
+   * full-reload notification from `onRouteManifestChanged`.
+   */
+  clientPatchesRouteMetadata?: boolean;
 };
 
 const collectManifestCssAssetOwnership = (
@@ -199,28 +205,42 @@ type DevRouteManifestEntry = NonNullable<
 
 const hasSameRouteMetadata = (
   previous: DevRouteManifestEntry,
-  next: DevRouteManifestEntry
-): boolean =>
-  previous.caseSensitive === next.caseSensitive &&
-  previous.clientActionModule === next.clientActionModule &&
-  previous.clientLoaderModule === next.clientLoaderModule &&
-  previous.clientMiddlewareModule === next.clientMiddlewareModule &&
-  previous.hasErrorBoundary === next.hasErrorBoundary &&
-  previous.hasAction === next.hasAction &&
-  previous.hasClientAction === next.hasClientAction &&
-  previous.hasClientLoader === next.hasClientLoader &&
-  previous.hasClientMiddleware === next.hasClientMiddleware &&
-  previous.hasDefaultExport === next.hasDefaultExport &&
-  previous.hasLoader === next.hasLoader &&
-  previous.hydrateFallbackModule === next.hydrateFallbackModule &&
-  previous.id === next.id &&
-  previous.index === next.index &&
-  previous.parentId === next.parentId &&
-  previous.path === next.path;
+  next: DevRouteManifestEntry,
+  includeHmrPatchableFlags: boolean
+): boolean => {
+  const structuralEqual =
+    previous.caseSensitive === next.caseSensitive &&
+    previous.clientActionModule === next.clientActionModule &&
+    previous.clientLoaderModule === next.clientLoaderModule &&
+    previous.clientMiddlewareModule === next.clientMiddlewareModule &&
+    previous.hasDefaultExport === next.hasDefaultExport &&
+    previous.hydrateFallbackModule === next.hydrateFallbackModule &&
+    previous.id === next.id &&
+    previous.index === next.index &&
+    previous.parentId === next.parentId &&
+    previous.path === next.path;
+  if (!structuralEqual) {
+    return false;
+  }
+  if (!includeHmrPatchableFlags) {
+    return true;
+  }
+  // Without a client-side HMR runtime these flags can only reach the browser
+  // through a full reload.
+  return (
+    previous.hasErrorBoundary === next.hasErrorBoundary &&
+    previous.hasAction === next.hasAction &&
+    previous.hasClientAction === next.hasClientAction &&
+    previous.hasClientLoader === next.hasClientLoader &&
+    previous.hasClientMiddleware === next.hasClientMiddleware &&
+    previous.hasLoader === next.hasLoader
+  );
+};
 
 const hasRouteManifestMetadataChanges = (
   previous: ReactRouterDevManifestSet,
-  next: ReactRouterDevManifestSet
+  next: ReactRouterDevManifestSet,
+  includeHmrPatchableFlags: boolean
 ): boolean => {
   const previousEntryNames = Object.keys(previous);
   if (previousEntryNames.length !== Object.keys(next).length) {
@@ -240,7 +260,10 @@ const hasRouteManifestMetadataChanges = (
     for (const routeId of previousRouteIds) {
       const previousRoute = previousRoutes[routeId];
       const nextRoute = nextRoutes[routeId];
-      if (!nextRoute || !hasSameRouteMetadata(previousRoute, nextRoute)) {
+      if (
+        !nextRoute ||
+        !hasSameRouteMetadata(previousRoute, nextRoute, includeHmrPatchableFlags)
+      ) {
         return true;
       }
     }
@@ -260,6 +283,7 @@ export const createReactRouterDevRuntime = ({
   onCssAssetOwnershipChanged = () => undefined,
   onRouteManifestChanged = () => undefined,
   onWarning = () => undefined,
+  clientPatchesRouteMetadata = false,
 }: CreateReactRouterDevRuntimeOptions): ReactRouterDevRuntime => {
   let nextAttemptId = 1;
   let reloadAfterCssRemoval = false;
@@ -513,7 +537,8 @@ export const createReactRouterDevRuntime = ({
         webChanged &&
         hasRouteManifestMetadataChanges(
           previous.web.manifestsByEntryName,
-          manifestsByEntryName
+          manifestsByEntryName,
+          !clientPatchesRouteMetadata
         );
       const reusePreviousNodeBuild =
         !!previous &&

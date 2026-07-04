@@ -46,6 +46,12 @@ import {
   roundMs,
 } from './performance.js';
 import { mapVirtualModules } from './virtual-modules.js';
+import {
+  createDevHdrRevisionSignal,
+  generateDevHmrRuntimeModule,
+  getDevHdrRevisionFilePath,
+  resolveReactRefreshRuntimePath,
+} from './dev-hmr.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import { importConfigWithWatchPaths } from './config-imports.js';
@@ -387,6 +393,26 @@ export const pluginReactRouter = (
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
 
+    // Development HMR/HDR support requires the react-refresh runtime that
+    // @rsbuild/plugin-react wires into the web bundle. When it is missing,
+    // route edits fall back to the previous full-reload behavior.
+    const devHmrRefreshRuntimePath =
+      isBuild || isRscMode
+        ? undefined
+        : resolveReactRefreshRuntimePath(api.context.rootPath);
+    const devHdrSignal = devHmrRefreshRuntimePath
+      ? createDevHdrRevisionSignal({
+          filePath: getDevHdrRevisionFilePath(api.context.rootPath),
+          onError: error =>
+            api.logger.debug(
+              `[${PLUGIN_NAME}] Failed to signal hot data revalidation: ${error.message}`
+            ),
+        })
+      : undefined;
+    // The revision module must exist before the first web compile resolves it.
+    devHdrSignal?.ensure();
+    const devHmrEnabled = devHmrRefreshRuntimePath !== undefined;
+
     const modePlan = await createReactRouterModePlan({
       api,
       allowedActionOriginsForBuild,
@@ -421,6 +447,17 @@ export const pluginReactRouter = (
       shouldDependOnWebCompiler,
       splitRouteModules,
       ssr,
+      devHmr:
+        devHmrRefreshRuntimePath && devHdrSignal
+          ? {
+              enabled: true,
+              runtimeModule: generateDevHmrRuntimeModule({
+                reactRefreshRuntimePath: devHmrRefreshRuntimePath,
+                hdrRevisionFilePath: devHdrSignal.filePath,
+              }),
+              onNodeRebuildCommitted: () => devHdrSignal.bump(),
+            }
+          : undefined,
     });
 
     const { manifestChunkNames } = modePlan;
@@ -791,6 +828,7 @@ export const pluginReactRouter = (
         ssr,
         isSpaMode,
         rootRoutePath,
+        devHmrEnabled,
         onRouteModuleAnalysis: rememberRouteModuleAnalysis,
       });
     }

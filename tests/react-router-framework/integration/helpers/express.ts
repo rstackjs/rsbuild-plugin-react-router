@@ -9,6 +9,7 @@ export function server() {
     const hmrPort = process.env.HMR_PORT ?? 3001
 
     const app = express();
+    let devServer;
 
     if (process.env.NODE_ENV === "production") {
       app.use(
@@ -20,10 +21,18 @@ export function server() {
         build: await import("./build/index.js"),
       }));
     } else {
-      throw new Error("Custom dev servers need an Rsbuild dev-server adapter");
+      const { createRsbuild, loadConfig } = await import("@rsbuild/core");
+      const { content } = await loadConfig();
+      const rsbuild = await createRsbuild({ rsbuildConfig: content });
+      devServer = await rsbuild.createDevServer();
+      app.use(devServer.middlewares);
     }
 
-    app.listen(port, () => console.log('http://localhost:' + port));
+    const server = app.listen(port, () => {
+      console.log('http://localhost:' + port);
+      devServer?.afterListen();
+    });
+    devServer?.connectWebSocket({ server });
   `;
 }
 

@@ -41,6 +41,8 @@ export type RouteClientEntryTransformTask = BaseRouteTransformTask & {
   environmentName?: string;
   isBuild: boolean;
   routeChunkConfig: RouteChunkConfig;
+  routeId?: string;
+  devHmr?: boolean;
 };
 
 export type RouteChunkTransformTask = BaseRouteTransformTask & {
@@ -69,6 +71,7 @@ export type RouteModuleTransformTask = BaseRouteTransformTask & {
   isBuild: boolean;
   isSpaMode: boolean;
   rootRoutePath: string | null;
+  devHmr?: boolean;
 };
 
 export type RouteTransformTask =
@@ -151,6 +154,103 @@ const createClientOnlyStub = async (
   };
 };
 
+const isComponentishName = (name: string): boolean => /^[A-Z]/.test(name);
+
+const collectDeclaredComponentNames = (
+  declaration: {
+    type?: string;
+    id?: { name?: string };
+    declarations?: Array<{
+      id?: { type?: string; name?: string };
+      init?: { type?: string };
+    }>;
+  },
+  names: Set<string>
+): void => {
+  if (
+    declaration.type === 'FunctionDeclaration' &&
+    declaration.id?.name &&
+    isComponentishName(declaration.id.name)
+  ) {
+    names.add(declaration.id.name);
+    return;
+  }
+  if (declaration.type !== 'VariableDeclaration') {
+    return;
+  }
+  for (const declarator of declaration.declarations ?? []) {
+    if (
+      declarator.id?.type === 'Identifier' &&
+      declarator.id.name &&
+      isComponentishName(declarator.id.name) &&
+      declarator.init &&
+      (declarator.init.type === 'ArrowFunctionExpression' ||
+        declarator.init.type === 'FunctionExpression' ||
+        declarator.init.type === 'CallExpression')
+    ) {
+      names.add(declarator.id.name);
+    }
+  }
+};
+
+/**
+ * Names of top-level components that still need a React Fast Refresh
+ * registration, following react-refresh/babel's name-based detection.
+ *
+ * SWC's refresh transform registers components in JSX/TSX sources, but
+ * compiled route modules whose JSX was already lowered by an earlier loader
+ * (e.g. MDX routes) reach it without JSX syntax and end up unregistered. An
+ * unregistered component has no refresh family, so hot updates remount its
+ * subtree instead of updating it in place.
+ */
+const collectUnregisteredComponentNames = (program: {
+  body?: Array<{
+    type?: string;
+    declaration?: Parameters<typeof collectDeclaredComponentNames>[0];
+    expression?: {
+      type?: string;
+      callee?: { type?: string; name?: string };
+      arguments?: Array<{ type?: string; value?: unknown }>;
+    };
+  }>;
+}): string[] => {
+  const declared = new Set<string>();
+  const registered = new Set<string>();
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ExportNamedDeclaration' && statement.declaration) {
+      collectDeclaredComponentNames(statement.declaration, declared);
+      continue;
+    }
+    if (
+      statement.type === 'ExpressionStatement' &&
+      statement.expression?.type === 'CallExpression' &&
+      statement.expression.callee?.type === 'Identifier' &&
+      statement.expression.callee.name === '$RefreshReg$'
+    ) {
+      const nameArgument = statement.expression.arguments?.[1];
+      if (typeof nameArgument?.value === 'string') {
+        registered.add(nameArgument.value);
+      }
+      continue;
+    }
+    collectDeclaredComponentNames(
+      statement as Parameters<typeof collectDeclaredComponentNames>[0],
+      declared
+    );
+  }
+  return [...declared].filter(name => !registered.has(name));
+};
+
+const buildComponentRefreshRegistrations = (names: string[]): string => {
+  const registrations = names
+    .map(
+      name =>
+        `  if (typeof ${name} === 'function') $RefreshReg$(${name}, ${JSON.stringify(name)});`
+    )
+    .join('\n');
+  return `\nif (typeof $RefreshReg$ === 'function') {\n${registrations}\n}\n`;
+};
+
 const transformRouteModule = async (
   task: RouteModuleTransformTask
 ): Promise<RouteTransformResult> => {
@@ -207,13 +307,24 @@ const transformRouteModule = async (
     removeUnusedImports(ast);
   }
 
-  return generate(ast, {
+  const result = generate(ast, {
     // Rsbuild merges this map with its downstream SWC transform. Only pay the
     // code-generation cost when this environment actually emits JS maps.
     sourceMaps: task.sourceMaps,
     filename: task.resource,
     sourceFileName: task.resourcePath,
   });
+
+  if (task.devHmr && task.environmentName === 'web' && !task.isBuild) {
+    const unregisteredComponents = collectUnregisteredComponentNames(
+      getProgram(ast)
+    );
+    if (unregisteredComponents.length > 0) {
+      result.code += buildComponentRefreshRegistrations(unregisteredComponents);
+    }
+  }
+
+  return result;
 };
 
 export const executeRouteTransformTask = async (
@@ -229,6 +340,8 @@ export const executeRouteTransformTask = async (
         isBuild: task.isBuild,
         routeChunkCache: getRouteChunkCache(options),
         routeChunkConfig: task.routeChunkConfig,
+        routeId: task.routeId,
+        devHmr: task.devHmr,
       });
     case 'routeChunk':
       return createRouteChunkArtifact({

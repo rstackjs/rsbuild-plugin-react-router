@@ -12,6 +12,7 @@ import type {
   ResolvedReactRouterConfig,
 } from './react-router-config.js';
 import type { RouteChunkCache, RouteChunkConfig } from './route-chunks.js';
+import type { DevHmrPlanOptions } from './dev-hmr.js';
 import type { PluginOptions, Route } from './types.js';
 import { createDevServerMiddleware } from './dev-server.js';
 import { resolveAppPackagePath } from './plugin-utils.js';
@@ -99,6 +100,7 @@ type ModePlanContext = {
 
 type CreateClassicModePlanOptions = ModePlanContext & {
   assetsBuildDirectory: string;
+  devHmr?: DevHmrPlanOptions;
   defaultEntryName: string;
   entryServerPath: string;
   federation?: boolean;
@@ -251,6 +253,7 @@ const createClassicModePlan = async ({
   basename,
   customServer,
   defaultEntryName,
+  devHmr,
   entryServerPath,
   federation,
   finalEntryClientPath,
@@ -305,6 +308,12 @@ const createClassicModePlan = async ({
     routes,
     rootDirectory: process.cwd(),
     ssr,
+    devHmr: devHmr
+      ? {
+          enabled: devHmr.enabled,
+          onNodeRebuildCommitted: devHmr.onNodeRebuildCommitted,
+        }
+      : undefined,
   });
   const reactRouterAliases = createReactRouterPackageAliases();
   return {
@@ -336,6 +345,7 @@ const createClassicModePlan = async ({
         appDirectory,
         assetsBuildDirectory,
         basename,
+        devHmrRuntimeModule: devHmr?.runtimeModule,
         entryServerPath,
         federation,
         future,
