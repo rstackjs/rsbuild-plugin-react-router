@@ -54,12 +54,9 @@ type ModifyBrowserManifestOptions = {
 
 type ProcessAssetsApi = Pick<RsbuildPluginAPI, 'processAssets'>;
 type AssetPrefixInput = string | (() => string);
-type GeneratedManifest = {
-  manifest: ReactRouterManifest;
-  moduleExportsByRouteId: RouteManifestModuleExports;
-  manifestStats: ReturnType<typeof createReactRouterManifestStats>;
-  assetPrefix: string;
-};
+type ManifestProcessAssetsContext = Parameters<
+  Parameters<RsbuildPluginAPI['processAssets']>[1]
+>[0];
 
 const BROWSER_MANIFEST_ASSET =
   'static/js/virtual/react-router/browser-manifest.js';
@@ -127,119 +124,106 @@ export function registerModifyBrowserManifestAssets(
       routes,
       routeChunkOptions?.splitRouteModules
     );
+  const isBuild = Boolean(routeChunkOptions?.isBuild);
   const finalizeSri = Boolean(
-    routeChunkOptions?.isBuild &&
+    isBuild &&
     (options?.subResourceIntegrity ??
       options?.future?.unstable_subResourceIntegrity)
   );
-  const generatedManifests = finalizeSri
-    ? new WeakMap<Rspack.Compilation, GeneratedManifest>()
-    : undefined;
 
-  api.processAssets(
-    { stage: 'additions', environments: ['web'] },
-    async ({ assets, sources, compilation }) => {
-      const currentAssetPrefix = getAssetPrefix();
-      const stats = createReactRouterManifestStats(
-        compilation,
-        manifestChunkNames
+  // Build the React Router manifest from the compilation's current asset names,
+  // emit the build-mode `manifest-<version>.js` asset (or replace the dev
+  // browser-manifest placeholder), and fire the `onManifest` callback.
+  const buildAndEmitManifest = async (
+    { assets, sources, compilation }: ManifestProcessAssetsContext,
+    { withSri }: { withSri: boolean }
+  ): Promise<void> => {
+    const currentAssetPrefix = getAssetPrefix();
+    const stats = createReactRouterManifestStats(
+      compilation,
+      manifestChunkNames
+    );
+    const { manifest, moduleExportsByRouteId } =
+      await generateReactRouterManifestForDev(
+        routes,
+        pluginOptions,
+        stats,
+        appDirectory,
+        currentAssetPrefix,
+        createReactRouterManifestOptions({
+          routeChunks: routeChunkOptions,
+          routeModuleAnalysis: options?.routeModuleAnalysis,
+        })
       );
-      const { manifest, moduleExportsByRouteId } =
-        await generateReactRouterManifestForDev(
-          routes,
-          pluginOptions,
-          stats,
-          appDirectory,
-          currentAssetPrefix,
-          createReactRouterManifestOptions({
-            routeChunks: routeChunkOptions,
-            routeModuleAnalysis: options?.routeModuleAnalysis,
-          })
-        );
-      const manifestForBrowser = finalizeSri
-        ? { ...manifest, sri: true as const }
-        : manifest;
 
-      const browserManifestAsset = assets[BROWSER_MANIFEST_ASSET];
-      if (browserManifestAsset) {
-        const originalSource = browserManifestAsset.source().toString();
-        const newSource = originalSource.replace(
-          /["'`]PLACEHOLDER["'`]/,
-          jsesc(manifestForBrowser, { es6: true })
-        );
-        compilation.updateAsset(
-          BROWSER_MANIFEST_ASSET,
-          new sources.RawSource(newSource)
-        );
-      }
+    // With SRI, integrity hashes are only available once the compilation has
+    // finalized asset hashes, so collect them at this (report) stage.
+    const sri = withSri
+      ? (collectSubresourceIntegrity(undefined, compilation, currentAssetPrefix) ??
+        true)
+      : undefined;
+    const manifestForBrowser: ReactRouterManifest =
+      sri !== undefined ? { ...manifest, sri } : manifest;
 
-      if (routeChunkOptions?.isBuild) {
-        const entryAssets = stats?.assetsByChunkName?.['entry.client'];
-        const entryJsAssets =
-          entryAssets?.filter(asset => asset.endsWith('.js')) || [];
-        const manifestPath = getReactRouterManifestPath({
-          version: manifest.version,
-          isBuild: true,
-          entryModulePath: entryJsAssets[0],
-        });
-        const manifestSource = `window.__reactRouterManifest=${jsesc(
-          manifestForBrowser,
-          { es6: true }
-        )};`;
-        const source = new sources.RawSource(manifestSource);
-        if (compilation.getAsset(manifestPath)) {
-          compilation.updateAsset(manifestPath, source);
-        } else {
-          compilation.emitAsset(manifestPath, source);
-        }
-      }
-
-      if (generatedManifests) {
-        generatedManifests.set(compilation, {
-          manifest,
-          moduleExportsByRouteId,
-          manifestStats: stats,
-          assetPrefix: currentAssetPrefix,
-        });
-        return;
-      }
-
-      options?.onManifest?.(manifest, undefined, moduleExportsByRouteId, {
-        compilation,
-        manifestStats: stats,
-      });
+    const browserManifestAsset = assets[BROWSER_MANIFEST_ASSET];
+    if (browserManifestAsset) {
+      const originalSource = browserManifestAsset.source().toString();
+      const newSource = originalSource.replace(
+        /["'`]PLACEHOLDER["'`]/,
+        jsesc(manifestForBrowser, { es6: true })
+      );
+      compilation.updateAsset(
+        BROWSER_MANIFEST_ASSET,
+        new sources.RawSource(newSource)
+      );
     }
-  );
 
-  if (generatedManifests) {
+    if (isBuild) {
+      const entryAssets = stats?.assetsByChunkName?.['entry.client'];
+      const entryJsAssets =
+        entryAssets?.filter(asset => asset.endsWith('.js')) || [];
+      const manifestPath = getReactRouterManifestPath({
+        version: manifest.version,
+        isBuild: true,
+        entryModulePath: entryJsAssets[0],
+      });
+      const manifestSource = `window.__reactRouterManifest=${jsesc(
+        manifestForBrowser,
+        { es6: true }
+      )};`;
+      const source = new sources.RawSource(manifestSource);
+      if (compilation.getAsset(manifestPath)) {
+        compilation.updateAsset(manifestPath, source);
+      } else {
+        compilation.emitAsset(manifestPath, source);
+      }
+    }
+
+    options?.onManifest?.(manifestForBrowser, sri, moduleExportsByRouteId, {
+      compilation,
+      manifestStats: stats,
+    });
+  };
+
+  if (isBuild) {
+    // In production, Rspack renames content-hashed assets during
+    // `realContentHash` (PROCESS_ASSETS_STAGE_OPTIMIZE_HASH = 2500). Reading
+    // asset names before that stage yields pre-rename hashes that never appear
+    // in the output, so CSS/JS URLs in the manifest 404. Defer manifest
+    // generation and emission to the `report` stage
+    // (PROCESS_ASSETS_STAGE_REPORT = 5000), which runs after the rename (and
+    // after SRI integrity hashes are finalized).
     api.processAssets(
       { stage: 'report', environments: ['web'] },
-      ({ compilation }) => {
-        const generatedManifest = generatedManifests.get(compilation);
-        if (!generatedManifest) {
-          return;
-        }
-
-        generatedManifests.delete(compilation);
-        const sri =
-          collectSubresourceIntegrity(
-            undefined,
-            compilation,
-            generatedManifest.assetPrefix
-          ) ?? true;
-        options?.onManifest?.(
-          {
-            ...generatedManifest.manifest,
-            sri,
-          },
-          sri,
-          generatedManifest.moduleExportsByRouteId,
-          {
-            compilation,
-            manifestStats: generatedManifest.manifestStats,
-          }
-        );
-      }
+      context => buildAndEmitManifest(context, { withSri: finalizeSri })
     );
+    return;
   }
+
+  // Dev has no `realContentHash` pass; generate the manifest at `additions` so
+  // the browser-manifest placeholder is populated as early as possible.
+  api.processAssets(
+    { stage: 'additions', environments: ['web'] },
+    context => buildAndEmitManifest(context, { withSri: false })
+  );
 }

@@ -13,6 +13,7 @@ import {
   findEntryFile,
   normalizeAssetPrefix,
   resolveAppPackagePath,
+  resolveEffectiveAssetPrefix,
 } from './plugin-utils.js';
 import { resolveReactRouterEntryPaths } from './entry-paths.js';
 import { registerReactRouterEnvironmentOutput } from './environment-output.js';
@@ -141,6 +142,21 @@ export const pluginReactRouter = (
     api.onBeforeBuild(() => {
       const normalized = api.getNormalizedConfig();
       warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
+    });
+
+    // Resolve the effective asset prefix the same way Rsbuild does, per mode.
+    // The prefix set in `modifyRsbuildConfig` only reflects `output.assetPrefix`,
+    // but in dev the effective prefix is `dev.assetPrefix` (defaulted from
+    // `server.base`). The normalized config has both fields already resolved, so
+    // read them here — this runs before compilation (and before the
+    // `processAssets` handlers that build the manifest read `assetPrefix`).
+    api.onBeforeCreateCompiler(() => {
+      const normalized = api.getNormalizedConfig();
+      assetPrefix = resolveEffectiveAssetPrefix({
+        dev: normalized.dev,
+        output: normalized.output,
+        isBuild: api.context.action === 'build',
+      });
     });
 
     const configPath = findEntryFile(resolve('react-router.config'));

@@ -163,6 +163,7 @@ rstest.mock('@scripts/test-helper', () => ({
       onAfterBuild: rstest.fn(),
       onBeforeDevCompile: rstest.fn(),
       onAfterDevCompile: rstest.fn(),
+      onBeforeCreateCompiler: rstest.fn(),
       onAfterCreateCompiler: rstest.fn(),
       getNormalizedConfig: rstest.fn().mockImplementation(() => mergedConfig),
       isPluginExists: rstest.fn().mockReturnValue(false),
