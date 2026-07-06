@@ -98,7 +98,7 @@ async exports before passing the build to React Router's request handler.
 Put React Router framework settings in `react-router.config.*`:
 
 ```ts
-import type { Config } from '@react-router/dev/config';
+import type { ReactRouterRsbuildConfig } from 'rsbuild-plugin-react-router';
 
 export default {
   ssr: true,
@@ -107,8 +107,12 @@ export default {
   basename: '/',
   splitRouteModules: true,
   subResourceIntegrity: false,
-} satisfies Config;
+} satisfies ReactRouterRsbuildConfig;
 ```
+
+Use `ReactRouterRsbuildConfig` for Rsbuild projects so plugin-supported
+configuration such as `splitRouteModules` remains typed across React Router 7
+and 8 releases.
 
 Commonly used options:
 

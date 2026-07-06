@@ -456,6 +456,9 @@ describe('pluginReactRouter', () => {
       );
 
       expect(rootDeclarations).toContain(
+        "export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';"
+      );
+      expect(rootDeclarations).toContain(
         "export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';"
       );
     } finally {

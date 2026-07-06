@@ -71,6 +71,7 @@ import { createReactRouterModePlan } from './mode-plan.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
+export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
 export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
 
 const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;

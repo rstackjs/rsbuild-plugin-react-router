@@ -64,7 +64,13 @@ describe('benchmark fixture generator', () => {
         join(root, 'react-router.config.ts'),
         'utf8'
       );
+      expect(reactRouterConfig).toContain(
+        "import type { ReactRouterRsbuildConfig } from 'rsbuild-plugin-react-router';"
+      );
       expect(reactRouterConfig).toContain('splitRouteModules: true');
+      expect(reactRouterConfig).toContain(
+        '} satisfies ReactRouterRsbuildConfig;'
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
