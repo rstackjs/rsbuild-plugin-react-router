@@ -1,4 +1,5 @@
 import { createStubRsbuild } from '@scripts/test-helper';
+import type { Rspack } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as fs from 'node:fs';
 import { pluginReactRouter, shouldParallelizeEnvironmentBuilds } from '../src';
@@ -46,6 +47,34 @@ const captureEnv = (keys: string[]) => {
       }
     }
   };
+};
+
+const hasReactRouterDynamicImportRules = (
+  rules: Rspack.RuleSetRule[]
+): boolean => {
+  const getParserMode = (rule: Rspack.RuleSetRule) =>
+    (rule.parser as { dynamicImportMode?: unknown } | undefined)
+      ?.dynamicImportMode;
+  const hasRouteQueryRule = rules.some(rule => {
+    const resourceQuery = (rule as { resourceQuery?: unknown }).resourceQuery;
+    return (
+      resourceQuery instanceof RegExp &&
+      resourceQuery.test('?__react-router-build-client-route') &&
+      resourceQuery.test('?react-router-route') &&
+      resourceQuery.test('?route-chunk=clientLoader') &&
+      getParserMode(rule) === 'lazy'
+    );
+  });
+  const hasRuntimeRule = rules.some(rule => {
+    const test = (rule as { test?: unknown }).test;
+    return (
+      test instanceof RegExp &&
+      test.test('/project/node_modules/react-router/dist/index.js') &&
+      getParserMode(rule) === 'lazy'
+    );
+  });
+
+  return hasRouteQueryRule && hasRuntimeRule;
 };
 
 describe('pluginReactRouter', () => {
@@ -592,6 +621,70 @@ describe('pluginReactRouter', () => {
     expect(webEntries['routes/index']).toMatchObject({
       html: false,
     });
+  });
+
+  it('preserves React Router dynamic imports when Rspack eager mode is configured', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        environments: {
+          web: {
+            tools: {
+              rspack: {
+                module: {
+                  parser: {
+                    javascript: {
+                      dynamicImportMode: 'eager',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    const rules = config.environments?.web?.tools?.rspack?.module?.rules ?? [];
+    expect(hasReactRouterDynamicImportRules(rules)).toBe(true);
+  });
+
+  it('preserves React Router dynamic imports when root Rspack eager mode is configured', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        tools: {
+          rspack: {
+            module: {
+              parser: {
+                javascript: {
+                  dynamicImportMode: 'eager',
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    const rules = config.environments?.web?.tools?.rspack?.module?.rules ?? [];
+    expect(hasReactRouterDynamicImportRules(rules)).toBe(true);
+  });
+
+  it('does not add React Router dynamic import rules without Rspack eager mode', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    const rules = config.environments?.web?.tools?.rspack?.module?.rules ?? [];
+    expect(hasReactRouterDynamicImportRules(rules)).toBe(false);
   });
 
   it('should enable Rsbuild SRI for the web environment when configured', async () => {

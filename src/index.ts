@@ -66,7 +66,6 @@ import {
   createReactRouterServerBuildPlan,
 } from './server-build-plan.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
-import { warnOnEagerDynamicImportMode } from './warnings/warn-on-eager-dynamic-import-mode.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
 import {
@@ -83,6 +82,7 @@ import {
   createReactRouterRouteWatchFiles,
   registerReactRouterDevBackgroundResources,
 } from './dev-background-resources.js';
+import { getReactRouterDynamicImportRules } from './react-router-dynamic-imports.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -581,7 +581,6 @@ export const pluginReactRouter = (
       isBuild,
       buildPlan: serverBuildPlan,
     });
-    let hasWarnedOnEagerDynamicImportMode = false;
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
@@ -823,6 +822,10 @@ export const pluginReactRouter = (
                 name: 'web',
                 module: {
                   rules: [
+                    ...getReactRouterDynamicImportRules(
+                      config.tools?.rspack,
+                      config.environments?.web?.tools?.rspack
+                    ),
                     {
                       resourceQuery: urlAssetResourceQuery,
                       exclude: cssUrlAssetExtensions,
@@ -909,13 +912,6 @@ export const pluginReactRouter = (
             rspack: rspackConfig => {
               if (pluginOptions.federation) {
                 ensureFederationAsyncStartup(rspackConfig);
-              }
-
-              if (name === 'web' && !hasWarnedOnEagerDynamicImportMode) {
-                hasWarnedOnEagerDynamicImportMode =
-                  warnOnEagerDynamicImportMode(rspackConfig, message =>
-                    api.logger.warn(message)
-                  );
               }
 
               if (name === 'node') {
