@@ -449,52 +449,60 @@ export const pluginReactRouter = (
     devHdrSignal?.ensure();
     const devHmrEnabled = devHmrRefreshRuntimePath !== undefined;
 
-    const modePlan = await createReactRouterModePlan({
+    const commonModeOptions = {
       api,
       allowedActionOriginsForBuild,
       appDirectory,
-      assetsBuildDirectory,
       basename,
-      buildDirectory,
       customServer: pluginOptions.customServer,
-      defaultEntryName: devServerBuildEntryName,
-      entryServerPath: finalEntryServerPath,
-      federation: options.federation,
-      finalEntryClientPath,
-      finalEntryRscClientPath,
-      finalEntryRscPath,
-      future,
-      hasServerApp,
       isBuild,
-      isRscMode,
-      outputClientPath,
-      parallelRouteTransform: pluginOptions.parallelRouteTransform,
-      pluginName: PLUGIN_NAME,
       prerenderConfig,
-      reactRouterConfig: resolvedConfigWithRoutes,
-      routeChunkCache,
       routeConfig,
-      routeCount,
       routeDiscovery,
       routes,
       rootRouteFile,
-      serverAppPath,
-      serverBuildFile,
-      shouldDependOnWebCompiler,
       splitRouteModules,
       ssr,
-      devHmr:
-        devHmrRefreshRuntimePath && devHdrSignal
-          ? {
-              enabled: true,
-              runtimeModule: generateDevHmrRuntimeModule({
-                reactRefreshRuntimePath: devHmrRefreshRuntimePath,
-                hdrRevisionFilePath: devHdrSignal.filePath,
-              }),
-              onNodeRebuildCommitted: () => devHdrSignal.bump(),
-            }
-          : undefined,
-    });
+    };
+    const modePlan = await (isRscMode
+      ? createReactRouterModePlan({
+          ...commonModeOptions,
+          isRscMode: true,
+          buildDirectory,
+          finalEntryRscClientPath,
+          finalEntryRscPath,
+          outputClientPath,
+          pluginName: PLUGIN_NAME,
+          serverBuildFile,
+        })
+      : createReactRouterModePlan({
+          ...commonModeOptions,
+          isRscMode: false,
+          assetsBuildDirectory,
+          defaultEntryName: devServerBuildEntryName,
+          entryServerPath: finalEntryServerPath,
+          federation: options.federation,
+          finalEntryClientPath,
+          future,
+          hasServerApp,
+          parallelRouteTransform: pluginOptions.parallelRouteTransform,
+          reactRouterConfig: resolvedConfigWithRoutes,
+          routeChunkCache,
+          routeCount,
+          serverAppPath,
+          shouldDependOnWebCompiler,
+          devHmr:
+            devHmrRefreshRuntimePath && devHdrSignal
+              ? {
+                  enabled: true,
+                  runtimeModule: generateDevHmrRuntimeModule({
+                    reactRefreshRuntimePath: devHmrRefreshRuntimePath,
+                    hdrRevisionFilePath: devHdrSignal.filePath,
+                  }),
+                  onNodeRebuildCommitted: () => devHdrSignal.bump(),
+                }
+              : undefined,
+        }));
 
     const { manifestChunkNames } = modePlan;
 

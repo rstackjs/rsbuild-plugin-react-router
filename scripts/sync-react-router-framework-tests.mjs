@@ -50,6 +50,71 @@ export const adapterOwnedPaths = [
 ];
 
 /**
+ * Upstream corpus files that intentionally carry Rsbuild-specific adaptations
+ * in-place. These are preserved across syncs the same way adapter-owned helper
+ * files are preserved, but are separated so the amount of local drift remains
+ * visible and reviewable.
+ */
+export const adaptedCorpusPaths = [
+  'integration/absolute-base-test.ts',
+  'integration/action-test.ts',
+  'integration/basename-test.ts',
+  'integration/build-test.ts',
+  'integration/catch-boundary-data-test.ts',
+  'integration/cli-test.ts',
+  'integration/client-data-test.ts',
+  'integration/css-lazy-loading-test.ts',
+  'integration/css-test.ts',
+  'integration/deduped-route-modules-test.ts',
+  'integration/dev-custom-entry-test.ts',
+  'integration/dev-test.ts',
+  'integration/dot-client-test.ts',
+  'integration/dot-server-test.ts',
+  'integration/dotenv-test.ts',
+  'integration/extra-server-environment-test.ts',
+  'integration/fog-of-war-test.ts',
+  'integration/fs-routes-test.ts',
+  'integration/helpers/rsbuild-template',
+  'integration/helpers/rsc-framework',
+  'integration/helpers/rsc-preview',
+  'integration/helpers/stream.ts',
+  'integration/helpers/templates.ts',
+  'integration/helpers/vite-plugin-cloudflare-template/package.json',
+  'integration/hmr-hdr-rsc-test.ts',
+  'integration/hmr-hdr-test.ts',
+  'integration/link-test.ts',
+  'integration/loader-context-test.ts',
+  'integration/manifests-test.ts',
+  'integration/mdx-test.ts',
+  'integration/middleware-test.ts',
+  'integration/node-env-test.ts',
+  'integration/package.json',
+  'integration/plugin-cloudflare-test.ts',
+  'integration/plugin-order-validation-test.ts',
+  'integration/prefetch-test.ts',
+  'integration/prerender-test.ts',
+  'integration/presets-test.ts',
+  'integration/preview-test.ts',
+  'integration/react-router-serve-test.ts',
+  'integration/redirects-test.ts',
+  'integration/route-added-test.ts',
+  'integration/route-config-test.ts',
+  'integration/route-exports-modified-offscreen-test.ts',
+  'integration/rsc/rsc-framework-test.ts',
+  'integration/rsc/rsc-prerender-test.ts',
+  'integration/rsc/utils.ts',
+  'integration/server-bundles-test.ts',
+  'integration/server-fs-allow-test.ts',
+  'integration/session-storage-denied-test.ts',
+  'integration/single-fetch-test.ts',
+  'integration/spa-mode-test.ts',
+  'integration/split-route-modules-test.ts',
+  'integration/sri-test.ts',
+  'integration/typegen-test.ts',
+  'integration/unused-route-exports-test.ts',
+];
+
+/**
  * Corpus renames applied on top of the upstream layout. Keys are the upstream
  * path (as it appears in a fresh sync of the pinned ref, relative to the corpus
  * root); values are the corpus path they now live at. These are hand-maintained
@@ -112,6 +177,18 @@ export const corpusRenames = {
   'integration/vite-unused-route-exports-test.ts':
     'integration/unused-route-exports-test.ts',
 };
+
+export const removedUpstreamPaths = [
+  'integration/helpers/vite-plugin-cloudflare-template/vite.config.ts',
+];
+
+const preservedCorpusPaths = [
+  ...new Set([
+    ...adapterOwnedPaths,
+    ...adaptedCorpusPaths,
+    ...Object.values(corpusRenames),
+  ]),
+];
 
 const defaultSource = '/home/zack/projects/react-router';
 const sourceRoot = path.resolve(
@@ -207,7 +284,7 @@ const copyIfExists = async (from, to) => {
 
 const preserveAdapterFiles = async () => {
   await rm(scratchRoot, { force: true, recursive: true });
-  for (const relativePath of adapterOwnedPaths) {
+  for (const relativePath of preservedCorpusPaths) {
     await copyIfExists(
       path.join(targetRoot, relativePath),
       path.join(scratchRoot, relativePath)
@@ -216,7 +293,7 @@ const preserveAdapterFiles = async () => {
 };
 
 const restoreAdapterFiles = async () => {
-  for (const relativePath of adapterOwnedPaths) {
+  for (const relativePath of preservedCorpusPaths) {
     await copyIfExists(
       path.join(scratchRoot, relativePath),
       path.join(targetRoot, relativePath)
@@ -233,6 +310,16 @@ const copyUpstreamTests = async () => {
     }
     await rm(path.join(targetRoot, target), { force: true, recursive: true });
     await cp(sourcePath, path.join(targetRoot, target), {
+      force: true,
+      recursive: true,
+    });
+  }
+
+  for (const sourcePath of [
+    ...Object.keys(corpusRenames),
+    ...removedUpstreamPaths,
+  ]) {
+    await rm(path.join(targetRoot, sourcePath), {
       force: true,
       recursive: true,
     });
@@ -293,38 +380,67 @@ const normalizePackageJson = async packageJsonPath => {
 /**
  * Compares the freshly synced working tree against the git index. A verified
  * corpus means the checked-in files are byte-identical to a fresh sync from
- * the pinned ref (plus the adapter-owned overlay) — i.e. nothing under the
- * corpus was hand-edited outside `adapterOwnedPaths`.
+ * the pinned ref plus the declared local overlay — i.e. nothing under the
+ * corpus was hand-edited outside `preservedCorpusPaths`.
  */
 const detectCorpusDrift = () => {
   // Raw output (no trim): porcelain lines are `XY <path>` and the first
   // line's status prefix may start with a significant space.
   const status = execFileSync(
     'git',
-    ['-C', repoRoot, 'status', '--porcelain', '--', 'tests/react-router-framework'],
+    [
+      '-C',
+      repoRoot,
+      'status',
+      '--porcelain',
+      '--',
+      'tests/react-router-framework',
+    ],
     { encoding: 'utf8' }
   );
   if (!status.trim()) {
     return [];
   }
-  const adapterOwned = new Set(
-    adapterOwnedPaths.map(relativePath =>
-      path.posix.join('tests/react-router-framework', relativePath)
-    )
+  const preserved = preservedCorpusPaths.map(relativePath =>
+    path.posix.join('tests/react-router-framework', relativePath)
   );
+  const isPreservedPath = entry =>
+    preserved.some(
+      preservedPath =>
+        entry === preservedPath || entry.startsWith(`${preservedPath}/`)
+    );
+
   return status
     .split('\n')
     .filter(line => line.length > 3)
     .map(line => line.slice(3).trim())
-    .filter(entry => entry && !adapterOwned.has(entry));
+    .filter(entry => entry && !isPreservedPath(entry));
+};
+
+const getCorpusVerification = () => {
+  const status = execFileSync(
+    'git',
+    [
+      '-C',
+      repoRoot,
+      'status',
+      '--porcelain',
+      '--',
+      'tests/react-router-framework',
+    ],
+    { encoding: 'utf8' }
+  );
+  return {
+    untrackedDriftPaths: detectCorpusDrift(),
+  };
 };
 
 const writeManifest = async ref => {
   const fileCount = (
     await findFiles(targetRoot, name => name !== 'UPSTREAM.json')
   ).length;
-  const driftedPaths = detectCorpusDrift();
-  const corpusVerified = updatePin ? true : driftedPaths.length === 0;
+  const { untrackedDriftPaths } = getCorpusVerification();
+  const corpusVerified = updatePin ? true : untrackedDriftPaths.length === 0;
 
   const manifest = {
     repository: PINNED_UPSTREAM.repository,
@@ -333,14 +449,17 @@ const writeManifest = async ref => {
     sourceDirs: sourceDirs.map(([source]) => source),
     fileCount,
     adapterOwnedFiles: adapterOwnedPaths,
+    adaptedCorpusFiles: adaptedCorpusPaths,
     renames: corpusRenames,
+    removedUpstreamFiles: removedUpstreamPaths,
     corpusVerified,
+    preservedLocalPathCount: preservedCorpusPaths.length,
   };
   if (!corpusVerified) {
-    manifest.driftFileCount = driftedPaths.length;
+    manifest.driftFileCount = untrackedDriftPaths.length;
     manifest.note =
-      `${driftedPaths.length} checked-in corpus path(s) outside the ` +
-      `adapter-owned overlay differ from a fresh sync of the pinned ref. ` +
+      `${untrackedDriftPaths.length} checked-in corpus path(s) outside the ` +
+      `declared local overlay differ from a fresh sync of the pinned ref. ` +
       `They carry local Rsbuild adaptations; this sync run overwrote them ` +
       `in the working tree. Run ` +
       `\`git checkout -- tests/react-router-framework\` to restore them, ` +
@@ -367,7 +486,7 @@ const writeManifest = async ref => {
     `${JSON.stringify(manifest, null, 2)}\n`,
     'utf8'
   );
-  return { corpusVerified, driftedPaths };
+  return { corpusVerified, untrackedDriftPaths };
 };
 
 if (!normalizeOnly) {
@@ -383,15 +502,15 @@ if (!normalizeOnly) {
     await normalizePackageJson(packageJsonPath);
   }
 
-  const { corpusVerified, driftedPaths } = await writeManifest(ref);
+  const { corpusVerified, untrackedDriftPaths } = await writeManifest(ref);
   console.log(
     `Synced React Router framework tests from ${sourceRoot}@${ref} into ${targetRoot}`
   );
   if (!corpusVerified) {
     console.warn(
-      `WARNING: ${driftedPaths.length} checked-in corpus path(s) differed ` +
+      `WARNING: ${untrackedDriftPaths.length} checked-in corpus path(s) differed ` +
         `from the fresh sync and were overwritten in the working tree:\n` +
-        driftedPaths.map(entry => `  - ${entry}`).join('\n') +
+        untrackedDriftPaths.map(entry => `  - ${entry}`).join('\n') +
         `\nSee the note in tests/react-router-framework/UPSTREAM.json.`
     );
   }

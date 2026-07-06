@@ -122,10 +122,9 @@ type CreateRscModePlanOptions = ModePlanContext & {
   serverBuildFile: string | undefined;
 };
 
-type CreateReactRouterModePlanOptions = CreateClassicModePlanOptions &
-  CreateRscModePlanOptions & {
-    isRscMode: boolean;
-  };
+type CreateReactRouterModePlanOptions =
+  | ({ isRscMode: true } & CreateRscModePlanOptions)
+  | ({ isRscMode: false } & CreateClassicModePlanOptions);
 
 const RSC_LAYERS = rspack.experiments.rsc.Layers;
 
