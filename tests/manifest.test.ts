@@ -136,11 +136,16 @@ describe('manifest', () => {
     });
   });
 
-  it('falls back to named chunk iteration when direct lookup misses requested chunks', () => {
+  it('falls back to iteration when direct lookup misses requested manifest chunks', () => {
     const chunks = new Map([
       ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
       ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
       ['vendor', { files: new Set(['static/js/vendor.js']) }],
+    ]);
+    const entrypoints = new Map([
+      ['entry.client', { getFiles: () => ['static/css/entry.client.css'] }],
+      ['routes/page', { getFiles: () => ['static/css/routes/page.css'] }],
+      ['vendor', { getFiles: () => ['static/css/vendor.css'] }],
     ]);
     const compilation = {
       namedChunks: {
@@ -149,6 +154,14 @@ describe('manifest', () => {
           [string, { files: Set<string> }]
         > {
           yield* chunks;
+        },
+      },
+      entrypoints: {
+        get: () => undefined,
+        *[Symbol.iterator](): IterableIterator<
+          [string, { getFiles: () => string[] }]
+        > {
+          yield* entrypoints;
         },
       },
     };
@@ -162,6 +175,10 @@ describe('manifest', () => {
       assetsByChunkName: {
         'entry.client': ['static/js/entry.client.js'],
         'routes/page': ['static/js/routes/page.js'],
+      },
+      entrypointFilesByName: {
+        'entry.client': ['static/css/entry.client.css'],
+        'routes/page': ['static/css/routes/page.css'],
       },
     });
   });
