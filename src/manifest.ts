@@ -171,6 +171,7 @@ export const createReactRouterManifestStats = (
     | undefined;
 
   if (chunkNames && typeof namedChunks.get === 'function') {
+    const missingChunkNames = new Set(chunkNames);
     for (const chunkName of chunkNames) {
       const chunk = namedChunks.get(chunkName);
       if (!chunk) {
@@ -178,6 +179,20 @@ export const createReactRouterManifestStats = (
       }
       const files = Array.from(chunk.files ?? []);
       assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
+      missingChunkNames.delete(chunkName);
+    }
+    if (missingChunkNames.size > 0) {
+      for (const [chunkName, chunk] of namedChunks) {
+        if (!missingChunkNames.has(chunkName)) {
+          continue;
+        }
+        const files = Array.from(chunk.files ?? []);
+        assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
+        missingChunkNames.delete(chunkName);
+        if (missingChunkNames.size === 0) {
+          break;
+        }
+      }
     }
   } else {
     for (const [chunkName, chunk] of namedChunks) {
@@ -191,6 +206,7 @@ export const createReactRouterManifestStats = (
 
   if (entrypoints) {
     if (chunkNames && typeof entrypoints.get === 'function') {
+      const missingEntrypointNames = new Set(chunkNames);
       for (const entrypointName of chunkNames) {
         const entrypoint = entrypoints.get(entrypointName);
         if (!entrypoint) {
@@ -199,6 +215,21 @@ export const createReactRouterManifestStats = (
         entrypointFilesByName[entrypointName] = Array.from(
           entrypoint.getFiles?.() ?? []
         );
+        missingEntrypointNames.delete(entrypointName);
+      }
+      if (missingEntrypointNames.size > 0) {
+        for (const [entrypointName, entrypoint] of entrypoints) {
+          if (!missingEntrypointNames.has(entrypointName)) {
+            continue;
+          }
+          entrypointFilesByName[entrypointName] = Array.from(
+            entrypoint.getFiles?.() ?? []
+          );
+          missingEntrypointNames.delete(entrypointName);
+          if (missingEntrypointNames.size === 0) {
+            break;
+          }
+        }
       }
     } else {
       for (const [entrypointName, entrypoint] of entrypoints) {
