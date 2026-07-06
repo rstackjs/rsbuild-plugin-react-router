@@ -66,6 +66,7 @@ import {
   createReactRouterServerBuildPlan,
 } from './server-build-plan.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
+import { warnOnEagerDynamicImportMode } from './warnings/warn-on-eager-dynamic-import-mode.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
 import { getSsrExternals } from './ssr-externals.js';
 import {
@@ -580,6 +581,7 @@ export const pluginReactRouter = (
       isBuild,
       buildPlan: serverBuildPlan,
     });
+    let hasWarnedOnEagerDynamicImportMode = false;
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
@@ -907,6 +909,13 @@ export const pluginReactRouter = (
             rspack: rspackConfig => {
               if (pluginOptions.federation) {
                 ensureFederationAsyncStartup(rspackConfig);
+              }
+
+              if (name === 'web' && !hasWarnedOnEagerDynamicImportMode) {
+                hasWarnedOnEagerDynamicImportMode =
+                  warnOnEagerDynamicImportMode(rspackConfig, message =>
+                    api.logger.warn(message)
+                  );
               }
 
               if (name === 'node') {
