@@ -219,7 +219,8 @@ test.describe("Server bundles", () => {
       stdout = buildResult.stdout.toString();
     });
 
-    test("Vite Environment API message", () => {
+    // Vite-only banner; rsbuild has no Vite Environment API.
+    test.skip("Vite Environment API message", () => {
       expect(stdout).toContain("Using Vite Environment API");
     });
 
@@ -329,7 +330,8 @@ test.describe("Server bundles", () => {
       expect(manifestFiles.length).toEqual(1);
     });
 
-    test("Vite manifests", () => {
+    // Vite-only build manifest; rsbuild does not emit `.vite/manifest.json`.
+    test.skip("Vite manifests", () => {
       [
         ["client"],
         ["server", "bundle_a"],

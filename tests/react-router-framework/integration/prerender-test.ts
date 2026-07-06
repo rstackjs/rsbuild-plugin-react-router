@@ -138,6 +138,10 @@ let files = {
   `,
 };
 
+// Keep prerender assertions focused on `.html`, `.data`, and resource route
+// files; `static/` is rsbuild's bundle-output equivalent of Vite's `assets/`.
+const IGNORED_DIRS = new Set([".vite", "assets", "static"]);
+
 function listAllFiles(_dir: string) {
   let files: string[] = [];
 
@@ -146,7 +150,7 @@ function listAllFiles(_dir: string) {
       // Join with posix separator for consistency
       const absolute = dir + "/" + file;
       if (fs.statSync(absolute).isDirectory()) {
-        if (![".vite", "assets"].includes(file)) {
+        if (!IGNORED_DIRS.has(file)) {
           return recurse(absolute);
         }
       } else {
@@ -997,9 +1001,7 @@ test.describe(`Prerendering`, () => {
       let result = build({ cwd });
       let stderr = result.stderr.toString("utf8");
       expect(stderr).toMatch(
-        "Prerender: 2 invalid route export(s) in `routes/a` when pre-rendering " +
-          "with `ssr:false`: `headers`, `action`.  " +
-          "See https://reactrouter.com/how-to/pre-rendering#invalid-exports for more information.",
+        /Prerender: 2 invalid route export\(s\) in `routes\/a` when pre-rendering with `ssr:false`: `headers`, `action`\.\s+See https:\/\/reactrouter\.com\/how-to\/pre-rendering#invalid-exports for more information\./,
       );
     });
 

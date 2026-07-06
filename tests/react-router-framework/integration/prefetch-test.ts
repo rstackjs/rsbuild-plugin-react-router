@@ -462,7 +462,7 @@ test.describe("prefetch", () => {
             page.locator(
               [
                 "link[rel='prefetch'][as='fetch'][href='/test.data']",
-                "link[rel='modulepreload'][href^='/assets/test-']",
+                "link[rel='modulepreload'][href^='/static/js/routes/test']",
               ].join(","),
             ),
           ).toHaveCount(0);
@@ -477,7 +477,7 @@ test.describe("prefetch", () => {
             { state: "attached" },
           );
           await page.waitForSelector(
-            "link[rel='modulepreload'][href^='/assets/test-']",
+            "link[rel='modulepreload'][href^='/static/js/routes/test']",
             { state: "attached" },
           );
 
@@ -487,7 +487,7 @@ test.describe("prefetch", () => {
             page.locator(
               [
                 "link[rel='prefetch'][as='fetch'][href='/test.data']",
-                "link[rel='modulepreload'][href^='/assets/test-']",
+                "link[rel='modulepreload'][href^='/static/js/routes/test']",
               ].join(","),
             ),
           ).toHaveCount(0);
@@ -579,7 +579,7 @@ test.describe("prefetch", () => {
           let stylesheets = requests.filter(
             (r) =>
               r.type === "stylesheet" &&
-              /\/global-[a-z0-9-]+\.css/i.test(r.url),
+              /\/static\/assets\/global(\.|-)?[a-z0-9-]*\.css/i.test(r.url),
           );
           expect(stylesheets.length).toBe(1);
         });

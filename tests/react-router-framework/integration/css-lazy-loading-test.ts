@@ -206,6 +206,8 @@ test.describe("CSS lazy loading", () => {
     appFixture.close();
   });
 
+  // rsbuild/rspack loads dynamic CSS through chunk CSS, not Vite's duplicate
+  // trailing-`#` route links, so assert retained applied styles instead.
   test("retains CSS from dynamic imports in a parent route on navigation if the same CSS is a static dependency of a child route", async ({
     page,
   }) => {
@@ -214,27 +216,22 @@ test.describe("CSS lazy loading", () => {
     await app.goto("/parent-child/with-css-component");
     await page.waitForSelector("[data-child-route-with-css-component]");
     expect(await page.locator("[data-css-component]").count()).toBe(1);
-    expect(await page.locator(CSS_COMPONENT_LINK_SELECTOR).count()).toBe(1);
     expect(
-      await page.locator(CSS_COMPONENT_FORCIBLY_UNIQUE_LINK_SELECTOR).count(),
-    ).toBe(1);
+      await page.locator(CSS_COMPONENT_LINK_SELECTOR).count(),
+    ).toBeGreaterThanOrEqual(1);
     expect(await getColor(page, "[data-css-component]")).toBe("rgb(0, 128, 0)");
 
     await page.locator("[data-load-lazy-css-component]").click();
     await page.waitForSelector("[data-css-component]");
-    expect(await page.locator(CSS_COMPONENT_LINK_SELECTOR).count()).toBe(2);
-    expect(
-      await page.locator(CSS_COMPONENT_FORCIBLY_UNIQUE_LINK_SELECTOR).count(),
-    ).toBe(1);
-    expect(await getColor(page, "[data-css-component]")).toBe("rgb(0, 128, 0)");
+    for (let element of await page.locator("[data-css-component]").all()) {
+      expect(
+        await element.evaluate((el) => window.getComputedStyle(el).color),
+      ).toBe("rgb(0, 128, 0)");
+    }
 
     await app.clickLink("/parent-child/without-css-component");
     await page.waitForSelector("[data-child-route-without-css-component]");
     expect(await page.locator("[data-css-component]").count()).toBe(1);
-    expect(await page.locator(CSS_COMPONENT_LINK_SELECTOR).count()).toBe(1);
-    expect(
-      await page.locator(CSS_COMPONENT_FORCIBLY_UNIQUE_LINK_SELECTOR).count(),
-    ).toBe(0);
     expect(await getColor(page, "[data-css-component]")).toBe("rgb(0, 128, 0)");
   });
 
@@ -246,19 +243,14 @@ test.describe("CSS lazy loading", () => {
     await app.goto("/siblings/with-css-component");
     await page.waitForSelector("[data-sibling-route-with-css-component]");
     expect(await page.locator("[data-css-component]").count()).toBe(1);
-    expect(await page.locator(CSS_COMPONENT_LINK_SELECTOR).count()).toBe(1);
     expect(
-      await page.locator(CSS_COMPONENT_FORCIBLY_UNIQUE_LINK_SELECTOR).count(),
-    ).toBe(1);
+      await page.locator(CSS_COMPONENT_LINK_SELECTOR).count(),
+    ).toBeGreaterThanOrEqual(1);
     expect(await getColor(page, "[data-css-component]")).toBe("rgb(0, 128, 0)");
 
     await app.clickLink("/siblings/with-lazy-css-component");
     await page.waitForSelector("[data-sibling-route-with-lazy-css-component]");
     expect(await page.locator("[data-css-component]").count()).toBe(1);
-    expect(await page.locator(CSS_COMPONENT_LINK_SELECTOR).count()).toBe(1);
-    expect(
-      await page.locator(CSS_COMPONENT_FORCIBLY_UNIQUE_LINK_SELECTOR).count(),
-    ).toBe(0);
     expect(await getColor(page, "[data-css-component]")).toBe("rgb(0, 128, 0)");
   });
 

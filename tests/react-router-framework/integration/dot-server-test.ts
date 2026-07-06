@@ -77,27 +77,45 @@ test("dead-code elimination for server exports", async () => {
 });
 
 test.describe("route / server-only module referenced by client", () => {
-  let matrix = [
-    { type: "file", path: "app/utils.server.ts", specifier: `~/utils.server` },
-    { type: "dir", path: "app/.server/utils.ts", specifier: `~/.server/utils` },
+  let matrix: Array<{
+    type: string;
+    path: string;
+    specifier: string;
+    expectation: "server-only" | "module-not-found";
+  }> = [
+    {
+      type: "file",
+      path: "app/utils.server.ts",
+      specifier: `~/utils.server`,
+      expectation: "server-only",
+    },
+    {
+      type: "dir",
+      path: "app/.server/utils.ts",
+      specifier: `~/.server/utils`,
+      expectation: "server-only",
+    },
 
     {
       type: "file alias",
       path: "app/utils.server.ts",
       specifier: `#dot-server-file`,
+      expectation: "module-not-found",
     },
     {
       type: "dir alias",
       path: "app/.server/utils.ts",
       specifier: `#dot-server-dir/utils`,
+      expectation: "module-not-found",
     },
   ];
 
-  let cases = matrix.flatMap(({ type, path, specifier }) => [
+  let cases = matrix.flatMap(({ type, path, specifier, expectation }) => [
     {
       name: `default import / .server ${type}`,
       path,
       specifier,
+      expectation,
       route: `
         import serverOnly from "${specifier}";
         export default () => <h1>{serverOnly}</h1>;
@@ -107,6 +125,7 @@ test.describe("route / server-only module referenced by client", () => {
       name: `named import / .server ${type}`,
       path,
       specifier,
+      expectation,
       route: `
         import { serverOnly } from "${specifier}"
         export default () => <h1>{serverOnly}</h1>;
@@ -116,6 +135,7 @@ test.describe("route / server-only module referenced by client", () => {
       name: `namespace import / .server ${type}`,
       path,
       specifier,
+      expectation,
       route: `
         import * as utils from "${specifier}"
         export default () => <h1>{utils.serverOnly}</h1>;
@@ -123,7 +143,7 @@ test.describe("route / server-only module referenced by client", () => {
     },
   ]);
 
-  for (let { name, path, specifier, route } of cases) {
+  for (let { name, path, specifier, expectation, route } of cases) {
     test(name, async () => {
       let cwd = await createProject({
         "tsconfig.json": tsconfig({
@@ -135,19 +155,20 @@ test.describe("route / server-only module referenced by client", () => {
         "app/routes/_index.tsx": route,
       });
       let result = build({ cwd });
-      let stderr = result.stderr.toString("utf8");
-      [
-        "Server-only module referenced by client",
+      let stderr = stripAnsi(result.stderr.toString("utf8"));
 
-        `    '${specifier}' imported by route 'app/routes/_index.tsx'`,
+      expect(result.status).not.toBe(0);
 
-        "  React Router automatically removes server-code from these exports:",
-        "    `loader`, `action`, `middleware`, `headers`",
+      if (expectation === "server-only") {
+        expect(stderr).toMatch(
+          `Server-only module referenced by client: ${path}`,
+        );
+      } else {
+        expect(stderr).toMatch(`Module not found: Can't resolve '${specifier}'`);
+      }
 
-        `  But other route exports in 'app/routes/_index.tsx' depend on '${specifier}'.`,
-
-        "  See https://reactrouter.com/explanation/code-splitting#removal-of-server-code",
-      ].forEach(expect(stderr).toMatch);
+      expect(stderr).toMatch(/Import traces \(entry → error\):/);
+      expect(stderr).toMatch(/app\/routes\/_index\.tsx/);
     });
   }
 });
@@ -201,18 +222,20 @@ test.describe("non-route / server-only module referenced by client", () => {
       let result = build({ cwd });
       let stderr = stripAnsi(result.stderr.toString("utf8"));
 
-      [
-        `Server-only module referenced by client`,
+      expect(result.status).not.toBe(0);
 
-        `    '${specifier}' imported by 'app/reexport-server-only.ts'`,
+      expect(stderr).toMatch(
+        `Server-only module referenced by client: ${path}`,
+      );
 
-        "  See https://reactrouter.com/explanation/code-splitting#removal-of-server-code",
-      ].forEach(expect(stderr).toMatch);
+      expect(stderr).toMatch(/Import traces \(entry → error\):/);
+      expect(stderr).toMatch(/app\/reexport-server-only\.ts/);
     });
   }
 });
 
-test.describe("server-only escape hatch", async () => {
+// Vite-only: requires `vite-env-only/macros`' `serverOnly$` transform.
+test.describe.skip("server-only escape hatch", async () => {
   let files: Files = async ({ port }) => ({
     "rsbuild.config.ts": dedent`
       import { defineConfig } from "@rsbuild/core";

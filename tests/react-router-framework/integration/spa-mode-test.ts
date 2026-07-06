@@ -41,7 +41,8 @@ test.describe("SPA Mode", () => {
             let result = build({ cwd });
             let stderr = result.stderr.toString("utf8");
             expect(stderr).toMatch(
-              "SPA Mode: 3 invalid route export(s) in `routes/invalid-exports.tsx`: " +
+              // rsbuild reports project-relative route paths.
+              "SPA Mode: 3 invalid route export(s) in `app/routes/invalid-exports.tsx`: " +
                 "`headers`, `loader`, `action`. See https://reactrouter.com/how-to/spa " +
                 "for more information.",
             );
@@ -74,7 +75,8 @@ test.describe("SPA Mode", () => {
             let result = build({ cwd });
             let stderr = result.stderr.toString("utf8");
             expect(stderr).toMatch(
-              "SPA Mode: 2 invalid route export(s) in `root.tsx`: `headers`, `action`. " +
+              // rsbuild reports project-relative route paths.
+              "SPA Mode: 2 invalid route export(s) in `app/root.tsx`: `headers`, `action`. " +
                 "See https://reactrouter.com/how-to/spa for more information.",
             );
           });
@@ -98,7 +100,8 @@ test.describe("SPA Mode", () => {
             let result = build({ cwd });
             let stderr = result.stderr.toString("utf8");
             expect(stderr).toMatch(
-              "SPA Mode: Invalid `HydrateFallback` export found in `routes/invalid-exports.tsx`. " +
+              // rsbuild reports project-relative route paths.
+              "SPA Mode: Invalid `HydrateFallback` export found in `app/routes/invalid-exports.tsx`. " +
                 "`HydrateFallback` is only permitted on the root route in SPA Mode. " +
                 "See https://reactrouter.com/how-to/spa for more information.",
             );

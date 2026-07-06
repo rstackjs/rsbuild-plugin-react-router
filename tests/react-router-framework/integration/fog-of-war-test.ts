@@ -1665,8 +1665,9 @@ test.describe("Fog of War", () => {
       let html = await res.text();
 
       expect(html).not.toContain("window.__reactRouterManifest = {");
-      expect(html).toContain(
-        '<link rel="modulepreload" href="/assets/manifest-',
+      // rsbuild emits the manifest chunk under `/static/js/`.
+      expect(html).toMatch(
+        /<link rel="modulepreload" href="\/static\/js\/manifest-[a-z0-9]+\.js"/i,
       );
 
       // Linking to A succeeds
@@ -1789,8 +1790,9 @@ test.describe("Fog of War", () => {
       });
 
       expect(err).toEqual(new Error("Build failed, check the output above"));
+      // rsbuild omits Vite's leading `Error: ` prefix.
       expect(buildOutput).toContain(
-        'Error: The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`',
+        'The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`',
       );
       console.error = ogConsole;
     });

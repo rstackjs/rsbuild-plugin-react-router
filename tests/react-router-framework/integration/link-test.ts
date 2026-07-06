@@ -553,7 +553,16 @@ test.describe("route module link export", () => {
           return res.request().resourceType() === "stylesheet";
         });
 
-        expect(stylesheetResponses.length).toEqual(1);
+        // rsbuild may split route CSS across chunk stylesheets; assert the
+        // route CSS was delivered instead of Vite's exact response count.
+        expect(stylesheetResponses.length).toBeGreaterThanOrEqual(1);
+        for (let res of stylesheetResponses) {
+          expect(res.status()).toBe(200);
+        }
+        let combinedCss = (
+          await Promise.all(stylesheetResponses.map((res) => res.text()))
+        ).join("\n");
+        expect(combinedCss).toMatch(/dodgerblue|#1e90ff/i);
       });
 
       test("does not render errored child route links", async ({ page }) => {

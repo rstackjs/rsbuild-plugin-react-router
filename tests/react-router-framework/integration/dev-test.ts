@@ -491,7 +491,9 @@ test.describe("rsbuild dev", () => {
     });
   }
 
-  test("does not prebundle RSC server-only route imports in the client optimizer", async ({
+  // Vite-only: rsbuild/rspack has no `.vite/deps/_metadata.json` optimizer
+  // state to inspect.
+  test.skip("does not prebundle RSC server-only route imports in the client optimizer", async ({
     page,
     dev,
   }) => {
