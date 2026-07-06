@@ -136,6 +136,36 @@ describe('manifest', () => {
     });
   });
 
+  it('falls back to named chunk iteration when direct lookup misses requested chunks', () => {
+    const chunks = new Map([
+      ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+      ['routes/page', { files: new Set(['static/js/routes/page.js']) }],
+      ['vendor', { files: new Set(['static/js/vendor.js']) }],
+    ]);
+    const compilation = {
+      namedChunks: {
+        get: () => undefined,
+        *[Symbol.iterator](): IterableIterator<
+          [string, { files: Set<string> }]
+        > {
+          yield* chunks;
+        },
+      },
+    };
+
+    expect(
+      createReactRouterManifestStats(
+        compilation,
+        new Set(['entry.client', 'routes/page'])
+      )
+    ).toEqual({
+      assetsByChunkName: {
+        'entry.client': ['static/js/entry.client.js'],
+        'routes/page': ['static/js/routes/page.js'],
+      },
+    });
+  });
+
   it('collects only manifest-readable chunk names', () => {
     expect(Array.from(getReactRouterManifestChunkNames(routes, false))).toEqual(
       ['entry.client', 'root', 'routes/page']
