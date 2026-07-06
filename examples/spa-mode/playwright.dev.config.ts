@@ -15,6 +15,10 @@ export default defineConfig({
   webServer: {
     ...baseConfig.webServer,
     command: 'pnpm run dev --port 3002',
-    url: 'http://localhost:3002',
+    url: undefined,
+    wait: {
+      stdout:
+        /ready[\s\S]*?\(web\)[\s\S]*?ready[\s\S]*?\(node\)|ready[\s\S]*?\(node\)[\s\S]*?ready[\s\S]*?\(web\)/,
+    },
   },
 });
