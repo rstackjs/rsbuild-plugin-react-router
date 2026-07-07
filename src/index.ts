@@ -769,7 +769,11 @@ export const pluginReactRouter = (
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
         },
-        ...(pluginOptions.customServer || !ssr
+        // React Router's request handler natively supports `ssr:false`
+        // builds (it renders the SPA shell for document requests), so the
+        // middleware is registered for SPA mode too — without it, dev
+        // requests would 404 because no HTML entry exists.
+        ...(pluginOptions.customServer
           ? {}
           : {
               server: {

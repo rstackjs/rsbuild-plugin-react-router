@@ -495,8 +495,12 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
                     }
                   : {}),
               },
-              readyEnvironments:
-                benchmark.variant === 'spa' ? ['web'] : ['web', 'node'],
+              // The plugin builds `web` + `node` dev environments for every
+              // fixture variant. SPA (`ssr:false`) fixtures need `node` too:
+              // the dev middleware renders the SPA shell from the node server
+              // build, so route fetches would race an unfinished node compile
+              // if we only waited for `web`.
+              readyEnvironments: ['web', 'node'],
               origin: `http://localhost:${devPort}`,
               routePaths: devRoutePaths,
               routeTimeoutMs: args.devRouteTimeoutMs,
@@ -592,12 +596,9 @@ const runBenchmark = ({
   Effect.gen(function* () {
     const measuredIterations = getMeasuredIterationCount(benchmark, args);
     const fixtureRoot = path.join(benchmarkRoot, 'fixtures', benchmark.id);
-    // Profile entries can pin dev-route behavior (e.g. `devRoutes: 'none'`
-    // for SPA fixtures, which serve no HTML document per route in dev).
-    const devRoutesValue = benchmark.devRoutes ?? args.devRoutes;
     const devRoutePaths =
       args.mode === 'dev'
-        ? resolveDevRoutePaths(devRoutesValue, benchmark)
+        ? resolveDevRoutePaths(args.devRoutes, benchmark)
         : [];
     const fixtureResult = yield* tryPromise(() =>
       generateSyntheticFixture({
@@ -614,7 +615,7 @@ const runBenchmark = ({
     );
     const totalRuns = args.warmup + measuredIterations;
     const devUpdateRoutePaths =
-      args.mode === 'dev' && devRoutesValue !== 'none'
+      args.mode === 'dev' && args.devRoutes !== 'none'
         ? (fixtureResult.updateRoutePaths ?? ['/'])
         : [];
     const benchmarkContext = {
