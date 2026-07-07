@@ -51,7 +51,9 @@ jobs:
         run: npx publint --errors-only
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: node_modules/.cache/ms-playwright
 
       - name: Run React Router ecosystem tests
         run: pnpm test:react-router-framework:failfast
