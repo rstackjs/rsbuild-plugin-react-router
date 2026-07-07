@@ -53,5 +53,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Run React Router ecosystem tests
+        run: pnpm test:react-router-framework:failfast
+
       - name: Run E2E tests
         run: pnpm e2e
