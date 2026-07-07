@@ -166,7 +166,8 @@ export const createReactRouterDevRuntimeController = ({
           if (
             result === 'committed' &&
             changes.node.known &&
-            changes.node.files.size > 0
+            changes.node.files.size > 0 &&
+            (!changes.web.known || changes.web.files.size === 0)
           ) {
             onNodeRebuildCommitted?.();
           }
