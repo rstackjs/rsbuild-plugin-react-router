@@ -18,7 +18,7 @@ import {
   PLUGIN_NAME,
 } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
-import { createDevServerMiddleware } from './dev-server.js';
+import { createReactRouterDevServerSetup } from './dev-server.js';
 import {
   generateWithProps,
   findEntryFile,
@@ -768,19 +768,19 @@ export const pluginReactRouter = (
           writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
-          setupMiddlewares:
-            pluginOptions.customServer || !ssr
-              ? []
-              : [
-                  middlewares => {
-                    middlewares.push(
-                      createDevServerMiddleware({
-                        loadBuild: devRuntime.createBuildLoader(),
-                      })
-                    );
-                  },
-                ],
         },
+        ...(pluginOptions.customServer || !ssr
+          ? {}
+          : {
+              server: {
+                setup: [
+                  createReactRouterDevServerSetup({
+                    // Lazy: the dev runtime binding does not exist yet here.
+                    loadBuild: () => devRuntime.createBuildLoader()(),
+                  }),
+                ],
+              },
+            }),
         tools: {
           rspack: {
             plugins: [vmodPlugin],
