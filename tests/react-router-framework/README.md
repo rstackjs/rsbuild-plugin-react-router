@@ -93,33 +93,26 @@ Do not add a local ignore list for Rsbuild gaps. Upstream `test.skip` and
 `test.fixme` calls should remain intact, but otherwise unsupported cases should
 fail visibly.
 
-## Vite artifact excision
+## Bundler artifact excision
 
-The corpus carries no inert Vite artifacts: the checked-in fixture/template
-`vite.config.*` files are deleted, and `vite`, `@vitejs/*`, and Vite-plugin
-dependencies (`vite-tsconfig-paths`, `@vanilla-extract/vite-plugin`,
-`@cloudflare/vite-plugin`) are stripped from corpus `package.json` files.
+The corpus carries no inert upstream bundler artifacts: checked-in fixture
+template config files from the upstream bundler setup are deleted, and
+upstream bundler dependencies are stripped from corpus `package.json` files.
 Tests author `rsbuild.config.ts` fixtures directly: the `rsbuildConfig` helper
-factory in `integration/helpers/rsbuild.ts` (formerly `viteConfig` in
-`helpers/vite.ts`) emits rsbuild config text (see its doc comment for the
-Vite -> rsbuild option mappings), and inline fixture configs are written as
-rsbuild configs with comments marking dropped Vite-only options. The adapter's
-`vite.config.*` interception remains only as a safety net and `console.warn`s
-loudly when it fires — new tests must not rely on it. The upstream
-`vite-7-template` / `vite-8-template` pair is collapsed into a single template,
-renamed to `rsbuild-template` (the Vite major split is meaningless for
-rsbuild).
+factory in `integration/helpers/rsbuild.ts` emits rsbuild config text, and
+inline fixture configs are written as rsbuild configs with comments marking
+dropped bundler-only options. The upstream major-version template pair is
+collapsed into a single `rsbuild-template`. Server-only macro fixtures were
+removed until an Rsbuild equivalent exists.
 
 ## Renames
 
 Because this corpus is repo-owned rather than a verbatim upstream mirror, the
-upstream Vite-oriented filenames, directory names, helper exports, and
+upstream bundler-oriented filenames, directory names, helper exports, and
 describe/test titles that are misleading under rsbuild have been renamed to
 rsbuild-flavored names via `git mv` (history preserved). The complete
-upstream-path -> corpus-path map lives in `UPSTREAM.json` under `renames`,
-alongside a `renamesNote` documenting the helper-export renames (e.g.
-`viteConfig` -> `rsbuildConfig`, `viteMajorTemplates` -> `bundlerTemplates`)
-and the title renames. Notable moves:
+upstream-path -> corpus-path map lives in `UPSTREAM.json` under `renames`.
+Notable moves:
 
 - `integration/vite-*-test.ts` -> `integration/*-test.ts` (drop the `vite-`
   prefix)
@@ -129,8 +122,8 @@ and the title renames. Notable moves:
 - `integration/helpers/rsc-vite-framework` -> `integration/helpers/rsc-framework`
 
 Vite-only skipped suites are intentionally not carried in this Rsbuild corpus.
-The RSC preview/framework fixtures use `react-server-dom-rspack` and
-`rsbuild-plugin-rsc`.
+The RSC preview/framework fixtures use `react-server-dom-rspack` runtime
+packages.
 
 ## Commands
 

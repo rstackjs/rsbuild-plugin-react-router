@@ -23,7 +23,6 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { type TemplateName, rsbuildConfig, reactRouterConfig } from "./rsbuild.js";
 import {
   finalizeFixtureProject,
-  normalizeFixtureFiles,
   prepareFixtureProjectDependencies,
   reactRouterServeBin,
   rsbuildBin,
@@ -548,9 +547,7 @@ export async function createFixtureProject(
   await cp(integrationTemplateDir, projectDir, { recursive: true });
 
   let hasBundlerConfig = Object.keys(init.files ?? {}).some(
-    (filename) =>
-      filename.startsWith("rsbuild.config.") ||
-      filename.startsWith("vite.config."),
+    (filename) => filename.startsWith("rsbuild.config."),
   );
 
   let hasReactRouterConfig = Object.keys(init.files ?? {}).some((filename) =>
@@ -560,7 +557,7 @@ export async function createFixtureProject(
   let { spaMode } = init;
 
   await writeTestFiles(
-    normalizeFixtureFiles({
+    {
       ...(hasBundlerConfig
         ? {}
         : {
@@ -577,7 +574,7 @@ export async function createFixtureProject(
             }),
       }),
       ...init.files,
-    }),
+    },
     projectDir,
   );
 
@@ -627,12 +624,10 @@ async function writeTestFiles(
   files: Record<string, string> | undefined,
   dir: string,
 ) {
-  const normalizedFiles = normalizeFixtureFiles(files ?? {});
   await Promise.all(
-    Object.keys(normalizedFiles).map(async (filename) => {
+    Object.entries(files ?? {}).map(async ([filename, file]) => {
       let filePath = path.join(dir, filename);
       await mkdir(path.dirname(filePath), { recursive: true });
-      let file = normalizedFiles[filename];
 
       await writeFile(filePath, stripIndent(file));
     }),

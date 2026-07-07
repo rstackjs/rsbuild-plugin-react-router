@@ -1,24 +1,18 @@
-import type { LinksFunction, MetaFunction } from "react-router";
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-} from "react-router";
-import { IntlProvider } from "react-intl";
-import globalStyles from "./styles/global.css?url";
+import type { LinksFunction, MetaFunction } from 'react-router';
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import { IntlProvider } from 'react-intl';
+import globalStyles from './styles/global.css?url';
 
 export const meta: MetaFunction = () => [
-  { title: "Synthetic Web Bundler Benchmark" },
+  { title: 'Synthetic Web Bundler Benchmark' },
   {
-    name: "description",
-    content: "A deterministic, non-product Vite and Rsbuild benchmark.",
+    name: 'description',
+    content: 'A deterministic, non-product Rsbuild and Rsbuild benchmark.',
   },
 ];
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: globalStyles },
+  { rel: 'stylesheet', href: globalStyles },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

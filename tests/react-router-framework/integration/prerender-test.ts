@@ -31,7 +31,7 @@ let files = {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -139,8 +139,8 @@ let files = {
 };
 
 // Keep prerender assertions focused on `.html`, `.data`, and resource route
-// files; `static/` is rsbuild's bundle-output equivalent of Vite's `assets/`.
-const IGNORED_DIRS = new Set([".vite", "assets", "static"]);
+// files; `static/` is rsbuild's bundle-output equivalent of Rsbuild's `assets/`.
+const IGNORED_DIRS = new Set(["assets", "static"]);
 
 function listAllFiles(_dir: string) {
   let files: string[] = [];
@@ -264,7 +264,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -362,7 +362,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -411,7 +411,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -600,7 +600,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -649,7 +649,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -699,7 +699,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -756,7 +756,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -810,7 +810,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });
@@ -894,7 +894,7 @@ test.describe(`Prerendering`, () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });

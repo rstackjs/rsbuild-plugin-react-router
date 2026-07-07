@@ -167,7 +167,6 @@ test.describe("Server bundles", () => {
           import { pluginReact } from "@rsbuild/plugin-react";
           import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-          // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
           export default defineConfig({
             ${await rsbuildConfig.server({ port })}
             plugins: [pluginReact(), pluginReactRouter()],
@@ -217,11 +216,6 @@ test.describe("Server bundles", () => {
     test.beforeAll(() => {
       let buildResult = build({ cwd });
       stdout = buildResult.stdout.toString();
-    });
-
-    // Vite-only banner; rsbuild has no Vite Environment API.
-    test.skip("Vite Environment API message", () => {
-      expect(stdout).toContain("Using Vite Environment API");
     });
 
     test("server", async ({ page }) => {
@@ -328,22 +322,6 @@ test.describe("Server bundles", () => {
       );
 
       expect(manifestFiles.length).toEqual(1);
-    });
-
-    // Vite-only build manifest; rsbuild does not emit `.vite/manifest.json`.
-    test.skip("Vite manifests", () => {
-      [
-        ["client"],
-        ["server", "bundle_a"],
-        ["server", "bundle_b"],
-        ["server", "bundle_c"],
-        ["server", "root"],
-      ].forEach((buildPaths) => {
-        let viteManifestFiles = fs.readdirSync(
-          path.join(cwd, "build", ...buildPaths, ".vite"),
-        );
-        expect(viteManifestFiles).toEqual(["manifest.json"]);
-      });
     });
 
     test("React Router build manifest", () => {

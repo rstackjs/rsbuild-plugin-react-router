@@ -27,7 +27,7 @@ const fixtures = [
   // TODO: Figure out why this is failing. It works outside the integration tests.
   // {
   //   templateName: "rsc-framework",
-  //   templateDisplayName: "RSC Vite Framework",
+  //   templateDisplayName: "RSC Rsbuild Framework",
   // },
 ] as const satisfies ReadonlyArray<{
   templateName: TemplateName;
@@ -351,13 +351,7 @@ test.describe("CSS", () => {
           // Note: fixtures already declare sideEffects: ["*.css.ts"], which
           // upstream applied here via a package.json edit.
 
-          let { stderr, status } = build({
-            cwd,
-            env: {
-              // Vanilla Extract uses Vite's CJS build which emits a warning to stderr
-              VITE_CJS_IGNORE_WARNING: "true",
-            },
-          });
+          let { stderr, status } = build({ cwd });
           let stderrString = stderr.toString();
           if (templateName.includes("rsc")) {
             // In RSC builds, the same assets can be generated multiple times
@@ -416,13 +410,7 @@ test.describe("CSS", () => {
           // Note: fixtures already declare sideEffects: ["*.css.ts"], which
           // upstream applied here via a package.json edit.
 
-          let { stderr, status } = build({
-            cwd,
-            env: {
-              // Vanilla Extract uses Vite's CJS build which emits a warning to stderr
-              VITE_CJS_IGNORE_WARNING: "true",
-            },
-          });
+          let { stderr, status } = build({ cwd });
           expect(stderr.toString()).toBeFalsy();
           expect(status).toBe(0);
           stop = await reactRouterServe({ cwd, port });

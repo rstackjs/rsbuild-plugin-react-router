@@ -137,7 +137,7 @@ const files = {
                   "export const keys = " + JSON.stringify(Object.keys(buildEndArgs)) + ";",
                   "export const buildManifest = " + serializeJs(buildManifest, { space: 2, unsafe: true }) + ";",
                   "export const reactRouterConfig = " + serializeJs(reactRouterConfig, { space: 2, unsafe: true }) + ";",
-                  // buildEnd receives the normalized rsbuild config; Vite's
+                  // buildEnd receives the normalized rsbuild config; Rsbuild's
                   // build.assetsDir maps to output.distPath.assets
                   "export const assetsDir = " + JSON.stringify(rsbuildConfig.output.distPath.assets) + ";",
                   "export const futureFlags = " + JSON.stringify(reactRouterConfig.future) + ";",
@@ -178,7 +178,7 @@ test.describe("presets", async () => {
 
       let { reactRouterConfig } = buildEndArgsMeta;
 
-      // Smoke test Vite config
+      // Smoke test Rsbuild config
       expect(buildEndArgsMeta.assetsDir).toBe("custom-assets-dir");
 
       // Before rewriting to relative paths, assert that paths are absolute within cwd

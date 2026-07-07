@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import url from "node:url";
 import path from "pathe";
 import stripIndent from "strip-indent";
@@ -51,39 +51,6 @@ export const rsbuildRscConfig = ({
     });
   `);
 
-export const normalizeFixtureFiles = <T>(
-  files: Record<string, T> = {}
-): Record<string, T> => {
-  const normalized: Record<string, T> = {};
-  const isRscConfig = Object.values(files).some(
-    contents =>
-      typeof contents === "string" && contents.includes("reactRouterRSC")
-  );
-
-  for (const [filename, contents] of Object.entries(files)) {
-    if (/^vite\.config\.[cm]?[jt]s$/.test(filename)) {
-      // Safety net only: the corpus should author rsbuild.config.ts directly.
-      const passthrough =
-        typeof contents === "string" &&
-        contents.includes("rsbuild-plugin-react-router");
-      console.warn(
-        `[rsbuild-adapter] Intercepted Vite config fixture "${filename}"` +
-          (passthrough
-            ? " (renamed to rsbuild.config.ts)."
-            : " and replaced it with a generic rsbuild config; per-test bundler options were DISCARDED.") +
-          " Author rsbuild.config.ts in the test fixture instead.",
-      );
-      normalized["rsbuild.config.ts"] = passthrough
-        ? contents
-        : ((isRscConfig ? rsbuildRscConfig() : rsbuildConfig()) as T);
-      continue;
-    }
-    normalized[filename] = contents;
-  }
-
-  return normalized;
-};
-
 export async function finalizeFixtureProject({
   projectDir,
   port,
@@ -95,12 +62,6 @@ export async function finalizeFixtureProject({
 }) {
   await writePackageJson(projectDir, templateName);
   await writeTsconfig(projectDir);
-
-  await Promise.all(
-    ["vite.config.ts", "vite.config.js", "vite.config.mjs"].map(file =>
-      rm(path.join(projectDir, file), { force: true })
-    )
-  );
 
   const rsbuildConfigPath = path.join(projectDir, "rsbuild.config.ts");
   if (!existsSync(rsbuildConfigPath)) {

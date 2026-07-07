@@ -57,8 +57,8 @@ jobs:
       - name: 🔎 Type check
         run: npm run typecheck --if-present
 
-  vitest:
-    name: ⚡ Vitest
+  rstest:
+    name: ⚡ Rstest
     runs-on: ubuntu-22.04
     steps:
       - name: ⬇️ Checkout repo
@@ -78,7 +78,7 @@ jobs:
       - name: 🖼 Build icons
         run: npm run build:icons
 
-      - name: ⚡ Run vitest
+      - name: ⚡ Run rstest
         run: npm run test -- --coverage
 
   playwright:
@@ -137,7 +137,7 @@ jobs:
   deploy:
     name: 🚀 Deploy
     runs-on: ubuntu-22.04
-    needs: [lint, typecheck, vitest, playwright]
+    needs: [lint, typecheck, rstest, playwright]
     # only build/deploy branches on pushes
     if: ${{ github.event_name == 'push' }}
 

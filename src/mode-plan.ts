@@ -166,7 +166,7 @@ const createRscModePlan = async ({
     kind: 'rsc',
     prerenderPaths,
     // RSC route chunking is content-detected; the config value only gates
-    // 'enforce' validation, matching upstream's RSC vite plugin.
+    // 'enforce' validation, matching upstream's RSC rsbuild plugin.
     routeChunkConfig: {
       splitRouteModules,
       appDirectory,

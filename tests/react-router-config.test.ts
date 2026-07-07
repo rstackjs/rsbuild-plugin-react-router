@@ -32,7 +32,7 @@ describe('resolveReactRouterConfig', () => {
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,
-      viteConfig: {} as any,
+      rsbuildConfig: {} as any,
     });
     expect(buildEndCalls).toBe(2);
   });
@@ -62,7 +62,7 @@ describe('resolveReactRouterConfig', () => {
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,
-      viteConfig: {} as any,
+      rsbuildConfig: {} as any,
     });
     expect(buildEndCalls).toBe(2);
   });

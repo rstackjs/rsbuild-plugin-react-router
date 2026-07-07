@@ -47,9 +47,9 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              output: { minify: false }, // Vite: build.minify
+              output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
@@ -380,9 +380,9 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              output: { minify: false }, // Vite: build.minify
+              output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
@@ -479,9 +479,9 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              output: { minify: false }, // Vite: build.minify
+              output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
@@ -787,9 +787,9 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              output: { minify: false }, // Vite: build.minify
+              output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
@@ -909,9 +909,9 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              output: { minify: false }, // Vite: build.minify
+              output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
@@ -1074,9 +1074,9 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              output: { minify: false }, // Vite: build.minify
+              output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
@@ -1170,9 +1170,9 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
-              output: { minify: false }, // Vite: build.minify
+              output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
             });
           `,
@@ -2002,7 +2002,7 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });

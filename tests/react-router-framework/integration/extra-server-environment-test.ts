@@ -25,7 +25,7 @@ test("ignores external server environments without skipping React Router build h
             },
           },
           output: {
-            dataUriLimit: 0, // Vite: build.assetsInlineLimit
+            dataUriLimit: 0, // Rsbuild: output.dataUriLimit
           },
           plugins: [pluginReact(), pluginReactRouter()],
         });

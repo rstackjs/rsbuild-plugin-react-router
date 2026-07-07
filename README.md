@@ -146,7 +146,7 @@ If none are found, it falls back to defaults.
 
 ### Framework Mode
 
-React Router "Framework Mode" is implemented as a Vite plugin, but this Rsbuild
+React Router "Framework Mode" is implemented as a Rsbuild plugin, but this Rsbuild
 plugin aims to provide equivalent **framework-mode behaviors** (typegen, Route
 Module API types, route module splitting, SPA/SSR/prerender strategies) on top
 of Rsbuild/Rspack.
@@ -166,7 +166,7 @@ a better fit.
 
 ### SPA Mode (`ssr: false`)
 
-React Router's SPA Mode still requires a build-time server render of the root route to generate a hydratable `index.html` (this is how the official React Router Vite plugin works).
+React Router's SPA Mode still requires a build-time server render of the root route to generate a hydratable `index.html` (this is how this Rsbuild integration mirrors React Router framework behavior).
 
 When `ssr: false`:
 
@@ -669,15 +669,14 @@ and embedded synthetic app timings in the same benchmark comment.
 
 ## React Router Framework Mode
 
-React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild
-plugin aims to match the important behaviors without depending on Vite:
+React Router "Framework Mode" wraps Data Mode using a Rsbuild plugin. This Rsbuild
+plugin aims to match the important framework behaviors on Rsbuild:
 
 - Typegen + Route Module API types (`./+types/*`)
 - Route module splitting (`splitRouteModules`)
 - SPA mode (`ssr: false`), SSR mode, and static prerendering (`prerender`)
 
-Some Vite-specific integrations (for example Vite's environment API + critical
-CSS endpoint) are not supported 1:1.
+Some upstream framework integrations are not supported 1:1.
 
 ## Examples
 

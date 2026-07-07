@@ -13,7 +13,7 @@ export type BuildEndHook = {
   bivarianceHack(args: {
     buildManifest: ReactRouterBuildManifest | undefined;
     reactRouterConfig: ResolvedReactRouterConfig;
-    viteConfig: NormalizedConfig;
+    rsbuildConfig: NormalizedConfig;
   }): void | Promise<void>;
 }['bivarianceHack'];
 

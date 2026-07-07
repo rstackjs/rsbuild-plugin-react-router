@@ -11,7 +11,7 @@ import {
 } from "./helpers/create-fixture.js";
 
 // Link hrefs with a trailing hash are only ever managed by React Router, to
-// ensure they're forcibly unique from the Vite-injected links
+// ensure they're forcibly unique from the Rsbuild-injected links
 const FORCIBLY_UNIQUE_HREF_SELECTOR = "[href$='#']";
 const CSS_LINK_SELECTOR = "link[rel='stylesheet']";
 const ANY_FORCIBLY_UNIQUE_CSS_LINK_SELECTOR = `link[rel='stylesheet']${FORCIBLY_UNIQUE_HREF_SELECTOR}`;
@@ -206,7 +206,7 @@ test.describe("CSS lazy loading", () => {
     appFixture.close();
   });
 
-  // rsbuild/rspack loads dynamic CSS through chunk CSS, not Vite's duplicate
+  // rsbuild/rspack loads dynamic CSS through chunk CSS, not Rsbuild's duplicate
   // trailing-`#` route links, so assert retained applied styles instead.
   test("retains CSS from dynamic imports in a parent route on navigation if the same CSS is a static dependency of a child route", async ({
     page,

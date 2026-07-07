@@ -93,7 +93,7 @@ export const createDevHdrRevisionSignal = ({
 /**
  * Browser-side HMR runtime shared by all route client entries in development.
  *
- * This mirrors React Router's Vite HMR contract (see `refresh-utils.mjs` in
+ * This mirrors React Router framework HMR contract (see `refresh-utils.mjs` in
  * `@react-router/dev`): route module updates are applied by patching
  * `window.__reactRouterRouteModules` while preserving the previous component
  * identities (React Fast Refresh swaps their implementations in place),

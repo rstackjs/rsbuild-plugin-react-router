@@ -1790,7 +1790,7 @@ test.describe("Fog of War", () => {
       });
 
       expect(err).toEqual(new Error("Build failed, check the output above"));
-      // rsbuild omits Vite's leading `Error: ` prefix.
+      // rsbuild omits Rsbuild's leading `Error: ` prefix.
       expect(buildOutput).toContain(
         'The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`',
       );

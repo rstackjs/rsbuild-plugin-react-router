@@ -60,7 +60,7 @@ test.describe(".env", () => {
           await edit({
             "server.mjs": isRsc ? Express.rsc() : Express.server(),
             ".env": `
-              VITE_ENV_ROUTE=dotenv
+              RSBUILD_ENV_ROUTE=dotenv
               ENV_VAR_FROM_DOTENV_FILE=Content from ${env.path} file
             `,
             "app/routes.ts": (contents) => {
@@ -69,7 +69,7 @@ test.describe(".env", () => {
                 import { type RouteConfig, route } from "@react-router/dev/routes";
 
                 const routes: RouteConfig = [];
-                if (import.meta.env.VITE_ENV_ROUTE === "dotenv") {
+                if (process.env.RSBUILD_ENV_ROUTE === "dotenv") {
                   routes.push(route("dotenv", "routes/dotenv.tsx"));
                 }
 

@@ -572,7 +572,7 @@ implementations.forEach((implementation) => {
                     <head>
                       <meta charSet="utf-8" />
                       <meta name="viewport" content="width=device-width, initial-scale=1" />
-                      <title>Vite (RSC)</title>
+                      <title>Rsbuild (RSC)</title>
                       <Links />
                     </head>
                     <body>

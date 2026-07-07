@@ -685,7 +685,7 @@ export const runReactRouterPrerenderBuild = async (
     await buildEnd({
       buildManifest,
       reactRouterConfig: resolvedConfigWithRoutes,
-      viteConfig: api.getNormalizedConfig(),
+      rsbuildConfig: api.getNormalizedConfig(),
     });
   }
 };

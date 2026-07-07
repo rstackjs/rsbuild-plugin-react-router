@@ -818,7 +818,7 @@ test.describe("SPA Mode", () => {
                 import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
                 export default defineConfig({
-                  output: { manifest: true }, // Vite: build.manifest
+                  output: { manifest: true }, // Rsbuild: output.manifest
                   plugins: [pluginReact(), pluginReactRouter()],
                 });
               `,
@@ -1196,7 +1196,7 @@ test.describe("SPA Mode", () => {
           import { pluginReact } from "@rsbuild/plugin-react";
           import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-          // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
+          // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
           export default defineConfig({
             plugins: [pluginReact(), pluginReactRouter()],
           });

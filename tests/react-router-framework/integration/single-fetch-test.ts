@@ -1932,7 +1932,7 @@ test.describe("single-fetch", () => {
           import { pluginReact } from "@rsbuild/plugin-react";
           import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-          // Vite 'base: "/base/"' is intentionally not mapped to an rsbuild
+          // Rsbuild 'base: "/base/"' is intentionally not mapped to an rsbuild
           // asset prefix: react-router-serve serves assets from the dist root
           // and React Router's basename covers the routing this test asserts.
           export default defineConfig({

@@ -50,10 +50,10 @@ const helpText = dedent`
       --profile           Start built-in Node.js inspector
       --strictPort        Exit if specified port is already in use (boolean)
     \`routes\` Options:
-      --config, -c        Use specified Vite config file (string)
+      --config, -c        Use specified Rsbuild config file (string)
       --json              Print the routes as JSON
     \`reveal\` Options:
-      --config, -c        Use specified Vite config file (string)
+      --config, -c        Use specified Rsbuild config file (string)
       --no-typescript     Generate plain JavaScript files
     \`typegen\` Options:
       --watch             Automatically regenerate types whenever route config (\`routes.ts\`) or route modules change
@@ -71,7 +71,7 @@ const helpText = dedent`
       $ react-router routes
       $ react-router routes my-app
       $ react-router routes --json
-      $ react-router routes --config vite.react-router.config.ts
+      $ react-router routes --config rsbuild.react-router.config.ts
 
     Reveal the used entry point:
 
@@ -79,7 +79,7 @@ const helpText = dedent`
       $ react-router reveal entry.server
       $ react-router reveal entry.client --no-typescript
       $ react-router reveal entry.server --no-typescript
-      $ react-router reveal entry.server --config vite.react-router.config.ts
+      $ react-router reveal entry.server --config rsbuild.react-router.config.ts
 
     Generate types for route modules:
 

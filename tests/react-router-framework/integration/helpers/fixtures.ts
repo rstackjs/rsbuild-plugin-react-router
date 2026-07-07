@@ -15,7 +15,6 @@ import * as Path from "pathe";
 import type { TemplateName } from "./rsbuild.js";
 import {
   finalizeFixtureProject,
-  normalizeFixtureFiles,
   prepareFixtureProjectDependencies,
 } from "./rsbuild-adapter.js";
 import {
@@ -39,8 +38,7 @@ const templatePath = (templateName: string) =>
 type Edits = Record<string, string | ((contents: string) => string)>;
 
 async function applyEdits(cwd: string, edits: Edits) {
-  const normalizedEdits = normalizeFixtureFiles(edits);
-  const promises = Object.entries(normalizedEdits).map(async ([file, transform]) => {
+  const promises = Object.entries(edits).map(async ([file, transform]) => {
     const filepath = Path.join(cwd, file);
     await fs.writeFile(
       filepath,

@@ -16,7 +16,6 @@ import { test as base, expect } from "@playwright/test";
 import type { Config } from "@react-router/dev/config";
 import {
   finalizeFixtureProject,
-  normalizeFixtureFiles,
   prepareFixtureProjectDependencies,
   reactRouterServeBin,
   rsbuildBin,
@@ -327,7 +326,7 @@ export async function createProject(
 
   // user-defined files
   await Promise.all(
-    Object.entries(normalizeFixtureFiles(files)).map(async ([filename, contents]) => {
+    Object.entries(files).map(async ([filename, contents]) => {
       let filepath = path.join(projectDir, filename);
       await mkdir(path.dirname(filepath), { recursive: true });
       await writeFile(filepath, stripIndent(contents));

@@ -69,7 +69,7 @@ test.describe(() => {
         import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
         export default defineConfig({
-          output: { manifest: true }, // Vite: build.manifest
+          output: { manifest: true }, // Rsbuild: output.manifest
           plugins: [pluginReact(), pluginReactRouter()],
         });
       `),

@@ -141,7 +141,7 @@ export const registerBuildOutputTransforms = ({
   // client, which fetches it from `build/client` at runtime, so the file must
   // exist there even though only the node compilation referenced it. The
   // assets are also stripped from the server build to avoid shipping duplicate
-  // static files, mirroring upstream React Router's Vite plugin. This runs for
+  // static files, mirroring upstream React Router framework plugin. This runs for
   // every node compilation, so it also covers `serverBundles` (multiple node
   // outputs) and dev mode (where `writeToDisk` is enabled).
   const relocatedDestinations = new Set<string>();
