@@ -175,6 +175,15 @@ describe('route chunks', () => {
       expect(result.chunkedExports).toEqual([]);
       expect(result.sharedChunkedExports).toEqual(['customExport']);
       expect(result.hasRouteChunkByExportName.clientLoader).toBe(false);
+
+      const mainChunk = await getRouteChunkIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        'main',
+        code
+      );
+      expect(mainChunk).not.toContain('custom_export_count');
     });
 
     it('keeps hydrated client loaders in main JSX route chunks', async () => {
