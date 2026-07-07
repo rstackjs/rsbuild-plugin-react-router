@@ -1,7 +1,11 @@
+import { dirname } from 'pathe';
+
 import { generate, parse } from './yuku.js';
 import { CLIENT_NON_COMPONENT_EXPORTS } from './constants.js';
 import { getExportNames } from './export-utils.js';
+import { getProgram, type AnyNode } from './route-ast.js';
 import { removeExports, removeUnusedImports } from './route-export-pruning.js';
+import { resolveQuerylessRouteImportRequest } from './route-imports.js';
 import {
   createEmptyRouteChunkByExportName,
   detectRouteChunks,
@@ -16,6 +20,7 @@ import {
   RSC_MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS,
   RSC_SERVER_COMPONENT_EXPORTS,
 } from './rsc-route-exports.js';
+import type { Route } from './types.js';
 
 const ENSURE_CLIENT_ROUTE_MODULE_CHUNK_FOR_HMR = `
 import * as ___EnsureClientRouteModuleForHMR_REACT___ from "react";
@@ -43,6 +48,7 @@ const SERVER_ROUTE_EXPORTS_SET = new Set<string>(SERVER_ROUTE_EXPORTS);
 
 const CLIENT_CHUNK_QUERY = 'client-route-module';
 const SERVER_MODULE_QUERY = 'server-route-module';
+const ROUTE_CLIENT_MODULE_CHUNK = 'route';
 
 type RscRouteTransformOptions = {
   code: string;
@@ -50,6 +56,7 @@ type RscRouteTransformOptions = {
   resourceQuery?: string;
   isRootRoute: boolean;
   routeId: string;
+  routeByFilePath?: ReadonlyMap<string, Route>;
   routeChunkCache: RouteChunkCache;
   routeChunkConfig: RouteChunkConfig;
   isServerEnvironment: boolean;
@@ -247,10 +254,8 @@ const createRscRouteExportPlan = async (
       !exportNameSet.has('ErrorBoundary') &&
       !exportNameSet.has('ServerErrorBoundary'),
     clientTargetFor(exportName) {
-      const chunkName = routeChunks.hasRouteChunkByExportName[
-        exportName as RouteChunkExportName
-      ]
-        ? exportName
+      const chunkName = isClientRouteExport(exportName)
+        ? ROUTE_CLIENT_MODULE_CHUNK
         : 'shared';
       return createClientRouteModuleId(
         options.resourcePath,
@@ -374,7 +379,14 @@ const createClientRouteModule = async (
   const plan = await createRscRouteExportPlan(options);
   const exportsToRemove =
     clientRouteChunk === 'shared'
-      ? [...SERVER_ROUTE_EXPORTS, ...plan.routeChunks.chunkedExports]
+      ? [...SERVER_ROUTE_EXPORTS, ...CLIENT_ROUTE_EXPORTS]
+      : clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK
+        ? [
+            ...SERVER_ROUTE_EXPORTS,
+            ...plan.exportNames.filter(
+              exportName => !isClientRouteExport(exportName)
+            ),
+          ]
       : [
           ...SERVER_ROUTE_EXPORTS,
           ...plan.exportNames.filter(
@@ -385,6 +397,7 @@ const createClientRouteModule = async (
   if (removed) {
     removeUnusedImports(ast);
   }
+  rewriteRscClientRouteImports(ast, sourceFileName, clientRouteChunk, options);
   const generated = generate(ast, {
     sourceMaps: false,
     filename: sourceFileName,
@@ -417,12 +430,67 @@ const createClientRouteModule = async (
   };
 };
 
+const rewriteRouteImportSource = (
+  statement: AnyNode,
+  sourceFileName: string,
+  clientRouteChunk: string,
+  options: RscRouteTransformOptions
+): void => {
+  const source = statement.source;
+  if (!source || typeof source.value !== 'string' || !options.routeByFilePath) {
+    return;
+  }
+  const resolved = resolveQuerylessRouteImportRequest({
+    compilerName: options.isServerEnvironment ? 'node' : 'web',
+    context: dirname(sourceFileName),
+    issuer: `${sourceFileName}?client-route-module=${clientRouteChunk}`,
+    request: source.value,
+    routeByFilePath: options.routeByFilePath,
+  });
+  if (resolved) {
+    source.value = resolved;
+    source.raw = JSON.stringify(resolved);
+  }
+};
+
+const rewriteRscClientRouteImports = (
+  ast: ReturnType<typeof parse>,
+  sourceFileName: string,
+  clientRouteChunk: string,
+  options: RscRouteTransformOptions
+): void => {
+  for (const statement of getProgram(ast).body ?? []) {
+    if (
+      statement.type === 'ImportDeclaration' ||
+      statement.type === 'ExportAllDeclaration' ||
+      statement.type === 'ExportNamedDeclaration'
+    ) {
+      rewriteRouteImportSource(
+        statement,
+        sourceFileName,
+        clientRouteChunk,
+        options
+      );
+    }
+  }
+};
+
 const createServerRouteModule = (
   code: string,
   sourceFileName: string
 ): RscRouteTransformResult => {
   const ast = parse(code, { sourceType: 'module' });
-  const removed = removeExports(ast, CLIENT_ROUTE_EXPORTS);
+  const removedClientLogicExports = removeExports(
+    ast,
+    CLIENT_NON_COMPONENT_EXPORTS
+  );
+  const removedClientComponentExports = removeExports(
+    ast,
+    RSC_CLIENT_COMPONENT_EXPORTS,
+    new Set(RSC_CLIENT_COMPONENT_EXPORTS),
+    { pruneDeadDeclarations: false }
+  );
+  const removed = removedClientLogicExports || removedClientComponentExports;
   if (removed) {
     removeUnusedImports(ast);
   }

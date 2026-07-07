@@ -145,10 +145,31 @@ const createRouteHmrAcceptTarget = (resourcePath: string): string => {
   return `./${basename(resourcePath)}?react-router-route`;
 };
 
+const shouldReexportFromRouteEntry = ({
+  chunkedExportSet,
+  exportName,
+  isServer,
+}: {
+  chunkedExportSet?: ReadonlySet<string>;
+  exportName: string;
+  isServer: boolean;
+}): boolean => {
+  if (chunkedExportSet?.has(exportName)) {
+    return false;
+  }
+  if (isServer) {
+    return (
+      CLIENT_ROUTE_EXPORTS_SET.has(exportName) ||
+      SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName)
+    );
+  }
+  return !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName);
+};
+
 export const buildRouteClientEntryCode = ({
   exportNames,
   chunkedExports,
-  sharedChunkedExports,
+  sharedChunkedExports = [],
   isServer,
   resourcePath,
   routeId,
@@ -163,34 +184,24 @@ export const buildRouteClientEntryCode = ({
   devHmr?: boolean;
 }): string => {
   const chunkedExportSet =
-    chunkedExports.length > 0 || sharedChunkedExports?.length
-      ? new Set<string>([...chunkedExports, ...(sharedChunkedExports ?? [])])
+    chunkedExports.length > 0 || sharedChunkedExports.length > 0
+      ? new Set<string>([...chunkedExports, ...sharedChunkedExports])
       : undefined;
-  const reexports = exportNames
-    .filter(exp => {
-      if (chunkedExportSet?.has(exp)) {
-        return false;
-      }
-      if (isServer) {
-        return (
-          CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
-          SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp)
-        );
-      }
-      return !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
-    })
-    .sort();
   const target = isServer
     ? resourcePath
     : chunkedExports.length > 0
       ? getRouteChunkModuleId(resourcePath, 'main')
       : `${resourcePath}?react-router-route`;
-  const acceptTarget = createRouteHmrAcceptTarget(resourcePath);
+  const reexports = exportNames
+    .filter(exportName =>
+      shouldReexportFromRouteEntry({ chunkedExportSet, exportName, isServer })
+    )
+    .sort();
   const reexportCode = [
     reexports.length > 0
       ? `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`
       : null,
-    ...(sharedChunkedExports ?? []).map(
+    ...sharedChunkedExports.map(
       exportName =>
         `export { ${exportName} } from ${JSON.stringify(
           getRouteChunkModuleId(resourcePath, exportName)
@@ -207,7 +218,7 @@ export const buildRouteClientEntryCode = ({
     buildRouteClientEntryHmrCode({
       routeId,
       target,
-      acceptTarget,
+      acceptTarget: createRouteHmrAcceptTarget(resourcePath),
       metadata: buildRouteHmrMetadata(exportNames),
     })
   );

@@ -7,11 +7,7 @@ import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
-import {
-  BUILD_CLIENT_ROUTE_QUERY_STRING,
-  JS_EXTENSIONS,
-  PLUGIN_NAME,
-} from './constants.js';
+import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 import {
   findEntryFile,
@@ -21,11 +17,7 @@ import {
 } from './plugin-utils.js';
 import { resolveReactRouterEntryPaths } from './entry-paths.js';
 import { registerReactRouterEnvironmentOutput } from './environment-output.js';
-import type {
-  PluginOptions,
-  ReactRouterRSCPluginOptions,
-  Route,
-} from './types.js';
+import type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
 import { resolveReactRouterServerBuild } from './server-utils.js';
 import { validatePrerenderConfig } from './prerender.js';
 import { runReactRouterPrerenderBuild } from './prerender-build.js';
@@ -76,6 +68,7 @@ import {
   setupReactRouterRscPlugin,
 } from './rsc-support.js';
 import { createReactRouterModePlan } from './mode-plan.js';
+import { createQuerylessRouteImportPlugin } from './route-imports.js';
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
@@ -103,66 +96,6 @@ const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
-
-type QuerylessRouteImportResolveData = {
-  request?: string;
-  context?: string;
-  contextInfo?: {
-    issuer?: string;
-  };
-};
-
-type QuerylessRouteImportFactory = {
-  hooks: {
-    beforeResolve: {
-      tap: (
-        pluginName: string,
-        handler: (data: QuerylessRouteImportResolveData) => void
-      ) => void;
-    };
-  };
-};
-
-const createQuerylessRouteImportPlugin = (
-  routeByFilePath: ReadonlyMap<string, Route>
-) => ({
-  name: `${PLUGIN_NAME}:queryless-route-imports`,
-  apply(compiler: Rspack.Compiler) {
-    if (compiler.options?.name !== 'web') {
-      return;
-    }
-
-    compiler.hooks.normalModuleFactory.tap(PLUGIN_NAME, factory => {
-      const typedFactory = factory as QuerylessRouteImportFactory;
-      typedFactory.hooks.beforeResolve.tap(PLUGIN_NAME, data => {
-        const request = data?.request;
-        const context = data?.context ?? data?.contextInfo?.issuer;
-        const issuer = data?.contextInfo?.issuer?.split('?')[0];
-        if (
-          typeof request !== 'string' ||
-          typeof context !== 'string' ||
-          typeof issuer !== 'string' ||
-          !routeByFilePath.has(issuer) ||
-          request.includes('?') ||
-          (!request.startsWith('.') && !request.startsWith('/'))
-        ) {
-          return;
-        }
-
-        const candidate = resolve(context, request);
-        const routeFilePath = routeByFilePath.has(candidate)
-          ? candidate
-          : JS_EXTENSIONS.map(extension => `${candidate}${extension}`).find(
-              candidate => routeByFilePath.has(candidate)
-            );
-
-        if (routeFilePath) {
-          data.request = `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`;
-        }
-      });
-    });
-  },
-});
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -748,6 +681,22 @@ export const pluginReactRouter = (
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
       const resolveConfig = modePlan.createResolveConfig(api.context.rootPath);
+      type SourceMapConfig =
+        | NonNullable<NonNullable<typeof config.output>['sourceMap']>
+        | undefined;
+      const hasConfiguredNodeJsSourceMap = (
+        sourceMap: SourceMapConfig
+      ): boolean =>
+        sourceMap === false ||
+        sourceMap === true ||
+        (typeof sourceMap === 'object' &&
+          sourceMap !== null &&
+          sourceMap.js !== undefined);
+      const hasConfiguredNodeSourceMap =
+        hasConfiguredNodeJsSourceMap(config.output?.sourceMap) ||
+        hasConfiguredNodeJsSourceMap(
+          config.environments?.node?.output?.sourceMap
+        );
 
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
@@ -835,6 +784,13 @@ export const pluginReactRouter = (
               entry: modePlan.nodeEntries,
             },
             output: {
+              ...(!isBuild && !hasConfiguredNodeSourceMap
+                ? {
+                    sourceMap: {
+                      js: 'inline-source-map',
+                    },
+                  }
+                : {}),
               distPath: {
                 root: resolve(buildDirectory, 'server'),
               },

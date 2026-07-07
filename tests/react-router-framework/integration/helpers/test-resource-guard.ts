@@ -1,6 +1,6 @@
 import { cpus } from "node:os";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readlinkSync } from "node:fs";
 import path from "node:path";
 
 type WorkerLimitOptions = {
@@ -27,7 +27,9 @@ type ProcessInfo = {
 };
 
 type ProcessFilterOptions = {
+  includeStale?: boolean;
   isOwnedPid?: (pid: number) => boolean;
+  isProcessCwdUnder?: (pid: number, parentPath: string) => boolean;
   runId?: string;
 };
 
@@ -41,6 +43,10 @@ const DEFAULT_MAX_INSTALLS = 0;
 const DEFAULT_MAX_BROWSERS_PER_WORKER = 2;
 const PROCESS_GROUP_KILL_DELAY_MS = 2_000;
 const TEST_RUN_ID_ENV = "RR_FRAMEWORK_TEST_RUN_ID";
+const frameworkTmpPath = path.join(
+  process.cwd(),
+  "tests/react-router-framework/.tmp/integration",
+);
 const CRASH_REPORT_ENV = {
   APPORT_DISABLE: "1",
 };
@@ -156,17 +162,41 @@ const processEnvIncludes = (pid: number, name: string, value: string): boolean =
   }
 };
 
+const defaultProcessCwdIsUnder = (pid: number, parentPath: string): boolean => {
+  if (process.platform === "win32") {
+    return false;
+  }
+  try {
+    const cwd = path.resolve(readlinkSync(`/proc/${pid}/cwd`));
+    return cwd === parentPath || cwd.startsWith(`${parentPath}${path.sep}`);
+  } catch {
+    return false;
+  }
+};
+
+const isFrameworkTestProcess = (args: string): boolean =>
+  args.includes("chrome-headless-shell") ||
+  args.includes("chromium") ||
+  args.includes("playwright/lib/worker/workerProcessEntry.js") ||
+  (/\bpnpm(?:\.cjs)?\b/.test(args) && /\binstall\b/.test(args)) ||
+  args.includes("tests/react-router-framework/.tmp/integration/");
+
 export const filterFrameworkTestProcesses = (
   processes: ProcessInfo[],
   {
+    includeStale = false,
     isOwnedPid = defaultIsOwnedPid,
+    isProcessCwdUnder = defaultProcessCwdIsUnder,
     runId = process.env[TEST_RUN_ID_ENV],
   }: ProcessFilterOptions = {},
 ): ProcessInfo[] =>
   processes.filter(
     ({ args, pid }) =>
       isOwnedPid(pid) ||
-      (runId !== undefined && args.includes(runId)),
+      (runId !== undefined && args.includes(runId)) ||
+      (includeStale &&
+        isFrameworkTestProcess(args) &&
+        isProcessCwdUnder(pid, frameworkTmpPath)),
   );
 
 export const countFrameworkTestResources = (
@@ -254,7 +284,9 @@ export const killProcessGroup = (child: ProcessRef | undefined): void => {
 };
 
 export const cleanupOrphanedTestProcesses = (): void => {
-  const candidates = filterFrameworkTestProcesses(listProcesses());
+  const candidates = filterFrameworkTestProcesses(listProcesses(), {
+    includeStale: true,
+  });
   for (const signal of ["SIGTERM", "SIGKILL"] as const) {
     for (const { pid } of candidates) {
       for (const target of killTargets(pid)) {

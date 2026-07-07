@@ -5,7 +5,7 @@ import {
 } from 'yuku-analyzer';
 import { print } from 'yuku-codegen';
 import { walk } from 'yuku-parser';
-import { normalize, relative, resolve } from 'pathe';
+import { dirname, normalize, relative, resolve } from 'pathe';
 import { SERVER_ONLY_ROUTE_EXPORTS_SET } from './constants.js';
 
 type AnyNode = Record<string, any>;
@@ -143,6 +143,7 @@ type ExportDependencies = {
   topLevelStatements: Set<AnyNode>;
   topLevelNonModuleStatements: Set<AnyNode>;
   importedIdentifierNames: Set<string>;
+  importSources: Set<string>;
   exportedVariableDeclarators: Set<AnyNode>;
 };
 
@@ -208,6 +209,26 @@ const setsIntersect = <T>(set1: Set<T>, set2: Set<T>) => {
   return false;
 };
 
+const isEntryClientImport = (source: string, importer: string): boolean => {
+  if (!source.startsWith('.') && !source.startsWith('/')) {
+    return false;
+  }
+  const resolved = normalize(resolve('/', dirname(importer), source));
+  return /(?:^|\/)entry\.client(?:\.[cm]?[jt]sx?)?$/.test(resolved);
+};
+
+const hasEntryClientImport = (
+  dependencies: ExportDependencies,
+  importer: string
+): boolean => {
+  for (const source of dependencies.importSources) {
+    if (isEntryClientImport(source, importer)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const getExportDependencies = (
   code: string,
   cache: RouteChunkCache,
@@ -267,6 +288,7 @@ const getExportDependencies = (
           topLevelStatements: new Set(),
           topLevelNonModuleStatements: new Set(),
           importedIdentifierNames: new Set(),
+          importSources: new Set(),
           exportedVariableDeclarators: new Set(),
         };
         const visitedSymbols = new Set<YukuSymbol>();
@@ -303,6 +325,9 @@ const getExportDependencies = (
             );
             if (statement.type === 'ImportDeclaration') {
               dependencies.importedIdentifierNames.add(symbol.name);
+              if (typeof statement.source?.value === 'string') {
+                dependencies.importSources.add(statement.source.value);
+              }
             }
             const declarator = getCachedVariableDeclaratorForNode(declaration);
             if (
@@ -352,13 +377,20 @@ const getExportDependencies = (
 
 const isExportChunkable = (
   exportName: string,
-  exportDependencies: Map<string, ExportDependencies>
+  exportDependencies: Map<string, ExportDependencies>,
+  importer: string
 ) => {
   const dependencies = exportDependencies.get(exportName);
   if (!dependencies) {
     return false;
   }
   if (exportName === 'clientLoader' && hasHydrateAssignment(dependencies)) {
+    return false;
+  }
+  if (
+    exportName === 'clientLoader' &&
+    hasEntryClientImport(dependencies, importer)
+  ) {
     return false;
   }
   for (const [currentExportName, currentDependencies] of exportDependencies) {
@@ -418,7 +450,7 @@ const getChunkableExportMap = (
   getOrSetFromCache(cache, `${cacheKey}::getChunkableExportMap`, code, () => {
     const exportDependencies = getExportDependencies(code, cache, cacheKey);
     return createRouteChunkExportMap(exportName =>
-      isExportChunkable(exportName, exportDependencies)
+      isExportChunkable(exportName, exportDependencies, cacheKey)
     );
   });
 
@@ -435,7 +467,8 @@ const hasChunkableExport = (
   }
   return isExportChunkable(
     exportName,
-    getExportDependencies(code, cache, cacheKey)
+    getExportDependencies(code, cache, cacheKey),
+    cacheKey
   );
 };
 
@@ -540,10 +573,8 @@ const getChunkedExport = (
   );
 };
 
-const getChunkedExportCacheKey = (
-  cacheKey: string,
-  exportName: string
-) => `${cacheKey}::getChunkedExport::${exportName}`;
+const getChunkedExportCacheKey = (cacheKey: string, exportName: string) =>
+  `${cacheKey}::getChunkedExport::${exportName}`;
 
 const hasCachedChunkedExport = (
   code: string,
@@ -678,14 +709,21 @@ const precomputeChunkedExports = (
     if (hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
       continue;
     }
-    if (!hasCachedValue(cache, getChunkedExportCacheKey(cacheKey, exportName), code)) {
+    if (
+      !hasCachedValue(
+        cache,
+        getChunkedExportCacheKey(cacheKey, exportName),
+        code
+      )
+    ) {
       getChunkedExport(code, exportName, cache, cacheKey);
     }
   }
 };
 
 const getSharedChunkedExports = (
-  exportDependencies: Map<string, ExportDependencies>
+  exportDependencies: Map<string, ExportDependencies>,
+  cacheKey: string
 ): string[] =>
   Array.from(exportDependencies.keys())
     .filter(
@@ -693,7 +731,7 @@ const getSharedChunkedExports = (
         exportName !== 'default' &&
         !(routeChunkExportNames as string[]).includes(exportName) &&
         !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName) &&
-        isExportChunkable(exportName, exportDependencies)
+        isExportChunkable(exportName, exportDependencies, cacheKey)
     )
     .sort();
 
@@ -704,11 +742,14 @@ const getChunkedExportNames = (
 ): string[] => {
   const exportDependencies = getExportDependencies(code, cache, cacheKey);
   const routeChunkedExports = routeChunkExportNames.filter(exportName =>
-    isExportChunkable(exportName, exportDependencies)
+    isExportChunkable(exportName, exportDependencies, cacheKey)
   );
+  if (routeChunkedExports.length === 0) {
+    return [];
+  }
   return [
     ...routeChunkedExports,
-    ...getSharedChunkedExports(exportDependencies),
+    ...getSharedChunkedExports(exportDependencies, cacheKey),
   ];
 };
 
@@ -731,7 +772,10 @@ export const detectRouteChunks = (
   const chunkedExports = Object.entries(hasRouteChunkByExportName)
     .filter(([, isChunked]) => isChunked)
     .map(([exportName]) => exportName as RouteChunkExportName);
-  const sharedChunkedExports = getSharedChunkedExports(exportDependencies);
+  const sharedChunkedExports =
+    chunkedExports.length > 0
+      ? getSharedChunkedExports(exportDependencies, cacheKey)
+      : [];
   const hasRouteChunks =
     chunkedExports.length > 0 || sharedChunkedExports.length > 0;
   return {

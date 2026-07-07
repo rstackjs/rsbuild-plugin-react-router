@@ -171,9 +171,9 @@ describe('route chunks', () => {
 
       const result = await detect(code);
 
-      expect(result.hasRouteChunks).toBe(true);
+      expect(result.hasRouteChunks).toBe(false);
       expect(result.chunkedExports).toEqual([]);
-      expect(result.sharedChunkedExports).toEqual(['customExport']);
+      expect(result.sharedChunkedExports).toEqual([]);
       expect(result.hasRouteChunkByExportName.clientLoader).toBe(false);
 
       const mainChunk = await getRouteChunkIfEnabled(
@@ -183,7 +183,25 @@ describe('route chunks', () => {
         'main',
         code
       );
-      expect(mainChunk).not.toContain('custom_export_count');
+      expect(mainChunk).toContain('custom_export_count');
+    });
+
+    it('keeps client loaders that import entry.client in the main route chunk', async () => {
+      const code = `
+        import { myContext } from "../entry.client";
+
+        export function clientLoader({ context }) {
+          return context.get(myContext);
+        }
+
+        export default function Route() {
+          return null;
+        }
+      `;
+
+      const result = await detect(code, '/app/routes/_index.tsx');
+
+      expectNoRouteChunks(result, ['clientLoader', 'default']);
     });
 
     it('keeps hydrated client loaders in main JSX route chunks', async () => {
@@ -238,9 +256,9 @@ describe('route chunks', () => {
 
       const result = await detect(code);
 
-      expect(result.hasRouteChunks).toBe(true);
+      expect(result.hasRouteChunks).toBe(false);
       expect(result.chunkedExports).toEqual([]);
-      expect(result.sharedChunkedExports).toEqual(['customExport']);
+      expect(result.sharedChunkedExports).toEqual([]);
       expect(result.hasRouteChunkByExportName.clientLoader).toBe(false);
     });
 
@@ -501,7 +519,7 @@ describe('route chunks', () => {
       expect(chunk).toBeNull();
     });
 
-    it('omits shared custom export initializers from the main chunk', async () => {
+    it('keeps shared custom export initializers when no route exports split', async () => {
       const code = `
         export const customExport = (() => {
           globalThis.custom_export_count = (globalThis.custom_export_count || 0) + 1;
@@ -519,7 +537,7 @@ describe('route chunks', () => {
 
       const result = await detect(code);
       expect(result.exportNames).toContain('customExport');
-      expect(result.sharedChunkedExports).toEqual(['customExport']);
+      expect(result.sharedChunkedExports).toEqual([]);
 
       const chunk = await getRouteChunkIfEnabled(
         new Map(),
@@ -529,8 +547,8 @@ describe('route chunks', () => {
         code
       );
 
-      expect(chunk).not.toContain('custom_export_count');
-      await expectExports(chunk, ['clientLoader', 'default'], ['customExport']);
+      expect(chunk).toContain('custom_export_count');
+      await expectExports(chunk, ['clientLoader', 'customExport', 'default']);
     });
 
     it('keeps side-effect imports in the main chunk and omits them from individual client chunks', async () => {

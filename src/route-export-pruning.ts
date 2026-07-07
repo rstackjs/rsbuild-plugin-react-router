@@ -489,7 +489,8 @@ const hasRemovableExport = (
 export const removeExports = (
   ast: ParseResult | AnyNode,
   exportsToRemove: readonly string[],
-  exportsToRemoveSet: ReadonlySet<string> = new Set(exportsToRemove)
+  exportsToRemoveSet: ReadonlySet<string> = new Set(exportsToRemove),
+  options: { pruneDeadDeclarations?: boolean } = {}
 ): boolean => {
   const program = getProgram(ast);
   if (!hasRemovableExport(program, exportsToRemoveSet)) {
@@ -631,7 +632,7 @@ export const removeExports = (
     }
   }
 
-  if (exportsChanged) {
+  if (exportsChanged && options.pruneDeadDeclarations !== false) {
     removeNewlyDeadTopLevelDeclarations(
       program,
       declarationGraph,

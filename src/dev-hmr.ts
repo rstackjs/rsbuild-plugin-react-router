@@ -184,6 +184,112 @@ function scheduleFlush() {
   flushTimeout = setTimeout(flush, 16);
 }
 
+function takePendingRouteUpdates() {
+  const updates = Array.from(pendingRouteUpdates, ([routeId, update]) => ({
+    routeId,
+    update,
+  }));
+  pendingRouteUpdates.clear();
+  return updates;
+}
+
+function applyRouteModuleUpdate(routeId, update, routeEntry, routeModules) {
+  Object.assign(routeEntry, update.routeMetadata);
+  const imported = update.getRouteModuleExports();
+  registerReactRouterRouteExports(routeId, imported);
+  const current = routeModules[routeId];
+  routeModules[routeId] = {
+    ...imported,
+    default: imported.default
+      ? (current && current.default) || imported.default
+      : imported.default,
+    ErrorBoundary: imported.ErrorBoundary
+      ? (current && current.ErrorBoundary) || imported.ErrorBoundary
+      : imported.ErrorBoundary,
+    HydrateFallback: imported.HydrateFallback
+      ? (current && current.HydrateFallback) || imported.HydrateFallback
+      : imported.HydrateFallback,
+  };
+}
+
+function applyPendingRouteUpdates(router, routeModules, manifest, context) {
+  if (pendingRouteUpdates.size === 0) {
+    return { nextManifest: undefined, shouldRefreshRouteState: false };
+  }
+
+  const nextManifest = JSON.parse(JSON.stringify(manifest));
+  const routesToRevalidate = new Set();
+  for (const { routeId, update } of takePendingRouteUpdates()) {
+    const routeEntry = nextManifest.routes[routeId];
+    if (!routeEntry) continue;
+
+    applyRouteModuleUpdate(routeId, update, routeEntry, routeModules);
+    if (
+      routeEntry.hasLoader ||
+      routeEntry.hasClientLoader ||
+      routeEntry.hasClientMiddleware
+    ) {
+      routesToRevalidate.add(routeId);
+    }
+  }
+
+  const shouldRefreshRouteState = routesToRevalidate.size === 0;
+  if (routesToRevalidate.size > 0) {
+    setNeedsHdrNavigation();
+  }
+  if (
+    typeof router.createRoutesForHMR === 'function' &&
+    typeof router._internalSetRoutes === 'function'
+  ) {
+    const routes = router.createRoutesForHMR(
+      routesToRevalidate,
+      nextManifest.routes,
+      routeModules,
+      context.ssr,
+      context.isSpaMode
+    );
+    router._internalSetRoutes(routes);
+  }
+
+  return { nextManifest, shouldRefreshRouteState };
+}
+
+async function revalidateRouter(router) {
+  try {
+    window.__reactRouterHdrActive = true;
+    if (consumeNeedsHdrNavigation() && typeof router.navigate === 'function') {
+      await router.navigate(getCurrentRouterPath(router), {
+        replace: true,
+        preventScrollReset: true,
+      });
+    } else {
+      await router.revalidate();
+    }
+  } finally {
+    window.__reactRouterHdrActive = false;
+  }
+}
+
+async function refreshRouteState(router) {
+  if (typeof router.navigate !== 'function') {
+    return;
+  }
+  await router.navigate(getCurrentRouterPath(router), {
+    replace: true,
+    preventScrollReset: true,
+    defaultShouldRevalidate: false,
+  });
+}
+
+function performReactRefresh() {
+  if (
+    RefreshRuntime &&
+    typeof RefreshRuntime.performReactRefresh === 'function'
+  ) {
+    RefreshRuntime.performReactRefresh();
+  }
+}
+
 async function flush() {
   const router = window.__reactRouterDataRouter;
   const routeModules = window.__reactRouterRouteModules;
@@ -192,100 +298,24 @@ async function flush() {
   if (!router || !routeModules || !manifest || !context) {
     return;
   }
-  let nextManifest;
-  let shouldRevalidate = pendingRevalidation;
-  let shouldRefreshRouteState = false;
+
+  const shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  if (pendingRouteUpdates.size > 0) {
-    nextManifest = JSON.parse(JSON.stringify(manifest));
-    const routesToRevalidate = new Set();
-    const updatedRouteIds = Array.from(pendingRouteUpdates.keys());
-    const updates = Array.from(pendingRouteUpdates.values());
-    pendingRouteUpdates.clear();
-    for (let index = 0; index < updates.length; index++) {
-      const routeId = updatedRouteIds[index];
-      const update = updates[index];
-      const routeEntry = nextManifest.routes[routeId];
-      if (!routeEntry) continue;
-      Object.assign(routeEntry, update.routeMetadata);
-      const imported = update.getRouteModuleExports();
-      registerReactRouterRouteExports(routeId, imported);
-      const current = routeModules[routeId];
-      routeModules[routeId] = {
-        ...imported,
-        default: imported.default
-          ? (current && current.default) || imported.default
-          : imported.default,
-        ErrorBoundary: imported.ErrorBoundary
-          ? (current && current.ErrorBoundary) || imported.ErrorBoundary
-          : imported.ErrorBoundary,
-        HydrateFallback: imported.HydrateFallback
-          ? (current && current.HydrateFallback) || imported.HydrateFallback
-          : imported.HydrateFallback,
-      };
-      if (
-        routeEntry.hasLoader ||
-        routeEntry.hasClientLoader ||
-        routeEntry.hasClientMiddleware
-      ) {
-        routesToRevalidate.add(routeId);
-      }
-    }
-    if (routesToRevalidate.size > 0) {
-      setNeedsHdrNavigation();
-    } else {
-      shouldRefreshRouteState = true;
-    }
-    if (
-      typeof router.createRoutesForHMR === 'function' &&
-      typeof router._internalSetRoutes === 'function'
-    ) {
-      const routes = router.createRoutesForHMR(
-        routesToRevalidate,
-        nextManifest.routes,
-        routeModules,
-        context.ssr,
-        context.isSpaMode
-      );
-      router._internalSetRoutes(routes);
-    }
-  }
+  const { nextManifest, shouldRefreshRouteState } = applyPendingRouteUpdates(
+    router,
+    routeModules,
+    manifest,
+    context
+  );
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
   }
   if (shouldRevalidate) {
-    try {
-      window.__reactRouterHdrActive = true;
-      if (
-        consumeNeedsHdrNavigation() &&
-        typeof router.navigate === 'function'
-      ) {
-        await router.navigate(getCurrentRouterPath(router), {
-          replace: true,
-          preventScrollReset: true,
-        });
-      } else {
-        await router.revalidate();
-      }
-    } finally {
-      window.__reactRouterHdrActive = false;
-    }
-  } else if (
-    shouldRefreshRouteState &&
-    typeof router.navigate === 'function'
-  ) {
-    await router.navigate(getCurrentRouterPath(router), {
-      replace: true,
-      preventScrollReset: true,
-      defaultShouldRevalidate: false,
-    });
+    await revalidateRouter(router);
+  } else if (shouldRefreshRouteState) {
+    await refreshRouteState(router);
   }
-  if (
-    RefreshRuntime &&
-    typeof RefreshRuntime.performReactRefresh === 'function'
-  ) {
-    RefreshRuntime.performReactRefresh();
-  }
+  performReactRefresh();
 }
 
 if (typeof window !== 'undefined' && import.meta.webpackHot) {

@@ -141,6 +141,27 @@ describe('route artifact helpers', () => {
       });
     });
 
+    it('keeps the full route module when no route exports split', async () => {
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export const clientLoader = async () => {};
+          clientLoader.hydrate = true;
+          export const customExport = true;
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        environmentName: 'web',
+        isBuild: true,
+        routeChunkConfig,
+      });
+
+      expect(result).toEqual({
+        code: `export { clientLoader, customExport, default } from ${JSON.stringify(
+          routeRequest
+        )};`,
+      });
+    });
+
     it('does not run split analysis for root route client entries', async () => {
       const rootResourcePath = '/app/root.tsx';
       const result = await createRouteClientEntryArtifact({

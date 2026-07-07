@@ -1,8 +1,5 @@
 import {
   existsSync,
-  lstatSync,
-  mkdirSync,
-  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -62,37 +59,10 @@ function readTemplateName(projectDir: string): TemplateName {
 }
 
 function linkWorkspaceNodeModules(sourceNodeModules: string, targetNodeModules: string) {
-  mkdirSync(targetNodeModules, { recursive: true });
-
-  for (const entry of readdirSync(sourceNodeModules, { withFileTypes: true })) {
-    if (entry.name === ".modules.yaml" || entry.name === ".pnpm") {
-      continue;
-    }
-
-    const sourceEntry = path.join(sourceNodeModules, entry.name);
-    const targetEntry = path.join(targetNodeModules, entry.name);
-    if (entry.name.startsWith("@") && lstatSync(sourceEntry).isDirectory()) {
-      linkScopedPackages(sourceEntry, targetEntry);
-      continue;
-    }
-    linkEntry(sourceEntry, targetEntry);
-  }
-}
-
-function linkScopedPackages(sourceScope: string, targetScope: string) {
-  mkdirSync(targetScope, { recursive: true });
-  for (const entry of readdirSync(sourceScope)) {
-    linkEntry(path.join(sourceScope, entry), path.join(targetScope, entry));
-  }
-}
-
-function linkEntry(sourceEntry: string, targetEntry: string) {
-  rmSync(targetEntry, { force: true, recursive: true });
+  rmSync(targetNodeModules, { force: true, recursive: true });
   symlinkSync(
-    sourceEntry,
-    targetEntry,
-    process.platform === "win32" && lstatSync(sourceEntry).isDirectory()
-      ? "junction"
-      : undefined,
+    sourceNodeModules,
+    targetNodeModules,
+    process.platform === "win32" ? "junction" : "dir",
   );
 }

@@ -118,6 +118,26 @@ describe('React Router framework test resource guard', () => {
     ).toEqual([2, 4]);
   });
 
+  it('can include stale fixture processes from the framework tmp workspace', () => {
+    const processes = [
+      { pid: 1, args: 'chrome-headless-shell --playwright' },
+      { pid: 2, args: 'node unrelated.js' },
+      {
+        pid: 3,
+        args: '/tests/react-router-framework/.tmp/integration/rr-test/node server.js',
+      },
+    ];
+
+    expect(
+      filterFrameworkTestProcesses(processes, {
+        includeStale: true,
+        isOwnedPid: () => false,
+        isProcessCwdUnder: (pid: number) => pid !== 2,
+        runId: 'this-run',
+      }).map(({ pid }: { pid: number }) => pid)
+    ).toEqual([1, 3]);
+  });
+
   it('resolves fixture dependencies from committed workspace templates', () => {
     expect(getFixtureWorkspaceNodeModulesPath('rsbuild-template')).toMatch(
       /tests\/react-router-framework\/integration\/helpers\/rsbuild-template\/node_modules$/

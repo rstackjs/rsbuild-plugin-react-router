@@ -1,12 +1,17 @@
 import { describe, expect, it } from '@rstest/core';
 import { transformRscRouteModule } from '../src/rsc-route-transforms';
 import type { RouteChunkConfig } from '../src/route-chunks';
+import type { Route } from '../src/types';
 
 const routeChunkConfig: RouteChunkConfig = {
   splitRouteModules: false,
   appDirectory: '/app',
   rootRouteFile: 'root.tsx',
 };
+const routeByFilePath = new Map<string, Route>([
+  ['/app/routes/client.tsx', { id: 'routes/client', file: 'routes/client.tsx' }],
+  ['/app/routes/target.tsx', { id: 'routes/target', file: 'routes/target.tsx' }],
+]);
 
 describe('RSC route transforms', () => {
   it('reexports the default root ErrorBoundary from root server route entries', async () => {
@@ -84,6 +89,131 @@ describe('RSC route transforms', () => {
     expect(result.code).not.toContain('export default function Route()');
   });
 
+  it('targets RSC client route exports separately from shared exports', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        export async function loader() {
+          return null;
+        }
+        export async function clientLoader() {
+          return null;
+        }
+        clientLoader.hydrate = true;
+        export const customExport = true;
+        export default function Route() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: false,
+      isDev: false,
+    });
+
+    expect(result.code).toContain(
+      'export const clientLoader = async (...args) => import("/app/routes/client.tsx?client-route-module=route")'
+    );
+    expect(result.code).toContain(
+      'export { customExport } from "/app/routes/client.tsx?client-route-module=shared";'
+    );
+    expect(result.code).toContain(
+      'export { default } from "/app/routes/client.tsx?client-route-module=route";'
+    );
+    expect(result.code).not.toContain(
+      'clientLoader")}).then(mod => mod.clientLoader'
+    );
+  });
+
+  it('groups RSC client route exports in one route client module', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        export async function loader() {
+          return null;
+        }
+        export async function clientLoader() {
+          return null;
+        }
+        export const customExport = true;
+        export default function Route() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=route',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: false,
+      isDev: false,
+    });
+
+    expect(result.code).toContain('export async function clientLoader()');
+    expect(result.code).toContain('export default function Route()');
+    expect(result.code).not.toContain('export async function loader()');
+    expect(result.code).not.toContain('export const customExport = true');
+  });
+
+  it('omits RSC client route exports from shared client route chunks', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        export async function loader() {
+          return null;
+        }
+        export async function clientLoader() {
+          return null;
+        }
+        clientLoader.hydrate = true;
+        export const customExport = true;
+        export default function Route() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=shared',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: false,
+      isDev: false,
+    });
+
+    expect(result.code).toContain('export const customExport = true;');
+    expect(result.code).not.toContain('export async function clientLoader()');
+    expect(result.code).not.toContain('export default function Route()');
+  });
+
+  it('rewrites RSC client route module imports to shared client modules', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        import { customExport } from "./target";
+
+        export const handle = customExport;
+        export default function Route() {
+          return customExport ? null : null;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=default',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeByFilePath,
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: true,
+      isDev: false,
+    });
+
+    expect(result.code).toContain(
+      'from \"/app/routes/target.tsx?client-route-module=shared\"'
+    );
+    expect(result.code).not.toContain('from \"./target\"');
+  });
+
   it('targets server route modules from the server route module query', async () => {
     const result = await transformRscRouteModule({
       code: `
@@ -110,5 +240,36 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain('export async function loader()');
     expect(result.code).not.toContain('export async function clientLoader()');
     expect(result.code).not.toContain('export default function Route()');
+  });
+
+  it('preserves client component initializer side effects in server route modules', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        export async function loader() {
+          return globalThis.componentCount;
+        }
+        export const clientLoader = (() => {
+          globalThis.clientLoaderCount = true;
+          return async () => null;
+        })();
+        const Route = (() => {
+          globalThis.componentCount = true;
+          return () => null;
+        })();
+        export default Route;
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?server-route-module=',
+      isRootRoute: false,
+      routeId: 'routes/server',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: true,
+      isDev: false,
+    });
+
+    expect(result.code).toContain('globalThis.componentCount = true');
+    expect(result.code).not.toContain('globalThis.clientLoaderCount = true');
+    expect(result.code).not.toContain('export default');
   });
 });
