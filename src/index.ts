@@ -719,7 +719,6 @@ export const pluginReactRouter = (
           writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
-          setupMiddlewares: modePlan.setupMiddlewares,
         },
         tools: {
           rspack: {

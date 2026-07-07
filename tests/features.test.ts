@@ -6,6 +6,20 @@ import path from 'node:path';
 import { pluginReactRouter } from '../src';
 import { getVirtualModuleFilePath } from '../src/virtual-modules';
 
+type ReactRouterTestGlobal = typeof globalThis & {
+  __reactRouterTestConfig?: unknown;
+};
+
+const testGlobal = globalThis as ReactRouterTestGlobal;
+
+const getServerSetupNames = (config: {
+  server?: { setup?: unknown };
+}): string[] =>
+  [config.server?.setup]
+    .flat()
+    .filter((fn): fn is (...args: unknown[]) => unknown => Boolean(fn))
+    .map(fn => fn.name);
+
 describe('pluginReactRouter', () => {
   describe('basic configuration', () => {
     it('should apply default options when no options provided', async () => {
@@ -22,6 +36,21 @@ describe('pluginReactRouter', () => {
       expect(config.dev.writeToDisk).toBe(true);
     });
 
+    it('should register the dev server middleware via server.setup', async () => {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      // The deprecated `dev.setupMiddlewares` API must stay untouched.
+      expect(config.dev.setupMiddlewares).toBeUndefined();
+      expect(getServerSetupNames(config)).toContain(
+        'reactRouterDevServerSetup'
+      );
+    });
+
     it('should respect customServer option', async () => {
       const rsbuild = await createStubRsbuild({
         rsbuildConfig: {},
@@ -30,7 +59,22 @@ describe('pluginReactRouter', () => {
       rsbuild.addPlugins([pluginReactRouter({ customServer: true })]);
       const config = await rsbuild.unwrapConfig();
 
-      expect(config.dev.setupMiddlewares).toEqual([]);
+      expect(config.dev.setupMiddlewares).toBeUndefined();
+      expect(getServerSetupNames(config)).not.toContain(
+        'reactRouterDevServerSetup'
+      );
+    });
+
+    it('should register the dev middleware for SPA mode (ssr: false)', async () => {
+      testGlobal.__reactRouterTestConfig = { ssr: false };
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      expect(config.server.setup).toHaveLength(1);
     });
 
     it('should configure server output format correctly', async () => {

@@ -14,7 +14,7 @@ import type {
 import type { RouteChunkCache, RouteChunkConfig } from './route-chunks.js';
 import type { DevHmrPlanOptions } from './dev-hmr.js';
 import type { PluginOptions, Route } from './types.js';
-import { createDevServerMiddleware } from './dev-server.js';
+import { createReactRouterDevServerSetup } from './dev-server.js';
 import { resolveAppPackagePath } from './plugin-utils.js';
 import {
   createRouteTransformExecutor,
@@ -35,14 +35,6 @@ import {
   createReactRouterRscVirtualModules,
 } from './rsc-support.js';
 
-type RsbuildDevSetupMiddlewares = NonNullable<
-  NonNullable<RsbuildConfig['dev']>['setupMiddlewares']
->;
-type RsbuildDevSetupMiddleware = Extract<
-  RsbuildDevSetupMiddlewares,
-  unknown[]
->[number];
-
 type CommonModePlan = {
   routeChunkConfig: RouteChunkConfig;
   manifestChunkNames: Set<string>;
@@ -51,7 +43,6 @@ type CommonModePlan = {
   createVirtualModules(publicPath: string): Record<string, string>;
   createResolveConfig(rootPath: string): Rspack.Configuration['resolve'];
   server: RsbuildConfig['server'] | undefined;
-  setupMiddlewares: RsbuildDevSetupMiddlewares;
   webExternalsType: 'module' | undefined;
   webOutput: NonNullable<Rspack.Configuration['output']>;
   webOptimization: NonNullable<Rspack.Configuration['optimization']>;
@@ -220,7 +211,6 @@ const createRscModePlan = async ({
             }),
           }
         : undefined,
-    setupMiddlewares: [],
     webExternalsType: undefined,
     webOutput: {
       chunkFormat: 'array-push',
@@ -349,19 +339,15 @@ const createClassicModePlan = async ({
         ssr,
       }),
     createResolveConfig: () => ({ alias: reactRouterAliases }),
-    server: undefined,
-    setupMiddlewares:
-      customServer || !ssr
-        ? []
-        : [
-            (middlewares: Parameters<RsbuildDevSetupMiddleware>[0]) => {
-              middlewares.push(
-                createDevServerMiddleware({
-                  loadBuild: artifacts.devRuntime.createBuildLoader(),
-                })
-              );
-            },
+    server: customServer
+      ? undefined
+      : {
+          setup: [
+            createReactRouterDevServerSetup({
+              loadBuild: artifacts.devRuntime.createBuildLoader(),
+            }),
           ],
+        },
     webExternalsType: 'module',
     webOutput: {
       chunkFormat: 'module',
