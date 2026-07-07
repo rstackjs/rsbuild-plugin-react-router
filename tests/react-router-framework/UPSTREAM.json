@@ -6,15 +6,20 @@
     "integration",
     "packages/react-router-dev/__tests__"
   ],
-  "fileCount": 166,
+  "fileCount": 164,
   "adapterOwnedFiles": [
     "README.md",
     "UPSTREAM.json",
+    "tsconfig.base.json",
+    "integration/helpers/fixture-workspace-dependencies.ts",
     "integration/helpers/rsbuild-adapter.ts",
     "integration/helpers/create-fixture.ts",
     "integration/helpers/express.ts",
     "integration/helpers/fixtures.ts",
+    "integration/helpers/global-setup.ts",
+    "integration/helpers/global-teardown.ts",
     "integration/helpers/rsbuild.ts",
+    "integration/helpers/test-resource-guard.ts",
     "integration/playwright.config.ts"
   ],
   "adaptedCorpusFiles": [
@@ -41,9 +46,9 @@
     "integration/helpers/rsc-preview",
     "integration/helpers/stream.ts",
     "integration/helpers/templates.ts",
-    "integration/helpers/vite-plugin-cloudflare-template/package.json",
     "integration/hmr-hdr-rsc-test.ts",
     "integration/hmr-hdr-test.ts",
+    "integration/tsconfig.json",
     "integration/link-test.ts",
     "integration/loader-context-test.ts",
     "integration/manifests-test.ts",
@@ -51,8 +56,6 @@
     "integration/middleware-test.ts",
     "integration/node-env-test.ts",
     "integration/package.json",
-    "integration/plugin-cloudflare-test.ts",
-    "integration/plugin-order-validation-test.ts",
     "integration/prefetch-test.ts",
     "integration/prerender-test.ts",
     "integration/presets-test.ts",
@@ -73,7 +76,8 @@
     "integration/split-route-modules-test.ts",
     "integration/sri-test.ts",
     "integration/typegen-test.ts",
-    "integration/unused-route-exports-test.ts"
+    "integration/unused-route-exports-test.ts",
+    "react-router-dev/__tests__/rsc-virtual-route-modules-test.ts"
   ],
   "renames": {
     "integration/helpers/vite-8-template": "integration/helpers/vite-7-template",
@@ -97,8 +101,6 @@
     "integration/vite-loader-context-test.ts": "integration/loader-context-test.ts",
     "integration/vite-manifests-test.ts": "integration/manifests-test.ts",
     "integration/vite-node-env-test.ts": "integration/node-env-test.ts",
-    "integration/vite-plugin-cloudflare-test.ts": "integration/plugin-cloudflare-test.ts",
-    "integration/vite-plugin-order-validation-test.ts": "integration/plugin-order-validation-test.ts",
     "integration/vite-prerender-test.ts": "integration/prerender-test.ts",
     "integration/vite-presets-test.ts": "integration/presets-test.ts",
     "integration/vite-preview-test.ts": "integration/preview-test.ts",
@@ -110,8 +112,10 @@
     "integration/vite-unused-route-exports-test.ts": "integration/unused-route-exports-test.ts"
   },
   "removedUpstreamFiles": [
-    "integration/helpers/vite-plugin-cloudflare-template/vite.config.ts"
+    "integration/helpers/vite-plugin-cloudflare-template",
+    "integration/vite-plugin-cloudflare-test.ts",
+    "integration/vite-plugin-order-validation-test.ts"
   ],
   "corpusVerified": true,
-  "preservedLocalPathCount": 65
+  "preservedLocalPathCount": 69
 }

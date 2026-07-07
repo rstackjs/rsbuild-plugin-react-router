@@ -15,9 +15,14 @@ import * as Path from "pathe";
 import type { TemplateName } from "./rsbuild.js";
 import {
   finalizeFixtureProject,
-  installFixtureProject,
   normalizeFixtureFiles,
+  prepareFixtureProjectDependencies,
 } from "./rsbuild-adapter.js";
+import {
+  assertResourceGuardrail,
+  killProcessGroup,
+  withFrameworkTestRunEnv,
+} from "./test-resource-guard.js";
 
 declare module "@playwright/test" {
   interface Page {
@@ -81,7 +86,7 @@ export const test = base.extend<{
 
     await applyEdits(cwd, files);
     await finalizeFixtureProject({ projectDir: cwd, templateName: template });
-    installFixtureProject(cwd);
+    prepareFixtureProjectDependencies(cwd, template);
 
     await use(cwd);
   },
@@ -93,19 +98,18 @@ export const test = base.extend<{
   $: async ({ cwd }, use) => {
     const spawn = execa({
       cwd,
-      env: {
+      cleanup: true,
+      detached: process.platform !== "win32",
+      env: withFrameworkTestRunEnv({
         NO_COLOR: "1",
         FORCE_COLOR: "0",
-        // The Rsbuild dev runtime evaluates ESM server bundles with vm
-        // modules, so directly spawned dev servers (e.g. `node server.mjs`)
-        // need the same flags the template `dev` script sets.
         NODE_OPTIONS: [
           process.env.NODE_OPTIONS,
           "--experimental-vm-modules --experimental-global-webcrypto",
         ]
           .filter(Boolean)
           .join(" "),
-      },
+      }),
       reject: false,
     });
 
@@ -114,6 +118,7 @@ export const test = base.extend<{
     const unexpectedErrors: Array<Error> = [];
 
     await use((command, options = {}) => {
+      assertResourceGuardrail();
       const [file, ...args] = parseCommandString(command);
 
       const p = spawn(file, args, options);
@@ -124,8 +129,7 @@ export const test = base.extend<{
       p.then((result) => {
         if (!(result instanceof Error)) return result;
 
-        // Once the test has ended, this process will be killed as part of its teardown resulting in an ExecaError.
-        // We only care about surfacing errors that occurred during test execution, not during teardown.
+        // Ignore ExecaErrors from teardown kills after the test ends.
         const expectedError = testHasEnded && result instanceof ExecaError;
         if (expectedError) return result;
         unexpectedErrors.push(result);
@@ -138,9 +142,8 @@ export const test = base.extend<{
     });
 
     testHasEnded = true;
-    processes.forEach((p) => p.kill());
+    processes.forEach(p => killProcessGroup(p));
 
-    // Throw any unexpected errors that occurred during test execution
     if (unexpectedErrors.length > 0) {
       const errorMessage =
         unexpectedErrors.length === 1

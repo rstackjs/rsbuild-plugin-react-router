@@ -23,11 +23,16 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { type TemplateName, rsbuildConfig, reactRouterConfig } from "./rsbuild.js";
 import {
   finalizeFixtureProject,
-  installFixtureProject,
   normalizeFixtureFiles,
+  prepareFixtureProjectDependencies,
   reactRouterServeBin,
   rsbuildBin,
 } from "./rsbuild-adapter.js";
+import {
+  assertResourceGuardrail,
+  killProcessGroup,
+  withFrameworkTestRunEnv,
+} from "./test-resource-guard.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const root = path.join(__dirname, "../..");
@@ -51,13 +56,7 @@ async function importFixtureModule<T>(projectDir: string, specifier: string) {
   return import(url.pathToFileURL(require.resolve(specifier)).href) as Promise<T>;
 }
 
-// The single-fetch data is decoded with the FIXTURE's copy of react-router
-// (resolved from the fixture's node_modules), whose
-// `Symbol("SingleFetchRedirect")` is a distinct instance from the one the test
-// files import from the HARNESS's react-router. Symbol keys compare by
-// identity, so `.toEqual` fails with "serializes to the same string". Re-key any
-// decoded single-fetch redirect entry onto the harness symbol so assertions that
-// use the harness-imported `UNSAFE_SingleFetchRedirectSymbol` match.
+// Re-key fixture redirect symbols onto the harness SingleFetchRedirect symbol.
 function normalizeSingleFetchRedirectSymbol(value: unknown): unknown {
   if (value === null || typeof value !== "object") {
     return value;
@@ -91,16 +90,28 @@ export async function spawnTestServer({
   timeout?: number;
 }): Promise<{ stop: VoidFunction }> {
   return new Promise((accept, reject) => {
+    assertResourceGuardrail();
     let serverProcess = spawn(command[0], command.slice(1), {
-      env: { ...process.env, ...env },
+      env: withFrameworkTestRunEnv({ ...process.env, ...env }),
       cwd,
+      detached: process.platform !== "win32",
       stdio: "pipe",
     });
 
     let started = false;
+    let settled = false;
     let stdout = "";
+    const fail = (error: unknown) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(rejectTimeout);
+      killProcessGroup(serverProcess);
+      reject(error);
+    };
     let rejectTimeout = setTimeout(() => {
-      reject(new Error(`Timed out waiting for server to start (${timeout}ms)`));
+      fail(new Error(`Timed out waiting for server to start (${timeout}ms)`));
     }, timeout);
 
     serverProcess.stderr.pipe(process.stderr);
@@ -115,21 +126,30 @@ export async function spawnTestServer({
 
         Promise.resolve(validate?.(match))
           .then(() => {
+            settled = true;
             accept({
               stop: () => {
-                serverProcess.kill();
+                killProcessGroup(serverProcess);
               },
             });
           })
           .catch((error: unknown) => {
-            reject(error);
+            fail(error);
           });
       }
     });
 
     serverProcess.on("error", (error: unknown) => {
-      clearTimeout(rejectTimeout);
-      reject(error);
+      fail(error);
+    });
+    serverProcess.on("exit", (code, signal) => {
+      if (!started) {
+        fail(
+          new Error(
+            `Server exited before startup with code=${code} signal=${signal}`,
+          ),
+        );
+      }
     });
   });
 }
@@ -266,7 +286,7 @@ export async function createFixture(init: FixtureInit, mode?: ServerMode) {
     handler = (await import(buildPath))?.default?.fetch;
     if (typeof handler !== "function") {
       throw new Error(
-        "Expected a default request handler function export in Vite RSC Framework Mode server build",
+          "Expected a default request handler function export in Rsbuild RSC Framework Mode server build",
       );
     }
   } else {
@@ -360,7 +380,8 @@ export async function createAppFixture(fixture: Fixture, mode?: ServerMode) {
   }> => {
     if (fixture.useReactRouterServe) {
       let port = await getPort();
-      const serverBuildPath = fixture.templateName.includes("rsc")
+      const templateName = fixture.templateName ?? "rsbuild-template";
+      const serverBuildPath = templateName.includes("rsc")
         ? "build/server/index.js"
         : "build/server/static/js/app.js";
       let { stop } = await spawnTestServer({
@@ -561,7 +582,7 @@ export async function createFixtureProject(
   );
 
   await finalizeFixtureProject({ projectDir, port, templateName });
-  installFixtureProject(projectDir);
+  prepareFixtureProjectDependencies(projectDir, templateName);
 
   reactRouterBuild(
     projectDir,
@@ -577,29 +598,18 @@ function reactRouterBuild(
   buildStdio?: Writable,
   mode?: ServerMode,
 ) {
-  // We have a "require" instead of a dynamic import in readConfig gated
-  // behind mode === ServerMode.Test to make jest happy, but that doesn't
-  // work for ESM configs, those MUST be dynamic imports. So we need to
-  // force the mode to be production for ESM configs when runtime mode is
-  // tested.
+  // ESM configs must be imported in production mode when runtime mode is tested.
   mode = mode === ServerMode.Test ? ServerMode.Production : mode;
 
   let buildArgs: string[] = [rsbuildBin, "build"];
 
   let buildSpawn = spawnSync("node", buildArgs, {
     cwd: projectDir,
-    env: {
+    env: withFrameworkTestRunEnv({
       ...process.env,
       NODE_ENV: mode || ServerMode.Production,
-    },
+    }),
   });
-
-  // These logs are helpful for debugging. Remove comments if needed.
-  // console.log("spawning node " + buildArgs.join(" ") + ":\n");
-  // console.log("  STDOUT:");
-  // console.log("  " + buildSpawn.stdout.toString("utf-8"));
-  // console.log("  STDERR:");
-  // console.log("  " + buildSpawn.stderr.toString("utf-8"));
 
   if (buildStdio) {
     buildStdio.write(buildSpawn.stdout.toString("utf-8"));

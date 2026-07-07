@@ -30,6 +30,11 @@ const enforceRouteChunkConfig: RouteChunkConfig = {
 
 const resourcePath = '/app/routes/demo.tsx';
 const routeRequest = `${resourcePath}?react-router-route`;
+const mainRouteChunkRequest = getRouteChunkModuleId(resourcePath, 'main');
+const customExportChunkRequest = getRouteChunkModuleId(
+  resourcePath,
+  'customExport'
+);
 
 const createRouteChunk = async (
   source: string,
@@ -57,6 +62,7 @@ describe('route artifact helpers', () => {
           export async function loader() { return null; }
           export async function clientLoader() { return null; }
           export { meta as meta };
+          export const customExport = true;
           const meta = () => [];
           export default function Route() { return null; }
         `,
@@ -67,9 +73,7 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { clientLoader, default, meta } from ${JSON.stringify(
-          routeRequest
-        )};`,
+        code: `export { clientLoader, customExport, default, meta } from ${JSON.stringify(routeRequest)};`,
       });
     });
 
@@ -89,7 +93,7 @@ describe('route artifact helpers', () => {
 
       expect(result).toEqual({
         code: `export { action, clientLoader, default, loader } from ${JSON.stringify(
-          routeRequest
+          resourcePath
         )};`,
       });
     });
@@ -108,7 +112,32 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { default } from ${JSON.stringify(routeRequest)};`,
+        code: `export { default } from ${JSON.stringify(
+          mainRouteChunkRequest
+        )};`,
+      });
+    });
+
+    it('reexports independent custom exports from shared route chunks', async () => {
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export const clientLoader = async () => {};
+          export const customExport = true;
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        environmentName: 'web',
+        isBuild: true,
+        routeChunkConfig,
+      });
+
+      expect(result).toEqual({
+        code: [
+          `export { default } from ${JSON.stringify(mainRouteChunkRequest)};`,
+          `export { customExport } from ${JSON.stringify(
+            customExportChunkRequest
+          )};`,
+        ].join('\n'),
       });
     });
 
@@ -174,13 +203,13 @@ describe('route artifact helpers', () => {
       await expect(
         createRouteChunkArtifact({
           code: `export const clientLoader = async () => {};`,
-          resource: `${resourcePath}?route-chunk=invalid`,
+          resource: `${resourcePath}?route-chunk=invalid-name`,
           resourcePath,
           routeChunkConfig,
           isBuild: true,
         })
       ).rejects.toThrow(
-        `Invalid route chunk name in "${resourcePath}?route-chunk=invalid"`
+        `Invalid route chunk name in "${resourcePath}?route-chunk=invalid-name"`
       );
     });
 

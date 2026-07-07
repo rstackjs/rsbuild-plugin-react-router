@@ -1,5 +1,11 @@
 import type { PlaywrightTestConfig } from "@playwright/test";
 import { devices } from "@playwright/test";
+import {
+  assertFrameworkWorkerLimit,
+  ensureFrameworkTestRunId,
+  getFrameworkCacheEnv,
+  resolveFrameworkWorkerLimit,
+} from "./helpers/test-resource-guard.js";
 
 // silence expected warnings in Node 22.22 about `require(esm)`
 // when it implicitly uses `react-router`'s `module-sync` export condition
@@ -7,6 +13,10 @@ process.env.NODE_OPTIONS =
   (process.env.NODE_OPTIONS ?? "") + ` --no-warnings=ExperimentalWarning`;
 
 const isWindows = process.platform === "win32";
+Object.assign(process.env, getFrameworkCacheEnv());
+ensureFrameworkTestRunId();
+const workerLimit = resolveFrameworkWorkerLimit();
+assertFrameworkWorkerLimit(workerLimit);
 
 const config: PlaywrightTestConfig = {
   testDir: ".",
@@ -19,7 +29,7 @@ const config: PlaywrightTestConfig = {
   /* Maximum time one test can run for. */
   timeout: isWindows ? 90_000 : 60_000,
   fullyParallel: false,
-  workers: 1,
+  workers: workerLimit.workers,
   expect: {
     /* Maximum time expect() should wait for the condition to be met. */
     timeout: isWindows ? 10_000 : 5_000,
@@ -27,7 +37,18 @@ const config: PlaywrightTestConfig = {
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 3 : 0,
   reporter: process.env.CI ? "dot" : [["html", { open: "never" }]],
-  use: { actionTimeout: 0 },
+  globalSetup: "./helpers/global-setup.ts",
+  globalTeardown: "./helpers/global-teardown.ts",
+  use: {
+    actionTimeout: 0,
+    launchOptions: {
+      args: [
+        "--disable-breakpad",
+        "--disable-crash-reporter",
+        "--disable-crashpad",
+      ],
+    },
+  },
 
   projects: [
     {

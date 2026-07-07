@@ -5,7 +5,7 @@ import {
   createTemporaryReferenceSet,
   encodeReply,
   setServerCallback,
-} from "@vitejs/plugin-rsc/browser";
+} from "react-server-dom-rspack/client.browser";
 import {
   unstable_createCallServer as createCallServer,
   unstable_getRSCStream as getRSCStream,
@@ -37,7 +37,7 @@ createFromReadableStream<RSCPayload>(getRSCStream()).then((payload) => {
         />
       </StrictMode>,
       {
-        // @ts-expect-error - no types for this yet
+        // @ts-expect-error React Router RSC formState is not typed yet.
         formState,
       },
     );

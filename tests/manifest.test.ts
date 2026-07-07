@@ -107,6 +107,23 @@ describe('manifest', () => {
     });
   });
 
+  it('skips missing named chunks while creating manifest stats', () => {
+    const compilation = {
+      namedChunks: new Map([
+        ['runtime', { files: new Set(['static/js/runtime.js']) }],
+        ['missing', null],
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+      ]),
+    };
+
+    expect(createReactRouterManifestStats(compilation)).toEqual({
+      assetsByChunkName: {
+        runtime: ['static/js/runtime.js'],
+        'entry.client': ['static/js/entry.client.js'],
+      },
+    });
+  });
+
   it('uses direct named chunk lookup for filtered manifest stats when available', () => {
     const chunks = new Map([
       ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
@@ -179,6 +196,28 @@ describe('manifest', () => {
       entrypointFilesByName: {
         'entry.client': ['static/css/entry.client.css'],
         'routes/page': ['static/css/routes/page.css'],
+      },
+    });
+  });
+
+  it('skips null manifest stats lookup entries', () => {
+    const compilation = {
+      namedChunks: new Map([
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+        ['routes/page', null],
+      ]),
+      entrypoints: new Map([
+        ['entry.client', { getFiles: () => ['static/css/entry.client.css'] }],
+        ['routes/page', null],
+      ]),
+    };
+
+    expect(createReactRouterManifestStats(compilation)).toEqual({
+      assetsByChunkName: {
+        'entry.client': ['static/js/entry.client.js'],
+      },
+      entrypointFilesByName: {
+        'entry.client': ['static/css/entry.client.css'],
       },
     });
   });

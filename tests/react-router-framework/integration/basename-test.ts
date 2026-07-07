@@ -422,7 +422,7 @@ test.describe("base + React Router basename", () => {
           );
           build({ cwd });
           if (startServer !== false) {
-            stop = await reactRouterServe({ cwd, port, basename });
+            stop = await reactRouterServe({ cwd, port, basename, base });
           }
         }
 
@@ -678,7 +678,7 @@ async function workflowDev({
   // verify client asset requests are all under base
   expect(
     requests
-      .filter((request) => isViteAssetRequest(request))
+      .filter((request) => isBundlerAssetRequest(request))
       .every((request) =>
         request.url().startsWith(`http://localhost:${port}${base}`),
       ),
@@ -686,33 +686,30 @@ async function workflowDev({
 
   // Firefox may request browser-managed resources like `/favicon.ico`
   // outside the app basename, so only assert on actual route/data requests.
-  expect(
-    requests
-      .filter((request) => isAppRouteRequest(request))
-      .every((request) =>
-        request.url().startsWith(`http://localhost:${port}${basename}`),
-      ),
-  ).toBe(true);
+  const offBasenameRequests = requests
+    .filter((request) => isAppRouteRequest(request))
+    .map((request) => request.url())
+    .filter((url) => !url.startsWith(`http://localhost:${port}${basename}`));
+  expect(offBasenameRequests).toEqual([]);
 }
 
-function isViteAssetRequest(request: Request) {
+function isBundlerAssetRequest(request: Request) {
   let url = request.url();
   return (
     request.resourceType() === "script" ||
     request.resourceType() === "stylesheet" ||
-    /\.[jt]sx?(?:\?|$)/.test(url) ||
-    /\/@id\/__x00__virtual:/.test(url) ||
-    /\/@vite\/client/.test(url) ||
-    /\/@fs\//.test(url)
+    /\.hot-update\./.test(url) ||
+    /\.[jt]sx?(?:\?|$)/.test(url)
   );
 }
 
 function isAppRouteRequest(request: Request) {
   return (
-    request.isNavigationRequest() ||
-    request.resourceType() === "document" ||
-    request.resourceType() === "fetch" ||
-    request.resourceType() === "xhr"
+    !isBundlerAssetRequest(request) &&
+    (request.isNavigationRequest() ||
+      request.resourceType() === "document" ||
+      request.resourceType() === "fetch" ||
+      request.resourceType() === "xhr")
   );
 }
 

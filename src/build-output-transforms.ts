@@ -340,6 +340,7 @@ export const registerBuildOutputTransforms = ({
       resourceQuery: {
         not: /__react-router-build-client-route|react-router-route|route-chunk=/,
       },
+      environments: isBuild && splitRouteModules ? ['node'] : undefined,
       order: 'post',
     },
     transformRouteModule

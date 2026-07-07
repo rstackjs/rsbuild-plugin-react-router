@@ -108,9 +108,7 @@ rsbuild configs with comments marking dropped Vite-only options. The adapter's
 loudly when it fires — new tests must not rely on it. The upstream
 `vite-7-template` / `vite-8-template` pair is collapsed into a single template,
 renamed to `rsbuild-template` (the Vite major split is meaningless for
-rsbuild). `vite-env-only` is kept: fixture app code imports
-`vite-env-only/macros`, and the adapter installs it in every materialized
-fixture.
+rsbuild).
 
 ## Renames
 
@@ -130,12 +128,9 @@ and the title renames. Notable moves:
 - `integration/helpers/rsc-vite` -> `integration/helpers/rsc-preview`
 - `integration/helpers/rsc-vite-framework` -> `integration/helpers/rsc-framework`
 
-Two `describe.skip`ed Vite-only suites keep their Vite names because they
-document genuinely Vite-only behavior in their skip reasons:
-`integration/plugin-order-validation-test.ts` and
-`integration/plugin-cloudflare-test.ts`. The RSC preview/framework fixtures
-still reference real `@vitejs/plugin-rsc` runtime packages and `vite/client`
-types — those are actual dependencies, not naming, and are left as-is.
+Vite-only skipped suites are intentionally not carried in this Rsbuild corpus.
+The RSC preview/framework fixtures use `react-server-dom-rspack` and
+`rsbuild-plugin-rsc`.
 
 ## Commands
 

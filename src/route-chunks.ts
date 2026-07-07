@@ -6,6 +6,7 @@ import {
 import { print } from 'yuku-codegen';
 import { walk } from 'yuku-parser';
 import { normalize, relative, resolve } from 'pathe';
+import { SERVER_ONLY_ROUTE_EXPORTS_SET } from './constants.js';
 
 type AnyNode = Record<string, any>;
 
@@ -15,7 +16,7 @@ export type RouteChunkExportName =
   | 'clientMiddleware'
   | 'HydrateFallback';
 
-export type RouteChunkName = 'main' | RouteChunkExportName;
+export type RouteChunkName = 'main' | RouteChunkExportName | (string & {});
 
 export type RouteChunkConfig = {
   splitRouteModules?: boolean | 'enforce';
@@ -35,6 +36,7 @@ export type RouteChunkInfo = {
   hasRouteChunks: boolean;
   hasRouteChunkByExportName: Record<RouteChunkExportName, boolean>;
   chunkedExports: RouteChunkExportName[];
+  sharedChunkedExports: string[];
 };
 
 export const routeChunkExportNames: RouteChunkExportName[] = [
@@ -63,7 +65,7 @@ export const emptyRouteChunkSnippet = (): string => 'export {};';
 
 const routeChunkQueryStringPrefix = '?route-chunk=';
 
-const routeChunkQueryStrings: Record<RouteChunkName, string> = {
+const routeChunkQueryStrings: Record<RouteChunkExportName | 'main', string> = {
   main: `${routeChunkQueryStringPrefix}main`,
   clientAction: `${routeChunkQueryStringPrefix}clientAction`,
   clientLoader: `${routeChunkQueryStringPrefix}clientLoader`,
@@ -172,6 +174,18 @@ const getVariableDeclaratorForNode = (
   return null;
 };
 
+const isTopLevelExportedVariableDeclarator = (
+  module: Module,
+  node: AnyNode
+): boolean => {
+  const declaration = module.parentOf(node as never) as AnyNode | null;
+  if (declaration?.type !== 'VariableDeclaration') {
+    return false;
+  }
+  const statement = module.parentOf(declaration as never) as AnyNode | null;
+  return statement?.type === 'ExportNamedDeclaration';
+};
+
 const getExportedName = (exported: AnyNode): string => {
   if (exported.type === 'Identifier') {
     return exported.name;
@@ -278,6 +292,9 @@ const getExportDependencies = (
             return;
           }
           visitedSymbols.add(symbol);
+          if (symbol.declarations.length === 0) {
+            return;
+          }
 
           for (const declaration of symbol.declarations as AnyNode[]) {
             const statement = addCachedTopLevelStatement(
@@ -290,8 +307,7 @@ const getExportDependencies = (
             const declarator = getCachedVariableDeclaratorForNode(declaration);
             if (
               declarator &&
-              getCachedTopLevelStatementForNode(declarator).type ===
-                'ExportNamedDeclaration'
+              isTopLevelExportedVariableDeclarator(module, declarator)
             ) {
               dependencies.exportedVariableDeclarators.add(declarator);
             }
@@ -342,6 +358,9 @@ const isExportChunkable = (
   if (!dependencies) {
     return false;
   }
+  if (exportName === 'clientLoader' && hasHydrateAssignment(dependencies)) {
+    return false;
+  }
   for (const [currentExportName, currentDependencies] of exportDependencies) {
     if (currentExportName === exportName) {
       continue;
@@ -376,6 +395,21 @@ const isExportChunkable = (
   return true;
 };
 
+const hasHydrateAssignment = (dependencies: ExportDependencies): boolean =>
+  Array.from(dependencies.topLevelNonModuleStatements).some(statement => {
+    const expression = statement.expression;
+    const left = expression?.left;
+    return (
+      statement.type === 'ExpressionStatement' &&
+      expression?.type === 'AssignmentExpression' &&
+      left?.type === 'MemberExpression' &&
+      left.object?.type === 'Identifier' &&
+      left.object.name === 'clientLoader' &&
+      left.property?.type === 'Identifier' &&
+      left.property.name === 'hydrate'
+    );
+  });
+
 const getChunkableExportMap = (
   code: string,
   cache: RouteChunkCache,
@@ -393,12 +427,17 @@ const hasChunkableExport = (
   exportName: string,
   cache: RouteChunkCache,
   cacheKey: string
-) =>
-  (routeChunkExportNames as string[]).includes(exportName)
-    ? getChunkableExportMap(code, cache, cacheKey)[
-        exportName as RouteChunkExportName
-      ]
-    : false;
+) => {
+  if ((routeChunkExportNames as string[]).includes(exportName)) {
+    return getChunkableExportMap(code, cache, cacheKey)[
+      exportName as RouteChunkExportName
+    ];
+  }
+  return isExportChunkable(
+    exportName,
+    getExportDependencies(code, cache, cacheKey)
+  );
+};
 
 const generateCode = (program: AnyNode): string | undefined => {
   if (program.body.length === 0) {
@@ -503,12 +542,12 @@ const getChunkedExport = (
 
 const getChunkedExportCacheKey = (
   cacheKey: string,
-  exportName: RouteChunkExportName
+  exportName: string
 ) => `${cacheKey}::getChunkedExport::${exportName}`;
 
 const hasCachedChunkedExport = (
   code: string,
-  exportName: RouteChunkExportName,
+  exportName: string,
   cache: RouteChunkCache,
   cacheKey: string
 ): boolean =>
@@ -525,11 +564,10 @@ const omitChunkedExports = (
     `${cacheKey}::omitChunkedExports::${exportNames.join(',')}`,
     code,
     () => {
-      const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
       const exportNameSet = new Set(exportNames);
       const isOmitted = (exportName: string) =>
         exportNameSet.has(exportName) &&
-        Boolean(chunkableExportMap[exportName as RouteChunkExportName]);
+        hasChunkableExport(code, exportName, cache, cacheKey);
       const isRetained = (exportName: string) => !isOmitted(exportName);
 
       const exportDependencies = getExportDependencies(code, cache, cacheKey);
@@ -633,15 +671,45 @@ const precomputeChunkedExports = (
   cache: RouteChunkCache,
   cacheKey: string
 ) => {
-  const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
-  for (const exportName of routeChunkExportNames) {
-    if (!chunkableExportMap[exportName]) {
+  for (const exportName of getChunkedExportNames(code, cache, cacheKey)) {
+    if (!hasChunkableExport(code, exportName, cache, cacheKey)) {
       continue;
     }
-    if (!hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
+    if (hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
+      continue;
+    }
+    if (!hasCachedValue(cache, getChunkedExportCacheKey(cacheKey, exportName), code)) {
       getChunkedExport(code, exportName, cache, cacheKey);
     }
   }
+};
+
+const getSharedChunkedExports = (
+  exportDependencies: Map<string, ExportDependencies>
+): string[] =>
+  Array.from(exportDependencies.keys())
+    .filter(
+      exportName =>
+        exportName !== 'default' &&
+        !(routeChunkExportNames as string[]).includes(exportName) &&
+        !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName) &&
+        isExportChunkable(exportName, exportDependencies)
+    )
+    .sort();
+
+const getChunkedExportNames = (
+  code: string,
+  cache: RouteChunkCache,
+  cacheKey: string
+): string[] => {
+  const exportDependencies = getExportDependencies(code, cache, cacheKey);
+  const routeChunkedExports = routeChunkExportNames.filter(exportName =>
+    isExportChunkable(exportName, exportDependencies)
+  );
+  return [
+    ...routeChunkedExports,
+    ...getSharedChunkedExports(exportDependencies),
+  ];
 };
 
 export const detectRouteChunks = (
@@ -663,12 +731,15 @@ export const detectRouteChunks = (
   const chunkedExports = Object.entries(hasRouteChunkByExportName)
     .filter(([, isChunked]) => isChunked)
     .map(([exportName]) => exportName as RouteChunkExportName);
-  const hasRouteChunks = chunkedExports.length > 0;
+  const sharedChunkedExports = getSharedChunkedExports(exportDependencies);
+  const hasRouteChunks =
+    chunkedExports.length > 0 || sharedChunkedExports.length > 0;
   return {
     exportNames: Array.from(exportDependencies.keys()),
     hasRouteChunks,
     hasRouteChunkByExportName,
     chunkedExports,
+    sharedChunkedExports,
   };
 };
 
@@ -687,7 +758,7 @@ export const getRouteChunkCode: (
   if (chunkName === 'main') {
     return omitChunkedExports(
       code,
-      routeChunkExportNames,
+      getChunkedExportNames(code, analysisCache, cacheKey),
       analysisCache,
       cacheKey
     );
@@ -701,13 +772,17 @@ export const getRouteChunkCode: (
 export const getRouteChunkModuleId = (
   filePath: string,
   chunkName: RouteChunkName
-) => `${filePath}${routeChunkQueryStrings[chunkName]}`;
+) =>
+  `${filePath}${
+    routeChunkQueryStrings[chunkName as RouteChunkExportName | 'main'] ??
+    `${routeChunkQueryStringPrefix}${encodeURIComponent(chunkName)}`
+  }`;
 
 export const isRouteChunkModuleId: (id: string) => boolean = (id: string) =>
   getRouteChunkNameFromModuleId(id) !== null;
 
 const isRouteChunkName = (name: string): name is RouteChunkName =>
-  name === 'main' || (routeChunkExportNames as string[]).includes(name);
+  name === 'main' || /^[A-Za-z_$][\w$]*$/.test(name);
 
 export const getRouteChunkNameFromModuleId = (
   id: string
@@ -783,6 +858,7 @@ export const detectRouteChunksIfEnabled: (
   const noRouteChunks = (): RouteChunkInfo => ({
     exportNames: [],
     chunkedExports: [] as RouteChunkExportName[],
+    sharedChunkedExports: [],
     hasRouteChunks: false,
     hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
   });

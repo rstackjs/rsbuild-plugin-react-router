@@ -22,4 +22,4 @@ pnpm run test:e2e
 
 ## Notes
 
-This example uses `react-server-dom-rspack` and `rsbuild-plugin-rsc`; it does not use the Vite RSC runtime packages from the upstream React Router template.
+This example uses `react-server-dom-rspack` and `rsbuild-plugin-rsc` for a Rsbuild/Rspack-native RSC runtime.

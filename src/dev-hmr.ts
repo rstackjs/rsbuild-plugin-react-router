@@ -25,8 +25,6 @@ export const resolveReactRefreshRuntimePath = (
     createRequire(base).resolve(request);
   const rootPackageJson = join(rootPath, 'package.json');
   try {
-    // Package entry files (not package.json subpaths, which some of these
-    // packages do not export) so the chain matches Node resolution exactly.
     const pluginReactEntry = resolveFrom(
       rootPackageJson,
       '@rsbuild/plugin-react'
@@ -37,11 +35,6 @@ export const resolveReactRefreshRuntimePath = (
     );
     return resolveFrom(refreshPluginEntry, 'react-refresh/runtime');
   } catch {
-    // No fallback resolution: a bare `react-refresh/runtime` resolve from the
-    // app root can bind a DIFFERENT physical instance than the one
-    // @rspack/plugin-react-refresh injected into the browser graph, making
-    // refresh registration a silent no-op. Treat the runtime as unavailable
-    // instead - callers fall back to the previous full-reload behavior.
     return undefined;
   }
 };
@@ -115,8 +108,7 @@ export const generateDevHmrRuntimeModule = ({
   hdrRevisionFilePath: string;
 }): string => `
 import * as __refreshRuntimeModule from ${JSON.stringify(reactRefreshRuntimePath)};
-// The revision binding must be read so the import survives tree shaking when
-// the app package declares "sideEffects": false.
+// Read revision so the import survives sideEffects: false tree-shaking.
 import __hdrRevision from ${JSON.stringify(hdrRevisionFilePath)};
 
 let latestHdrRevision = __hdrRevision;
@@ -132,6 +124,26 @@ const RefreshRuntime =
 
 const pendingRouteUpdates = new Map();
 let flushTimeout;
+let pendingRevalidation = false;
+
+function setNeedsHdrNavigation() {
+  window.__reactRouterNeedsHdrNavigation = true;
+}
+
+function consumeNeedsHdrNavigation() {
+  const needsNavigation = window.__reactRouterNeedsHdrNavigation === true;
+  window.__reactRouterNeedsHdrNavigation = false;
+  return needsNavigation;
+}
+
+function getCurrentRouterPath(router) {
+  const basename = router.basename || '/';
+  let pathname = window.location.pathname;
+  if (basename !== '/' && pathname.startsWith(basename)) {
+    pathname = pathname.slice(basename.length) || '/';
+  }
+  return pathname + window.location.search + window.location.hash;
+}
 
 export function registerReactRouterRouteExports(routeId, moduleExports) {
   if (
@@ -160,6 +172,7 @@ export function scheduleReactRouterRouteUpdate(
 }
 
 export function scheduleReactRouterRevalidation() {
+  pendingRevalidation = true;
   scheduleFlush();
 }
 
@@ -180,9 +193,12 @@ async function flush() {
     return;
   }
   let nextManifest;
+  let shouldRevalidate = pendingRevalidation;
+  let shouldRefreshRouteState = false;
+  pendingRevalidation = false;
   if (pendingRouteUpdates.size > 0) {
     nextManifest = JSON.parse(JSON.stringify(manifest));
-    const needsRevalidation = new Set();
+    const routesToRevalidate = new Set();
     const updatedRouteIds = Array.from(pendingRouteUpdates.keys());
     const updates = Array.from(pendingRouteUpdates.values());
     pendingRouteUpdates.clear();
@@ -195,8 +211,6 @@ async function flush() {
       const imported = update.getRouteModuleExports();
       registerReactRouterRouteExports(routeId, imported);
       const current = routeModules[routeId];
-      // React Fast Refresh updates component implementations in place, so the
-      // previous component identities must be preserved to keep their state.
       routeModules[routeId] = {
         ...imported,
         default: imported.default
@@ -214,15 +228,20 @@ async function flush() {
         routeEntry.hasClientLoader ||
         routeEntry.hasClientMiddleware
       ) {
-        needsRevalidation.add(routeId);
+        routesToRevalidate.add(routeId);
       }
+    }
+    if (routesToRevalidate.size > 0) {
+      setNeedsHdrNavigation();
+    } else {
+      shouldRefreshRouteState = true;
     }
     if (
       typeof router.createRoutesForHMR === 'function' &&
       typeof router._internalSetRoutes === 'function'
     ) {
       const routes = router.createRoutesForHMR(
-        needsRevalidation,
+        routesToRevalidate,
         nextManifest.routes,
         routeModules,
         context.ssr,
@@ -231,14 +250,35 @@ async function flush() {
       router._internalSetRoutes(routes);
     }
   }
-  try {
-    window.__reactRouterHdrActive = true;
-    await router.revalidate();
-  } finally {
-    window.__reactRouterHdrActive = false;
-  }
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
+  }
+  if (shouldRevalidate) {
+    try {
+      window.__reactRouterHdrActive = true;
+      if (
+        consumeNeedsHdrNavigation() &&
+        typeof router.navigate === 'function'
+      ) {
+        await router.navigate(getCurrentRouterPath(router), {
+          replace: true,
+          preventScrollReset: true,
+        });
+      } else {
+        await router.revalidate();
+      }
+    } finally {
+      window.__reactRouterHdrActive = false;
+    }
+  } else if (
+    shouldRefreshRouteState &&
+    typeof router.navigate === 'function'
+  ) {
+    await router.navigate(getCurrentRouterPath(router), {
+      replace: true,
+      preventScrollReset: true,
+      defaultShouldRevalidate: false,
+    });
   }
   if (
     RefreshRuntime &&

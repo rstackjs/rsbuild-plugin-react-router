@@ -3,14 +3,15 @@ import {
   decodeAction,
   decodeFormState,
   decodeReply,
-  loadServerAction,
+  loadServerAction as loadServerActionSync,
   renderToReadableStream,
-} from "@vitejs/plugin-rsc/rsc";
+} from "react-server-dom-rspack/server.node";
 import { unstable_matchRSCServerRequest as matchRSCServerRequest } from "react-router";
 import { basename } from "./config/basename";
 
 import { routes } from "./routes";
 import { requestContext } from "./config/request-context";
+import ssrHandler from "./entry.ssr";
 
 export async function fetchServer(request: Request) {
   return await matchRSCServerRequest({
@@ -18,7 +19,7 @@ export async function fetchServer(request: Request) {
     decodeReply,
     decodeAction,
     decodeFormState,
-    loadServerAction,
+    loadServerAction: (id: string) => Promise.resolve(loadServerActionSync(id)),
     request,
     requestContext,
     routes,
@@ -33,8 +34,5 @@ export async function fetchServer(request: Request) {
 }
 
 export default async function handler(request: Request) {
-  const ssr = await import.meta.viteRsc.loadModule<
-    typeof import("./entry.ssr")
-  >("ssr", "index");
-  return ssr.default(request, await fetchServer(request));
+  return ssrHandler(request, await fetchServer(request));
 }

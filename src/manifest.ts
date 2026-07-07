@@ -151,8 +151,10 @@ type ReactRouterManifestStatsEntrypoint = {
   getFiles?: () => Iterable<string>;
 };
 
-type ReactRouterManifestStatsLookup<T> = Iterable<[string, T]> & {
-  get?: (name: string) => T | undefined;
+type ReactRouterManifestStatsLookup<T> = Iterable<
+  [string, T | null | undefined]
+> & {
+  get?: (name: string) => T | null | undefined;
 };
 
 type ReactRouterManifestStatsCompilation = {
@@ -182,6 +184,9 @@ const collectManifestFilesByName = <T>(
   const filesByName: Record<string, string[]> = {};
   if (!names) {
     for (const [name, item] of items) {
+      if (item == null) {
+        continue;
+      }
       filesByName[name] = getFiles(name, item);
     }
     return filesByName;
@@ -191,7 +196,7 @@ const collectManifestFilesByName = <T>(
   if (typeof items.get === 'function') {
     for (const name of names) {
       const item = items.get(name);
-      if (!item) {
+      if (item == null) {
         continue;
       }
       filesByName[name] = getFiles(name, item);
@@ -205,6 +210,9 @@ const collectManifestFilesByName = <T>(
 
   for (const [name, item] of items) {
     if (!missingNames.has(name)) {
+      continue;
+    }
+    if (item == null) {
       continue;
     }
     filesByName[name] = getFiles(name, item);

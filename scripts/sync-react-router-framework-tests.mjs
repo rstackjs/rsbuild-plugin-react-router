@@ -41,11 +41,16 @@ export const sourceDirs = [
 export const adapterOwnedPaths = [
   'README.md',
   'UPSTREAM.json',
+  'tsconfig.base.json',
+  'integration/helpers/fixture-workspace-dependencies.ts',
   'integration/helpers/rsbuild-adapter.ts',
   'integration/helpers/create-fixture.ts',
   'integration/helpers/express.ts',
   'integration/helpers/fixtures.ts',
+  'integration/helpers/global-setup.ts',
+  'integration/helpers/global-teardown.ts',
   'integration/helpers/rsbuild.ts',
+  'integration/helpers/test-resource-guard.ts',
   'integration/playwright.config.ts',
 ];
 
@@ -79,9 +84,9 @@ export const adaptedCorpusPaths = [
   'integration/helpers/rsc-preview',
   'integration/helpers/stream.ts',
   'integration/helpers/templates.ts',
-  'integration/helpers/vite-plugin-cloudflare-template/package.json',
   'integration/hmr-hdr-rsc-test.ts',
   'integration/hmr-hdr-test.ts',
+  'integration/tsconfig.json',
   'integration/link-test.ts',
   'integration/loader-context-test.ts',
   'integration/manifests-test.ts',
@@ -89,8 +94,6 @@ export const adaptedCorpusPaths = [
   'integration/middleware-test.ts',
   'integration/node-env-test.ts',
   'integration/package.json',
-  'integration/plugin-cloudflare-test.ts',
-  'integration/plugin-order-validation-test.ts',
   'integration/prefetch-test.ts',
   'integration/prerender-test.ts',
   'integration/presets-test.ts',
@@ -112,6 +115,7 @@ export const adaptedCorpusPaths = [
   'integration/sri-test.ts',
   'integration/typegen-test.ts',
   'integration/unused-route-exports-test.ts',
+  'react-router-dev/__tests__/rsc-virtual-route-modules-test.ts',
 ];
 
 /**
@@ -159,10 +163,6 @@ export const corpusRenames = {
     'integration/loader-context-test.ts',
   'integration/vite-manifests-test.ts': 'integration/manifests-test.ts',
   'integration/vite-node-env-test.ts': 'integration/node-env-test.ts',
-  'integration/vite-plugin-cloudflare-test.ts':
-    'integration/plugin-cloudflare-test.ts',
-  'integration/vite-plugin-order-validation-test.ts':
-    'integration/plugin-order-validation-test.ts',
   'integration/vite-prerender-test.ts': 'integration/prerender-test.ts',
   'integration/vite-presets-test.ts': 'integration/presets-test.ts',
   'integration/vite-preview-test.ts': 'integration/preview-test.ts',
@@ -179,7 +179,9 @@ export const corpusRenames = {
 };
 
 export const removedUpstreamPaths = [
-  'integration/helpers/vite-plugin-cloudflare-template/vite.config.ts',
+  'integration/helpers/vite-plugin-cloudflare-template',
+  'integration/vite-plugin-cloudflare-test.ts',
+  'integration/vite-plugin-order-validation-test.ts',
 ];
 
 const preservedCorpusPaths = [
@@ -214,11 +216,13 @@ const packageVersionByName = {
   '@react-router/serve': '^8.0.1',
   '@types/react': '^19.2.10',
   '@types/react-dom': '^19.2.3',
-  '@vitejs/plugin-rsc': '^0.4.10',
+  '@rsbuild/core': '2.1.0',
+  '@rsbuild/plugin-react': '2.1.0',
   react: '^19.2.4',
   'react-dom': '^19.2.4',
   'react-router': '^8.0.1',
-  'react-server-dom-webpack': '0.0.0-experimental-029e8bd6-20250306',
+  'react-server-dom-rspack': '0.0.2',
+  'rsbuild-plugin-rsc': '^0.1.1',
   typescript: '^5.9.3',
 };
 

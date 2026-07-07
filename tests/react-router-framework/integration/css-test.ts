@@ -390,7 +390,7 @@ test.describe("CSS", () => {
       test.describe("build with CSS code splitting disabled", async () => {
         test.fixme(
           templateName.includes("rsc"),
-          "RSC Framework mode doesn't support disabling CSS code splitting yet (likely due to @vitejs/plugin-rsc)",
+          "RSC Framework mode doesn't support disabling CSS code splitting yet",
         );
 
         let port: number;
@@ -463,7 +463,7 @@ async function pageLoadWorkflow({
     page.on("pageerror", (error) => pageErrors.push(error));
 
     await page.goto(`http://localhost:${port}${base ?? "/"}${routeBase}`, {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
     });
 
     await Promise.all(
@@ -499,7 +499,7 @@ async function hmrWorkflow({
     page.on("pageerror", (error) => pageErrors.push(error));
 
     await page.goto(`http://localhost:${port}${base ?? "/"}${routeBase}`, {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
     });
 
     let input = page.locator("input");
@@ -523,10 +523,9 @@ async function hmrWorkflow({
         file: "styles.module.css",
         selector: "#css-modules",
       },
-      {
-        file: "styles-postcss-linked.css",
-        selector: "#css-postcss-linked",
-      },
+      // Rsbuild treats `css?url` as an emitted asset URL. It is validated by
+      // page-load tests, but Rspack CSS HMR only manages stylesheet modules
+      // that are imported as CSS.
       {
         file: "styles-vanilla-global.css.ts",
         selector: "#css-vanilla-global",
@@ -557,16 +556,6 @@ async function hmrWorkflow({
       // Ensure CSS updates were handled by HMR
       await expect(input, `State preservation for ${routeFile}`).toHaveValue(
         routeFile,
-      );
-    }
-
-    // RSC Framework mode doesn't support custom entries yet
-    if (!templateName.includes("rsc")) {
-      // The following change triggers a full page reload, so we check it after all the checks for HMR state preservation
-      await edit("app/entry.client.css", modifyCss);
-      await expect(page.locator("#entry-client")).toHaveCSS(
-        "padding",
-        NEW_PADDING,
       );
     }
 

@@ -2,7 +2,6 @@ import type { ChildProcess } from "node:child_process";
 import { sync as spawnSync, spawn } from "cross-spawn";
 import { existsSync, globSync } from "node:fs";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { platform } from "node:os";
 import type { Readable } from "node:stream";
 import url from "node:url";
@@ -17,13 +16,15 @@ import { test as base, expect } from "@playwright/test";
 import type { Config } from "@react-router/dev/config";
 import {
   finalizeFixtureProject,
-  installFixtureProject,
   normalizeFixtureFiles,
+  prepareFixtureProjectDependencies,
   reactRouterServeBin,
   rsbuildBin,
 } from "./rsbuild-adapter.js";
-
-const nodeRequire = createRequire(import.meta.url);
+import {
+  assertResourceGuardrail,
+  withFrameworkTestRunEnv,
+} from "./test-resource-guard.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const root = path.resolve(__dirname, "../..");
@@ -175,12 +176,7 @@ export const rsbuildConfig = {
       ]),
       ...(args.vanillaExtract
         ? [
-            `// vanilla-extract via @vanilla-extract/webpack-plugin.`,
-            `// - identifiers: "debug" keeps class names deterministic across the`,
-            `//   client and server compilations (SSR markup must match client CSS).`,
-            `// - optimization.sideEffects is disabled so side-effect-only .css.ts`,
-            `//   imports (compiled to virtual CSS imports) survive the fixture's`,
-            `//   "sideEffects": false package flag.`,
+            `// vanilla-extract: debug identifiers + sideEffects disabled for .css.ts imports.`,
             `tools: {`,
             `  rspack: {`,
             `    plugins: [new VanillaExtractPlugin({ identifiers: "debug" })],`,
@@ -225,9 +221,7 @@ export const EXPRESS_SERVER = (args: {
         let build = (await import("./build/server/index.js")).default;
         app.all("*", createRequestListener(build.fetch));
       } else {
-        // Rsbuild dev-server adapter (RSC): the plugin attaches its RSC dev
-        // request handler to the dev server's middleware chain, so delegating
-        // to \`devServer.middlewares\` serves RSC documents, assets, and HMR.
+        // Delegate to devServer.middlewares for RSC documents, assets, and HMR.
         const { createRsbuild, loadConfig } = await import("@rsbuild/core");
         const { content } = await loadConfig();
         const rsbuild = await createRsbuild({ rsbuildConfig: content });
@@ -267,9 +261,7 @@ export const EXPRESS_SERVER = (args: {
         })
       );
     } else {
-      // Rsbuild dev-server adapter: boot the plugin's dev server
-      // programmatically and delegate asset serving, HMR, and SSR document
-      // handling to its middleware (mirrors helpers/express.ts).
+      // Boot the plugin dev server and delegate to its middleware.
       const { createRsbuild, loadConfig } = await import("@rsbuild/core");
       const { content } = await loadConfig();
       const rsbuild = await createRsbuild({ rsbuildConfig: content });
@@ -289,20 +281,15 @@ export const EXPRESS_SERVER = (args: {
   `;
 };
 
-type FrameworkModeBundlerTemplateName =
-  | "rsbuild-template"
-  | "vite-plugin-cloudflare-template";
+type FrameworkModeBundlerTemplateName = "rsbuild-template";
 
 type FrameworkModeRscTemplateName = "rsc-framework";
-
-type FrameworkModeCloudflareTemplateName = "vite-plugin-cloudflare-template";
 
 export type RscBundlerTemplateName = "rsc-preview";
 
 export type TemplateName =
   | FrameworkModeBundlerTemplateName
   | FrameworkModeRscTemplateName
-  | FrameworkModeCloudflareTemplateName
   | RscBundlerTemplateName;
 
 // Collapsed from the upstream Vite 7/Vite 8 template pair: the Vite major
@@ -332,7 +319,11 @@ export async function createProject(
 
   // base template
   let templateDir = path.resolve(__dirname, templateName);
-  await cp(templateDir, projectDir, { errorOnExist: true, recursive: true });
+  await cp(templateDir, projectDir, {
+    errorOnExist: true,
+    filter: (source) => path.basename(source) !== "node_modules",
+    recursive: true,
+  });
 
   // user-defined files
   await Promise.all(
@@ -344,14 +335,12 @@ export async function createProject(
   );
 
   await finalizeFixtureProject({ projectDir, templateName });
-  installFixtureProject(projectDir);
+  prepareFixtureProjectDependencies(projectDir, templateName);
 
   return projectDir;
 }
 
-// Avoid "Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env
-// being set" in vite-ecosystem-ci which breaks empty stderr assertions. To fix
-// this, we always ensure that only NO_COLOR is set after spreading process.env.
+// Keep empty stderr assertions stable when FORCE_COLOR is set by CI.
 const colorEnv = {
   FORCE_COLOR: undefined,
   NO_COLOR: "1",
@@ -365,15 +354,15 @@ export const build = ({
   env?: Record<string, string>;
 }) => {
   let nodeBin = process.argv[0];
-  installFixtureProject(cwd);
+  prepareFixtureProjectDependencies(cwd);
 
   return spawnSync(nodeBin, [rsbuildBin, "build"], {
     cwd,
-    env: {
+    env: withFrameworkTestRunEnv({
       ...process.env,
       ...colorEnv,
       ...env,
-    },
+    }),
   });
 };
 
@@ -392,11 +381,13 @@ export const reactRouterServe = async ({
   port,
   serverBundle,
   basename,
+  base,
 }: {
   cwd: string;
   port: number;
   serverBundle?: string;
   basename?: string;
+  base?: string;
 }) => {
   let nodeBin = process.argv[0];
   const isRscFixture =
@@ -409,40 +400,21 @@ export const reactRouterServe = async ({
         reactRouterServeBin,
         `build/server/${serverBundle ? serverBundle + "/" : ""}static/js/app.js`,
       ];
+  assertResourceGuardrail();
   let serveProc = spawn(nodeBin, args, {
     cwd,
     stdio: "pipe",
     detached: platform() !== "win32",
-    env: { NODE_ENV: "production", PORT: port.toFixed(0) },
+    env: withFrameworkTestRunEnv({
+      ...process.env,
+      ...colorEnv,
+      NODE_ENV: "production",
+      PORT: port.toFixed(0),
+      ...(base === undefined ? {} : { RSBUILD_BASE: base }),
+    }),
   });
   await waitForServer(serveProc, { port, basename });
   return () => stopProcess(serveProc);
-};
-
-export const wranglerPagesDev = async ({
-  cwd,
-  port,
-}: {
-  cwd: string;
-  port: number;
-}) => {
-  let nodeBin = process.argv[0];
-  let wranglerBin = nodeRequire.resolve("wrangler/bin/wrangler.js", {
-    paths: [cwd],
-  });
-
-  let proc = spawn(
-    nodeBin,
-    [wranglerBin, "pages", "dev", "./build/client", "--port", String(port)],
-    {
-      cwd,
-      stdio: "pipe",
-      detached: platform() !== "win32",
-      env: { NODE_ENV: "production" },
-    },
-  );
-  await waitForServer(proc, { port, host: "127.0.0.1" });
-  return () => stopProcess(proc);
 };
 
 type ServerArgs = {
@@ -460,7 +432,7 @@ export const createDev =
     env,
     basename,
   }: ServerArgs): Promise<() => Promise<void>> => {
-    installFixtureProject(cwd);
+    prepareFixtureProjectDependencies(cwd);
     const args =
       nodeArgs[0] === rsbuildBin && nodeArgs[1] === "dev"
         ? [...nodeArgs, "--port", String(port)]
@@ -589,14 +561,13 @@ const spaStaticPreview = async ({
 // wait for the server
 export const rsbuildDevCmd = ({ cwd }: { cwd: string }) => {
   let nodeBin = process.argv[0];
-  installFixtureProject(cwd);
+  prepareFixtureProjectDependencies(cwd);
   // `rsbuild dev` is a persistent server and never exits on its own
-  // (unlike Vite's validate-and-exit startup failures this helper was
-  // written for). The timeout guard keeps an assumed-to-exit spawn from
-  // blocking a whole suite run indefinitely.
+  // on successful startup. The timeout guard keeps an assumed-to-exit spawn
+  // from blocking a whole suite run indefinitely.
   return spawnSync(nodeBin, [rsbuildBin, "dev"], {
     cwd,
-    env: { ...process.env },
+    env: withFrameworkTestRunEnv({ ...process.env }),
     timeout: 30_000,
     killSignal: "SIGTERM",
   });
@@ -633,10 +604,6 @@ type Fixtures = {
     files: Files,
     templateName?: TemplateName,
   ) => Promise<{
-    port: number;
-    cwd: string;
-  }>;
-  wranglerPagesDev: (files: Files) => Promise<{
     port: number;
     cwd: string;
   }>;
@@ -696,22 +663,6 @@ export const test = base.extend<Fixtures>({
     });
     await stop?.();
   },
-  // eslint-disable-next-line no-empty-pattern
-  wranglerPagesDev: async ({}, use) => {
-    let stop: (() => unknown) | undefined;
-    await use(async (files) => {
-      let port = await getPort();
-      let cwd = await createProject(
-        await files({ port }),
-        "vite-plugin-cloudflare-template",
-      );
-      let result = build({ cwd });
-      expect(result.status, formatBuildFailure(result)).toBe(0);
-      stop = await wranglerPagesDev({ cwd, port });
-      return { port, cwd };
-    });
-    await stop?.();
-  },
 });
 
 function node(
@@ -727,14 +678,15 @@ function node(
     .filter(Boolean)
     .join(" ");
 
+  assertResourceGuardrail();
   let proc = spawn(nodeBin, args, {
     cwd: options.cwd,
-    env: {
+    env: withFrameworkTestRunEnv({
       ...process.env,
       ...colorEnv,
       NODE_OPTIONS: nodeOptions,
       ...options.env,
-    },
+    }),
     stdio: "pipe",
     detached: platform() !== "win32",
   });

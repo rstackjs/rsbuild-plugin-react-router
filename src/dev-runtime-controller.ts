@@ -166,8 +166,10 @@ export const createReactRouterDevRuntimeController = ({
           if (
             result === 'committed' &&
             changes.node.known &&
-            changes.node.files.size > 0 &&
-            (!changes.web.known || changes.web.files.size === 0)
+            (!changes.web.known || changes.web.files.size === 0) &&
+            Array.from(changes.node.files).some(
+              file => !file.includes('.react-router/hdr-revision.mjs')
+            )
           ) {
             onNodeRebuildCommitted?.();
           }
@@ -544,21 +546,22 @@ export const createReactRouterDevRuntimeController = ({
     },
 
     createBuildLoader(entryName?: string): () => Promise<ServerBuild> {
-      const server = sessions.getActiveBinding()?.server;
-      if (server) {
-        return () => loadReactRouterServerBuild(server, entryName);
-      }
-      const state = sessions.getState();
-      if (state.status === 'terminal') {
-        const { error } = state;
-        return () => Promise.reject(error);
-      }
-      return () =>
-        Promise.reject(
+      const boundServer = sessions.getActiveBinding()?.server;
+      return () => {
+        const server = boundServer ?? sessions.getActiveBinding()?.server;
+        if (server) {
+          return loadReactRouterServerBuild(server, entryName);
+        }
+        const state = sessions.getState();
+        if (state.status === 'terminal') {
+          return Promise.reject(state.error);
+        }
+        return Promise.reject(
           new Error(
             `[${PLUGIN_NAME}] The development server runtime is not ready.`
           )
         );
+      };
     },
   };
 };

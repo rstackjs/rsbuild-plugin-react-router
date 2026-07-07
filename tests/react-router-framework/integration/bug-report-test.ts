@@ -23,7 +23,7 @@ let appFixture: AppFixture;
 // commit to this pull request, and your now-succeeding test will have to be moved
 // to the appropriate file.
 //
-// First, make sure to install dependencies and build React Router. From the root of
+// First, make sure to install dependencies and build this repo. From the root of
 // the project, run this:
 //
 //    ```
@@ -40,13 +40,13 @@ let appFixture: AppFixture;
 // Now try running this test:
 //
 //    ```
-//    pnpm test:integration bug-report --project chromium
+//    pnpm test:react-router-framework -- bug-report-test.ts --project chromium
 //    ```
 //
 // You can add `--watch` to the end to have it re-run on file changes:
 //
 //    ```
-//    pnpm test:integration bug-report --project chromium --watch
+//    pnpm test:react-router-framework -- bug-report-test.ts --project chromium --watch
 //    ```
 ////////////////////////////////////////////////////////////////////////////////
 

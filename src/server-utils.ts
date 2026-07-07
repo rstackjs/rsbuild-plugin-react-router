@@ -45,7 +45,7 @@ function generateStaticTemplate(
       .map((key, index) => {
         const route = routes[key];
         return `import * as route${index} from ${JSON.stringify(
-          `${resolve(options.appDirectory, route.file)}?react-router-route`
+          resolve(options.appDirectory, route.file)
         )};`;
       })
       .join('\n')}

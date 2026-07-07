@@ -32,8 +32,6 @@ export const SERVER_ONLY_ROUTE_EXPORTS_SET: ReadonlySet<string> = new Set(
   SERVER_ONLY_ROUTE_EXPORTS
 );
 
-// Client route exports are split into non-component exports and component exports.
-// This mirrors upstream React Router Vite plugin intent and is used for export filtering.
 export const CLIENT_NON_COMPONENT_EXPORTS = [
   'clientAction',
   'clientLoader',

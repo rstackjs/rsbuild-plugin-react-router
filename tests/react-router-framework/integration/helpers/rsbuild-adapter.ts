@@ -1,15 +1,14 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { sync as spawnSync } from "cross-spawn";
 import url from "node:url";
 import path from "pathe";
 import stripIndent from "strip-indent";
 
 import type { TemplateName } from "./rsbuild.js";
+export { prepareFixtureProjectDependencies } from "./fixture-workspace-dependencies.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
-
 const reactRouterVersion = "^8.0.1";
 
 export const rsbuildBin = "node_modules/@rsbuild/core/bin/rsbuild.js";
@@ -115,35 +114,6 @@ export async function finalizeFixtureProject({
   }
 }
 
-export function installFixtureProject(projectDir: string) {
-  if (existsSync(path.join(projectDir, "node_modules"))) {
-    return;
-  }
-
-  const install = spawnSync(
-    "pnpm",
-    [
-      "install",
-      "--ignore-workspace",
-      "--silent",
-      // Fail fast on flaky registry connections instead of hanging the
-      // synchronous spawn (and with it the whole Playwright worker).
-      "--fetch-timeout=60000",
-      "--fetch-retries=3",
-    ],
-    {
-    cwd: projectDir,
-    env: {
-      ...process.env,
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
-    },
-  });
-
-  if (install.error || install.status) {
-    throw install.error ?? new Error(install.stderr.toString("utf8"));
-  }
-}
-
 async function writePackageJson(projectDir: string, templateName?: TemplateName) {
   const isRscTemplate = templateName?.includes("rsc") ?? false;
   const source = await readPackageJson(projectDir);
@@ -191,7 +161,6 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       "rsbuild-plugin-react-router": `file:${repoRoot}`,
       ...(isRscTemplate ? { "rsbuild-plugin-rsc": "^0.1.1" } : {}),
       typescript: "^5.9.3",
-      "vite-env-only": "^3.0.3",
     },
     engines: {
       node: ">=22.22.0",

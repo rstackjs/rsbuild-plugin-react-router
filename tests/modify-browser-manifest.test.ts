@@ -224,7 +224,7 @@ describe('modify browser manifest plugin', () => {
       );
 
       expect(harness.getDescriptor()).toEqual({
-        stage: 'additions',
+        stage: 'report',
         environments: ['web'],
       });
       await harness.run({ assets, compilation });

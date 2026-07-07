@@ -222,9 +222,10 @@ export function registerModifyBrowserManifestAssets(
     return;
   }
 
-  // Dev has no `realContentHash` pass; generate the manifest at `additions` so
-  // the browser-manifest placeholder is populated as early as possible.
-  api.processAssets({ stage: 'additions', environments: ['web'] }, context =>
+  // In dev, CSS extraction can also attach entry CSS after `additions`.
+  // Generate the manifest at `report` so custom entry CSS is visible to
+  // React Router's `<Links />`.
+  api.processAssets({ stage: 'report', environments: ['web'] }, context =>
     buildAndEmitManifest(context, { withSri: false })
   );
 }

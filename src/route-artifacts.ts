@@ -1,3 +1,5 @@
+import { basename } from 'pathe';
+
 import {
   CLIENT_ROUTE_EXPORTS_SET,
   SERVER_ONLY_ROUTE_EXPORTS_SET,
@@ -8,6 +10,7 @@ import {
   detectRouteChunksIfEnabled,
   emptyRouteChunkSnippet,
   getRouteChunkIfEnabled,
+  getRouteChunkModuleId,
   getRouteChunkNameFromModuleId,
   shouldAnalyzeRouteChunks,
   validateRouteChunks,
@@ -82,13 +85,16 @@ export const buildRouteHmrMetadata = (
 const buildRouteClientEntryHmrCode = ({
   routeId,
   target,
+  acceptTarget,
   metadata,
 }: {
   routeId: string;
   target: string;
+  acceptTarget: string;
   metadata: RouteHmrMetadata;
 }): string => {
   const targetJson = JSON.stringify(target);
+  const acceptTargetJson = JSON.stringify(acceptTarget);
   return `
 import * as __reactRouterRouteModule from ${targetJson};
 import {
@@ -106,8 +112,7 @@ __reactRouterRegisterRouteExports(
 );
 
 if (import.meta.webpackHot) {
-  const __reactRouterHot = import.meta.webpackHot;
-  __reactRouterHot.accept(${targetJson}, () => {
+  import.meta.webpackHot.accept(${acceptTargetJson}, () => {
     __reactRouterRegisterRouteExports(
       __reactRouterRouteId,
       __reactRouterRouteModule
@@ -118,11 +123,14 @@ if (import.meta.webpackHot) {
       __reactRouterGetRouteModule
     );
   });
-  __reactRouterHot.accept();
-  __reactRouterHot.dispose(data => {
+  import.meta.webpackHot.accept();
+  import.meta.webpackHot.dispose(data => {
     data.__reactRouterRouteShim = true;
   });
-  if (__reactRouterHot.data && __reactRouterHot.data.__reactRouterRouteShim) {
+  if (
+    import.meta.webpackHot.data &&
+    import.meta.webpackHot.data.__reactRouterRouteShim
+  ) {
     __reactRouterScheduleRouteUpdate(
       __reactRouterRouteId,
       __reactRouterRouteMetadata,
@@ -133,9 +141,14 @@ if (import.meta.webpackHot) {
 `;
 };
 
+const createRouteHmrAcceptTarget = (resourcePath: string): string => {
+  return `./${basename(resourcePath)}?react-router-route`;
+};
+
 export const buildRouteClientEntryCode = ({
   exportNames,
   chunkedExports,
+  sharedChunkedExports,
   isServer,
   resourcePath,
   routeId,
@@ -143,26 +156,49 @@ export const buildRouteClientEntryCode = ({
 }: {
   exportNames: readonly string[];
   chunkedExports: readonly string[];
+  sharedChunkedExports?: readonly string[];
   isServer: boolean;
   resourcePath: string;
   routeId?: string;
   devHmr?: boolean;
 }): string => {
   const chunkedExportSet =
-    chunkedExports.length > 0 ? new Set<string>(chunkedExports) : undefined;
+    chunkedExports.length > 0 || sharedChunkedExports?.length
+      ? new Set<string>([...chunkedExports, ...(sharedChunkedExports ?? [])])
+      : undefined;
   const reexports = exportNames
     .filter(exp => {
       if (chunkedExportSet?.has(exp)) {
         return false;
       }
-      return (
-        CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
-        (isServer && SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp))
-      );
+      if (isServer) {
+        return (
+          CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
+          SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp)
+        );
+      }
+      return !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
     })
     .sort();
-  const target = `${resourcePath}?react-router-route`;
-  const reexportCode = `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`;
+  const target = isServer
+    ? resourcePath
+    : chunkedExports.length > 0
+      ? getRouteChunkModuleId(resourcePath, 'main')
+      : `${resourcePath}?react-router-route`;
+  const acceptTarget = createRouteHmrAcceptTarget(resourcePath);
+  const reexportCode = [
+    reexports.length > 0
+      ? `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`
+      : null,
+    ...(sharedChunkedExports ?? []).map(
+      exportName =>
+        `export { ${exportName} } from ${JSON.stringify(
+          getRouteChunkModuleId(resourcePath, exportName)
+        )};`
+    ),
+  ]
+    .filter(Boolean)
+    .join('\n');
   if (!devHmr || isServer || routeId === undefined) {
     return reexportCode;
   }
@@ -171,6 +207,7 @@ export const buildRouteClientEntryCode = ({
     buildRouteClientEntryHmrCode({
       routeId,
       target,
+      acceptTarget,
       metadata: buildRouteHmrMetadata(exportNames),
     })
   );
@@ -202,10 +239,12 @@ export const createRouteClientEntryArtifact = async ({
   const exportNames =
     routeChunkInfo?.exportNames ?? (await getExportNames(code));
   const chunkedExports = routeChunkInfo?.chunkedExports ?? [];
+  const sharedChunkedExports = routeChunkInfo?.sharedChunkedExports ?? [];
   return {
     code: buildRouteClientEntryCode({
       exportNames,
       chunkedExports,
+      sharedChunkedExports,
       isServer,
       resourcePath,
       routeId,

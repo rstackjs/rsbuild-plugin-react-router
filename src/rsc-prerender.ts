@@ -16,7 +16,7 @@ import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 /**
  * RSC-mode prerendering.
  *
- * Mirrors React Router's upstream Vite RSC plugin, which feeds the shared
+ * Mirrors React Router's upstream RSC behavior, feeding the shared
  * `prerender` plugin with one request per prerender path (plus
  * `/__spa-fallback.html` when `ssr: false`) and post-processes each HTML
  * response into two artifacts in the client build directory:
@@ -257,7 +257,7 @@ const prerenderRscUrl = async ({
 
     // Non-HTML response (e.g. a resource route): emit the raw payload at the
     // request path and also prerender its `.rsc` variant for client
-    // navigations, matching the upstream RSC Vite plugin.
+    // navigations, matching upstream RSC behavior.
     await writePrerenderedFile({
       api,
       clientBuildDir,

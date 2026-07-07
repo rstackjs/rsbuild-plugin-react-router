@@ -95,7 +95,7 @@ describe('build output transforms', () => {
     const querylessRouteModuleTransform = harness.transforms.find(
       transform =>
         transform.descriptor.order === 'post' &&
-        transform.descriptor.environments === undefined &&
+        transform.descriptor.environments?.includes('node') &&
         typeof transform.descriptor.test === 'function' &&
         (transform.descriptor.test as (path: string) => boolean)(
           options.routePath
@@ -178,7 +178,7 @@ describe('build output transforms', () => {
     const querylessRouteModuleTransform = harness.transforms.find(
       transform =>
         transform.descriptor.order === 'post' &&
-        transform.descriptor.environments === undefined &&
+        transform.descriptor.environments?.includes('node') &&
         typeof transform.descriptor.test === 'function'
     );
 

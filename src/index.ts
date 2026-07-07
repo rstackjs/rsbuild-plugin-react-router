@@ -7,7 +7,11 @@ import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
-import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
+import {
+  BUILD_CLIENT_ROUTE_QUERY_STRING,
+  JS_EXTENSIONS,
+  PLUGIN_NAME,
+} from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 import {
   findEntryFile,
@@ -17,7 +21,11 @@ import {
 } from './plugin-utils.js';
 import { resolveReactRouterEntryPaths } from './entry-paths.js';
 import { registerReactRouterEnvironmentOutput } from './environment-output.js';
-import type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
+import type {
+  PluginOptions,
+  ReactRouterRSCPluginOptions,
+  Route,
+} from './types.js';
 import { resolveReactRouterServerBuild } from './server-utils.js';
 import { validatePrerenderConfig } from './prerender.js';
 import { runReactRouterPrerenderBuild } from './prerender-build.js';
@@ -96,6 +104,66 @@ const cssUrlAssetExtensions =
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
 
+type QuerylessRouteImportResolveData = {
+  request?: string;
+  context?: string;
+  contextInfo?: {
+    issuer?: string;
+  };
+};
+
+type QuerylessRouteImportFactory = {
+  hooks: {
+    beforeResolve: {
+      tap: (
+        pluginName: string,
+        handler: (data: QuerylessRouteImportResolveData) => void
+      ) => void;
+    };
+  };
+};
+
+const createQuerylessRouteImportPlugin = (
+  routeByFilePath: ReadonlyMap<string, Route>
+) => ({
+  name: `${PLUGIN_NAME}:queryless-route-imports`,
+  apply(compiler: Rspack.Compiler) {
+    if (compiler.options?.name !== 'web') {
+      return;
+    }
+
+    compiler.hooks.normalModuleFactory.tap(PLUGIN_NAME, factory => {
+      const typedFactory = factory as QuerylessRouteImportFactory;
+      typedFactory.hooks.beforeResolve.tap(PLUGIN_NAME, data => {
+        const request = data?.request;
+        const context = data?.context ?? data?.contextInfo?.issuer;
+        const issuer = data?.contextInfo?.issuer?.split('?')[0];
+        if (
+          typeof request !== 'string' ||
+          typeof context !== 'string' ||
+          typeof issuer !== 'string' ||
+          !routeByFilePath.has(issuer) ||
+          request.includes('?') ||
+          (!request.startsWith('.') && !request.startsWith('/'))
+        ) {
+          return;
+        }
+
+        const candidate = resolve(context, request);
+        const routeFilePath = routeByFilePath.has(candidate)
+          ? candidate
+          : JS_EXTENSIONS.map(extension => `${candidate}${extension}`).find(
+              candidate => routeByFilePath.has(candidate)
+            );
+
+        if (routeFilePath) {
+          data.request = `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`;
+        }
+      });
+    });
+  },
+});
+
 export const pluginReactRouter = (
   options: PluginOptions = {}
 ): RsbuildPlugin => ({
@@ -144,12 +212,6 @@ export const pluginReactRouter = (
       warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
     });
 
-    // Resolve the effective asset prefix the same way Rsbuild does, per mode.
-    // The prefix set in `modifyRsbuildConfig` only reflects `output.assetPrefix`,
-    // but in dev the effective prefix is `dev.assetPrefix` (defaulted from
-    // `server.base`). The normalized config has both fields already resolved, so
-    // read them here — this runs before compilation (and before the
-    // `processAssets` handlers that build the manifest read `assetPrefix`).
     api.onBeforeCreateCompiler(() => {
       const normalized = api.getNormalizedConfig();
       assetPrefix = resolveEffectiveAssetPrefix({
@@ -259,9 +321,6 @@ export const pluginReactRouter = (
     (globalThis as any).__reactRouterAppDirectory = resolve(appDirectory);
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
     if (!existsSync(routesPath)) {
-      // `findEntryFile` falls back to a `.tsx` path when no route config file
-      // exists, but upstream always reports the canonical `routes.ts` path in
-      // this error, so build the display path from that basename directly.
       const missingRoutesPath = relative(
         process.cwd(),
         resolve(appDirectory, 'routes.ts')
@@ -275,8 +334,6 @@ export const pluginReactRouter = (
     const importRouteConfig = async (
       importer: Pick<typeof jiti, 'import'>
     ): Promise<RouteConfigEntry[]> => {
-      // Upstream reports the route config path relative to the app directory
-      // (e.g. "routes.ts"), not the project root.
       const routeConfigFile = relative(resolve(appDirectory), routesPath);
       let routeConfigValue: RouteConfigEntry[];
       try {
@@ -429,9 +486,6 @@ export const pluginReactRouter = (
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
 
-    // Development HMR/HDR support requires the react-refresh runtime that
-    // @rsbuild/plugin-react wires into the web bundle. When it is missing,
-    // route edits fall back to the previous full-reload behavior.
     const devHmrRefreshRuntimePath =
       isBuild || isRscMode
         ? undefined
@@ -445,7 +499,6 @@ export const pluginReactRouter = (
             ),
         })
       : undefined;
-    // The revision module must exist before the first web compile resolves it.
     devHdrSignal?.ensure();
     const devHmrEnabled = devHmrRefreshRuntimePath !== undefined;
 
@@ -661,9 +714,6 @@ export const pluginReactRouter = (
     };
 
     api.modifyRsbuildConfig(async (config, { mergeRsbuildConfig }) => {
-      // The virtual server build embeds `output.assetPrefix` as its runtime
-      // publicPath; the shared `assetPrefix` variable is owned exclusively by
-      // the `onBeforeCreateCompiler` resolver above (per-mode effective value).
       const vmodPlugin = createVirtualModulePlugin(
         normalizeAssetPrefix(config.output?.assetPrefix)
       );
@@ -723,7 +773,10 @@ export const pluginReactRouter = (
         tools: {
           rspack: {
             resolve: resolveConfig,
-            plugins: [vmodPlugin],
+            plugins: [
+              vmodPlugin,
+              createQuerylessRouteImportPlugin(routeByFilePath),
+            ],
           },
         },
         environments: {
@@ -750,6 +803,7 @@ export const pluginReactRouter = (
             },
             tools: {
               rspack: {
+                resolve: resolveConfig,
                 name: 'web',
                 module: {
                   rules: [
@@ -787,23 +841,11 @@ export const pluginReactRouter = (
               target: config.environments?.node?.output?.target || 'node',
               filename: {
                 js: '[name].js',
-                // On the server, `emitCss` is disabled (the default for node
-                // targets), so the only CSS emitted is from `.css?url` imports
-                // handled by Rsbuild's `cssUrlLoader`. That loader joins this
-                // template onto `distPath.css` (`static/css`), so a leading
-                // `../assets/` redirects server-only `.css?url` files to
-                // `static/assets/` — the same directory (and flat basename
-                // layout) as other `?url` assets, and where the SSR-only asset
-                // relocation step moves them. The default `[name]` for a
-                // `.css?url` import is the source-relative path (e.g.
-                // `app/assets/test`); a function collapses it to the basename so
-                // the emitted file is `static/assets/test.<hash>.css`, matching
-                // `asset/resource` outputs. The content is still
-                // postcss-processed (the loader imports the compiled module
-                // before emitting), so returned URLs resolve to processed
-                // stylesheets in `build/client`.
                 css: (pathData: Rspack.PathData) => {
                   const sourceName = pathData.chunk?.name ?? '[name]';
+                  if (!isBuild) {
+                    return `${sourceName}.css`;
+                  }
                   const baseName =
                     sourceName.split(/[\\/]/).pop() || sourceName;
                   return `../assets/${baseName}.[contenthash:10].css`;
@@ -831,13 +873,6 @@ export const pluginReactRouter = (
                   workerChunkLoading: nodeChunkLoading,
                   wasmLoading: 'fetch',
                   module: resolvedServerOutput === 'module',
-                  // Node entries carry their `static/js/` prefix in the entry
-                  // name, so the top-level `filename` is `[name].js`. That also
-                  // makes async chunks default to `[name].js` at the server
-                  // build root. Give server code-split chunks the same
-                  // `static/js/async/` home the web build uses so they stay
-                  // under `build/server/static/js/` instead of leaking to the
-                  // output root.
                   chunkFilename: 'static/js/async/[name].js',
                 },
               },
@@ -903,7 +938,7 @@ export const pluginReactRouter = (
         routeByFilePath,
         routeChunkConfig: modePlan.routeChunkConfig,
         isBuild,
-        splitRouteModules: Boolean(splitRouteModules),
+        splitRouteModules: Boolean(modePlan.routeChunkConfig.splitRouteModules),
         ssr,
         isSpaMode,
         rootRoutePath,

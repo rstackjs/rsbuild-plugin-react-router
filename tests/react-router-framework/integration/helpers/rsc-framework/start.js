@@ -7,11 +7,11 @@ import build from "./build/server/index.js";
 
 const app = express();
 const clientBuildDirectory = "build/client";
-const base = process.env.VITE_BASE || "/";
+const base = process.env.RSBUILD_BASE || "/";
 
 app.use(base, express.static(clientBuildDirectory, { index: false }));
 
-// Serve prerendered documents, mirroring the React Router RSC Vite plugin's
+// Serve prerendered documents, mirroring the Rsbuild RSC integration's
 // preview server middleware (`<path>/index.html` written at build time).
 app.use(base, async (req, res, next) => {
   try {

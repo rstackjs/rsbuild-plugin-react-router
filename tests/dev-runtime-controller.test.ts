@@ -321,6 +321,30 @@ describe('React Router development runtime controller', () => {
     );
   });
 
+  it('resolves a loader created before dev server startup', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    const loadBuild = controller.createBuildLoader();
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    loadBundle.mockImplementation(() => createBuild('initial'));
+
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const webCompilation = web.compile();
+    controller.captureWeb(webCompilation, createManifestSet('initial'));
+    web.complete(webCompilation);
+    const nodeCompilation = node.compile();
+    await callbacks.after({ stats: createGraphStats(webCompilation, nodeCompilation) });
+
+    await expect(loadBuild()).resolves.toMatchObject({
+      marker: 'initial',
+      assets: { version: 'initial' },
+    });
+  });
+
   it('rejects initial readiness when aggregate stats omit an environment', async () => {
     const { callbacks, controller, server } = createHarness();
     const web = createCompiler('web');

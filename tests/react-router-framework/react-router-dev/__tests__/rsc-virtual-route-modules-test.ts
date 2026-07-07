@@ -1,13 +1,19 @@
 import * as assert from "node:assert";
 import ts from "typescript";
 
-import {
-  createClientRouteModuleForOptimizeDepsScan,
-  virtualRouteModulesPlugin,
-} from "../vite/rsc/virtual-route-modules";
+import { transformRscRouteModule } from "../../../../src/rsc-route-transforms";
+import type { RouteChunkConfig } from "../../../../src/route-chunks";
+import { removeExports, removeUnusedImports } from "../../../../src/route-export-pruning";
+import { generate, parse } from "../../../../src/yuku";
 
-const plugin = virtualRouteModulesPlugin({
-  enforceSplitRouteModules: () => false,
+const routeChunkConfig: RouteChunkConfig = {
+  splitRouteModules: false,
+  appDirectory: "/app",
+  rootRouteFile: "root.tsx",
+};
+
+const routeChunkCache = new Map();
+const plugin = {
   getRouteIdForFile() {
     return "test-route-id";
   },
@@ -21,7 +27,38 @@ const plugin = virtualRouteModulesPlugin({
       jsx: ts.JsxEmit.ReactJSX,
     });
   },
-});
+  async transform(_code: string, id: string) {
+    const [resourcePath, resourceQuery] = id.split("?");
+    const code = await plugin.transformToJs(_code, resourcePath);
+    return await transformRscRouteModule({
+      code,
+      resourcePath,
+      resourceQuery: resourceQuery ? `?${resourceQuery}` : undefined,
+      isRootRoute: plugin.isRootRouteModule(resourcePath),
+      routeId: plugin.getRouteIdForFile(resourcePath)!,
+      routeChunkCache,
+      routeChunkConfig,
+      isServerEnvironment: this.environment.name === "rsc",
+      isDev: this.environment.mode === "dev",
+    });
+  },
+};
+
+function createClientRouteModuleForOptimizeDepsScan(code: string) {
+  const ast = parse(code, { sourceType: "module" });
+  removeExports(ast, [
+    "ServerComponent",
+    "ServerLayout",
+    "ServerHydrateFallback",
+    "ServerErrorBoundary",
+    "loader",
+    "action",
+    "middleware",
+    "headers",
+  ]);
+  removeUnusedImports(ast);
+  return generate(ast);
+}
 
 const js = String.raw;
 
@@ -105,6 +142,7 @@ const transform = plugin.transform.bind({
 function withSharedChunkHmr(lines: string[]) {
   return [
     ...lines,
+    "",
     'import * as ___EnsureClientRouteModuleForHMR_REACT___ from "react";',
     "export function EnsureClientRouteModuleForHMR___() { return ___EnsureClientRouteModuleForHMR_REACT___.createElement(___EnsureClientRouteModuleForHMR_REACT___.Fragment, null) }",
     "",
@@ -176,8 +214,8 @@ describe("route entry", () => {
           '"use client";',
           'import * as React from "react";',
           'export { test } from "/test.js?client-route-module=shared";',
-          'export { clientLoader } from "/test.js?client-route-module=shared";',
-          'export { clientAction } from "/test.js?client-route-module=shared";',
+          'export const clientLoader = async (...args) => import("/test.js?client-route-module=shared").then(mod => mod.clientLoader(...args));',
+          'export const clientAction = async (...args) => import("/test.js?client-route-module=shared").then(mod => mod.clientAction(...args));',
           'export { links } from "/test.js?client-route-module=shared";',
           'export { meta } from "/test.js?client-route-module=shared";',
           'export { default } from "/test.js?client-route-module=shared";',
@@ -192,11 +230,10 @@ describe("route entry", () => {
   describe("server environment", () => {
     function withCss(name: string) {
       return [
-        `import { ${name} as ${name}WithoutCss } from "/test.js?server-route-module=";`,
+        `import { ${name} as ${name}WithoutClientChunk } from "/test.js?server-route-module=";`,
         `export function ${name}(props) {`,
         `  return React.createElement(React.Fragment, null,`,
-        `    import.meta.viteRsc.loadCss(),`,
-        `    React.createElement(${name}WithoutCss, props),`,
+        `    React.createElement(${name}WithoutClientChunk, props),`,
         `  );`,
         `}`,
       ];
@@ -230,7 +267,6 @@ describe("route entry", () => {
         [
           'import * as React from "react";',
           'import { EnsureClientRouteModuleForHMR___ } from "/test.js?client-route-module=shared";',
-          "",
           'export { loader } from "/test.js?server-route-module=";',
           'export { action } from "/test.js?server-route-module=";',
           'export { headers } from "/test.js?server-route-module=";',
@@ -238,18 +274,18 @@ describe("route entry", () => {
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
           'export { links } from "/test.js?client-route-module=shared";',
           'export { meta } from "/test.js?client-route-module=shared";',
-          ...withCss("ServerComponent").slice(0, 4),
+          ...withCss("ServerComponent").slice(0, 3),
           "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerComponent").slice(4),
-          ...withCss("ServerLayout").slice(0, 4),
+          ...withCss("ServerComponent").slice(3),
+          ...withCss("ServerLayout").slice(0, 3),
           "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerLayout").slice(4),
-          ...withCss("ServerErrorBoundary").slice(0, 4),
+          ...withCss("ServerLayout").slice(3),
+          ...withCss("ServerErrorBoundary").slice(0, 3),
           "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerErrorBoundary").slice(4),
-          ...withCss("ServerHydrateFallback").slice(0, 4),
+          ...withCss("ServerErrorBoundary").slice(3),
+          ...withCss("ServerHydrateFallback").slice(0, 3),
           "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerHydrateFallback").slice(4),
+          ...withCss("ServerHydrateFallback").slice(3),
         ].join("\n") + "\n",
       );
     });
@@ -261,7 +297,6 @@ describe("route entry", () => {
         [
           'import * as React from "react";',
           'import { EnsureClientRouteModuleForHMR___ } from "/test.js?client-route-module=shared";',
-          "",
           'export { loader } from "/test.js?server-route-module=";',
           'export { action } from "/test.js?server-route-module=";',
           'export { headers } from "/test.js?server-route-module=";',
@@ -269,9 +304,9 @@ describe("route entry", () => {
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
           'export { links } from "/test.js?client-route-module=shared";',
           'export { meta } from "/test.js?client-route-module=shared";',
-          ...withCss("ServerComponent").slice(0, 4),
+          ...withCss("ServerComponent").slice(0, 3),
           "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerComponent").slice(4),
+          ...withCss("ServerComponent").slice(3),
           'export { Layout } from "/test.js?client-route-module=shared";',
           'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
           'export { HydrateFallback } from "/test.js?client-route-module=HydrateFallback";',

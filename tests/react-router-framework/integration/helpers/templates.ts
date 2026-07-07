@@ -6,8 +6,6 @@ const templates = [
   // RSC templates
   { name: "rsc-preview", displayName: "RSC (rsbuild)" },
   { name: "rsc-framework", displayName: "RSC Framework" },
-
-  { name: "vite-plugin-cloudflare-template", displayName: "Cloudflare" },
 ] as const;
 
 export type Template = (typeof templates)[number];
