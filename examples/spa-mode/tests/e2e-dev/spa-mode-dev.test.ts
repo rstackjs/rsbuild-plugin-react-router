@@ -29,8 +29,9 @@ test.describe('SPA Mode dev server', () => {
 
     expect(response?.status()).toBe(200);
     await expect(page.locator('h1:has-text("About This Demo")')).toBeVisible();
+  });
 
-    // Nested routes resolve as document requests too.
+  test('serves the SPA shell for nested routes', async ({ page }) => {
     await page.goto('/docs/getting-started');
     await expect(
       page.locator('h1:has-text("Getting Started")')
