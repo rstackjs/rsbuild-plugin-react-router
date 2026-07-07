@@ -122,22 +122,13 @@ type ReactRouterManifestStatsEntrypoint = {
   getFiles?: () => Iterable<string>;
 };
 
-type ReactRouterManifestStatsCompilation = {
-  namedChunks: Iterable<[string, ReactRouterManifestStatsChunk]>;
-  entrypoints?: Iterable<[string, ReactRouterManifestStatsEntrypoint]>;
+type ReactRouterManifestStatsLookup<T> = Iterable<[string, T]> & {
+  get?: (name: string) => T | undefined;
 };
 
-type ReactRouterManifestStatsNamedChunks =
-  ReactRouterManifestStatsCompilation['namedChunks'] & {
-    get?: (chunkName: string) => ReactRouterManifestStatsChunk | undefined;
-  };
-
-type ReactRouterManifestStatsEntrypoints = NonNullable<
-  ReactRouterManifestStatsCompilation['entrypoints']
-> & {
-  get?: (
-    entrypointName: string
-  ) => ReactRouterManifestStatsEntrypoint | undefined;
+type ReactRouterManifestStatsCompilation = {
+  namedChunks: ReactRouterManifestStatsLookup<ReactRouterManifestStatsChunk>;
+  entrypoints?: ReactRouterManifestStatsLookup<ReactRouterManifestStatsEntrypoint>;
 };
 
 const orderChunkFiles = (chunkName: string, files: string[]): string[] => {
@@ -154,6 +145,49 @@ const orderChunkFiles = (chunkName: string, files: string[]): string[] => {
   ];
 };
 
+const collectManifestFilesByName = <T>(
+  items: ReactRouterManifestStatsLookup<T>,
+  names: ReadonlySet<string> | undefined,
+  getFiles: (name: string, item: T) => string[]
+): Record<string, string[]> => {
+  const filesByName: Record<string, string[]> = {};
+  if (!names) {
+    for (const [name, item] of items) {
+      filesByName[name] = getFiles(name, item);
+    }
+    return filesByName;
+  }
+
+  const missingNames = new Set(names);
+  if (typeof items.get === 'function') {
+    for (const name of names) {
+      const item = items.get(name);
+      if (!item) {
+        continue;
+      }
+      filesByName[name] = getFiles(name, item);
+      missingNames.delete(name);
+    }
+  }
+
+  if (missingNames.size === 0) {
+    return filesByName;
+  }
+
+  for (const [name, item] of items) {
+    if (!missingNames.has(name)) {
+      continue;
+    }
+    filesByName[name] = getFiles(name, item);
+    missingNames.delete(name);
+    if (missingNames.size === 0) {
+      break;
+    }
+  }
+
+  return filesByName;
+};
+
 export const createReactRouterManifestStats = (
   compilation: ReactRouterManifestStatsCompilation | undefined,
   chunkNames?: ReadonlySet<string>
@@ -162,86 +196,19 @@ export const createReactRouterManifestStats = (
     return undefined;
   }
 
-  const assetsByChunkName: Record<string, string[]> = {};
-  const entrypointFilesByName: Record<string, string[]> = {};
-  const namedChunks =
-    compilation.namedChunks as ReactRouterManifestStatsNamedChunks;
-  const entrypoints = compilation.entrypoints as
-    | ReactRouterManifestStatsEntrypoints
-    | undefined;
-
-  if (chunkNames && typeof namedChunks.get === 'function') {
-    const missingChunkNames = new Set(chunkNames);
-    for (const chunkName of chunkNames) {
-      const chunk = namedChunks.get(chunkName);
-      if (!chunk) {
-        continue;
-      }
-      const files = Array.from(chunk.files ?? []);
-      assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
-      missingChunkNames.delete(chunkName);
-    }
-    if (missingChunkNames.size > 0) {
-      for (const [chunkName, chunk] of namedChunks) {
-        if (!missingChunkNames.has(chunkName)) {
-          continue;
-        }
-        const files = Array.from(chunk.files ?? []);
-        assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
-        missingChunkNames.delete(chunkName);
-        if (missingChunkNames.size === 0) {
-          break;
-        }
-      }
-    }
-  } else {
-    for (const [chunkName, chunk] of namedChunks) {
-      if (chunkNames && !chunkNames.has(chunkName)) {
-        continue;
-      }
-      const files = Array.from(chunk.files ?? []);
-      assetsByChunkName[chunkName] = orderChunkFiles(chunkName, files);
-    }
-  }
-
-  if (entrypoints) {
-    if (chunkNames && typeof entrypoints.get === 'function') {
-      const missingEntrypointNames = new Set(chunkNames);
-      for (const entrypointName of chunkNames) {
-        const entrypoint = entrypoints.get(entrypointName);
-        if (!entrypoint) {
-          continue;
-        }
-        entrypointFilesByName[entrypointName] = Array.from(
-          entrypoint.getFiles?.() ?? []
-        );
-        missingEntrypointNames.delete(entrypointName);
-      }
-      if (missingEntrypointNames.size > 0) {
-        for (const [entrypointName, entrypoint] of entrypoints) {
-          if (!missingEntrypointNames.has(entrypointName)) {
-            continue;
-          }
-          entrypointFilesByName[entrypointName] = Array.from(
-            entrypoint.getFiles?.() ?? []
-          );
-          missingEntrypointNames.delete(entrypointName);
-          if (missingEntrypointNames.size === 0) {
-            break;
-          }
-        }
-      }
-    } else {
-      for (const [entrypointName, entrypoint] of entrypoints) {
-        if (chunkNames && !chunkNames.has(entrypointName)) {
-          continue;
-        }
-        entrypointFilesByName[entrypointName] = Array.from(
-          entrypoint.getFiles?.() ?? []
-        );
-      }
-    }
-  }
+  const assetsByChunkName = collectManifestFilesByName(
+    compilation.namedChunks,
+    chunkNames,
+    (chunkName, chunk) =>
+      orderChunkFiles(chunkName, Array.from(chunk.files ?? []))
+  );
+  const entrypointFilesByName = compilation.entrypoints
+    ? collectManifestFilesByName(
+        compilation.entrypoints,
+        chunkNames,
+        (_name, entrypoint) => Array.from(entrypoint.getFiles?.() ?? [])
+      )
+    : {};
 
   return Object.keys(entrypointFilesByName).length > 0
     ? { assetsByChunkName, entrypointFilesByName }
