@@ -412,10 +412,11 @@ export const reactRouterServe = async ({
   let serveProc = spawn(nodeBin, args, {
     cwd,
     stdio: "pipe",
+    detached: platform() !== "win32",
     env: { NODE_ENV: "production", PORT: port.toFixed(0) },
   });
   await waitForServer(serveProc, { port, basename });
-  return () => serveProc.kill();
+  return () => stopProcess(serveProc);
 };
 
 export const wranglerPagesDev = async ({
@@ -436,11 +437,12 @@ export const wranglerPagesDev = async ({
     {
       cwd,
       stdio: "pipe",
+      detached: platform() !== "win32",
       env: { NODE_ENV: "production" },
     },
   );
   await waitForServer(proc, { port, host: "127.0.0.1" });
-  return () => proc.kill();
+  return () => stopProcess(proc);
 };
 
 type ServerArgs = {
@@ -452,7 +454,12 @@ type ServerArgs = {
 
 export const createDev =
   (nodeArgs: string[]) =>
-  async ({ cwd, port, env, basename }: ServerArgs): Promise<() => unknown> => {
+  async ({
+    cwd,
+    port,
+    env,
+    basename,
+  }: ServerArgs): Promise<() => Promise<void>> => {
     installFixtureProject(cwd);
     const args =
       nodeArgs[0] === rsbuildBin && nodeArgs[1] === "dev"
@@ -460,7 +467,7 @@ export const createDev =
         : nodeArgs;
     let proc = node(args, { cwd, env });
     await waitForServer(proc, { port, basename });
-    return () => proc.kill();
+    return () => stopProcess(proc);
   };
 
 export const dev = createDev([rsbuildBin, "dev", "--host", "localhost"]);
@@ -650,7 +657,7 @@ export const test = base.extend<Fixtures>({
       stop = await dev({ cwd, port });
       return { port, cwd };
     });
-    stop?.();
+    await stop?.();
   },
   // eslint-disable-next-line no-empty-pattern
   customDev: async ({}, use) => {
@@ -661,7 +668,7 @@ export const test = base.extend<Fixtures>({
       stop = await customDev({ cwd, port });
       return { port, cwd };
     });
-    stop?.();
+    await stop?.();
   },
   // eslint-disable-next-line no-empty-pattern
   reactRouterServe: async ({}, use) => {
@@ -674,7 +681,7 @@ export const test = base.extend<Fixtures>({
       stop = await reactRouterServe({ cwd, port });
       return { port, cwd };
     });
-    stop?.();
+    await stop?.();
   },
   // eslint-disable-next-line no-empty-pattern
   rsbuildPreview: async ({}, use) => {
@@ -687,7 +694,7 @@ export const test = base.extend<Fixtures>({
       stop = await rsbuildPreview({ cwd, port });
       return { port, cwd };
     });
-    stop?.();
+    await stop?.();
   },
   // eslint-disable-next-line no-empty-pattern
   wranglerPagesDev: async ({}, use) => {
@@ -703,7 +710,7 @@ export const test = base.extend<Fixtures>({
       stop = await wranglerPagesDev({ cwd, port });
       return { port, cwd };
     });
-    stop?.();
+    await stop?.();
   },
 });
 
@@ -729,8 +736,43 @@ function node(
       ...options.env,
     },
     stdio: "pipe",
+    detached: platform() !== "win32",
   });
   return proc;
+}
+
+async function stopProcess(proc: ChildProcess) {
+  if (proc.exitCode !== null || proc.signalCode !== null) {
+    return;
+  }
+
+  let forceKill: NodeJS.Timeout | undefined;
+  let settle: NodeJS.Timeout | undefined;
+  const exited = new Promise<void>((resolve) => {
+    const done = () => {
+      if (forceKill) clearTimeout(forceKill);
+      if (settle) clearTimeout(settle);
+      resolve();
+    };
+    proc.once("exit", done);
+    proc.once("close", done);
+    settle = setTimeout(done, 6000);
+  });
+  const kill = (signal: NodeJS.Signals) => {
+    if (proc.pid && platform() !== "win32") {
+      try {
+        process.kill(-proc.pid, signal);
+        return;
+      } catch {
+        // The group may already be gone; fall back to the direct child.
+      }
+    }
+    proc.kill(signal);
+  };
+
+  kill("SIGTERM");
+  forceKill = setTimeout(() => kill("SIGKILL"), 5000);
+  await exited;
 }
 
 async function waitForServer(
@@ -747,10 +789,10 @@ async function waitForServer(
       }`,
     ],
     timeout: platform() === "win32" ? 20000 : 10000,
-  }).catch((err) => {
+  }).catch(async (err) => {
     let stdout = devStdout();
     let stderr = devStderr();
-    proc.kill();
+    await stopProcess(proc);
     throw new Error(
       [
         err.message,
