@@ -8,6 +8,8 @@ import { test, createEditor, rsbuildConfig } from "./helpers/rsbuild.js";
 const templateName = "rsc-framework" as const satisfies TemplateName;
 const hydrationTimeout = 45_000;
 
+test.use({ javaScriptEnabled: true });
+
 test.describe("HMR & HDR (RSC)", () => {
   test("rsbuild dev", async ({ page, dev }) => {
     test.setTimeout(120_000);
