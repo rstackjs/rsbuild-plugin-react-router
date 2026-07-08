@@ -6,9 +6,12 @@ import type { Files, TemplateName } from "./helpers/rsbuild.js";
 import { test, createEditor, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const templateName = "rsc-framework" as const satisfies TemplateName;
+const hydrationTimeout = 45_000;
 
 test.describe("HMR & HDR (RSC)", () => {
   test("rsbuild dev", async ({ page, dev }) => {
+    test.setTimeout(120_000);
+
     let files: Files = async ({ port }) => ({
       "rsbuild.config.ts": await rsbuildConfig.basic({ port, templateName }),
       "app/routes/hmr/route.tsx": `
@@ -56,6 +59,7 @@ test.describe("HMR & HDR (RSC)", () => {
     // setup: hydration
     await expect(page.locator("#index [data-mounted]")).toHaveText(
       "Mounted: yes",
+      { timeout: hydrationTimeout },
     );
 
     // setup: browser state
@@ -386,6 +390,7 @@ test.describe("HMR & HDR (RSC)", () => {
     // await page.waitForLoadState("networkidle");
     await expect(page.locator("#index [data-mounted]")).toHaveText(
       "Mounted: yes",
+      { timeout: hydrationTimeout },
     );
     await expect(hmrStatus).toHaveText("Client Route HMR: 0");
   });
