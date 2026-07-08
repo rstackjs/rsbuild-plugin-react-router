@@ -276,7 +276,7 @@ export const collectClientOnlyStubExportNames = async (
   resolveModule: RouteExportResolver = resolveExportAllModule
 ): Promise<Set<string>> => {
   const { exportNames: directExportNames, exportAllModules } =
-    await getExportNamesAndExportAll(code);
+    await getExportNamesAndExportAll(code, resourcePath);
   const exportNames = new Set(directExportNames);
   const unresolvedExportAll = new Set<string>();
   const visitedModules = new Set<string>();
