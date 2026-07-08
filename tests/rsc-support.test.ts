@@ -7,6 +7,7 @@ import {
   assertReactRouterRscSupport,
   createReactRouterRscResolveAliases,
   createReactRouterRscVirtualModules,
+  setupReactRouterRscPlugin,
 } from '../src/rsc-support';
 
 describe('RSC support helpers', () => {
@@ -78,6 +79,32 @@ describe('RSC support helpers', () => {
         userConfig: { ssr: true, basename: '/app' },
       })
     ).not.toThrow();
+  });
+
+  it('rejects the legacy SRI future alias after config normalization', () => {
+    expect(() =>
+      assertReactRouterRscConfigSupport({
+        pluginName: 'test-plugin',
+        userConfig: {
+          future: { unstable_subResourceIntegrity: true },
+          subResourceIntegrity: true,
+        },
+      })
+    ).toThrow(/subResourceIntegrity/);
+  });
+
+  it('rejects separately registered rsbuild-plugin-rsc instances', async () => {
+    await expect(
+      setupReactRouterRscPlugin({
+        api: {
+          isPluginExists: () => true,
+        } as any,
+        entryRscPath: '/repo/app/entry.rsc.tsx',
+        entrySsrPath: '/repo/app/entry.rsc.ssr.tsx',
+        pluginName: 'test-plugin',
+        rsc: {},
+      })
+    ).rejects.toThrow(/already registered/);
   });
 
   it('rejects React Router versions before the RSC export surface', () => {

@@ -4,6 +4,10 @@ import type { Config } from './react-router-config.js';
 import type { PluginOptions } from './types.js';
 
 type RscPluginOptions = Exclude<NonNullable<PluginOptions['rsc']>, boolean>;
+type RscUnsupportedConfig = Pick<
+  Config,
+  'buildEnd' | 'future' | 'presets' | 'serverBundles' | 'subResourceIntegrity'
+>;
 
 // Mirrors upstream @react-router/dev's RSC-mode validateConfig: these
 // options have no effect in RSC framework mode, so reject them loudly
@@ -13,7 +17,7 @@ export const assertReactRouterRscConfigSupport = ({
   userConfig,
 }: {
   pluginName: string;
-  userConfig: Config;
+  userConfig: RscUnsupportedConfig;
 }): void => {
   const unsupported: string[] = [];
   if (userConfig.buildEnd) unsupported.push('buildEnd');
@@ -80,15 +84,16 @@ export const setupReactRouterRscPlugin = async ({
   pluginName: string;
   rsc: RscPluginOptions;
 }): Promise<void> => {
-  const { PLUGIN_RSC_NAME, pluginRSC } = await import('rsbuild-plugin-rsc');
+  const { PLUGIN_RSC_NAME } = await import('rsbuild-plugin-rsc');
   if (api.isPluginExists(PLUGIN_RSC_NAME)) {
-    api.logger.warn(
+    throw new Error(
       `[${pluginName}] The "${PLUGIN_RSC_NAME}" plugin is already registered. ` +
-        'Skipping built-in RSC setup.'
+        `Remove the separately configured plugin and pass RSC options through ` +
+        `"${pluginName}" so the managed node/web environments stay aligned.`
     );
-    return;
   }
 
+  const { pluginRSC } = await import('rsbuild-plugin-rsc');
   await pluginRSC({
     ...rsc,
     environments: {

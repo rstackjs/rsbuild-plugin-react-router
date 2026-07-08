@@ -126,6 +126,11 @@ const isServerRouteExport = (name: string): boolean =>
 const isServerComponentExport = (name: string): boolean =>
   SERVER_COMPONENT_EXPORTS_SET.has(name);
 
+const isSplittableRouteChunkExport = (
+  exportName: string
+): exportName is RouteChunkExportName =>
+  routeChunkExportNames.includes(exportName as RouteChunkExportName);
+
 const createReexport = (exportName: string, target: string): string =>
   exportName === 'default'
     ? `export { default } from ${JSON.stringify(target)};`
@@ -254,13 +259,27 @@ const createRscRouteExportPlan = async (
       !exportNameSet.has('ErrorBoundary') &&
       !exportNameSet.has('ServerErrorBoundary'),
     clientTargetFor(exportName) {
-      const chunkName = isClientRouteExport(exportName)
-        ? ROUTE_CLIENT_MODULE_CHUNK
-        : 'shared';
+      if (isSplittableRouteChunkExport(exportName)) {
+        const chunkName = routeChunks.hasRouteChunkByExportName[exportName]
+          ? exportName
+          : ROUTE_CLIENT_MODULE_CHUNK;
+        return createClientRouteModuleId(
+          options.resourcePath,
+          options.resourceQuery,
+          chunkName
+        );
+      }
+      if (isClientRouteExport(exportName)) {
+        return createClientRouteModuleId(
+          options.resourcePath,
+          options.resourceQuery,
+          ROUTE_CLIENT_MODULE_CHUNK
+        );
+      }
       return createClientRouteModuleId(
         options.resourcePath,
         options.resourceQuery,
-        chunkName
+        'shared'
       );
     },
   };
@@ -387,12 +406,12 @@ const createClientRouteModule = async (
               exportName => !isClientRouteExport(exportName)
             ),
           ]
-      : [
-          ...SERVER_ROUTE_EXPORTS,
-          ...plan.exportNames.filter(
-            exportName => exportName !== clientRouteChunk
-          ),
-        ];
+        : [
+            ...SERVER_ROUTE_EXPORTS,
+            ...plan.exportNames.filter(
+              exportName => exportName !== clientRouteChunk
+            ),
+          ];
   const removed = removeExports(ast, exportsToRemove);
   if (removed) {
     removeUnusedImports(ast);
@@ -424,7 +443,7 @@ const createClientRouteModule = async (
         ? `\n${ENSURE_CLIENT_ROUTE_MODULE_CHUNK_FOR_HMR}`
         : '') +
       (options.isDev
-        ? `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(); }\n`
+        ? `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(() => { import.meta.webpackHot.emit("rsc:update"); }); }\n`
         : ''),
     map: null,
   };

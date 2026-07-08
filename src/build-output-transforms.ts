@@ -13,7 +13,10 @@ import {
 import type { RouteTransformExecutor } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
 import { createBundlerRouteExportResolver } from './route-export-resolution.js';
-import type { RouteChunkConfig } from './route-chunks.js';
+import {
+  getRouteChunkNameFromModuleId,
+  type RouteChunkConfig,
+} from './route-chunks.js';
 import type { PluginOptions, Route } from './types.js';
 import { isSourceMapEnabled } from './warnings/warn-on-client-source-maps.js';
 import {
@@ -144,7 +147,7 @@ export const registerBuildOutputTransforms = ({
   // static files, mirroring upstream React Router's Vite plugin. This runs for
   // every node compilation, so it also covers `serverBundles` (multiple node
   // outputs) and dev mode (where `writeToDisk` is enabled).
-  const relocatedDestinations = new Set<string>();
+  const relocatedDestinations = new Map<string, string>();
   api.processAssets(
     { stage: 'report', targets: ['node'] },
     async ({ compilation }) => {
@@ -243,15 +246,38 @@ export const registerBuildOutputTransforms = ({
         args.environment?.name,
         'route:chunk',
         args.resource,
-        async () =>
-          routeTransformExecutor.run({
+        async () => {
+          const routeChunkArtifact = await routeTransformExecutor.run({
             kind: 'routeChunk',
             code: args.code,
             resource: args.resource,
             resourcePath: args.resourcePath,
             isBuild,
             routeChunkConfig,
-          })
+          });
+
+          if (
+            !isBuild ||
+            getRouteChunkNameFromModuleId(args.resource) !== 'main'
+          ) {
+            return routeChunkArtifact;
+          }
+
+          return routeTransformExecutor.run({
+            kind: 'routeModule',
+            code: routeChunkArtifact.code,
+            resource: args.resource,
+            resourcePath: args.resourcePath,
+            environmentName: 'web',
+            sourceMaps: isSourceMapEnabled(
+              args.environment.config.output.sourceMap
+            ),
+            ssr,
+            isBuild,
+            isSpaMode,
+            rootRoutePath,
+          });
+        }
       );
     }
   );

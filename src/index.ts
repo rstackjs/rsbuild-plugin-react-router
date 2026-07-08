@@ -3,7 +3,6 @@ import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
-import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
@@ -55,7 +54,11 @@ import {
 } from './dev-hmr.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
-import { importConfigWithWatchPaths } from './config-imports.js';
+import {
+  createConfigImporter,
+  type ConfigImporter,
+  importConfigWithWatchPaths,
+} from './config-imports.js';
 import {
   createReactRouterRouteTopology,
   createReactRouterRouteWatchFiles,
@@ -261,11 +264,16 @@ export const pluginReactRouter = (
       throw new Error(`Route config file not found at "${missingRoutesPath}".`);
     }
 
-    const jiti = createJiti(process.cwd(), {
+    const routeConfigDefine =
+      typeof api.getRsbuildConfig === 'function'
+        ? api.getRsbuildConfig().source?.define
+        : undefined;
+    const jiti = createConfigImporter({
+      define: routeConfigDefine,
       moduleCache: false,
     });
     const importRouteConfig = async (
-      importer: Pick<typeof jiti, 'import'>
+      importer: ConfigImporter
     ): Promise<RouteConfigEntry[]> => {
       const routeConfigFile = relative(resolve(appDirectory), routesPath);
       let routeConfigValue: RouteConfigEntry[];
@@ -301,7 +309,9 @@ export const pluginReactRouter = (
     };
     const loadRouteConfig = () => importRouteConfig(jiti);
     const { value: routeConfig, watchPaths: routeConfigWatchPaths } =
-      await importConfigWithWatchPaths(routesPath, importRouteConfig);
+      await importConfigWithWatchPaths(routesPath, importRouteConfig, {
+        define: routeConfigDefine,
+      });
 
     const {
       devServerBuildEntryName,
@@ -324,7 +334,7 @@ export const pluginReactRouter = (
       });
       assertReactRouterRscConfigSupport({
         pluginName: PLUGIN_NAME,
-        userConfig: reactRouterUserConfig,
+        userConfig: resolvedConfig,
       });
       await setupReactRouterRscPlugin({
         api,
@@ -666,7 +676,9 @@ export const pluginReactRouter = (
         : (config.dev?.lazyCompilation ?? pluginOptions.lazyCompilation);
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
-        entryClientPath: finalEntryClientPath,
+        entryClientPath: isRscMode
+          ? finalEntryRscClientPath
+          : finalEntryClientPath,
         prewarmReactRouterModules: Boolean(
           pluginOptions.unstableLazyCompilationPrewarm
         ),
@@ -708,7 +720,9 @@ export const pluginReactRouter = (
             resolve: resolveConfig,
             plugins: [
               vmodPlugin,
-              createQuerylessRouteImportPlugin(routeByFilePath),
+              createQuerylessRouteImportPlugin(routeByFilePath, {
+                rsc: isRscMode,
+              }),
             ],
           },
         },

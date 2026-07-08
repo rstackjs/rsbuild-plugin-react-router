@@ -4,6 +4,7 @@ import getPort from "get-port";
 
 import * as Express from "./helpers/express";
 import { test } from "./helpers/fixtures";
+import { rsbuildConfig } from "./helpers/rsbuild";
 import * as Stream from "./helpers/stream";
 import { bundlerTemplates, getTemplates } from "./helpers/templates";
 
@@ -59,6 +60,10 @@ test.describe(".env", () => {
         test(env.name, async ({ edit, $, page }) => {
           await edit({
             "server.mjs": isRsc ? Express.rsc() : Express.server(),
+            "rsbuild.config.ts": await rsbuildConfig.basic({
+              envPrefixes: ["VITE_"],
+              templateName: template.name,
+            }),
             ".env": `
               VITE_ENV_ROUTE=dotenv
               ENV_VAR_FROM_DOTENV_FILE=Content from ${env.path} file

@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +30,11 @@ export const PINNED_UPSTREAM = {
   repository: 'https://github.com/remix-run/react-router',
   ref: '4cf6e62d0cdf9d7f6e09b0ea10077d7fb0e1b438',
 };
+const originalPinnedUpstreamRef = PINNED_UPSTREAM.ref;
+
+const rootPackageJson = JSON.parse(
+  await readFile(path.join(repoRoot, 'package.json'), 'utf8')
+);
 
 /**
  * Upstream directories copied into the corpus, as
@@ -206,6 +219,9 @@ const scratchRoot = path.join(
   repoRoot,
   'node_modules/.cache/react-router-framework-sync'
 );
+const stagedTargetRoot = path.join(scratchRoot, 'target');
+const preservedRoot = path.join(scratchRoot, 'preserved');
+const backupRoot = path.join(scratchRoot, 'previous');
 
 const packageVersionByName = {
   '@react-router/dev': '^8.0.1',
@@ -222,6 +238,7 @@ const packageVersionByName = {
   'react-dom': '^19.2.4',
   'react-router': '^8.0.1',
   'react-server-dom-rspack': '0.0.2',
+  'rsbuild-plugin-react-router': `^${rootPackageJson.version}`,
   'rsbuild-plugin-rsc': '^0.1.1',
   typescript: '^5.9.3',
 };
@@ -262,19 +279,7 @@ const enforcePinnedRef = async () => {
     );
   }
 
-  const scriptSource = await readFile(scriptPath, 'utf8');
-  const updatedSource = scriptSource.replace(
-    `ref: '${PINNED_UPSTREAM.ref}'`,
-    `ref: '${headSha}'`
-  );
-  if (updatedSource === scriptSource) {
-    throw new Error(
-      `--update-pin could not rewrite the pinned ref in ${scriptPath}.`
-    );
-  }
-  await writeFile(scriptPath, updatedSource, 'utf8');
   PINNED_UPSTREAM.ref = headSha;
-  console.log(`Updated pinned upstream ref to ${headSha}`);
   return headSha;
 };
 
@@ -286,34 +291,33 @@ const copyIfExists = async (from, to) => {
   await cp(from, to, { force: true, recursive: true });
 };
 
-const preserveAdapterFiles = async () => {
-  await rm(scratchRoot, { force: true, recursive: true });
+const preserveAdapterFiles = async (workRoot = targetRoot) => {
+  await rm(preservedRoot, { force: true, recursive: true });
   for (const relativePath of preservedCorpusPaths) {
     await copyIfExists(
-      path.join(targetRoot, relativePath),
-      path.join(scratchRoot, relativePath)
+      path.join(workRoot, relativePath),
+      path.join(preservedRoot, relativePath)
     );
   }
 };
 
-const restoreAdapterFiles = async () => {
+const restoreAdapterFiles = async (workRoot = targetRoot) => {
   for (const relativePath of preservedCorpusPaths) {
     await copyIfExists(
-      path.join(scratchRoot, relativePath),
-      path.join(targetRoot, relativePath)
+      path.join(preservedRoot, relativePath),
+      path.join(workRoot, relativePath)
     );
   }
-  await rm(scratchRoot, { force: true, recursive: true });
 };
 
-const copyUpstreamTests = async () => {
+const copyUpstreamTests = async (workRoot = targetRoot) => {
   for (const [source, target] of sourceDirs) {
     const sourcePath = path.join(sourceRoot, source);
     if (!existsSync(sourcePath)) {
       throw new Error(`Missing upstream React Router test path: ${sourcePath}`);
     }
-    await rm(path.join(targetRoot, target), { force: true, recursive: true });
-    await cp(sourcePath, path.join(targetRoot, target), {
+    await rm(path.join(workRoot, target), { force: true, recursive: true });
+    await cp(sourcePath, path.join(workRoot, target), {
       force: true,
       recursive: true,
     });
@@ -323,11 +327,23 @@ const copyUpstreamTests = async () => {
     ...Object.keys(corpusRenames),
     ...removedUpstreamPaths,
   ]) {
-    await rm(path.join(targetRoot, sourcePath), {
+    await rm(path.join(workRoot, sourcePath), {
       force: true,
       recursive: true,
     });
   }
+};
+
+const replaceCorpusFromStage = async () => {
+  await rm(backupRoot, { force: true, recursive: true });
+  await rename(targetRoot, backupRoot);
+  try {
+    await rename(stagedTargetRoot, targetRoot);
+  } catch (error) {
+    await rename(backupRoot, targetRoot);
+    throw error;
+  }
+  await rm(backupRoot, { force: true, recursive: true });
 };
 
 const findFiles = async (directory, predicate) => {
@@ -444,7 +460,7 @@ const writeManifest = async ref => {
     await findFiles(targetRoot, name => name !== 'UPSTREAM.json')
   ).length;
   const { untrackedDriftPaths } = getCorpusVerification();
-  const corpusVerified = updatePin ? true : untrackedDriftPaths.length === 0;
+  const corpusVerified = untrackedDriftPaths.length === 0;
 
   const manifest = {
     repository: PINNED_UPSTREAM.repository,
@@ -495,16 +511,19 @@ const writeManifest = async ref => {
 
 if (!normalizeOnly) {
   const ref = await enforcePinnedRef();
-  await preserveAdapterFiles();
-  await copyUpstreamTests();
-  await restoreAdapterFiles();
+  await rm(scratchRoot, { force: true, recursive: true });
+  await mkdir(stagedTargetRoot, { recursive: true });
+  await preserveAdapterFiles(targetRoot);
+  await copyUpstreamTests(stagedTargetRoot);
+  await restoreAdapterFiles(stagedTargetRoot);
 
   for (const packageJsonPath of await findFiles(
-    targetRoot,
+    stagedTargetRoot,
     name => name === 'package.json'
   )) {
     await normalizePackageJson(packageJsonPath);
   }
+  await replaceCorpusFromStage();
 
   const { corpusVerified, untrackedDriftPaths } = await writeManifest(ref);
   console.log(
@@ -518,6 +537,22 @@ if (!normalizeOnly) {
         `\nSee the note in tests/react-router-framework/UPSTREAM.json.`
     );
   }
+
+  if (updatePin) {
+    const scriptSource = await readFile(scriptPath, 'utf8');
+    const updatedSource = scriptSource.replace(
+      `ref: '${originalPinnedUpstreamRef}'`,
+      `ref: '${ref}'`
+    );
+    if (updatedSource === scriptSource) {
+      throw new Error(
+        `--update-pin could not rewrite the pinned ref in ${scriptPath}.`
+      );
+    }
+    await writeFile(scriptPath, updatedSource, 'utf8');
+    console.log(`Updated pinned upstream ref to ${ref}`);
+  }
+  await rm(scratchRoot, { force: true, recursive: true });
 } else {
   for (const packageJsonPath of await findFiles(
     targetRoot,

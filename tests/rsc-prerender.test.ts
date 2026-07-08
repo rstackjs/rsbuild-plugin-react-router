@@ -4,6 +4,7 @@ import {
   extractRscFlightData,
   getRscHtmlFilePath,
   getRscPayloadFilePath,
+  getRscPrerenderRequests,
   getRscPrerenderRequestPaths,
   normalizeRscPrerenderBasename,
 } from '../src/rsc-prerender';
@@ -62,6 +63,21 @@ describe('getRscPrerenderRequestPaths', () => {
         basename: '/base',
       })
     ).toEqual(['/base/', '/base/products/1']);
+  });
+
+  it('keeps basename request paths separate from artifact paths', () => {
+    expect(
+      getRscPrerenderRequests({
+        prerenderPaths: [],
+        ssr: false,
+        basename: '/base',
+      })
+    ).toEqual([
+      {
+        requestPath: '/base/__spa-fallback.html',
+        artifactPath: SPA_FALLBACK_REQUEST_PATH,
+      },
+    ]);
   });
 
   it('deduplicates paths', () => {

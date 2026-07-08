@@ -430,10 +430,10 @@ const validatePrerenderPathMatches = (
   }
 };
 
-export const createBoundedPrerenderTasksEffect = (
-  prerenderPaths: string[],
+export const createBoundedPrerenderTasksEffect = <T>(
+  prerenderPaths: T[],
   concurrency: number,
-  renderPath: (path: string) => Effect.Effect<void, Error, never>
+  renderPath: (path: T) => Effect.Effect<void, Error, never>
 ): Effect.Effect<void, Error, never> =>
   Effect.forEach(prerenderPaths, renderPath, { concurrency, discard: true });
 

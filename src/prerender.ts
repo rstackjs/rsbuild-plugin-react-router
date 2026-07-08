@@ -14,7 +14,7 @@ type PrerenderPathsConfig =
     }) => boolean | string[] | Promise<boolean | string[]>);
 
 type PrerenderConfigObject = {
-  paths?: PrerenderPathsConfig;
+  paths: PrerenderPathsConfig;
   concurrency?: number;
   unstable_concurrency?: number;
 } & Record<string, unknown>;

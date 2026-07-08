@@ -63,6 +63,7 @@ type RsbuildConfigBuildArgs = {
 type RsbuildConfigBaseArgs = {
   templateName?: TemplateName;
   base?: string;
+  envPrefixes?: string[];
   mdx?: boolean;
   vanillaExtract?: boolean;
 };
@@ -139,7 +140,7 @@ export const rsbuildConfig = {
     const routerPlugin = isRsc ? "pluginReactRouterRSC" : "pluginReactRouter";
 
     const imports = [
-      `import { defineConfig } from "@rsbuild/core";`,
+      `import { defineConfig${args.envPrefixes ? ", loadEnv" : ""} } from "@rsbuild/core";`,
       ...(args.mdx ? [`import { pluginMdx } from "@rsbuild/plugin-mdx";`] : []),
       `import { pluginReact } from "@rsbuild/plugin-react";`,
       `import { ${routerPlugin} } from "rsbuild-plugin-react-router";`,
@@ -149,6 +150,13 @@ export const rsbuildConfig = {
           ]
         : []),
     ];
+
+    const prelude = args.envPrefixes
+      ? [
+          `const { publicVars } = loadEnv({ prefixes: ${JSON.stringify(args.envPrefixes)} });`,
+          "",
+        ]
+      : [];
 
     const config = [
       ...configSection("server", [
@@ -174,6 +182,9 @@ export const rsbuildConfig = {
             ]
           : []),
       ]),
+      ...configSection("source", [
+        ...(args.envPrefixes ? [`define: publicVars,`] : []),
+      ]),
       ...(args.vanillaExtract
         ? [
             `// vanilla-extract: debug identifiers + sideEffects disabled for .css.ts imports.`,
@@ -192,6 +203,7 @@ export const rsbuildConfig = {
     return [
       ...imports,
       "",
+      ...prelude,
       "export default defineConfig({",
       ...config.map((line) => `  ${line}`),
       "});",

@@ -54,6 +54,38 @@ describe('React Router framework test resource guard', () => {
     ).toEqual({ browsers: 1, installs: 1, workers: 1 });
   });
 
+  it('counts explicitly tracked child pids without proc ownership', () => {
+    expect(
+      countFrameworkTestResources(
+        [
+          { pid: 1, args: 'node playwright/lib/worker/workerProcessEntry.js' },
+          { pid: 2, args: 'chrome-headless-shell --playwright' },
+        ],
+        {
+          isOwnedPid: () => false,
+          ownedPids: [1],
+          runId: 'other-run',
+        }
+      )
+    ).toEqual({ browsers: 0, installs: 0, workers: 1 });
+  });
+
+  it('filters explicitly tracked child pids without proc ownership', () => {
+    expect(
+      filterFrameworkTestProcesses(
+        [
+          { pid: 1, args: 'node playwright/lib/worker/workerProcessEntry.js' },
+          { pid: 2, args: 'node unrelated.js' },
+        ],
+        {
+          isOwnedPid: () => false,
+          ownedPids: [1],
+          runId: 'other-run',
+        }
+      ).map(process => process.pid)
+    ).toEqual([1]);
+  });
+
   it('reuses package and browser caches across child processes', () => {
     const cacheEnv = getFrameworkCacheEnv('/repo');
     expect(cacheEnv.APPORT_DISABLE).toBe('1');

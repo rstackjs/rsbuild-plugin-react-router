@@ -55,17 +55,29 @@ test.describe("rsbuild dev", () => {
             );
           }
         `,
-        "app/routes/_index.tsx": tsx`
-          export default function IndexRoute() {
-            return (
-              <div id="index">
-                <h2 data-title>Index</h2>
-                <input />
-                <p data-hmr>HMR updated: no</p>
-              </div>
-            );
-          }
-        `,
+        "app/routes/_index.tsx": templateName.includes("rsc")
+          ? tsx`
+              export function ServerComponent() {
+                return (
+                  <div id="index">
+                    <h2 data-title>Index</h2>
+                    <input />
+                    <p data-hmr>HMR updated: no</p>
+                  </div>
+                );
+              }
+            `
+          : tsx`
+              export default function IndexRoute() {
+                return (
+                  <div id="index">
+                    <h2 data-title>Index</h2>
+                    <input />
+                    <p data-hmr>HMR updated: no</p>
+                  </div>
+                );
+              }
+            `,
         "app/routes/deferred-loader-data.tsx": tsx`
           import { Suspense } from "react";
           import { Await, useLoaderData } from "react-router";
@@ -138,17 +150,27 @@ test.describe("rsbuild dev", () => {
             );
           }
         `,
-        "app/routes/jsx.jsx": tsx`
-          export default function JsxRoute() {
-            return (
-              <div id="jsx">
-                <p data-hmr>HMR updated: no</p>
-              </div>
-            );
-          }
-        `,
+        "app/routes/jsx.jsx": templateName.includes("rsc")
+          ? tsx`
+              export function ServerComponent() {
+                return (
+                  <div id="jsx">
+                    <p data-hmr>HMR updated: no</p>
+                  </div>
+                );
+              }
+            `
+          : tsx`
+              export default function JsxRoute() {
+                return (
+                  <div id="jsx">
+                    <p data-hmr>HMR updated: no</p>
+                  </div>
+                );
+              }
+            `,
         "app/routes/mdx.mdx": tsx`
-          import { useLoaderData } from "react-router";
+          import { MdxComponent } from "../components/mdx-components";
 
           export const loader = () => {
             return {
@@ -156,14 +178,17 @@ test.describe("rsbuild dev", () => {
             }
           }
 
+          ## MDX Route
+
+          <MdxComponent />
+        `,
+        "app/components/mdx-components.tsx": tsx`
+          import { useLoaderData } from "react-router";
+
           export function MdxComponent() {
             const { content } = useLoaderData();
             return <div data-mdx-route>{content}</div>
           }
-
-          ## MDX Route
-
-          <MdxComponent />
         `,
         ...(!templateName.includes("rsc")
           ? {

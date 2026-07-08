@@ -20,6 +20,7 @@ import {
 } from "./rsbuild-adapter.js";
 import {
   assertResourceGuardrail,
+  getActiveResourceCounts,
   killProcessGroup,
   withFrameworkTestRunEnv,
 } from "./test-resource-guard.js";
@@ -125,6 +126,13 @@ export const test = base.extend<{
       if (p instanceof ChildProcess) {
         processes.push(p);
       }
+      assertResourceGuardrail({
+        counts: getActiveResourceCounts({
+          ownedPids: processes
+            .map(process => process.pid)
+            .filter((pid): pid is number => pid !== undefined),
+        }),
+      });
 
       p.then((result) => {
         if (!(result instanceof Error)) return result;

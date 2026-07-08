@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import ts from "typescript";
+import { describe, expect, it } from "@rstest/core";
 
 import { transformRscRouteModule } from "../../../../src/rsc-route-transforms";
 import type { RouteChunkConfig } from "../../../../src/route-chunks";
@@ -164,11 +165,11 @@ describe("route entry", () => {
           'import * as React from "react";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";',
+          'export { default } from "/test.js?client-route-module=route";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=HydrateFallback").then(mod => ({ default: mod.HydrateFallback })));\n',
         ].join("\n"),
       );
@@ -182,8 +183,8 @@ describe("route entry", () => {
           '"use client";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";\n',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";\n',
         ].join("\n"),
       );
     });
@@ -197,10 +198,10 @@ describe("route entry", () => {
           'import * as React from "react";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=HydrateFallback").then(mod => ({ default: mod.HydrateFallback })));\n',
         ].join("\n"),
       );
@@ -214,14 +215,14 @@ describe("route entry", () => {
           '"use client";',
           'import * as React from "react";',
           'export { test } from "/test.js?client-route-module=shared";',
-          'export const clientLoader = async (...args) => import("/test.js?client-route-module=shared").then(mod => mod.clientLoader(...args));',
-          'export const clientAction = async (...args) => import("/test.js?client-route-module=shared").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
-          'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=shared").then(mod => ({ default: mod.HydrateFallback })));\n',
+          'export const clientLoader = async (...args) => import("/test.js?client-route-module=route").then(mod => mod.clientLoader(...args));',
+          'export const clientAction = async (...args) => import("/test.js?client-route-module=route").then(mod => mod.clientAction(...args));',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";',
+          'export { default } from "/test.js?client-route-module=route";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
+          'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=route").then(mod => ({ default: mod.HydrateFallback })));\n',
         ].join("\n"),
       );
     });
@@ -249,11 +250,11 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";',
+          'export { default } from "/test.js?client-route-module=route";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export { HydrateFallback } from "/test.js?client-route-module=HydrateFallback";\n',
         ].join("\n"),
       );
@@ -272,8 +273,8 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";',
           ...withCss("ServerComponent").slice(0, 3),
           "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
           ...withCss("ServerComponent").slice(3),
@@ -302,13 +303,13 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";',
           ...withCss("ServerComponent").slice(0, 3),
           "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
           ...withCss("ServerComponent").slice(3),
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export { HydrateFallback } from "/test.js?client-route-module=HydrateFallback";',
         ].join("\n") + "\n",
       );
@@ -323,14 +324,14 @@ describe("route entry", () => {
           'export { loader } from "/test.js?server-route-module=";',
           'export { action } from "/test.js?server-route-module=";',
           'export { headers } from "/test.js?server-route-module=";',
-          'export { clientLoader } from "/test.js?client-route-module=shared";',
-          'export { clientAction } from "/test.js?client-route-module=shared";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
-          'export { HydrateFallback } from "/test.js?client-route-module=shared";\n',
+          'export { clientLoader } from "/test.js?client-route-module=route";',
+          'export { clientAction } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=route";',
+          'export { meta } from "/test.js?client-route-module=route";',
+          'export { default } from "/test.js?client-route-module=route";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
+          'export { HydrateFallback } from "/test.js?client-route-module=route";\n',
         ].join("\n"),
       );
     });
@@ -409,13 +410,6 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
-        "export default function Route() {\n  console.log(client, shared);\n}",
-        "export function Layout() {\n  console.log(client, shared);\n}",
-        "export function ErrorBoundary() {\n  console.log(client, shared);\n}",
       ]).join("\n"),
     );
   });
@@ -430,10 +424,6 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
       ]).join("\n"),
     );
   });
@@ -448,12 +438,6 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
-        "export function Layout() {\n  console.log(client, shared);\n}",
-        "export function ErrorBoundary() {\n  console.log(client, shared);\n}",
       ]).join("\n"),
     );
   });
@@ -468,17 +452,7 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
         'export const test = "test";',
-        "export function clientLoader() {\n  console.log(client, shared, test);\n}",
-        "export function clientAction() {\n  console.log(client, shared, test);\n}",
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
-        "export default function Route() {\n  console.log(client, shared);\n}",
-        "export function Layout() {\n  console.log(client, shared);\n}",
-        "export function ErrorBoundary() {\n  console.log(client, shared);\n}",
-        "export function HydrateFallback() {\n  console.log(client, shared, test);\n}",
       ]).join("\n"),
     );
   });

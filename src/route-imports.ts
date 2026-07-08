@@ -34,6 +34,7 @@ type QuerylessRouteImportPlugin = {
 
 const RSC_CLIENT_ROUTE_MODULE_QUERY_PREFIX = '?client-route-module=';
 const RSC_SHARED_CLIENT_ROUTE_MODULE_QUERY = '?client-route-module=shared';
+const RSC_SERVER_ROUTE_MODULE_QUERY = '?server-route-module=';
 
 const isRscClientRouteModuleIssuer = (issuer: string): boolean =>
   issuer.includes(RSC_CLIENT_ROUTE_MODULE_QUERY_PREFIX);
@@ -42,12 +43,14 @@ export const resolveQuerylessRouteImportRequest = ({
   compilerName,
   context,
   issuer,
+  rsc = false,
   request,
   routeByFilePath,
 }: {
   compilerName?: string;
   context?: string;
   issuer?: string;
+  rsc?: boolean;
   request?: string;
   routeByFilePath: ReadonlyMap<string, Route>;
 }): string | undefined => {
@@ -67,7 +70,8 @@ export const resolveQuerylessRouteImportRequest = ({
   }
 
   const isRscClientIssuer = isRscClientRouteModuleIssuer(issuer);
-  if (compilerName !== 'web' && !isRscClientIssuer) {
+  const isWebCompiler = compilerName === 'web';
+  if (!rsc && !isWebCompiler && !isRscClientIssuer) {
     return;
   }
 
@@ -82,15 +86,22 @@ export const resolveQuerylessRouteImportRequest = ({
     return;
   }
 
+  if (!rsc && isWebCompiler) {
+    return `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`;
+  }
+
+  if (isWebCompiler || isRscClientIssuer) {
+    return `${routeFilePath}${RSC_SHARED_CLIENT_ROUTE_MODULE_QUERY}`;
+  }
+
   return `${routeFilePath}${
-    isRscClientIssuer
-      ? RSC_SHARED_CLIENT_ROUTE_MODULE_QUERY
-      : BUILD_CLIENT_ROUTE_QUERY_STRING
+    rsc ? RSC_SERVER_ROUTE_MODULE_QUERY : BUILD_CLIENT_ROUTE_QUERY_STRING
   }`;
 };
 
 export const createQuerylessRouteImportPlugin = (
-  routeByFilePath: ReadonlyMap<string, Route>
+  routeByFilePath: ReadonlyMap<string, Route>,
+  options: { rsc?: boolean } = {}
 ): QuerylessRouteImportPlugin => ({
   name: `${PLUGIN_NAME}:queryless-route-imports`,
   apply(compiler: Rspack.Compiler) {
@@ -101,6 +112,7 @@ export const createQuerylessRouteImportPlugin = (
           compilerName: compiler.options?.name,
           context: data?.context ?? data?.contextInfo?.issuer,
           issuer: data?.contextInfo?.issuer,
+          rsc: options.rsc,
           request: data?.request,
           routeByFilePath,
         });

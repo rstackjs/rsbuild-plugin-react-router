@@ -75,6 +75,12 @@ const escapeHtml = (value: string): string =>
 
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
 
+const isHdrRevisionFile = (file: string): boolean =>
+  file.includes('.react-router/hdr-revision.mjs');
+
+const isCssSourceFile = (file: string): boolean =>
+  /\.css(?:\.[cm]?[jt]s)?$/.test(file);
+
 export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
@@ -166,9 +172,8 @@ export const createReactRouterDevRuntimeController = ({
           if (
             result === 'committed' &&
             changes.node.known &&
-            (!changes.web.known || changes.web.files.size === 0) &&
             Array.from(changes.node.files).some(
-              file => !file.includes('.react-router/hdr-revision.mjs')
+              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
             )
           ) {
             onNodeRebuildCommitted?.();

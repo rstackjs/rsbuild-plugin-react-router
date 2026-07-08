@@ -200,4 +200,32 @@ describe('build output transforms', () => {
     expect(resourceQuery.not.test('?route-chunk=clientLoader')).toBe(true);
     expect(resourceQuery.not.test('')).toBe(false);
   });
+
+  it('composes main route chunk extraction with route module transformation explicitly', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness);
+
+    registerBuildOutputTransforms(options);
+
+    const routeChunkTransform = harness.transforms.find(
+      transform => String(transform.descriptor.resourceQuery) === String(/route-chunk=/)
+    );
+
+    await routeChunkTransform!.handler(
+      createTransformArgs(options.routePath, '?route-chunk=main')
+    );
+
+    const run = options.routeTransformExecutor.run;
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ kind: 'routeChunk' })
+    );
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        kind: 'routeModule',
+        code: 'routeChunk:export async function loader() {}',
+      })
+    );
+  });
 });

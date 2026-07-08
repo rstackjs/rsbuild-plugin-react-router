@@ -607,7 +607,7 @@ describe('React Router development runtime controller', () => {
     expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
   });
 
-  it('does not signal a separate node rebuild for paired web and node route changes', async () => {
+  it('signals a node rebuild for paired web and node route changes', async () => {
     const {
       callbacks,
       controller,
@@ -644,6 +644,48 @@ describe('React Router development runtime controller', () => {
 
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({
       marker: 'route-next',
+      assets: { version: 'web-next' },
+    });
+    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+  });
+
+  it('does not signal a node rebuild for paired CSS source changes', async () => {
+    const {
+      callbacks,
+      controller,
+      loadBundle,
+      onNodeRebuildCommitted,
+      server,
+    } = createHarness();
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const cssSourcePath = '/app/routes/page/styles.css.ts';
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    build = createBuild('css-next');
+    web.setChanges([cssSourcePath]);
+    node.setChanges([cssSourcePath]);
+    callbacks.before();
+    const nextWeb = web.compile();
+    controller.captureWeb(nextWeb, createManifestSet('web-next'));
+    web.complete(nextWeb);
+    const nextNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(nextWeb, nextNode) });
+
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'css-next',
       assets: { version: 'web-next' },
     });
     expect(onNodeRebuildCommitted).not.toHaveBeenCalled();

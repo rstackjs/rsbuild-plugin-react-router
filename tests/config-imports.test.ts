@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@rstest/core';
 import type { ModuleCache } from 'jiti';
 import {
+  applyConfigDefines,
   clearConfigImportCache,
   collectConfigImportWatchPaths,
 } from '../src/config-imports';
@@ -16,6 +17,40 @@ const createModuleCache = (paths: string[]): ModuleCache =>
   ) as ModuleCache;
 
 describe('config import helpers', () => {
+  it('applies rsbuild source.define values before importing config', () => {
+    expect(
+      applyConfigDefines(
+        'if (import.meta.env.VITE_ENV_ROUTE === "dotenv") route();',
+        {
+          'import.meta.env.VITE_ENV_ROUTE': '"dotenv"',
+        }
+      )
+    ).toBe('if ("dotenv" === "dotenv") route();');
+  });
+
+  it('does not apply source.define values inside non-expression text', () => {
+    expect(
+      applyConfigDefines(
+        [
+          'const text = "import.meta.env.VITE_ENV_ROUTE";',
+          'const config = { "import.meta.env.VITE_ENV_ROUTE": true };',
+          '// import.meta.env.VITE_ENV_ROUTE',
+          'if (import.meta.env.VITE_ENV_ROUTE === "dotenv") route();',
+        ].join('\n'),
+        {
+          'import.meta.env.VITE_ENV_ROUTE': '"dotenv"',
+        }
+      )
+    ).toBe(
+      [
+        'const text = "import.meta.env.VITE_ENV_ROUTE";',
+        'const config = { "import.meta.env.VITE_ENV_ROUTE": true };',
+        '// import.meta.env.VITE_ENV_ROUTE',
+        'if ("dotenv" === "dotenv") route();',
+      ].join('\n')
+    );
+  });
+
   it('collects local modules loaded while importing config', () => {
     const configPath = '/project/react-router.config.ts';
     const helperPath = '/project/config/server-bundles.ts';

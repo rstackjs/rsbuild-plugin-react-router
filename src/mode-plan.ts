@@ -202,15 +202,14 @@ const createRscModePlan = async ({
       modules: [resolve(rootPath, 'node_modules'), 'node_modules'],
       alias: createReactRouterRscResolveAliases(rootPath),
     }),
-    server:
-      !customServer && ssr
-        ? {
-            setup: createReactRouterRscDevServerSetup({
-              entryName: rscServerEntryName,
-              pluginName,
-            }),
-          }
-        : undefined,
+    server: !customServer
+      ? {
+          setup: createReactRouterRscDevServerSetup({
+            entryName: rscServerEntryName,
+            pluginName,
+          }),
+        }
+      : undefined,
     webExternalsType: undefined,
     webOutput: {
       chunkFormat: 'array-push',

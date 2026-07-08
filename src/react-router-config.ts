@@ -46,7 +46,7 @@ type FutureConfig = {
 type PrerenderConfig =
   | ReactRouterConfig['prerender']
   | ({
-      paths?: ReactRouterConfig['prerender'];
+      paths: ReactRouterConfig['prerender'];
       concurrency?: number;
       unstable_concurrency?: number;
     } & Record<string, unknown>)

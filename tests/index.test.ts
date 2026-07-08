@@ -408,6 +408,32 @@ describe('pluginReactRouter', () => {
     ).toBe(false);
   });
 
+  it('installs the RSC dev request handler for SPA mode', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true, ssr: false })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.server.setup).toBeDefined();
+  });
+
+  it('rejects RSC mode when legacy future SRI normalizes to unsupported SRI', async () => {
+    testGlobal.__reactRouterTestConfig = {
+      future: { unstable_subResourceIntegrity: true },
+    };
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+
+    await expect(rsbuild.unwrapConfig()).rejects.toThrow(
+      /subResourceIntegrity/
+    );
+  });
+
   it('exposes an explicit RSC plugin helper', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
@@ -688,6 +714,32 @@ describe('pluginReactRouter', () => {
       test({
         resource: '/project/vendor/react.tsx',
         nameForCondition: () => '/project/vendor/react.tsx',
+      })
+    ).toBe(false);
+  });
+
+  it('guards the RSC client hydration entry from lazy compilation in RSC mode', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: {
+          lazyCompilation: {
+            entries: true,
+            imports: true,
+            test: /entry\.rsc\.client/,
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+    const config = await rsbuild.unwrapConfig();
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
+    const rscClientEntry = config.environments.web.source.entry.index.import;
+
+    expect(
+      test({
+        resource: rscClientEntry,
+        nameForCondition: () => rscClientEntry,
       })
     ).toBe(false);
   });

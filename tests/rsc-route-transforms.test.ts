@@ -98,7 +98,6 @@ describe('RSC route transforms', () => {
         export async function clientLoader() {
           return null;
         }
-        clientLoader.hydrate = true;
         export const customExport = true;
         export default function Route() {
           return null;
@@ -114,7 +113,7 @@ describe('RSC route transforms', () => {
     });
 
     expect(result.code).toContain(
-      'export const clientLoader = async (...args) => import("/app/routes/client.tsx?client-route-module=route")'
+      'export const clientLoader = async (...args) => import("/app/routes/client.tsx?client-route-module=clientLoader")'
     );
     expect(result.code).toContain(
       'export { customExport } from "/app/routes/client.tsx?client-route-module=shared";'
@@ -125,6 +124,50 @@ describe('RSC route transforms', () => {
     expect(result.code).not.toContain(
       'clientLoader")}).then(mod => mod.clientLoader'
     );
+  });
+
+  it('keeps unsplittable RSC client route exports in the shared client module', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        const shared = true;
+        export async function clientLoader() {
+          return shared;
+        }
+        export default function Route() {
+          return shared ? null : null;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: false,
+      isDev: false,
+    });
+
+    expect(result.code).toContain(
+      'export const clientLoader = async (...args) => import("/app/routes/client.tsx?client-route-module=route")'
+    );
+    expect(result.code).toContain(
+      'export { default } from "/app/routes/client.tsx?client-route-module=route";'
+    );
+  });
+
+  it('notifies the RSC HMR runtime when route client modules update', async () => {
+    const result = await transformRscRouteModule({
+      code: 'export default function Route() { return null; }',
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=route',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: false,
+      isDev: true,
+    });
+
+    expect(result.code).toContain('import.meta.webpackHot.emit("rsc:update")');
   });
 
   it('groups RSC client route exports in one route client module', async () => {
@@ -157,7 +200,7 @@ describe('RSC route transforms', () => {
     expect(result.code).not.toContain('export const customExport = true');
   });
 
-  it('omits RSC client route exports from shared client route chunks', async () => {
+  it('keeps shared RSC route exports in shared client route chunks', async () => {
     const result = await transformRscRouteModule({
       code: `
         export async function loader() {
@@ -166,7 +209,6 @@ describe('RSC route transforms', () => {
         export async function clientLoader() {
           return null;
         }
-        clientLoader.hydrate = true;
         export const customExport = true;
         export default function Route() {
           return null;
