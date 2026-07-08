@@ -106,6 +106,18 @@ describe('getExportNamesAndExportAll', () => {
         exportNames: ['loader', 'default'],
         exportAllModules: [],
       });
+      await expect(
+        getExportNamesAndExportAll(
+          `
+            export const action = () => null;
+            export default function Route() { return <form />; }
+          `,
+          'routes/simple.tsx?react-router-route'
+        )
+      ).resolves.toEqual({
+        exportNames: ['action', 'default'],
+        exportAllModules: [],
+      });
       expect(transformCalls).toBe(0);
     } finally {
       rspack.experiments.swc.transformSync = originalTransform;

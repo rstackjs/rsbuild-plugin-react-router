@@ -35,6 +35,9 @@ const routeModuleAnalysisCache = new Map<
 
 const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
 
+const stripResourcePathQuery = (resourcePath: string): string =>
+  resourcePath.replace(/[?#].*$/, '');
+
 type TypeScriptParseLang = Extract<
   NonNullable<ParseOptions['lang']>,
   'ts' | 'tsx'
@@ -63,7 +66,10 @@ const getParseErrorMessage = (
 ): string => errors.map(error => error.message).join('\n');
 
 const parseProgram = (code: string, resourcePath?: string): ProgramNode => {
-  const lang = resourcePath ? langFromPath(resourcePath) : 'tsx';
+  const sourcePath = resourcePath
+    ? stripResourcePathQuery(resourcePath)
+    : undefined;
+  const lang = sourcePath ? langFromPath(sourcePath) : 'tsx';
   const result = parse(code, {
     sourceType: 'module',
     lang,
@@ -72,11 +78,11 @@ const parseProgram = (code: string, resourcePath?: string): ProgramNode => {
   if (errors.length === 0) {
     return getProgram(result);
   }
-  if (!resourcePath || (lang !== 'ts' && lang !== 'tsx')) {
+  if (!sourcePath || (lang !== 'ts' && lang !== 'tsx')) {
     throw new Error(getParseErrorMessage(errors));
   }
 
-  const normalizedCode = getExportAnalysisCode(code, resourcePath, lang);
+  const normalizedCode = getExportAnalysisCode(code, sourcePath, lang);
   const normalizedResult = parse(normalizedCode, {
     sourceType: 'module',
     lang: 'js',
@@ -92,7 +98,9 @@ const getExportInfoCacheKey = (
   code: string,
   resourcePath?: string
 ): string => {
-  const lang = resourcePath ? langFromPath(resourcePath) : 'inline';
+  const lang = resourcePath
+    ? langFromPath(stripResourcePathQuery(resourcePath))
+    : 'inline';
   return `${lang}\0${code}`;
 };
 
