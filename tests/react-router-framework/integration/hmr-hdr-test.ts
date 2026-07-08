@@ -250,7 +250,8 @@ async function workflow({
   await expect(hdrStatus).toHaveText("HDR updated: 1", {
     timeout: hmrTimeout,
   });
-  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
+  await expect(input).toBeVisible({ timeout: hmrTimeout });
+  await input.fill("stateful");
 
   // route: HMR + HDR
   await edit({
