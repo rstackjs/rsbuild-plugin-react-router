@@ -800,9 +800,20 @@ export const getRouteChunkCode: (
 ) => {
   const analysisCache = cache ?? new Map();
   if (chunkName === 'main') {
+    const exportDependencies = getExportDependencies(
+      code,
+      analysisCache,
+      cacheKey
+    );
+    const serverOnlyExports = Array.from(exportDependencies.keys()).filter(
+      exportName => SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName)
+    );
     return omitChunkedExports(
       code,
-      getChunkedExportNames(code, analysisCache, cacheKey),
+      [
+        ...getChunkedExportNames(code, analysisCache, cacheKey),
+        ...serverOnlyExports,
+      ],
       analysisCache,
       cacheKey
     );

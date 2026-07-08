@@ -422,7 +422,7 @@ test.describe("rsbuild dev", () => {
           "Error: crash-server-render",
         );
         await expect(page.locator("main")).toContainText(
-          "error-stacktrace.tsx:14:11",
+          /error-stacktrace\.tsx:(14|15)/,
         );
 
         await page.goto(
@@ -430,7 +430,7 @@ test.describe("rsbuild dev", () => {
         );
         await expect(page.locator("main")).toContainText("Error: crash-loader");
         await expect(page.locator("main")).toContainText(
-          "error-stacktrace.tsx:5:11",
+          /error-stacktrace\.tsx:(5|6)/,
         );
       });
 

@@ -681,22 +681,6 @@ export const pluginReactRouter = (
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
       const resolveConfig = modePlan.createResolveConfig(api.context.rootPath);
-      type SourceMapConfig =
-        | NonNullable<NonNullable<typeof config.output>['sourceMap']>
-        | undefined;
-      const hasConfiguredNodeJsSourceMap = (
-        sourceMap: SourceMapConfig
-      ): boolean =>
-        sourceMap === false ||
-        sourceMap === true ||
-        (typeof sourceMap === 'object' &&
-          sourceMap !== null &&
-          sourceMap.js !== undefined);
-      const hasConfiguredNodeSourceMap =
-        hasConfiguredNodeJsSourceMap(config.output?.sourceMap) ||
-        hasConfiguredNodeJsSourceMap(
-          config.environments?.node?.output?.sourceMap
-        );
 
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
@@ -784,13 +768,6 @@ export const pluginReactRouter = (
               entry: modePlan.nodeEntries,
             },
             output: {
-              ...(!isBuild && !hasConfiguredNodeSourceMap
-                ? {
-                    sourceMap: {
-                      js: 'inline-source-map',
-                    },
-                  }
-                : {}),
               distPath: {
                 root: resolve(buildDirectory, 'server'),
               },
@@ -826,6 +803,9 @@ export const pluginReactRouter = (
                 output: {
                   chunkFormat: resolvedServerOutput,
                   chunkLoading: nodeChunkLoading,
+                  devtoolModuleFilenameTemplate: '[absolute-resource-path]',
+                  devtoolFallbackModuleFilenameTemplate:
+                    '[absolute-resource-path]?[hash]',
                   workerChunkLoading: nodeChunkLoading,
                   wasmLoading: 'fetch',
                   module: resolvedServerOutput === 'module',

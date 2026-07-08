@@ -413,7 +413,7 @@ describe('route chunks', () => {
   });
 
   describe('generate route chunk code', () => {
-    it('omits chunkable client exports from the main chunk while retaining default and server exports', async () => {
+    it('omits chunkable client and server-only exports from the main chunk', async () => {
       const code = `
         import { json } from 'react-router';
         export async function action() { return json({}); }
@@ -429,7 +429,7 @@ describe('route chunks', () => {
         code
       );
 
-      await expectExports(chunk, ['default', 'action'], ['clientAction']);
+      await expectExports(chunk, ['default'], ['action', 'clientAction']);
     });
 
     it('returns main chunk code without analysis when no route chunk exports exist', async () => {

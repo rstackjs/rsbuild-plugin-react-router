@@ -253,6 +253,24 @@ describe('route artifact helpers', () => {
       expect(result).toEqual({ code: expectedCode, map: null });
     });
 
+    it('omits server-only exports and imports from main route chunks', async () => {
+      const result = await createRouteChunk(
+        `
+          import { clientValue } from '../client-data.client';
+          import { serverValue } from '../server-data.server';
+          export async function loader() { return serverValue; }
+          export async function clientLoader() { return clientValue; }
+          export default function Route() { return null; }
+        `,
+        'main'
+      );
+
+      expect(result.code).not.toContain('server-data.server');
+      expect(result.code).not.toContain('loader');
+      expect(result.code).not.toContain('clientLoader');
+      expect(result.code).toContain('function Route');
+    });
+
     it('generates route chunks through the Effect API', async () => {
       const source = `
         export const clientAction = async () => {};

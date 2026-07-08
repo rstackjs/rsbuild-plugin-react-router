@@ -759,6 +759,12 @@ describe('pluginReactRouter', () => {
     const nodeConfig = config.environments?.node?.tools?.rspack;
     expect(nodeConfig.externals).toContain('express');
     expect(nodeConfig.experiments.outputModule).toBe(true);
+    expect(nodeConfig.output.devtoolModuleFilenameTemplate).toBe(
+      '[absolute-resource-path]'
+    );
+    expect(nodeConfig.output.devtoolFallbackModuleFilenameTemplate).toBe(
+      '[absolute-resource-path]?[hash]'
+    );
   });
 
   it('should apply the resolved development compiler dependency policy', async () => {
