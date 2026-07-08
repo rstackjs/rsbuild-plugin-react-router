@@ -629,14 +629,16 @@ export const test = base.extend<Fixtures>({
   },
   // eslint-disable-next-line no-empty-pattern
   dev: async ({}, use) => {
-    let stop: (() => unknown) | undefined;
+    let stops: Array<() => unknown> = [];
     await use(async (files, template) => {
       let port = await getPort();
       let cwd = await createProject(await files({ port }), template);
-      stop = await dev({ cwd, port });
+      stops.push(await dev({ cwd, port }));
       return { port, cwd };
     });
-    await stop?.();
+    for (let stop of stops.reverse()) {
+      await stop();
+    }
   },
   // eslint-disable-next-line no-empty-pattern
   customDev: async ({}, use) => {

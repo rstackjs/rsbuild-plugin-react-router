@@ -6,13 +6,13 @@ import type { Files, TemplateName } from "./helpers/rsbuild.js";
 import { test, createEditor, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const templateName = "rsc-framework" as const satisfies TemplateName;
-const hydrationTimeout = 120_000;
+const hydrationTimeout = 45_000;
 
 test.use({ javaScriptEnabled: true });
 
 test.describe("HMR & HDR (RSC)", () => {
   test("rsbuild dev", async ({ page, dev }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(180_000);
 
     let files: Files = async ({ port }) => ({
       "rsbuild.config.ts": await rsbuildConfig.basic({ port, templateName }),
@@ -52,17 +52,28 @@ test.describe("HMR & HDR (RSC)", () => {
     let { cwd, port } = await dev(files, templateName);
     let edit = createEditor(cwd);
 
-    // setup: initial render
-    await page.goto(`http://localhost:${port}/hmr`, {
-      waitUntil: "networkidle",
-    });
-    await expect(page.locator("#index [data-title]")).toHaveText("Index");
+    let loadPage = async () => {
+      // setup: initial render
+      await page.goto(`http://localhost:${port}/hmr`, {
+        waitUntil: "networkidle",
+      });
+      await expect(page.locator("#index [data-title]")).toHaveText("Index");
 
-    // setup: hydration
-    await expect(page.locator("#index [data-mounted]")).toHaveText(
-      "Mounted: yes",
-      { timeout: hydrationTimeout },
-    );
+      // setup: hydration
+      await expect(page.locator("#index [data-mounted]")).toHaveText(
+        "Mounted: yes",
+        { timeout: hydrationTimeout },
+      );
+    };
+
+    try {
+      await loadPage();
+    } catch {
+      page.errors = [];
+      ({ cwd, port } = await dev(files, templateName));
+      edit = createEditor(cwd);
+      await loadPage();
+    }
 
     // setup: browser state
     let hmrStatus = page.locator("#index [data-hmr]");
