@@ -1,0 +1,116 @@
+name: Canary Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or SHA to publish from'
+        required: true
+        default: 'main'
+        type: string
+      npm_tag:
+        description: 'npm dist-tag to publish under'
+        required: true
+        default: 'next'
+        type: string
+      snapshot_tag:
+        description: 'Changesets snapshot identifier'
+        required: true
+        default: 'canary'
+        type: string
+      confirm:
+        description: 'I understand this publishes to npm'
+        required: true
+        default: false
+        type: boolean
+
+concurrency: ${{ github.workflow }}-${{ inputs.ref }}-${{ inputs.npm_tag }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish canary to npm
+    runs-on: ubuntu-latest
+    if: ${{ inputs.confirm }}
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org/'
+          package-manager-cache: false
+
+      - name: Setup npm for Trusted Publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release inputs
+        env:
+          NPM_TAG: ${{ inputs.npm_tag }}
+          SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "$NPM_TAG" = "latest" ]; then
+            echo "Refusing to publish a canary release to the latest dist-tag."
+            exit 1
+          fi
+
+          if ! [[ "$NPM_TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "npm_tag must contain only letters, numbers, dots, underscores, or hyphens."
+            exit 1
+          fi
+
+          if ! [[ "$SNAPSHOT_TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "snapshot_tag must contain only letters, numbers, dots, underscores, or hyphens."
+            exit 1
+          fi
+
+      - name: Create snapshot version
+        env:
+          SNAPSHOT_TAG: ${{ inputs.snapshot_tag }}
+        run: |
+          set -euo pipefail
+
+          cat > .changeset/manual-canary-release.md <<'CHANGESET'
+          ---
+          "rsbuild-plugin-react-router": patch
+          ---
+
+          Manual npm canary release.
+          CHANGESET
+
+          pnpm exec changeset version --snapshot "$SNAPSHOT_TAG"
+
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" != *"-"* ]]; then
+            echo "Snapshot version guard failed; refusing to publish stable version $VERSION."
+            exit 1
+          fi
+
+          echo "Publishing snapshot version $VERSION"
+
+      - name: Build Project
+        run: pnpm build
+
+      - name: Publish canary to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ inputs.npm_tag }}
+        run: pnpm exec changeset publish --no-git-tag --tag "$NPM_TAG"
