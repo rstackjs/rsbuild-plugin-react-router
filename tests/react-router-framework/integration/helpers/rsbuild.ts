@@ -23,6 +23,7 @@ import {
 } from "./rsbuild-adapter.js";
 import {
   assertResourceGuardrail,
+  getActiveResourceCounts,
   withFrameworkTestRunEnv,
 } from "./test-resource-guard.js";
 
@@ -703,6 +704,11 @@ function node(
     }),
     stdio: "pipe",
     detached: platform() !== "win32",
+  });
+  assertResourceGuardrail({
+    counts: getActiveResourceCounts({
+      ownedPids: proc.pid === undefined ? undefined : [proc.pid],
+    }),
   });
   return proc;
 }

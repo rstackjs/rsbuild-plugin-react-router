@@ -213,6 +213,16 @@ const sourceRoot = path.resolve(
 );
 const normalizeOnly = process.argv.includes('--normalize-only');
 const updatePin = process.argv.includes('--update-pin');
+
+const toCorpusRelativePath = (root, absolutePath) =>
+  path.relative(root, absolutePath).split(path.sep).join('/');
+
+const isPreservedCorpusPath = relativePath =>
+  preservedCorpusPaths.some(
+    preservedPath =>
+      relativePath === preservedPath ||
+      relativePath.startsWith(`${preservedPath}/`)
+  );
 const targetRoot = path.join(repoRoot, 'tests/react-router-framework');
 const manifestPath = path.join(targetRoot, 'UPSTREAM.json');
 const scratchRoot = path.join(
@@ -343,7 +353,46 @@ const replaceCorpusFromStage = async () => {
     await rename(backupRoot, targetRoot);
     throw error;
   }
+  await moveLocalCorpusDirs(backupRoot, targetRoot);
   await rm(backupRoot, { force: true, recursive: true });
+};
+
+const copyCorpusTree = async (from, to) => {
+  await mkdir(to, { recursive: true });
+  const entries = await readdir(from, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === '.tmp') {
+      continue;
+    }
+    const sourcePath = path.join(from, entry.name);
+    const targetPath = path.join(to, entry.name);
+    if (entry.isDirectory()) {
+      await copyCorpusTree(sourcePath, targetPath);
+    } else {
+      await cp(sourcePath, targetPath, { force: true, recursive: true });
+    }
+  }
+};
+
+const moveLocalCorpusDirs = async (from, to) => {
+  if (!existsSync(from)) {
+    return;
+  }
+  const entries = await readdir(from, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const sourcePath = path.join(from, entry.name);
+    const targetPath = path.join(to, entry.name);
+    if (entry.name === 'node_modules' || entry.name === '.tmp') {
+      await mkdir(path.dirname(targetPath), { recursive: true });
+      await rm(targetPath, { force: true, recursive: true });
+      await rename(sourcePath, targetPath);
+      continue;
+    }
+    await moveLocalCorpusDirs(sourcePath, targetPath);
+  }
 };
 
 const findFiles = async (directory, predicate) => {
@@ -521,6 +570,13 @@ if (!normalizeOnly) {
     stagedTargetRoot,
     name => name === 'package.json'
   )) {
+    if (
+      isPreservedCorpusPath(
+        toCorpusRelativePath(stagedTargetRoot, packageJsonPath)
+      )
+    ) {
+      continue;
+    }
     await normalizePackageJson(packageJsonPath);
   }
   await replaceCorpusFromStage();
@@ -554,12 +610,23 @@ if (!normalizeOnly) {
   }
   await rm(scratchRoot, { force: true, recursive: true });
 } else {
+  await rm(scratchRoot, { force: true, recursive: true });
+  await copyCorpusTree(targetRoot, stagedTargetRoot);
   for (const packageJsonPath of await findFiles(
-    targetRoot,
+    stagedTargetRoot,
     name => name === 'package.json'
   )) {
+    if (
+      isPreservedCorpusPath(
+        toCorpusRelativePath(stagedTargetRoot, packageJsonPath)
+      )
+    ) {
+      continue;
+    }
     await normalizePackageJson(packageJsonPath);
   }
+  await replaceCorpusFromStage();
+  await rm(scratchRoot, { force: true, recursive: true });
   console.log(
     `Normalized React Router framework test package manifests in ${targetRoot}`
   );

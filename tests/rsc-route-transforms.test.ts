@@ -200,6 +200,36 @@ describe('RSC route transforms', () => {
     expect(result.code).not.toContain('export const customExport = true');
   });
 
+  it('keeps exported shared dependencies in unsplittable route client chunks', async () => {
+    const result = await transformRscRouteModule({
+      code: `
+        export const shared = true;
+        export async function loader() {
+          return null;
+        }
+        export async function clientLoader() {
+          return shared;
+        }
+        export default function Route() {
+          return shared ? null : null;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=route',
+      isRootRoute: false,
+      routeId: 'routes/client',
+      routeChunkCache: new Map(),
+      routeChunkConfig,
+      isServerEnvironment: false,
+      isDev: false,
+    });
+
+    expect(result.code).toContain('const shared = true;');
+    expect(result.code).toContain('export async function clientLoader()');
+    expect(result.code).toContain('export default function Route()');
+    expect(result.code).not.toContain('export async function loader()');
+  });
+
   it('keeps shared RSC route exports in shared client route chunks', async () => {
     const result = await transformRscRouteModule({
       code: `

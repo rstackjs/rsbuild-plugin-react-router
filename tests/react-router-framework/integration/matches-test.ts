@@ -96,60 +96,53 @@ test.describe("useMatches", () => {
 
   test("grabs the handle from the route module cache", async ({ page }) => {
     let app = new PlaywrightFixture(appFixture, page);
+    const readMatches = async () =>
+      JSON.parse(await page.locator("#matches").innerText());
+    const indexMatches = [
+      {
+        id: "root",
+        pathname: "/",
+        params: {},
+        loaderData: "ROOT",
+        handle: { stuff: "root handle" },
+      },
+      {
+        id: "routes/_index",
+        pathname: "/",
+        params: {},
+        loaderData: "INDEX",
+        handle: { stuff: "index handle" },
+      },
+    ];
+    const aboutMatches = [
+      {
+        id: "root",
+        pathname: "/",
+        params: {},
+        loaderData: "ROOT",
+        handle: { stuff: "root handle" },
+      },
+      {
+        id: "routes/about",
+        pathname: "/about",
+        params: {},
+        loaderData: "ABOUT",
+        handle: { stuff: "about handle" },
+      },
+    ];
+
     await app.goto("/");
 
     // Wait for effect
     await page.waitForSelector("#matches-count-root");
     expect(await app.getHtml("#matches-count-root")).toMatch(">1<");
     expect(await app.getHtml()).toMatch("Index Page");
-    expect(await app.getHtml("#matches")).toEqual(`<pre id="matches">
-[
-  {
-    "id": "root",
-    "pathname": "/",
-    "params": {},
-    "loaderData": "ROOT",
-    "handle": {
-      "stuff": "root handle"
-    }
-  },
-  {
-    "id": "routes/_index",
-    "pathname": "/",
-    "params": {},
-    "loaderData": "INDEX",
-    "handle": {
-      "stuff": "index handle"
-    }
-  }
-]</pre
->`);
+    expect(await readMatches()).toEqual(indexMatches);
 
     // Click and don't wait so we can assert _during_ the navigation that we're
     // still showing the index matches and we haven't triggered a new effect
     await app.clickLink("/about", { wait: false });
-    expect(await app.getHtml("#matches")).toEqual(`<pre id="matches">
-[
-  {
-    "id": "root",
-    "pathname": "/",
-    "params": {},
-    "loaderData": "ROOT",
-    "handle": {
-      "stuff": "root handle"
-    }
-  },
-  {
-    "id": "routes/_index",
-    "pathname": "/",
-    "params": {},
-    "loaderData": "INDEX",
-    "handle": {
-      "stuff": "index handle"
-    }
-  }
-]</pre
->`);
+    expect(await readMatches()).toEqual(indexMatches);
     expect(await app.getHtml("#matches-count-root")).toMatch(">1<");
 
     // Once the new page shows up we should get update dmatches and a single
@@ -157,28 +150,7 @@ test.describe("useMatches", () => {
     await page.waitForSelector("#about");
     expect(await app.getHtml()).toMatch("About Page");
     expect(await app.getHtml("#matches-count-root")).toMatch(">2<");
-    expect(await app.getHtml("#matches")).toEqual(`<pre id="matches">
-[
-  {
-    "id": "root",
-    "pathname": "/",
-    "params": {},
-    "loaderData": "ROOT",
-    "handle": {
-      "stuff": "root handle"
-    }
-  },
-  {
-    "id": "routes/about",
-    "pathname": "/about",
-    "params": {},
-    "loaderData": "ABOUT",
-    "handle": {
-      "stuff": "about handle"
-    }
-  }
-]</pre
->`);
+    expect(await readMatches()).toEqual(aboutMatches);
   });
 
   test("memoizes matches from react router", async ({ page }) => {

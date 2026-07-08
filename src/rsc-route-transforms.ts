@@ -3,8 +3,17 @@ import { dirname } from 'pathe';
 import { generate, parse } from './yuku.js';
 import { CLIENT_NON_COMPONENT_EXPORTS } from './constants.js';
 import { getExportNames } from './export-utils.js';
-import { getProgram, type AnyNode } from './route-ast.js';
-import { removeExports, removeUnusedImports } from './route-export-pruning.js';
+import {
+  getExportedName,
+  getPatternIdentifierNames,
+  getProgram,
+  type AnyNode,
+} from './route-ast.js';
+import {
+  collectReferencedNames,
+  removeExports,
+  removeUnusedImports,
+} from './route-export-pruning.js';
 import { resolveQuerylessRouteImportRequest } from './route-imports.js';
 import {
   createEmptyRouteChunkByExportName,
@@ -211,6 +220,170 @@ const getRouteChunkValidation = (
   ) as Record<RouteChunkExportName, boolean>;
 };
 
+const createExportReferenceMap = (program: ReturnType<typeof getProgram>) => {
+  const referencesByExportName = new Map<string, Set<string>>();
+  const addReferences = (exportName: string, node: AnyNode) => {
+    referencesByExportName.set(exportName, collectReferencedNames(node));
+  };
+
+  for (const statement of program.body ?? []) {
+    if (statement.type === 'ExportDefaultDeclaration') {
+      addReferences('default', statement);
+      continue;
+    }
+
+    if (statement.type !== 'ExportNamedDeclaration') {
+      continue;
+    }
+
+    for (const specifier of statement.specifiers ?? []) {
+      if (specifier.type !== 'ExportSpecifier') {
+        continue;
+      }
+      const exportedName = getExportedName(specifier);
+      if (exportedName) {
+        addReferences(exportedName, specifier);
+      }
+    }
+
+    const declaration = statement.declaration;
+    if (declaration?.type === 'VariableDeclaration') {
+      for (const declarator of declaration.declarations ?? []) {
+        for (const name of getPatternIdentifierNames(declarator.id)) {
+          addReferences(name, declarator);
+        }
+      }
+      continue;
+    }
+
+    if (
+      (declaration?.type === 'FunctionDeclaration' ||
+        declaration?.type === 'ClassDeclaration') &&
+      declaration.id?.name
+    ) {
+      addReferences(declaration.id.name, declaration);
+    }
+  }
+
+  return referencesByExportName;
+};
+
+const collectRouteClientDependencyExports = (
+  program: ReturnType<typeof getProgram>,
+  plan: RscRouteExportPlan
+): Set<string> => {
+  const referencesByExportName = createExportReferenceMap(program);
+  const dependencyExports = new Set<string>();
+  const pending: string[] = [];
+
+  for (const exportName of plan.exportNames) {
+    if (isClientRouteExport(exportName)) {
+      pending.push(...(referencesByExportName.get(exportName) ?? []));
+    }
+  }
+
+  while (pending.length > 0) {
+    const exportName = pending.pop();
+    if (
+      !exportName ||
+      dependencyExports.has(exportName) ||
+      isClientRouteExport(exportName) ||
+      isServerRouteExport(exportName)
+    ) {
+      continue;
+    }
+
+    const references = referencesByExportName.get(exportName);
+    if (!references) {
+      continue;
+    }
+
+    dependencyExports.add(exportName);
+    pending.push(...references);
+  }
+
+  return dependencyExports;
+};
+
+const stripPreservedDependencyExports = (
+  program: ReturnType<typeof getProgram>,
+  dependencyExports: ReadonlySet<string>
+): void => {
+  if (dependencyExports.size === 0) {
+    return;
+  }
+
+  for (let index = 0; index < program.body.length; index += 1) {
+    const statement = program.body[index];
+    if (statement.type !== 'ExportNamedDeclaration') {
+      continue;
+    }
+
+    if (statement.specifiers?.length) {
+      statement.specifiers = statement.specifiers.filter(
+        (specifier: AnyNode) => {
+          const exportedName =
+            specifier.type === 'ExportSpecifier'
+              ? getExportedName(specifier)
+              : null;
+          return !exportedName || !dependencyExports.has(exportedName);
+        }
+      );
+      if (statement.specifiers.length === 0 && !statement.declaration) {
+        program.body.splice(index, 1);
+        index -= 1;
+        continue;
+      }
+    }
+
+    const declaration = statement.declaration;
+    if (declaration?.type === 'VariableDeclaration') {
+      const preservedDeclarations: AnyNode[] = [];
+      const exportedDeclarations: AnyNode[] = [];
+      for (const declarator of declaration.declarations ?? []) {
+        const names = getPatternIdentifierNames(declarator.id);
+        if ([...names].some(name => dependencyExports.has(name))) {
+          preservedDeclarations.push(declarator);
+        } else {
+          exportedDeclarations.push(declarator);
+        }
+      }
+
+      if (preservedDeclarations.length === 0) {
+        continue;
+      }
+
+      const localDeclaration = {
+        ...declaration,
+        declarations: preservedDeclarations,
+      };
+      if (exportedDeclarations.length === 0) {
+        program.body[index] = localDeclaration;
+        continue;
+      }
+
+      program.body.splice(index, 1, localDeclaration, {
+        ...statement,
+        declaration: {
+          ...declaration,
+          declarations: exportedDeclarations,
+        },
+      });
+      index += 1;
+      continue;
+    }
+
+    if (
+      (declaration?.type === 'FunctionDeclaration' ||
+        declaration?.type === 'ClassDeclaration') &&
+      declaration.id?.name &&
+      dependencyExports.has(declaration.id.name)
+    ) {
+      program.body[index] = declaration;
+    }
+  }
+};
+
 const validateRouteModuleExports = (exportNames: readonly string[]): void => {
   const exported = new Set(exportNames);
   const errors: string[] = [];
@@ -395,7 +568,14 @@ const createClientRouteModule = async (
   options: RscRouteTransformOptions
 ): Promise<RscRouteTransformResult> => {
   const ast = parse(code, { sourceType: 'module' });
+  const program = getProgram(ast);
   const plan = await createRscRouteExportPlan(options);
+  if (clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK) {
+    stripPreservedDependencyExports(
+      program,
+      collectRouteClientDependencyExports(program, plan)
+    );
+  }
   const exportsToRemove =
     clientRouteChunk === 'shared'
       ? [...SERVER_ROUTE_EXPORTS, ...CLIENT_ROUTE_EXPORTS]
