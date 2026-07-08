@@ -239,6 +239,11 @@ describe('modify browser manifest plugin', () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-modify-manifest-'));
     const appDir = join(root, 'app');
     const routeFile = join(appDir, 'routes/dollar.tsx');
+    const specialRouteIds = [
+      'routes/dollar$',
+      'routes/match$&',
+      'routes/literal$$',
+    ] as const;
     mkdirSync(join(appDir, 'routes'), { recursive: true });
     writeFileSync(
       join(appDir, 'root.tsx'),
@@ -259,7 +264,10 @@ describe('modify browser manifest plugin', () => {
       [
         ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
         ['root', { files: new Set(['static/js/root.js']) }],
-        ['routes/dollar$', { files: new Set(['static/js/dollar.js']) }],
+        ...specialRouteIds.map((routeId, index) => [
+          routeId,
+          { files: new Set([`static/js/special-${index}.js`]) },
+        ]),
       ],
       assets
     );
@@ -269,12 +277,17 @@ describe('modify browser manifest plugin', () => {
         harness.api as never,
         {
           root: rootRoute,
-          'routes/dollar$': {
-            id: 'routes/dollar$',
-            parentId: 'root',
-            file: 'routes/dollar.tsx',
-            path: 'dollar',
-          },
+          ...Object.fromEntries(
+            specialRouteIds.map((routeId, index) => [
+              routeId,
+              {
+                id: routeId,
+                parentId: 'root',
+                file: 'routes/dollar.tsx',
+                path: `special-${index}`,
+              },
+            ])
+          ),
         },
         {},
         appDir
@@ -283,7 +296,10 @@ describe('modify browser manifest plugin', () => {
       await harness.run({ assets, compilation });
 
       const source = assets[BROWSER_MANIFEST_PATH].source();
-      expect(source).toContain("'routes/dollar$'");
+      for (const routeId of specialRouteIds) {
+        expect(source).toContain(`'${routeId}'`);
+      }
+      expect(source).not.toContain('PLACEHOLDER');
       expect(source.match(/window\.afterPlaceholder=true/g)).toHaveLength(1);
     } finally {
       rmSync(root, { recursive: true, force: true });

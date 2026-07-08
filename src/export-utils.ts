@@ -35,27 +35,57 @@ const routeModuleAnalysisCache = new Map<
 
 const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
 
+type TypeScriptParseLang = Extract<
+  NonNullable<ParseOptions['lang']>,
+  'ts' | 'tsx'
+>;
+
 const getExportAnalysisCode = (
   code: string,
-  resourcePath?: string
-): { code: string; lang: NonNullable<ParseOptions['lang']> } => {
+  resourcePath: string,
+  lang: TypeScriptParseLang
+): string =>
+  rspack.experiments.swc.transformSync(code, {
+    filename: resourcePath,
+    jsc: {
+      parser: {
+        syntax: 'typescript',
+        tsx: lang === 'tsx',
+      },
+    },
+  }).code;
+
+const getParseErrors = (result: ReturnType<typeof parse>) =>
+  result.diagnostics.filter(diagnostic => diagnostic.severity === 'error');
+
+const getParseErrorMessage = (
+  errors: ReturnType<typeof getParseErrors>
+): string => errors.map(error => error.message).join('\n');
+
+const parseProgram = (code: string, resourcePath?: string): ProgramNode => {
   const lang = resourcePath ? langFromPath(resourcePath) : 'tsx';
+  const result = parse(code, {
+    sourceType: 'module',
+    lang,
+  });
+  const errors = getParseErrors(result);
+  if (errors.length === 0) {
+    return getProgram(result);
+  }
   if (!resourcePath || (lang !== 'ts' && lang !== 'tsx')) {
-    return { code, lang };
+    throw new Error(getParseErrorMessage(errors));
   }
 
-  return {
-    code: rspack.experiments.swc.transformSync(code, {
-      filename: resourcePath,
-      jsc: {
-        parser: {
-          syntax: 'typescript',
-          tsx: lang === 'tsx',
-        },
-      },
-    }).code,
+  const normalizedCode = getExportAnalysisCode(code, resourcePath, lang);
+  const normalizedResult = parse(normalizedCode, {
+    sourceType: 'module',
     lang: 'js',
-  };
+  });
+  const normalizedErrors = getParseErrors(normalizedResult);
+  if (normalizedErrors.length > 0) {
+    throw new Error(getParseErrorMessage(normalizedErrors));
+  }
+  return getProgram(normalizedResult);
 };
 
 const getExportInfoCacheKey = (
@@ -74,21 +104,6 @@ const cachePromiseOnReject = <T>(
     invalidate();
     throw error;
   });
-
-const parseProgram = (code: string, resourcePath?: string): ProgramNode => {
-  const analysis = getExportAnalysisCode(code, resourcePath);
-  const result = parse(analysis.code, {
-    sourceType: 'module',
-    lang: analysis.lang,
-  });
-  const errors = result.diagnostics.filter(
-    diagnostic => diagnostic.severity === 'error'
-  );
-  if (errors.length > 0) {
-    throw new Error(errors.map(error => error.message).join('\n'));
-  }
-  return getProgram(result);
-};
 
 const isTypeOnlyExport = (node: AnyNode): boolean =>
   node.exportKind === 'type' ||

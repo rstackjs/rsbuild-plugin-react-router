@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
+import { rspack } from '@rsbuild/core';
 import { getExportNamesAndExportAll } from '../src/export-utils';
 
 describe('getExportNamesAndExportAll', () => {
@@ -46,6 +47,57 @@ describe('getExportNamesAndExportAll', () => {
       exportNames: ['default'],
       exportAllModules: [],
     });
+  });
+
+  it('collects exports when route TSX contains typed arrows in conditional JSX data', async () => {
+    await expect(
+      getExportNamesAndExportAll(
+        `
+          const ok = true;
+          const values: unknown[] = [];
+          export const clientLoader = () =>
+            ok
+              ? values.filter((value): value is string => Boolean(value))
+              : [];
+          export default function Route() {
+            return <main>{clientLoader().map(value => <span key={value}>{value}</span>)}</main>;
+          }
+        `,
+        'routes/page.tsx'
+      )
+    ).resolves.toEqual({
+      exportNames: ['clientLoader', 'default'],
+      exportAllModules: [],
+    });
+  });
+
+  it('uses Yuku directly when route TypeScript parses without normalization', async () => {
+    const originalTransform = rspack.experiments.swc.transformSync;
+    let transformCalls = 0;
+    try {
+      rspack.experiments.swc.transformSync = ((
+        ...args: Parameters<typeof originalTransform>
+      ) => {
+        transformCalls += 1;
+        return originalTransform(...args);
+      }) as typeof originalTransform;
+
+      await expect(
+        getExportNamesAndExportAll(
+          `
+            export const loader = () => null;
+            export default function Route() { return null; }
+          `,
+          'routes/simple.ts'
+        )
+      ).resolves.toEqual({
+        exportNames: ['loader', 'default'],
+        exportAllModules: [],
+      });
+      expect(transformCalls).toBe(0);
+    } finally {
+      rspack.experiments.swc.transformSync = originalTransform;
+    }
   });
 
   it('ignores erased default interfaces', async () => {
