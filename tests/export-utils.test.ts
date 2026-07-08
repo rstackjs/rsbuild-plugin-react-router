@@ -29,6 +29,25 @@ describe('getExportNamesAndExportAll', () => {
     });
   });
 
+  it('collects exports when route TypeScript contains typed arrows in conditionals', async () => {
+    await expect(
+      getExportNamesAndExportAll(
+        `
+          const ok = true;
+          const values: unknown[] = [];
+          ok
+            ? values.filter((value): value is string => Boolean(value))
+            : [];
+          export default function Route() { return null; }
+        `,
+        'routes/page.tsx'
+      )
+    ).resolves.toEqual({
+      exportNames: ['default'],
+      exportAllModules: [],
+    });
+  });
+
   it('ignores erased default interfaces', async () => {
     await expect(
       getExportNamesAndExportAll(

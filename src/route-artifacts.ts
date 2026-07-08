@@ -92,7 +92,7 @@ export const createRouteClientEntryArtifact = async ({
       )
     : null;
   const exportNames =
-    routeChunkInfo?.exportNames ?? (await getExportNames(code));
+    routeChunkInfo?.exportNames ?? (await getExportNames(code, resourcePath));
   const chunkedExports = routeChunkInfo?.chunkedExports ?? [];
   return {
     code: buildRouteClientEntryCode({
@@ -140,7 +140,7 @@ export const createRouteChunkArtifact = async ({
   );
 
   if (splitRouteModules === 'enforce' && chunkName === 'main' && chunk) {
-    const exportNames = await getExportNames(chunk);
+    const exportNames = await getExportNames(chunk, resourcePath);
     validateRouteChunks({
       config: routeChunkConfig,
       id: resourcePath,

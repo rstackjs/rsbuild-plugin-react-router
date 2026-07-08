@@ -1,5 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
-import { langFromPath, parse } from 'yuku-parser';
+import { rspack } from '@rsbuild/core';
+import { langFromPath, parse, type ParseOptions } from 'yuku-parser';
 import { setBoundedCacheEntry } from './bounded-cache.js';
 import {
   getExportedName,
@@ -34,6 +35,37 @@ const routeModuleAnalysisCache = new Map<
 
 const MAX_EXPORT_UTILS_CACHE_ENTRIES = 2048;
 
+const getExportAnalysisCode = (
+  code: string,
+  resourcePath?: string
+): { code: string; lang: NonNullable<ParseOptions['lang']> } => {
+  const lang = resourcePath ? langFromPath(resourcePath) : 'tsx';
+  if (!resourcePath || (lang !== 'ts' && lang !== 'tsx')) {
+    return { code, lang };
+  }
+
+  return {
+    code: rspack.experiments.swc.transformSync(code, {
+      filename: resourcePath,
+      jsc: {
+        parser: {
+          syntax: 'typescript',
+          tsx: lang === 'tsx',
+        },
+      },
+    }).code,
+    lang: 'js',
+  };
+};
+
+const getExportInfoCacheKey = (
+  code: string,
+  resourcePath?: string
+): string => {
+  const lang = resourcePath ? langFromPath(resourcePath) : 'inline';
+  return `${lang}\0${code}`;
+};
+
 const cachePromiseOnReject = <T>(
   promise: Promise<T>,
   invalidate: () => void
@@ -44,9 +76,10 @@ const cachePromiseOnReject = <T>(
   });
 
 const parseProgram = (code: string, resourcePath?: string): ProgramNode => {
-  const result = parse(code, {
+  const analysis = getExportAnalysisCode(code, resourcePath);
+  const result = parse(analysis.code, {
     sourceType: 'module',
-    lang: resourcePath ? langFromPath(resourcePath) : 'tsx',
+    lang: analysis.lang,
   });
   const errors = result.diagnostics.filter(
     diagnostic => diagnostic.severity === 'error'
@@ -140,21 +173,24 @@ const collectExportAllModules = (program: AnyNode): string[] => {
 };
 
 export const getExportNames = async (
-  code: string
+  code: string,
+  resourcePath?: string
 ): Promise<readonly string[]> => {
-  return (await getExportNamesAndExportAll(code)).exportNames;
+  return (await getExportNamesAndExportAll(code, resourcePath)).exportNames;
 };
 
 export const getExportNamesAndExportAll = async (
-  code: string
+  code: string,
+  resourcePath?: string
 ): Promise<ExportInfo> => {
-  const cached = exportInfoCache.get(code);
+  const cacheKey = getExportInfoCacheKey(code, resourcePath);
+  const cached = exportInfoCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
   const exportInfo = (async () => {
-    const program = parseProgram(code);
+    const program = parseProgram(code, resourcePath);
     return {
       exportNames: collectProgramExportNames(program),
       exportAllModules: collectExportAllModules(program),
@@ -163,14 +199,14 @@ export const getExportNamesAndExportAll = async (
 
   let trackedExportInfo: Promise<ExportInfo>;
   trackedExportInfo = cachePromiseOnReject(exportInfo, () => {
-    if (exportInfoCache.get(code) === trackedExportInfo) {
-      exportInfoCache.delete(code);
+    if (exportInfoCache.get(cacheKey) === trackedExportInfo) {
+      exportInfoCache.delete(cacheKey);
     }
   });
 
   setBoundedCacheEntry(
     exportInfoCache,
-    code,
+    cacheKey,
     trackedExportInfo,
     MAX_EXPORT_UTILS_CACHE_ENTRIES
   );

@@ -163,9 +163,10 @@ export function registerModifyBrowserManifestAssets(
       const browserManifestAsset = assets[BROWSER_MANIFEST_ASSET];
       if (browserManifestAsset) {
         const originalSource = browserManifestAsset.source().toString();
+        const serializedManifest = jsesc(manifestForBrowser, { es6: true });
         const newSource = originalSource.replace(
           /["'`]PLACEHOLDER["'`]/,
-          jsesc(manifestForBrowser, { es6: true })
+          () => serializedManifest
         );
         compilation.updateAsset(
           BROWSER_MANIFEST_ASSET,

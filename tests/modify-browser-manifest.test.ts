@@ -235,6 +235,61 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
+  it('treats serialized browser manifest values as literal replacement text', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-modify-manifest-'));
+    const appDir = join(root, 'app');
+    const routeFile = join(appDir, 'routes/dollar.tsx');
+    mkdirSync(join(appDir, 'routes'), { recursive: true });
+    writeFileSync(
+      join(appDir, 'root.tsx'),
+      `export default function Root() { return null; }`
+    );
+    writeFileSync(
+      routeFile,
+      `export default function Dollar() { return null; }`
+    );
+    const harness = createProcessAssetsHarness();
+    const suffix = ';window.afterPlaceholder=true;';
+    const assets = {
+      [BROWSER_MANIFEST_PATH]: createAsset(
+        `window.__reactRouterManifest="PLACEHOLDER"${suffix}`
+      ),
+    };
+    const compilation = createCompilation(
+      [
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+        ['root', { files: new Set(['static/js/root.js']) }],
+        ['routes/dollar$', { files: new Set(['static/js/dollar.js']) }],
+      ],
+      assets
+    );
+
+    try {
+      registerModifyBrowserManifestAssets(
+        harness.api as never,
+        {
+          root: rootRoute,
+          'routes/dollar$': {
+            id: 'routes/dollar$',
+            parentId: 'root',
+            file: 'routes/dollar.tsx',
+            path: 'dollar',
+          },
+        },
+        {},
+        appDir
+      );
+
+      await harness.run({ assets, compilation });
+
+      const source = assets[BROWSER_MANIFEST_PATH].source();
+      expect(source).toContain("'routes/dollar$'");
+      expect(source.match(/window\.afterPlaceholder=true/g)).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('reports the exact compilation that produced the manifest', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
