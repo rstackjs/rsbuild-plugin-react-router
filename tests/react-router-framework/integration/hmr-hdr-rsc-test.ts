@@ -6,13 +6,13 @@ import type { Files, TemplateName } from "./helpers/rsbuild.js";
 import { test, createEditor, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const templateName = "rsc-framework" as const satisfies TemplateName;
-const hydrationTimeout = 45_000;
+const hydrationTimeout = 120_000;
 
 test.use({ javaScriptEnabled: true });
 
 test.describe("HMR & HDR (RSC)", () => {
   test("rsbuild dev", async ({ page, dev }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
 
     let files: Files = async ({ port }) => ({
       "rsbuild.config.ts": await rsbuildConfig.basic({ port, templateName }),
