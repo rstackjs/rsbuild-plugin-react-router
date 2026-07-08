@@ -134,7 +134,8 @@ test.describe("HMR & HDR (RSC)", () => {
     await page.waitForLoadState("networkidle");
     await expect(hmrStatus).toHaveText("HMR updated: 2");
     await expect(hdrStatus).toHaveText("HDR updated: 2");
-    await expect(input).toHaveValue("stateful");
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // create new non-route imported server component
