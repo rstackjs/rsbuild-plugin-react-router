@@ -182,7 +182,7 @@ test.describe("base + React Router basename", () => {
       test.describe("rsbuild dev", () => {
         let port: number;
         let cwd: string;
-        let stop: () => unknown;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -208,7 +208,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(async () => await stop?.());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when the base and basename are the same", async ({
           page,
@@ -344,7 +347,7 @@ test.describe("base + React Router basename", () => {
       test.describe("express dev", async () => {
         let port: number;
         let cwd: string;
-        let stop: () => void;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -369,7 +372,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(() => stop());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when base and basename are the same", async ({ page }) => {
           await setup({ base: "/mybase/", basename: "/mybase/" });
@@ -403,7 +409,7 @@ test.describe("base + React Router basename", () => {
       test.describe("build", () => {
         let port: number;
         let cwd: string;
-        let stop: () => unknown;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -428,7 +434,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(() => stop());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when base and basename are the same", async ({ page }) => {
           await setup({ base: "/mybase/", basename: "/mybase/" });
@@ -473,7 +482,7 @@ test.describe("base + React Router basename", () => {
       test.describe("express build", async () => {
         let port: number;
         let cwd: string;
-        let stop: () => void;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -509,7 +518,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(() => stop?.());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when base and basename are the same", async ({ page }) => {
           await setup({ base: "/mybase/", basename: "/mybase/" });
