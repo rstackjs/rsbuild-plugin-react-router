@@ -85,6 +85,10 @@ import {
 
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
+export {
+  pluginReactRouterTailwindcss,
+  type ReactRouterTailwindcssPluginOptions,
+} from './tailwindcss-plugin.js';
 
 const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
 

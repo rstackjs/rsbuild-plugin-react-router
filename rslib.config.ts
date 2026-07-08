@@ -13,6 +13,7 @@ const config = defineConfig({
           index: './src/index.ts',
           'parallel-route-transform-worker':
             './src/parallel-route-transform-worker.ts',
+          'tailwind-loader': './src/tailwind-loader.ts',
           'templates/entry.server': './src/templates/entry.server.tsx',
           'templates/entry.client': './src/templates/entry.client.tsx',
         },
@@ -23,6 +24,7 @@ const config = defineConfig({
       source: {
         entry: {
           index: './src/index.ts',
+          'tailwind-loader': './src/tailwind-loader.ts',
           'templates/entry.server': './src/templates/entry.server.tsx',
           'templates/entry.client': './src/templates/entry.client.tsx',
         },
@@ -37,6 +39,9 @@ const config = defineConfig({
         /^react-router-dom/,
         /^react-router/,
         /^@react-router/,
+        /^@tailwindcss\/node(?:\/.*)?$/,
+        /^@tailwindcss\/oxide(?:\/.*)?$/,
+        '@alloc/quick-lru',
         'react',
         /^react-dom/,
       ],
