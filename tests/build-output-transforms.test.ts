@@ -46,10 +46,9 @@ const createBaseOptions = (
     appDirectory,
     getAssetPrefix: () => '/',
     routeChunkOptions: { isBuild: true },
-    routeTransformExecutor: {
-      run: rstest.fn(async task => ({ code: `${task.kind}:${task.code}` })),
-      close: rstest.fn(async () => undefined),
-    },
+    routeTransformRunner: rstest.fn(async task => ({
+      code: `${task.kind}:${task.code}`,
+    })),
     routeByFilePath: new Map([[routePath, { id: 'page' }]]),
     routeChunkConfig: {
       splitRouteModules: true,
@@ -99,7 +98,7 @@ describe('build output transforms', () => {
     expect(
       harness.transforms.find(transform => transform.descriptor.order === 'post')
     ).toBeUndefined();
-    expect(options.routeTransformExecutor.run).not.toHaveBeenCalledWith(
+    expect(options.routeTransformRunner).not.toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'routeModule' })
     );
   });
@@ -130,10 +129,10 @@ describe('build output transforms', () => {
       createTransformArgs(options.routePath)
     );
 
-    expect(options.routeTransformExecutor.run).toHaveBeenCalledWith(
+    expect(options.routeTransformRunner).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'routeModule' })
     );
-    expect(options.routeTransformExecutor.run).toHaveBeenCalledTimes(2);
+    expect(options.routeTransformRunner).toHaveBeenCalledTimes(2);
   });
 
   it('does not match split-export transforms for internal route requests', () => {

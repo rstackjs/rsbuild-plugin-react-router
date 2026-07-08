@@ -18,7 +18,6 @@ import {
   configRoutesToRouteManifestEntries,
   type ReactRouterManifestForDev,
 } from './manifest.js';
-import type { RouteTransformExecutor } from './parallel-route-transforms.js';
 import {
   createRouteManifestSnapshot,
   createRouteTopologyWatcher,
@@ -31,7 +30,6 @@ type RegisterReactRouterDevBackgroundResourcesOptions = {
   api: RsbuildPluginAPI;
   isBuild: boolean;
   lazyCompilationPrewarm: PluginOptions['unstableLazyCompilationPrewarm'];
-  routeTransformExecutor: RouteTransformExecutor;
   routeRestartMarkerPath: string;
   watchDirectory: string;
   getRouteTopology: () => Promise<Set<string>>;
@@ -135,7 +133,6 @@ export const registerReactRouterDevBackgroundResources = ({
   api,
   isBuild,
   lazyCompilationPrewarm,
-  routeTransformExecutor,
   routeRestartMarkerPath,
   watchDirectory,
   getRouteTopology,
@@ -213,8 +210,6 @@ export const registerReactRouterDevBackgroundResources = ({
       scheduleRouteTopologyWatcher();
       lazyCompilationPrewarmController?.schedule();
     });
-
-    routeTransformExecutor.prewarm();
   }
 
   const closeRouteTopologyWatcher = async (): Promise<void> => {
@@ -230,20 +225,12 @@ export const registerReactRouterDevBackgroundResources = ({
     );
   };
 
-  const closeRouteTransformExecutor = (): Promise<void> =>
-    routeTransformExecutor.close();
-
   api.onCloseDevServer(() =>
     closeAll(
       '[rsbuild-plugin-react-router] Failed to close dev server resources.',
-      [
-        closeRouteTopologyWatcher,
-        closeLazyCompilationPrewarm,
-        closeRouteTransformExecutor,
-      ]
+      [closeRouteTopologyWatcher, closeLazyCompilationPrewarm]
     )
   );
-  api.onCloseBuild(closeRouteTransformExecutor);
 
   return {
     setManifest(manifest) {

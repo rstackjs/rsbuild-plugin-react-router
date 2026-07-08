@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
@@ -19,6 +18,7 @@ import {
   PLUGIN_NAME,
 } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
+import { ensureFederationAsyncStartup } from './federation.js';
 import { createReactRouterDevServerSetup } from './dev-server.js';
 import {
   generateWithProps,
@@ -53,10 +53,13 @@ import {
   type RouteChunkConfig,
 } from './route-chunks.js';
 import {
-  createRouteTransformExecutor,
+  createRouteTransformRunner,
   shouldParallelizeRouteTransforms,
 } from './parallel-route-transforms.js';
-import type { RouteModuleTransformLoaderOptions } from './route-module-transform-loader.js';
+import {
+  registerRouteModuleTransformRules,
+  shouldUseApiRouteModuleTransforms,
+} from './route-module-transform-rules.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
@@ -99,87 +102,11 @@ export const shouldParallelizeEnvironmentBuilds = ({
 }): boolean =>
   !isBuild && spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES;
 
-type ModuleFederationPluginLike = {
-  name?: string;
-  _options?: { experiments?: { asyncStartup?: boolean } };
-  options?: { experiments?: { asyncStartup?: boolean } };
-};
-
-const ensureFederationAsyncStartup = (
-  rspackConfig: Rspack.Configuration | undefined
-): void => {
-  if (!rspackConfig?.plugins?.length) {
-    return;
-  }
-
-  for (const plugin of rspackConfig.plugins) {
-    if (!plugin || typeof plugin !== 'object') {
-      continue;
-    }
-    const pluginName = (plugin as ModuleFederationPluginLike).name;
-    if (pluginName !== 'ModuleFederationPlugin') {
-      continue;
-    }
-
-    const pluginOptions =
-      (plugin as ModuleFederationPluginLike)._options ??
-      (plugin as ModuleFederationPluginLike).options;
-    if (!pluginOptions) {
-      continue;
-    }
-
-    pluginOptions.experiments = {
-      ...pluginOptions.experiments,
-      asyncStartup: true,
-    };
-  }
-};
-
 const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
-const routeModuleTransformLoaderPath = fileURLToPath(
-  new URL('./route-module-transform-loader.js', import.meta.url)
-);
-const useApiRouteModuleTransforms =
-  existsSync(
-    fileURLToPath(
-      new URL('./route-module-transform-loader.ts', import.meta.url)
-    )
-  ) || process.env.RSTEST === 'true';
-
-const getRouteModuleTransformParallel = (
-  parallelRouteTransform: PluginOptions['parallelRouteTransform']
-): Rspack.RuleSetLoaderWithOptions['parallel'] => {
-  if (parallelRouteTransform === true) {
-    return true;
-  }
-  if (typeof parallelRouteTransform === 'number') {
-    if (
-      !Number.isInteger(parallelRouteTransform) ||
-      parallelRouteTransform < 1
-    ) {
-      throw new Error(
-        '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
-      );
-    }
-    return { maxWorkers: parallelRouteTransform };
-  }
-  return undefined;
-};
-
-const createRouteModuleTransformUse = (
-  options: RouteModuleTransformLoaderOptions,
-  parallelRouteTransform: PluginOptions['parallelRouteTransform']
-): Rspack.RuleSetLoaderWithOptions => {
-  const parallel = getRouteModuleTransformParallel(parallelRouteTransform);
-  return {
-    loader: routeModuleTransformLoaderPath,
-    options,
-    ...(parallel ? { parallel } : {}),
-  };
-};
+const useApiRouteModuleTransforms = shouldUseApiRouteModuleTransforms();
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -466,7 +393,7 @@ export const pluginReactRouter = (
     const parallelRouteTransform =
       pluginOptions.parallelRouteTransform ??
       shouldParallelizeRouteTransforms(routeCount);
-    const routeTransformExecutor = createRouteTransformExecutor({
+    const routeTransformRunner = createRouteTransformRunner({
       routeChunkCache,
     });
     const routeChunkOptions = {
@@ -489,7 +416,6 @@ export const pluginReactRouter = (
       api,
       isBuild,
       lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor,
       routeRestartMarkerPath,
       watchDirectory,
       getRouteTopology: routeTopology.getRouteTopology,
@@ -949,33 +875,16 @@ export const pluginReactRouter = (
           tools: {
             rspack: rspackConfig => {
               if (!useApiRouteModuleTransforms) {
-                const routeModuleTransformUse = createRouteModuleTransformUse(
-                  {
-                    environmentName: name,
-                    ssr,
-                    isBuild,
-                    isSpaMode,
-                    rootRoutePath,
-                  },
-                  parallelRouteTransform
-                );
-                rspackConfig.module ??= {};
-                rspackConfig.module.rules ??= [];
-                rspackConfig.module.rules.push(
-                  {
-                    resourceQuery: /\?react-router-route/,
-                    enforce: 'post',
-                    use: [routeModuleTransformUse],
-                  },
-                  {
-                    test: path => routeByFilePath.has(path),
-                    resourceQuery: {
-                      not: /__react-router-build-client-route|react-router-route|route-chunk=/,
-                    },
-                    enforce: 'post',
-                    use: [routeModuleTransformUse],
-                  }
-                );
+                registerRouteModuleTransformRules(rspackConfig, {
+                  environmentName: name,
+                  ssr,
+                  isBuild,
+                  isSpaMode,
+                  rootRoutePath,
+                  logPerformance,
+                  routeByFilePath,
+                  parallelRouteTransform,
+                });
               }
 
               if (pluginOptions.federation) {
@@ -1046,7 +955,7 @@ export const pluginReactRouter = (
       appDirectory,
       getAssetPrefix: () => assetPrefix,
       routeChunkOptions,
-      routeTransformExecutor,
+      routeTransformRunner,
       routeByFilePath,
       routeChunkConfig,
       isBuild,

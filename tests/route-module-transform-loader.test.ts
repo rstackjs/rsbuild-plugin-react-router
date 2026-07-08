@@ -1,10 +1,11 @@
-import { describe, expect, it } from '@rstest/core';
+import { describe, expect, it, rstest } from '@rstest/core';
 import routeModuleTransformLoader, {
   type RouteModuleTransformLoaderOptions,
 } from '../src/route-module-transform-loader';
 
 const defaultOptions: RouteModuleTransformLoaderOptions = {
   environmentName: 'web',
+  logPerformance: false,
   ssr: true,
   isBuild: false,
   isSpaMode: false,
@@ -60,5 +61,36 @@ describe('route module transform loader', () => {
     );
 
     expect(result.map).toBeDefined();
+  });
+
+  it('logs route-module performance reports when enabled', async () => {
+    const info = rstest.spyOn(console, 'info').mockImplementation(() => {});
+
+    try {
+      await runLoader(
+        `
+          export default function Route() { return null; }
+        `,
+        { options: { ...defaultOptions, logPerformance: true } }
+      );
+
+      expect(info).toHaveBeenCalledTimes(1);
+      const message = String(info.mock.calls[0][0]);
+      const prefix = '[react-router:performance] ';
+      expect(message.startsWith(prefix)).toBe(true);
+
+      const report = JSON.parse(message.slice(prefix.length));
+      expect(report.environment).toBe('web');
+      expect(report.operations['route:module']).toMatchObject({
+        count: 1,
+        slowest: [
+          {
+            resource: '/project/app/routes/page.tsx?react-router-route',
+          },
+        ],
+      });
+    } finally {
+      info.mockRestore();
+    }
   });
 });

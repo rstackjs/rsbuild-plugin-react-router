@@ -1,20 +1,20 @@
 import { describe, expect, it } from '@rstest/core';
 import {
-  createRouteTransformExecutor,
+  createRouteTransformRunner,
   shouldParallelizeRouteTransforms,
 } from '../src/parallel-route-transforms';
 
-describe('route transform executor', () => {
+describe('route transform runner', () => {
   it('enables Rspack loader parallelism for large route graphs', () => {
     expect(shouldParallelizeRouteTransforms(255)).toBe(false);
     expect(shouldParallelizeRouteTransforms(256)).toBe(true);
   });
 
   it('runs non-loader route transform tasks inline', async () => {
-    const executor = createRouteTransformExecutor();
+    const routeTransformRunner = createRouteTransformRunner();
 
     await expect(
-      executor.run({
+      routeTransformRunner({
         kind: 'routeModule',
         code: `
           export async function loader() { return null; }
@@ -32,8 +32,5 @@ describe('route transform executor', () => {
     ).resolves.toMatchObject({
       code: expect.stringContaining('export default _withComponentProps'),
     });
-
-    expect(() => executor.prewarm()).not.toThrow();
-    await expect(executor.close()).resolves.toBeUndefined();
   });
 });

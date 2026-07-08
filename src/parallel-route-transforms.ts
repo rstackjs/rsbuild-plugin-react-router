@@ -10,18 +10,13 @@ const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
 export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
   routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
 
-export type RouteTransformExecutorOptions = RouteTransformTaskOptions;
+export type RouteTransformRunnerOptions = RouteTransformTaskOptions;
 
-export type RouteTransformExecutor = {
-  run: (task: RouteTransformTask) => Promise<RouteTransformResult>;
-  prewarm: () => void;
-  close: () => Promise<void>;
-};
+export type RouteTransformRunner = (
+  task: RouteTransformTask
+) => Promise<RouteTransformResult>;
 
-export const createRouteTransformExecutor = (
-  options: RouteTransformExecutorOptions = {}
-): RouteTransformExecutor => ({
-  run: task => executeRouteTransformTask(task, options),
-  prewarm: () => {},
-  close: async () => {},
-});
+export const createRouteTransformRunner =
+  (options: RouteTransformRunnerOptions = {}): RouteTransformRunner =>
+  task =>
+    executeRouteTransformTask(task, options);

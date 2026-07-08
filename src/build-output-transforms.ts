@@ -6,7 +6,7 @@ import {
   getReactRouterManifestForDev,
   type ReactRouterManifestStats,
 } from './manifest.js';
-import type { RouteTransformExecutor } from './parallel-route-transforms.js';
+import type { RouteTransformRunner } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
 import { createBundlerRouteExportResolver } from './route-export-resolution.js';
 import type { RouteChunkConfig } from './route-chunks.js';
@@ -31,7 +31,7 @@ type RegisterBuildOutputTransformsOptions = {
   appDirectory: string;
   getAssetPrefix: () => string;
   routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
-  routeTransformExecutor: RouteTransformExecutor;
+  routeTransformRunner: RouteTransformRunner;
   routeByFilePath: Map<string, Route>;
   routeChunkConfig: RouteChunkConfig;
   isBuild: boolean;
@@ -54,7 +54,7 @@ export const registerBuildOutputTransforms = ({
   appDirectory,
   getAssetPrefix,
   routeChunkOptions,
-  routeTransformExecutor,
+  routeTransformRunner,
   routeByFilePath,
   routeChunkConfig,
   isBuild,
@@ -70,7 +70,7 @@ export const registerBuildOutputTransforms = ({
       'route:module',
       args.resource,
       async () =>
-        routeTransformExecutor.run({
+        routeTransformRunner({
           kind: 'routeModule',
           code: args.code,
           resource: args.resource,
@@ -153,7 +153,7 @@ export const registerBuildOutputTransforms = ({
         'route:client-entry',
         args.resource,
         async () =>
-          routeTransformExecutor.run({
+          routeTransformRunner({
             kind: 'routeClientEntry',
             code: args.code,
             resourcePath: args.resourcePath,
@@ -175,7 +175,7 @@ export const registerBuildOutputTransforms = ({
         'route:chunk',
         args.resource,
         async () =>
-          routeTransformExecutor.run({
+          routeTransformRunner({
             kind: 'routeChunk',
             code: args.code,
             resource: args.resource,
@@ -201,7 +201,7 @@ export const registerBuildOutputTransforms = ({
           'route:split-exports',
           args.resource,
           async () =>
-            routeTransformExecutor.run({
+            routeTransformRunner({
               kind: 'splitRouteExports',
               code: args.code,
               resourcePath: args.resourcePath,
@@ -241,7 +241,7 @@ export const registerBuildOutputTransforms = ({
         'module:client-only-stub',
         args.resource,
         async () => {
-          return routeTransformExecutor.run({
+          return routeTransformRunner({
             kind: 'clientOnlyStub',
             code: args.code,
             resourcePath: args.resourcePath,
