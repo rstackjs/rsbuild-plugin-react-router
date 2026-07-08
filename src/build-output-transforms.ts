@@ -36,6 +36,7 @@ type RegisterBuildOutputTransformsOptions = {
   routeChunkConfig: RouteChunkConfig;
   isBuild: boolean;
   splitRouteModules: boolean;
+  useApiRouteModuleTransforms: boolean;
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
@@ -58,6 +59,7 @@ export const registerBuildOutputTransforms = ({
   routeChunkConfig,
   isBuild,
   splitRouteModules,
+  useApiRouteModuleTransforms,
   ssr,
   isSpaMode,
   rootRoutePath,
@@ -252,22 +254,24 @@ export const registerBuildOutputTransforms = ({
       )
   );
 
-  api.transform(
-    {
-      resourceQuery: /\?react-router-route/,
-      order: 'post',
-    },
-    transformRouteModule
-  );
-
-  api.transform(
-    {
-      test: path => routeByFilePath.has(path),
-      resourceQuery: {
-        not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+  if (useApiRouteModuleTransforms) {
+    api.transform(
+      {
+        resourceQuery: /\?react-router-route/,
+        order: 'post',
       },
-      order: 'post',
-    },
-    transformRouteModule
-  );
+      transformRouteModule
+    );
+
+    api.transform(
+      {
+        test: path => routeByFilePath.has(path),
+        resourceQuery: {
+          not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+        },
+        order: 'post',
+      },
+      transformRouteModule
+    );
+  }
 };

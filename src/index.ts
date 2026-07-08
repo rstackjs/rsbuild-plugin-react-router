@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
@@ -55,6 +56,7 @@ import {
   createRouteTransformExecutor,
   shouldParallelizeRouteTransforms,
 } from './parallel-route-transforms.js';
+import type { RouteModuleTransformLoaderOptions } from './route-module-transform-loader.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
@@ -137,6 +139,47 @@ const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
+const routeModuleTransformLoaderPath = fileURLToPath(
+  new URL('./route-module-transform-loader.js', import.meta.url)
+);
+const useApiRouteModuleTransforms =
+  existsSync(
+    fileURLToPath(
+      new URL('./route-module-transform-loader.ts', import.meta.url)
+    )
+  ) || process.env.RSTEST === 'true';
+
+const getRouteModuleTransformParallel = (
+  parallelRouteTransform: PluginOptions['parallelRouteTransform']
+): Rspack.RuleSetLoaderWithOptions['parallel'] => {
+  if (parallelRouteTransform === true) {
+    return true;
+  }
+  if (typeof parallelRouteTransform === 'number') {
+    if (
+      !Number.isInteger(parallelRouteTransform) ||
+      parallelRouteTransform < 1
+    ) {
+      throw new Error(
+        '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
+      );
+    }
+    return { maxWorkers: parallelRouteTransform };
+  }
+  return undefined;
+};
+
+const createRouteModuleTransformUse = (
+  options: RouteModuleTransformLoaderOptions,
+  parallelRouteTransform: PluginOptions['parallelRouteTransform']
+): Rspack.RuleSetLoaderWithOptions => {
+  const parallel = getRouteModuleTransformParallel(parallelRouteTransform);
+  return {
+    loader: routeModuleTransformLoaderPath,
+    options,
+    ...(parallel ? { parallel } : {}),
+  };
+};
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -420,13 +463,11 @@ export const pluginReactRouter = (
       rootRouteFile,
     };
     const routeChunkCache: RouteChunkCache = new Map();
+    const parallelRouteTransform =
+      pluginOptions.parallelRouteTransform ??
+      shouldParallelizeRouteTransforms(routeCount);
     const routeTransformExecutor = createRouteTransformExecutor({
-      parallelRouteTransform:
-        pluginOptions.parallelRouteTransform ??
-        shouldParallelizeRouteTransforms(routeCount),
       routeChunkCache,
-      splitRouteModules: Boolean(splitRouteModules),
-      isBuild,
     });
     const routeChunkOptions = {
       splitRouteModules,
@@ -748,7 +789,6 @@ export const pluginReactRouter = (
         routeCount >= 256 &&
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
-
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
           ? {
@@ -765,7 +805,6 @@ export const pluginReactRouter = (
           assetPrefix: config.output?.assetPrefix || '/',
         },
         dev: {
-          writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
         },
@@ -909,6 +948,36 @@ export const pluginReactRouter = (
         return mergeEnvironmentConfig(config, {
           tools: {
             rspack: rspackConfig => {
+              if (!useApiRouteModuleTransforms) {
+                const routeModuleTransformUse = createRouteModuleTransformUse(
+                  {
+                    environmentName: name,
+                    ssr,
+                    isBuild,
+                    isSpaMode,
+                    rootRoutePath,
+                  },
+                  parallelRouteTransform
+                );
+                rspackConfig.module ??= {};
+                rspackConfig.module.rules ??= [];
+                rspackConfig.module.rules.push(
+                  {
+                    resourceQuery: /\?react-router-route/,
+                    enforce: 'post',
+                    use: [routeModuleTransformUse],
+                  },
+                  {
+                    test: path => routeByFilePath.has(path),
+                    resourceQuery: {
+                      not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+                    },
+                    enforce: 'post',
+                    use: [routeModuleTransformUse],
+                  }
+                );
+              }
+
               if (pluginOptions.federation) {
                 ensureFederationAsyncStartup(rspackConfig);
               }
@@ -982,6 +1051,7 @@ export const pluginReactRouter = (
       routeChunkConfig,
       isBuild,
       splitRouteModules: Boolean(splitRouteModules),
+      useApiRouteModuleTransforms,
       ssr,
       isSpaMode,
       rootRoutePath,

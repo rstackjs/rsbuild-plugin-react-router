@@ -23,7 +23,8 @@ const createTransformHarness = () => {
 };
 
 const createBaseOptions = (
-  transforms: ReturnType<typeof createTransformHarness>
+  transforms: ReturnType<typeof createTransformHarness>,
+  useApiRouteModuleTransforms = false
 ) => {
   const appDirectory = resolve('/project/app');
   const routePath = resolve(appDirectory, 'routes/page.tsx');
@@ -57,6 +58,7 @@ const createBaseOptions = (
     },
     isBuild: true,
     splitRouteModules: true,
+    useApiRouteModuleTransforms,
     ssr: true,
     isSpaMode: false,
     rootRoutePath: resolve(appDirectory, 'root.tsx'),
@@ -81,9 +83,30 @@ const createTransformArgs = (
   }) as never;
 
 describe('build output transforms', () => {
-  it('registers post-order route-module transforms for explicit and queryless route modules', async () => {
+  it('does not register route-module transforms through api.transform', () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);
+
+    registerBuildOutputTransforms(options);
+
+    expect(
+      harness.transforms.find(
+        transform =>
+          transform.descriptor.resourceQuery?.toString() ===
+          String(/\?react-router-route/)
+      )
+    ).toBeUndefined();
+    expect(
+      harness.transforms.find(transform => transform.descriptor.order === 'post')
+    ).toBeUndefined();
+    expect(options.routeTransformExecutor.run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'routeModule' })
+    );
+  });
+
+  it('registers route-module transforms through api.transform in source mode', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness, true);
 
     registerBuildOutputTransforms(options);
 
@@ -99,11 +122,6 @@ describe('build output transforms', () => {
     expect(routeModuleTransforms[1].descriptor).toMatchObject({
       order: 'post',
     });
-    expect(
-      (routeModuleTransforms[1].descriptor.test as (path: string) => boolean)(
-        options.routePath
-      )
-    ).toBe(true);
 
     await routeModuleTransforms[0].handler(
       createTransformArgs(options.routePath, '?react-router-route')
@@ -112,27 +130,26 @@ describe('build output transforms', () => {
       createTransformArgs(options.routePath)
     );
 
-    const run = options.routeTransformExecutor.run;
-    expect(run).toHaveBeenCalledWith(
+    expect(options.routeTransformExecutor.run).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'routeModule' })
     );
-    expect(run).toHaveBeenCalledTimes(2);
+    expect(options.routeTransformExecutor.run).toHaveBeenCalledTimes(2);
   });
 
-  it('does not match queryless route-module transforms for internal route requests', () => {
+  it('does not match split-export transforms for internal route requests', () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);
 
     registerBuildOutputTransforms(options);
 
-    const querylessRouteModuleTransform = harness.transforms.find(
+    const splitExportsTransform = harness.transforms.find(
       transform =>
-        transform.descriptor.order === 'post' &&
+        transform.descriptor.environments?.includes('web') &&
         typeof transform.descriptor.test === 'function'
     );
 
-    expect(querylessRouteModuleTransform).toBeDefined();
-    const predicate = querylessRouteModuleTransform!.descriptor.test as (
+    expect(splitExportsTransform).toBeDefined();
+    const predicate = splitExportsTransform!.descriptor.test as (
       path: string
     ) => boolean;
     expect(predicate(options.routePath)).toBe(true);
@@ -140,8 +157,9 @@ describe('build output transforms', () => {
       false
     );
 
-    const resourceQuery = querylessRouteModuleTransform!.descriptor
-      .resourceQuery as { not: RegExp };
+    const resourceQuery = splitExportsTransform!.descriptor.resourceQuery as {
+      not: RegExp;
+    };
     expect(resourceQuery.not.test('?__react-router-build-client-route')).toBe(
       true
     );
