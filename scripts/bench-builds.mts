@@ -13,6 +13,7 @@ import {
 } from './benchmark/dev-server.mjs';
 import { generateSyntheticFixture } from './benchmark/fixture.mts';
 import { profiles } from './benchmark/profiles.mjs';
+import { collectBuildOutputStats } from './benchmark/bundle-size.mjs';
 import {
   parsePluginReports,
   parseTimeStats,
@@ -550,6 +551,12 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
     const pluginReports = parsePluginReports(
       `${commandResult.stdout}\n${commandResult.stderr}`
     );
+    const bundleSize =
+      args.mode === 'build' && commandResult.status === 0
+        ? yield* tryPromise(() =>
+            collectBuildOutputStats(path.join(fixtureRoot, 'build'))
+          )
+        : null;
 
     if (commandResult.status !== 0 && args.failFast) {
       yield* Effect.fail(
@@ -574,6 +581,7 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
           userMs: timeStats.userMs ?? null,
           sysMs: timeStats.sysMs ?? null,
           maxRssKb: timeStats.maxRssKb ?? null,
+          bundleSize,
           pluginReports,
           rspackProfiles,
           rspackTraceOutput:

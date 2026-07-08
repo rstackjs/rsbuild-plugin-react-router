@@ -78,6 +78,10 @@ import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import { importConfigWithWatchPaths } from './config-imports.js';
 import {
+  createWebOptimizationConfig,
+  createWebOutputConfig,
+} from './web-rspack-config.js';
+import {
   createReactRouterRouteTopology,
   createReactRouterRouteWatchFiles,
   registerReactRouterDevBackgroundResources,
@@ -840,18 +844,8 @@ export const pluginReactRouter = (
                     }
                   : {}),
                 externalsType: 'module',
-                output: {
-                  chunkFormat: 'module',
-                  chunkLoading: 'import',
-                  workerChunkLoading: 'import',
-                  wasmLoading: 'fetch',
-                  library: { type: 'module' },
-                  module: true,
-                },
-                optimization: {
-                  avoidEntryIife: true,
-                  runtimeChunk: 'single',
-                },
+                output: createWebOutputConfig(isBuild),
+                optimization: createWebOptimizationConfig(isBuild),
               },
             },
           },

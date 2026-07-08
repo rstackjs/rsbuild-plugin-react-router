@@ -360,6 +360,37 @@ describe('benchmark fixture generator', () => {
     }
   });
 
+  it('collects build output bundle size metrics', async () => {
+    const { collectBuildOutputStats } = await import(
+      '../scripts/benchmark/bundle-size.mjs'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-size-'));
+
+    try {
+      mkdirSync(join(root, 'client/assets'), { recursive: true });
+      mkdirSync(join(root, 'server'), { recursive: true });
+      writeFileSync(join(root, 'client/assets/entry.js'), 'console.log("entry");');
+      writeFileSync(join(root, 'client/assets/route.js'), 'export default 1;');
+      writeFileSync(join(root, 'client/assets/styles.css'), '.route{color:red}');
+      writeFileSync(join(root, 'client/assets/entry.js.map'), '{}');
+      writeFileSync(join(root, 'server/index.js'), 'export default {};');
+
+      const stats = await collectBuildOutputStats(root);
+
+      expect(stats.fileCount).toBe(5);
+      expect(stats.sourceMapBytes).toBe(2);
+      expect(stats.totalBytes).toBe(75);
+      expect(stats.clientBytes).toBe(57);
+      expect(stats.clientJsBytes).toBe(38);
+      expect(stats.clientCssBytes).toBe(17);
+      expect(stats.serverBytes).toBe(18);
+      expect(stats.totalGzipBytes).toBeGreaterThan(0);
+      expect(stats.clientJsGzipBytes).toBeGreaterThan(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('accepts equals-form CLI options before benchmark selection', () => {
     const result = spawnSync(
       process.execPath,
@@ -592,6 +623,12 @@ describe('benchmark fixture generator', () => {
             userMs: { median: 700 },
             sysMs: { median: 100 },
             maxRssKb: benchmark.summary.maxRssKb,
+            bundleSize: {
+              totalBytes: { median: 180000 },
+              totalGzipBytes: { median: 60000 },
+              clientJsBytes: { median: 120000 },
+              clientJsGzipBytes: { median: 40000 },
+            },
           },
           devRouteSummary: [],
           devUpdateRouteSummary: [],
@@ -607,6 +644,12 @@ describe('benchmark fixture generator', () => {
             userMs: { median: 650 },
             sysMs: { median: 90 },
             maxRssKb: benchmark.summary.maxRssKb,
+            bundleSize: {
+              totalBytes: { median: 150000 },
+              totalGzipBytes: { median: 50000 },
+              clientJsBytes: { median: 90000 },
+              clientJsGzipBytes: { median: 30000 },
+            },
           },
           devRouteSummary: [],
           devUpdateRouteSummary: [],
@@ -707,6 +750,9 @@ describe('benchmark fixture generator', () => {
       );
       expect(comment).toContain('### Production Build Benchmarks');
       expect(comment).toContain('Rendered 2 production build benchmarks.');
+      expect(comment).toContain('Head client JS gzip');
+      expect(comment).toContain('Head total gzip');
+      expect(comment).toContain('| `large-355-ssr-esm` | 1 | 1.00s | 0.90s | -10.0% | 0.92s | 1.00s | 1.11x | 488 MB | 29.3 kB | -25.0% | 48.8 kB |');
       expect(comment).toContain('### Dev Rollup');
       expect(comment).toContain(
         '| All dev fixtures | 2 | 1.80s | 1.66s | -7.8% | 1.20s | 1.11s | -7.5% | 0.55s | 0.48s | -12.7% | 0.38s | 0.34s | -10.5% | 1.08x |'

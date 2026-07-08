@@ -328,6 +328,34 @@ describe('pluginReactRouter', () => {
     expect(
       config.environments?.web?.tools?.rspack?.optimization?.avoidEntryIife
     ).toBe(true);
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.mangleExports
+    ).toBeUndefined();
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.usedExports
+    ).toBeUndefined();
+  });
+
+  it('configures production web builds to reduce browser output size', async () => {
+    const rsbuild = await createStubRsbuild({
+      action: 'build',
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization
+    ).toMatchObject({
+      avoidEntryIife: true,
+      mangleExports: 'size',
+      runtimeChunk: 'single',
+      usedExports: 'global',
+    });
+    expect(
+      config.environments?.web?.tools?.rspack?.output?.chunkFilename
+    ).toBe('static/js/async/[id]-[contenthash:16].js');
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {

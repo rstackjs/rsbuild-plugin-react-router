@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { formatBytes, summarizeBundleSizeRuns } from './bundle-size.mjs';
 
 export const parseTimeStats = stderr => {
   const user = stderr.match(/User time \(seconds\):\s*([\d.]+)/);
@@ -64,6 +65,7 @@ export const summarizeRuns = runs => ({
   userMs: summarizeMetric(runs.map(run => run.userMs)),
   sysMs: summarizeMetric(runs.map(run => run.sysMs)),
   maxRssKb: summarizeMetric(runs.map(run => run.maxRssKb)),
+  bundleSize: summarizeBundleSizeRuns(runs, summarizeMetric),
 });
 
 const summarizeDevRequests = (runs, key) => {
@@ -163,7 +165,6 @@ const formatMs = value =>
 const formatReportMs = value => (value == null ? '-' : `${value.toFixed(1)}ms`);
 const formatRss = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
-
 const formatParallelRouteTransform = parallelRouteTransform => {
   if (parallelRouteTransform === undefined) {
     return 'adaptive';
@@ -237,8 +238,8 @@ export const renderMarkdown = result => {
       ? [`- Rspack trace output: ${result.rspackTraceOutput}`]
       : []),
     '',
-    '| Benchmark | Routes | Variant | Median ready | Median route load | Median update/HMR | Median wall | Mean wall | p95 wall | Max RSS | Plugin reports (--log-performance) |',
-    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|',
+    '| Benchmark | Routes | Variant | Median ready | Median route load | Median update/HMR | Median wall | Mean wall | p95 wall | Max RSS | Client JS gzip | Total gzip | Plugin reports (--log-performance) |',
+    '|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|',
   ];
 
   for (const benchmark of result.benchmarks) {
@@ -254,6 +255,8 @@ export const renderMarkdown = result => {
         formatMs(benchmark.summary.wallMs.mean),
         formatMs(benchmark.summary.wallMs.p95),
         formatRss(benchmark.summary.maxRssKb.p95),
+        formatBytes(benchmark.summary.bundleSize.clientJsGzipBytes.median),
+        formatBytes(benchmark.summary.bundleSize.totalGzipBytes.median),
         benchmark.runs.reduce((sum, run) => sum + run.pluginReports.length, 0),
       ]
         .join(' | ')

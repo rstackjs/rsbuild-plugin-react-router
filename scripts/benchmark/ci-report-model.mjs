@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { getBundleSizeMedian } from './bundle-size.mjs';
 
 export const readJson = async file => JSON.parse(await readFile(file, 'utf8'));
 
@@ -144,6 +145,22 @@ const compareBenchmarks = (baseResult, headResult) => {
     const headRouteTotalMs = medianRouteTotal(headBenchmark);
     const baseUpdateMs = medianUpdate(baseBenchmark);
     const headUpdateMs = medianUpdate(headBenchmark);
+    const baseClientJsGzipBytes = getBundleSizeMedian(
+      baseBenchmark,
+      'clientJsGzipBytes'
+    );
+    const headClientJsGzipBytes = getBundleSizeMedian(
+      headBenchmark,
+      'clientJsGzipBytes'
+    );
+    const baseTotalGzipBytes = getBundleSizeMedian(
+      baseBenchmark,
+      'totalGzipBytes'
+    );
+    const headTotalGzipBytes = getBundleSizeMedian(
+      headBenchmark,
+      'totalGzipBytes'
+    );
 
     return {
       id,
@@ -166,6 +183,18 @@ const compareBenchmarks = (baseResult, headResult) => {
       headCpuMs: cpuMedian(headBenchmark),
       baseRssKb: p95Rss(baseBenchmark),
       headRssKb: p95Rss(headBenchmark),
+      baseClientJsGzipBytes,
+      headClientJsGzipBytes,
+      clientJsGzipDeltaPercent: percentDelta(
+        baseClientJsGzipBytes,
+        headClientJsGzipBytes
+      ),
+      baseTotalGzipBytes,
+      headTotalGzipBytes,
+      totalGzipDeltaPercent: percentDelta(
+        baseTotalGzipBytes,
+        headTotalGzipBytes
+      ),
       baseRunCount: baseBenchmark?.runs?.length ?? null,
       headRunCount: headBenchmark?.runs?.length ?? null,
       headWallMeanMs: headBenchmark?.summary?.wallMs?.mean ?? null,

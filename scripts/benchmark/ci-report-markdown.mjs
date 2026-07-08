@@ -1,3 +1,5 @@
+import { bundleSizeCiColumns, formatBytes } from './bundle-size.mjs';
+
 const formatSeconds = value =>
   typeof value === 'number' ? `${(value / 1000).toFixed(2)}s` : '-';
 const formatPercent = value =>
@@ -15,8 +17,8 @@ const formatMilliseconds = value =>
 const formatCount = value => (typeof value === 'number' ? String(value) : '-');
 
 const productionBenchmarkTableHeader = [
-  '| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
-  '|---|---:|---:|---:|---:|---:|---:|---:|---:|',
+  `| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 | ${bundleSizeCiColumns.map(column => column.heading).join(' | ')} |`,
+  `|---|---:|---:|---:|---:|---:|---:|---:|---:|${bundleSizeCiColumns.map(() => '---:').join('|')}|`,
 ];
 
 const devBenchmarkTableHeader = [
@@ -28,13 +30,13 @@ const benchmarkRunCount = benchmark =>
   benchmark.headRunCount ?? benchmark.baseRunCount;
 
 const renderBuildBenchmarkRow = benchmark =>
-  `| \`${benchmark.id}\` | ${formatCount(benchmarkRunCount(benchmark))} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`;
+  `| \`${benchmark.id}\` | ${formatCount(benchmarkRunCount(benchmark))} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} | ${bundleSizeCiColumns.map(column => (column.format === 'percent' ? formatPercent(benchmark[column.headField]) : formatBytes(benchmark[column.headField]))).join(' | ')} |`;
 
 const renderDevBenchmarkRow = benchmark =>
   `| \`${benchmark.id}\` | ${formatCount(benchmarkRunCount(benchmark))} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.baseReadyMs)} | ${formatSeconds(benchmark.headReadyMs)} | ${formatSeconds(benchmark.baseRouteTotalMs)} | ${formatSeconds(benchmark.headRouteTotalMs)} | ${formatSeconds(benchmark.baseUpdateMs)} | ${formatSeconds(benchmark.headUpdateMs)} | ${formatPercent(benchmark.updateDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`;
 
 const renderSyntheticBuildBenchmarkRow = benchmark =>
-  `| complex app | ${formatCount(benchmark.runs)} | ${formatDurationSeconds(benchmark.baseMedianSeconds)} | ${formatDurationSeconds(benchmark.headMedianSeconds)} | ${formatPercent(benchmark.deltaPercent)} | ${formatDurationSeconds(benchmark.headMeanSeconds)} | ${formatDurationSeconds(benchmark.headP95Seconds)} | ${formatSpeedup(benchmark.speedup)} | - |`;
+  `| complex app | ${formatCount(benchmark.runs)} | ${formatDurationSeconds(benchmark.baseMedianSeconds)} | ${formatDurationSeconds(benchmark.headMedianSeconds)} | ${formatPercent(benchmark.deltaPercent)} | ${formatDurationSeconds(benchmark.headMeanSeconds)} | ${formatDurationSeconds(benchmark.headP95Seconds)} | ${formatSpeedup(benchmark.speedup)} | - | ${bundleSizeCiColumns.map(() => '-').join(' | ')} |`;
 
 const renderSyntheticDevBenchmarkRow = benchmark =>
   `| complex app | ${formatCount(benchmark.runs)} | ${formatDurationSeconds(benchmark.baseMedianSeconds)} | ${formatDurationSeconds(benchmark.headMedianSeconds)} | ${formatPercent(benchmark.deltaPercent)} | ${formatSeconds(benchmark.baseReadyMs)} | ${formatSeconds(benchmark.headReadyMs)} | ${formatSeconds(benchmark.baseRouteTotalMs)} | ${formatSeconds(benchmark.headRouteTotalMs)} | ${formatSeconds(benchmark.baseUpdateMs)} | ${formatSeconds(benchmark.headUpdateMs)} | ${formatPercent(benchmark.updateDeltaPercent)} | ${formatDurationSeconds(benchmark.headMeanSeconds)} | ${formatDurationSeconds(benchmark.headP95Seconds)} | ${formatSpeedup(benchmark.speedup)} | - |`;
