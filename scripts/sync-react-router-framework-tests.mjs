@@ -374,7 +374,7 @@ const normalizePackageJson = async packageJsonPath => {
     }
 
     for (const [name, version] of Object.entries(dependencies)) {
-      if (version !== 'workspace:*' && version !== 'catalog:') {
+      if (!version.startsWith('workspace:') && version !== 'catalog:') {
         continue;
       }
       const replacement = packageVersionByName[name];
