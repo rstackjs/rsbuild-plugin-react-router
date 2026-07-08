@@ -71,7 +71,7 @@ describe('getExportNamesAndExportAll', () => {
     });
   });
 
-  it('uses Yuku directly when route TypeScript parses without normalization', async () => {
+  it('uses Yuku directly when route TypeScript and TSX parse without normalization', async () => {
     const originalTransform = rspack.experiments.swc.transformSync;
     let transformCalls = 0;
     try {
@@ -82,6 +82,18 @@ describe('getExportNamesAndExportAll', () => {
         return originalTransform(...args);
       }) as typeof originalTransform;
 
+      await expect(
+        getExportNamesAndExportAll(
+          `
+            export const loader = () => null;
+            export default function Route() { return <main />; }
+          `,
+          'routes/simple.tsx'
+        )
+      ).resolves.toEqual({
+        exportNames: ['loader', 'default'],
+        exportAllModules: [],
+      });
       await expect(
         getExportNamesAndExportAll(
           `
