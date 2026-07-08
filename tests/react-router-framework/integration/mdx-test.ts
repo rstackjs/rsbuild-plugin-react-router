@@ -69,6 +69,8 @@ test.describe("MDX", () => {
             // components defined within an MDX file must be exported. This
             // means they're not removed in the RSC build.
             "app/components/mdx-components.tsx": js`
+              "use client";
+
               import { useState, useEffect } from "react";
               import { useLoaderData } from "react-router";
 
