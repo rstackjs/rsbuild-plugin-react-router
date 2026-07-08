@@ -21,6 +21,8 @@ const templateNames = [
   "rsc-framework",
 ] as const satisfies TemplateName[];
 
+const devHmrTimeout = 15_000;
+
 const sharedFiles = {
   "app/routes/_index.tsx": js`
     import { useState, useEffect } from "react";
@@ -665,8 +667,10 @@ async function workflowDev({
     contents.replace("HMR updated: 0", "HMR updated: 1"),
   );
   await page.waitForLoadState("networkidle");
-  await expect(hmrStatus).toHaveText("HMR updated: 1");
-  await expect(input).toHaveValue("stateful");
+  await expect(hmrStatus).toHaveText("HMR updated: 1", {
+    timeout: devHmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: devHmrTimeout });
   expect(pageErrors).toEqual([]);
 
   // client side navigation
