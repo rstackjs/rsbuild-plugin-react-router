@@ -4,24 +4,13 @@ import tsx from "dedent";
 import * as Path from "pathe";
 
 import { test } from "./helpers/fixtures";
-import { reactRouterConfig } from "./helpers/rsbuild";
-
-const rsbuildConfig = ({ rsc }: { rsc: boolean }) => {
-  const routerPlugin = rsc ? "pluginReactRouterRSC" : "pluginReactRouter";
-  return tsx`
-    import { defineConfig } from "@rsbuild/core";
-    import { pluginReact } from "@rsbuild/plugin-react";
-    import { ${routerPlugin} } from "rsbuild-plugin-react-router";
-
-    export default defineConfig({
-      plugins: [pluginReact(), ${routerPlugin}()],
-    });
-  `;
-};
+import { reactRouterConfig, rsbuildConfig } from "./helpers/rsbuild";
 
 test.use({
   files: {
-    "rsbuild.config.ts": rsbuildConfig({ rsc: false }),
+    "rsbuild.config.ts": await rsbuildConfig.basic({
+      templateName: "rsbuild-template",
+    }),
     "app/expect-type.ts": tsx`
       export type Expect<T extends true> = T
 
@@ -686,7 +675,9 @@ test.describe("typegen", () => {
     test.describe("ServerComponent export", () => {
       test("when RSC Framework Mode plugin is present", async ({ edit, $ }) => {
         await edit({
-          "rsbuild.config.ts": rsbuildConfig({ rsc: true }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({
+            templateName: "rsc-framework",
+          }),
           "app/routes.ts": tsx`
             import { type RouteConfig, route } from "@react-router/dev/routes";
 
@@ -850,7 +841,9 @@ test.describe("typegen", () => {
 
       test("when RSC Framework Mode plugin is present", async ({ edit, $ }) => {
         await edit({
-          "rsbuild.config.ts": rsbuildConfig({ rsc: true }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({
+            templateName: "rsc-framework",
+          }),
           ...clientFirstRouteFiles,
         });
         await $("pnpm typecheck");
@@ -861,7 +854,9 @@ test.describe("typegen", () => {
         $,
       }) => {
         await edit({
-          "rsbuild.config.ts": rsbuildConfig({ rsc: false }),
+          "rsbuild.config.ts": await rsbuildConfig.basic({
+            templateName: "rsbuild-template",
+          }),
           ...clientFirstRouteFiles,
         });
         await $("pnpm typecheck");

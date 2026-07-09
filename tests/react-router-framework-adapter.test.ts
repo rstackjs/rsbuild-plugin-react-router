@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, rstest } from '@rstest/cor
 import {
   assertNoViteConfigFiles,
   finalizeFixtureProject,
-} from './react-router-framework/integration/helpers/rsbuild-adapter';
-import { rsbuildConfig } from './react-router-framework/integration/helpers/rsbuild-config';
+} from './react-router-framework/integration/helpers/rsbuild-adapter.js';
+import { rsbuildConfig } from './react-router-framework/integration/helpers/rsbuild-config.js';
 
 describe('React Router framework fixture adapter', () => {
   beforeEach(() => {
