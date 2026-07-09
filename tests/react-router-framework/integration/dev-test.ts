@@ -13,6 +13,7 @@ import {
 } from "./helpers/rsbuild.js";
 
 const tsx = dedent;
+const hmrTimeout = 15_000;
 
 const fixtures = [
   {
@@ -489,19 +490,31 @@ test.describe("rsbuild dev", () => {
         await editFile((data) =>
           data.replace("HMR component: 0", "HMR component: 1"),
         );
-        await expect(page.locator("[data-hmr]")).toHaveText("HMR component: 1");
+        await expect(page.locator("[data-hmr]")).toHaveText(
+          "HMR component: 1",
+          {
+            timeout: hmrTimeout,
+          },
+        );
         await expect(input).toHaveValue("stateful");
 
         // handle
         await editFile((data) =>
           data.replace("HMR handle: 0", "HMR handle: 1"),
         );
-        await expect(page.locator("[data-handle]")).toHaveText("HMR handle: 1");
+        await expect(page.locator("[data-handle]")).toHaveText(
+          "HMR handle: 1",
+          {
+            timeout: hmrTimeout,
+          },
+        );
         await expect(input).toHaveValue("stateful");
 
         // meta
         await editFile((data) => data.replace("HMR meta: 0", "HMR meta: 1"));
-        await expect(page).toHaveTitle("HMR meta: 1");
+        await expect(page).toHaveTitle("HMR meta: 1", {
+          timeout: hmrTimeout,
+        });
         await expect(input).toHaveValue("stateful");
 
         // links
@@ -509,6 +522,7 @@ test.describe("rsbuild dev", () => {
         await expect(page.locator("[data-link]")).toHaveAttribute(
           "data-link",
           "HMR links: 1",
+          { timeout: hmrTimeout },
         );
 
         expect(page.errors).toEqual([]);

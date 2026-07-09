@@ -24,10 +24,20 @@ const NEW_PADDING = "30px";
 
 const fixtures = [
   ...bundlerTemplates,
-  // TODO: Figure out why this is failing. It works outside the integration tests.
+  // RSC Framework mode is intentionally excluded: this matrix always enables
+  // `vanillaExtract: true`, and `@vanilla-extract/webpack-plugin` is NOT applied
+  // in the RSC server (node) compilation. The raw `@vanilla-extract/css` runtime
+  // (setFileScope/style/globalStyle) leaks into `build/server/index.js` instead
+  // of being compiled to CSS, which corrupts the affected route's
+  // `?client-route-module=route` "use client" boundary. Its exports (e.g.
+  // `links`) then serialize as raw functions during the RSC render, throwing
+  // "Functions cannot be passed directly to Client Components" (HTTP 500).
+  // Non-vanilla CSS (bundled/css-modules/postcss/links export) works in RSC
+  // framework mode — see rsc/rsc-css-test.ts. Re-enable once vanilla-extract is
+  // compiled in the RSC server environment.
   // {
   //   templateName: "rsc-framework",
-  //   templateDisplayName: "RSC Vite Framework",
+  //   templateDisplayName: "RSC Framework",
   // },
 ] as const satisfies ReadonlyArray<{
   templateName: TemplateName;

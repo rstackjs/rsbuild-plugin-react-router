@@ -208,6 +208,44 @@ function applyRouteModuleUpdate(routeId, update, routeEntry, routeModules) {
   };
 }
 
+function getRouteById(routes, routeId) {
+  for (const route of routes) {
+    if (route.id === routeId) {
+      return route;
+    }
+    if (route.children) {
+      const child = getRouteById(route.children, routeId);
+      if (child) {
+        return child;
+      }
+    }
+  }
+}
+
+function patchCurrentRouteMatches(router, routes) {
+  if (
+    !router.state ||
+    !Array.isArray(router.state.matches) ||
+    typeof router._internalSetStateDoNotUseOrYouWillBreakYourApp !== 'function'
+  ) {
+    return;
+  }
+
+  let changed = false;
+  const matches = router.state.matches.map(match => {
+    const route = getRouteById(routes, match.route.id);
+    if (!route || route === match.route) {
+      return match;
+    }
+    changed = true;
+    return { ...match, route };
+  });
+
+  if (changed) {
+    router._internalSetStateDoNotUseOrYouWillBreakYourApp({ matches });
+  }
+}
+
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
     return { nextManifest: undefined, shouldRefreshRouteState: false };
@@ -253,6 +291,7 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
       context.isSpaMode
     );
     router._internalSetRoutes(routes);
+    patchCurrentRouteMatches(router, routes);
   }
 
   return { nextManifest, shouldRefreshRouteState };
