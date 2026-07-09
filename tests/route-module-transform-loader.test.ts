@@ -1,10 +1,12 @@
 import { describe, expect, it, rstest } from '@rstest/core';
 import routeModuleTransformLoader, {
+  flushRouteModuleTransformLoaderPerformance,
   type RouteModuleTransformLoaderOptions,
 } from '../src/route-module-transform-loader';
 
 const defaultOptions: RouteModuleTransformLoaderOptions = {
   environmentName: 'web',
+  performanceScopeId: 'web:dev:ssr:/project/app/root.tsx',
   logPerformance: false,
   ssr: true,
   isBuild: false,
@@ -63,7 +65,7 @@ describe('route module transform loader', () => {
     expect(result.map).toBeDefined();
   });
 
-  it('logs route-module performance reports when enabled', async () => {
+  it('aggregates route-module performance reports when enabled', async () => {
     const info = rstest.spyOn(console, 'info').mockImplementation(() => {});
 
     try {
@@ -73,7 +75,15 @@ describe('route module transform loader', () => {
         `,
         { options: { ...defaultOptions, logPerformance: true } }
       );
+      await runLoader(
+        `
+          export default function Route() { return null; }
+        `,
+        { options: { ...defaultOptions, logPerformance: true } }
+      );
 
+      expect(info).not.toHaveBeenCalled();
+      flushRouteModuleTransformLoaderPerformance();
       expect(info).toHaveBeenCalledTimes(1);
       const message = String(info.mock.calls[0][0]);
       const prefix = '[react-router:performance] ';
@@ -82,14 +92,59 @@ describe('route module transform loader', () => {
       const report = JSON.parse(message.slice(prefix.length));
       expect(report.environment).toBe('web');
       expect(report.operations['route:module']).toMatchObject({
-        count: 1,
-        slowest: [
-          {
-            resource: '/project/app/routes/page.tsx?react-router-route',
-          },
-        ],
+        count: 2,
       });
+      expect(report.operations['route:module'].slowest[0].resource).toBe(
+        '/project/app/routes/page.tsx?react-router-route'
+      );
     } finally {
+      flushRouteModuleTransformLoaderPerformance();
+      info.mockRestore();
+    }
+  });
+
+  it('keeps route-module performance scopes isolated', async () => {
+    const info = rstest.spyOn(console, 'info').mockImplementation(() => {});
+
+    try {
+      await runLoader(
+        `
+          export default function Route() { return null; }
+        `,
+        {
+          options: {
+            ...defaultOptions,
+            logPerformance: true,
+            performanceScopeId: 'scope-a',
+          },
+        }
+      );
+      await runLoader(
+        `
+          export default function Route() { return null; }
+        `,
+        {
+          options: {
+            ...defaultOptions,
+            logPerformance: true,
+            performanceScopeId: 'scope-b',
+          },
+        }
+      );
+
+      flushRouteModuleTransformLoaderPerformance();
+
+      expect(info).toHaveBeenCalledTimes(2);
+      for (const call of info.mock.calls) {
+        const message = String(call[0]);
+        const report = JSON.parse(
+          message.slice('[react-router:performance] '.length)
+        );
+        expect(report.environment).toBe('web');
+        expect(report.operations['route:module'].count).toBe(1);
+      }
+    } finally {
+      flushRouteModuleTransformLoaderPerformance();
       info.mockRestore();
     }
   });

@@ -41,6 +41,7 @@ describe('route module transform rules', () => {
     expect(queryRule.use[0]).toMatchObject({
       options: {
         environmentName: 'web',
+        performanceScopeId: 'web:dev:ssr:/project/app/root.tsx',
         logPerformance: true,
         ssr: true,
         isBuild: false,

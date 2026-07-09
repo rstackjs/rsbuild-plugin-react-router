@@ -72,6 +72,12 @@ export const registerRouteModuleTransformRules = (
   const routeModuleTransformUse = createRouteModuleTransformUse(
     {
       environmentName,
+      performanceScopeId: [
+        environmentName,
+        isBuild ? 'build' : 'dev',
+        ssr ? 'ssr' : 'spa',
+        rootRoutePath ?? 'rootless',
+      ].join(':'),
       logPerformance,
       ssr,
       isBuild,

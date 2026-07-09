@@ -57,32 +57,6 @@ export type ReactRouterPerformanceReport = {
   operations: Record<string, OperationTiming>;
 };
 
-export const createSingleOperationPerformanceReport = ({
-  environment,
-  operation,
-  resource,
-  durationMs,
-}: {
-  environment: string | undefined;
-  operation: string;
-  resource: string;
-  durationMs: number;
-}): ReactRouterPerformanceReport => {
-  const roundedDurationMs = roundMs(durationMs);
-  return {
-    environment: environment ?? 'unknown',
-    operations: {
-      [operation]: {
-        count: 1,
-        totalMs: roundedDurationMs,
-        wallMs: roundedDurationMs,
-        maxMs: roundedDurationMs,
-        slowest: [{ durationMs: roundedDurationMs, resource }],
-      },
-    },
-  };
-};
-
 export const formatReactRouterPerformanceReport = (
   report: ReactRouterPerformanceReport
 ): string => `[react-router:performance] ${JSON.stringify(report)}`;
