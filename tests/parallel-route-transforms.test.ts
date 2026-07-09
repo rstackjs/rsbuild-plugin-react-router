@@ -591,4 +591,160 @@ describe('parallel route transforms', () => {
     });
     expect(withoutSourceMaps.map).toBeNull();
   });
+
+  // These pin `collectUnregisteredComponentNames` (route-transform-tasks.ts,
+  // the dev-HMR $RefreshReg$ backfill for pre-lowered JSX, e.g. MDX routes)
+  // against react-refresh/babel's own component-detection ruleset
+  // (react-refresh/cjs/react-refresh-babel.development.js). The heuristic is
+  // now aligned with that ruleset: single-declarator gate, curried-arrow bail,
+  // require*/import*/Import callee rejection, first-argument recursion for
+  // wrapping calls, and a runtime guard that matches `register()`'s own
+  // function-or-exotic-object acceptance.
+  describe('dev HMR $RefreshReg$ backfill for pre-lowered routes', () => {
+    const devHmrTask = (
+      code: string,
+      overrides: Partial<Omit<RouteModuleTransformTask, 'kind' | 'code'>> = {}
+    ) =>
+      createRouteModuleTask({
+        code,
+        devHmr: true,
+        environmentName: 'web',
+        isBuild: false,
+        ...overrides,
+      });
+
+    it('registers a top-level function declaration component (matches babel)', async () => {
+      const result = await executeRouteTransformTask(
+        devHmrTask(`export function App(){return null}`)
+      );
+
+      expect(result.code).toContain('$RefreshReg$(App, "App")');
+    });
+
+    it('registers a single-declarator arrow-fn const referenced as default export (matches babel)', async () => {
+      const result = await executeRouteTransformTask(
+        devHmrTask(`const Foo = () => null; export default Foo;`)
+      );
+
+      expect(result.code).toContain('$RefreshReg$(Foo, "Foo")');
+    });
+
+    it('skips a multi-declarator export entirely (aligned with react-refresh as of this change)', async () => {
+      // Babel's react-refresh visitor only registers a VariableDeclaration
+      // when it has exactly one declarator. We now bail on the whole
+      // declaration too, so neither `A` (componentish) nor `B` is registered.
+      const result = await executeRouteTransformTask(
+        devHmrTask(`export const A = ()=>null, B = 2;`)
+      );
+
+      expect(result.code).not.toContain('$RefreshReg$(A, "A")');
+      expect(result.code).not.toContain('$RefreshReg$(B, "B")');
+    });
+
+    it('rejects a CallExpression init whose argument is not a component (aligned with react-refresh as of this change)', async () => {
+      // Babel recurses into the call's first argument and only registers
+      // when it resolves to a component (fn expr / componentish identifier /
+      // nested call). We now recurse the first argument too, so an HOC-like
+      // call with a plain string argument such as `createBox('div')` is no
+      // longer a false positive.
+      const result = await executeRouteTransformTask(
+        devHmrTask(`const Layout = createBox('div'); export default Layout;`)
+      );
+
+      expect(result.code).not.toContain('$RefreshReg$(Layout, "Layout")');
+    });
+
+    it('emits a memo()-wrapped component registration that fires at runtime (aligned with react-refresh as of this change)', async () => {
+      // We collect `Card` and emit a guarded `$RefreshReg$` call. The guard
+      // now also accepts non-null objects, so the `memo`/`forwardRef` exotic
+      // object registers -- matching react-refresh's runtime `register()`,
+      // which tags functions and `$$typeof` exotic objects alike.
+      const result = await executeRouteTransformTask(
+        devHmrTask(
+          `import { memo } from 'react'; const Card = memo(()=>null); export default Card;`
+        )
+      );
+
+      expect(result.code).toContain(
+        "if (typeof Card === 'function' || (typeof Card === 'object' && Card !== null)) $RefreshReg$(Card, \"Card\");"
+      );
+    });
+
+    it('rejects a require/interop-wrapped init (aligned with react-refresh as of this change)', async () => {
+      // Babel excludes CallExpression inits whose callee is
+      // `require*`/`import*`/`Import`, and otherwise only registers when the
+      // first argument resolves to a component. We now do both, so
+      // `_interopRequireDefault(x)` -- whose lowercase `x` argument is not
+      // componentish -- is rejected.
+      const result = await executeRouteTransformTask(
+        devHmrTask(
+          `const Fragment = _interopRequireDefault(x); export default Fragment;`
+        )
+      );
+
+      expect(result.code).not.toContain('$RefreshReg$(Fragment, "Fragment")');
+    });
+
+    it('registers an inline `export default function Route(){}` (matches babel, not via the collector\'s own export-default handling)', async () => {
+      // NOTE: collectUnregisteredComponentNames never inspects
+      // ExportDefaultDeclaration itself, so in isolation it would miss this
+      // case. In the real pipeline it still matches babel here because
+      // transformRoute() runs *before* the refresh backfill and rewrites
+      // `export default function Route(){}` into a bare `function Route(){}`
+      // declaration plus a separate `export default
+      // _withComponentProps(Route)` statement -- so the bare function
+      // declaration is picked up by the FunctionDeclaration branch instead.
+      const result = await executeRouteTransformTask(
+        devHmrTask(`export default function Route(){return null}`)
+      );
+
+      expect(result.code).toContain('$RefreshReg$(Route, "Route")');
+    });
+
+    it('skips class components and non-function capitalized constants (matches babel)', async () => {
+      const classDecl = await executeRouteTransformTask(
+        devHmrTask(`class App{ render(){ return null } } export default App;`)
+      );
+      expect(classDecl.code).not.toContain('$RefreshReg$');
+
+      const classExpr = await executeRouteTransformTask(
+        devHmrTask(`const App = class{}; export default App;`)
+      );
+      expect(classExpr.code).not.toContain('$RefreshReg$');
+
+      const nonFnConst = await executeRouteTransformTask(
+        devHmrTask(
+          `export const N = 5; export default function Other(){return null}`
+        )
+      );
+      expect(nonFnConst.code).not.toContain('$RefreshReg$(N, "N")');
+      expect(nonFnConst.code).toContain('$RefreshReg$(Other, "Other")');
+    });
+
+    it('subtracts components already registered via an existing $RefreshReg$ call (matches babel/SWC dedupe)', async () => {
+      const result = await executeRouteTransformTask(
+        devHmrTask(
+          `function App(){return null} $RefreshReg$(_c, "App"); export default App;`
+        )
+      );
+
+      // Only the pre-existing call should be present; no backfill block
+      // should be appended for a name that is already registered.
+      expect(result.code).not.toContain(
+        "if (typeof $RefreshReg$ === 'function')"
+      );
+    });
+
+    it('bails on a curried arrow (aligned with react-refresh as of this change)', async () => {
+      // Babel breaks out of registration when the arrow's body is itself an
+      // arrow function (a curried component factory, not a component). We now
+      // apply the same bail, so the outer arrow's identifier is not
+      // registered.
+      const result = await executeRouteTransformTask(
+        devHmrTask(`const A = () => () => null; export default A;`)
+      );
+
+      expect(result.code).not.toContain('$RefreshReg$(A, "A")');
+    });
+  });
 });

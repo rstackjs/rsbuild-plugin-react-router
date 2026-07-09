@@ -156,13 +156,87 @@ const createClientOnlyStub = async (
 
 const isComponentishName = (name: string): boolean => /^[A-Z]/.test(name);
 
+type AnyNode = {
+  type?: string;
+  name?: string;
+  body?: { type?: string };
+  callee?: { type?: string; name?: string };
+  arguments?: Array<AnyNode>;
+};
+
+/**
+ * Whether an expression that appears as the first argument of a wrapping call
+ * resolves to a component, mirroring react-refresh/babel's
+ * `findInnerComponents` recursion for the node kinds it accepts as arguments.
+ */
+const argumentResolvesToComponent = (node: AnyNode | undefined): boolean => {
+  switch (node?.type) {
+    case 'FunctionExpression':
+      return true;
+    case 'ArrowFunctionExpression':
+      // Babel bails on a curried arrow (an arrow whose body is another arrow):
+      // that is a component factory, not a component.
+      return node.body?.type !== 'ArrowFunctionExpression';
+    case 'Identifier':
+      return !!node.name && isComponentishName(node.name);
+    case 'CallExpression':
+      return callResolvesToComponent(node);
+    default:
+      return false;
+  }
+};
+
+/**
+ * Whether a `CallExpression` resolves to a component: it must have at least one
+ * argument, a callee that is not `Import`/`require*`/`import*`, and a first
+ * argument that itself resolves to a component.
+ */
+const callResolvesToComponent = (node: AnyNode): boolean => {
+  const args = node.arguments ?? [];
+  if (args.length === 0) {
+    return false;
+  }
+  const callee = node.callee;
+  if (!callee || callee.type === 'Import') {
+    return false;
+  }
+  if (callee.type === 'Identifier') {
+    const calleeName = callee.name ?? '';
+    if (calleeName.startsWith('require') || calleeName.startsWith('import')) {
+      return false;
+    }
+  } else if (callee.type !== 'MemberExpression') {
+    return false;
+  }
+  return argumentResolvesToComponent(args[0]);
+};
+
+/**
+ * Whether a `VariableDeclarator` initializer resolves to a component, matching
+ * react-refresh/babel's accepted init kinds: a non-curried arrow, a function
+ * expression, a tagged template, or a qualifying call expression.
+ */
+const initResolvesToComponent = (init: AnyNode): boolean => {
+  switch (init.type) {
+    case 'FunctionExpression':
+    case 'TaggedTemplateExpression':
+      return true;
+    case 'ArrowFunctionExpression':
+      return init.body?.type !== 'ArrowFunctionExpression';
+    case 'CallExpression':
+      return callResolvesToComponent(init);
+    default:
+      return false;
+  }
+};
+
 const collectDeclaredComponentNames = (
   declaration: {
     type?: string;
     id?: { name?: string };
     declarations?: Array<{
       id?: { type?: string; name?: string };
-      init?: { type?: string };
+      init?: AnyNode;
     }>;
   },
   names: Set<string>
@@ -178,18 +252,21 @@ const collectDeclaredComponentNames = (
   if (declaration.type !== 'VariableDeclaration') {
     return;
   }
-  for (const declarator of declaration.declarations ?? []) {
-    if (
-      declarator.id?.type === 'Identifier' &&
-      declarator.id.name &&
-      isComponentishName(declarator.id.name) &&
-      declarator.init &&
-      (declarator.init.type === 'ArrowFunctionExpression' ||
-        declarator.init.type === 'FunctionExpression' ||
-        declarator.init.type === 'CallExpression')
-    ) {
-      names.add(declarator.id.name);
-    }
+  const declarators = declaration.declarations ?? [];
+  // Babel's react-refresh visitor only registers a `VariableDeclaration` with
+  // exactly one declarator; multi-declarator declarations are skipped whole.
+  if (declarators.length !== 1) {
+    return;
+  }
+  const [declarator] = declarators;
+  if (
+    declarator?.id?.type === 'Identifier' &&
+    declarator.id.name &&
+    isComponentishName(declarator.id.name) &&
+    declarator.init &&
+    initResolvesToComponent(declarator.init)
+  ) {
+    names.add(declarator.id.name);
   }
 };
 
@@ -245,7 +322,11 @@ const buildComponentRefreshRegistrations = (names: string[]): string => {
   const registrations = names
     .map(
       name =>
-        `  if (typeof ${name} === 'function') $RefreshReg$(${name}, ${JSON.stringify(name)});`
+        // react-refresh's runtime `register()` tags plain functions *and*
+        // non-null exotic objects (memo/forwardRef `$$typeof` wrappers),
+        // ignoring everything else safely -- so mirror that guard here. The
+        // `typeof` short-circuit keeps this safe even for undeclared names.
+        `  if (typeof ${name} === 'function' || (typeof ${name} === 'object' && ${name} !== null)) $RefreshReg$(${name}, ${JSON.stringify(name)});`
     )
     .join('\n');
   return `\nif (typeof $RefreshReg$ === 'function') {\n${registrations}\n}\n`;
