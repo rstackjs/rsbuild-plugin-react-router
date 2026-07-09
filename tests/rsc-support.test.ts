@@ -34,6 +34,7 @@ describe('RSC support helpers', () => {
       basename: '/',
       buildDirectory: '/repo/build',
       isBuild: false,
+      jsDistPath: 'custom/js',
       outputClientPath: '/repo/build/client',
       publicPath: '/assets',
       routeDiscovery: { mode: 'initial' },
@@ -50,7 +51,7 @@ describe('RSC support helpers', () => {
     expect(modules['virtual/react-router/server-build']).toBeUndefined();
     expect(
       modules['virtual/react-router/unstable_rsc/bootstrap-scripts']
-    ).toContain('/assets/static/js/index.js');
+    ).toContain('/assets/custom/js/index.js');
     expect(
       modules['virtual/react-router/unstable_rsc/inject-hmr-runtime']
     ).toContain('rsc:update');
@@ -75,6 +76,7 @@ describe('RSC support helpers', () => {
         basename: '/',
         buildDirectory: '/repo/build',
         isBuild: true,
+        jsDistPath: 'static/js',
         outputClientPath: '/repo/build/client',
         publicPath: '/',
         routeDiscovery,

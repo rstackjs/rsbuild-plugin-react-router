@@ -1,7 +1,7 @@
 import { relative, resolve } from 'pathe';
 import type { Config } from './react-router-config.js';
 import type { Route } from './types.js';
-import { normalizeAssetPrefix } from './plugin-utils.js';
+import { combineURLs, normalizeAssetPrefix } from './plugin-utils.js';
 import { getVirtualModuleFilePath } from './virtual-modules.js';
 import {
   createRscInternalClientModule,
@@ -28,6 +28,8 @@ type RscVirtualModulesOptions = {
   basename: string;
   buildDirectory: string;
   isBuild: boolean;
+  /** Resolved web `output.distPath.js` segment, e.g. `static/js`. */
+  jsDistPath: string;
   outputClientPath: string;
   publicPath: string;
   routeDiscovery: Config['routeDiscovery'];
@@ -60,6 +62,7 @@ export const createReactRouterRscVirtualModules = ({
   basename,
   buildDirectory,
   isBuild,
+  jsDistPath,
   outputClientPath,
   publicPath,
   routeDiscovery,
@@ -99,7 +102,7 @@ export const createReactRouterRscVirtualModules = ({
         publicPath,
       }),
     'virtual/react-router/unstable_rsc/bootstrap-scripts': defaultExport([
-      `${bootstrapPublicPath}static/js/index.js`,
+      combineURLs(bootstrapPublicPath, `${jsDistPath}/index.js`),
     ]),
     'virtual/react-router/unstable_rsc/server-manifest': `export default function getServerManifest() {
   return __webpack_require__.rscM?.serverManifest;

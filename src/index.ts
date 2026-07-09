@@ -664,15 +664,28 @@ export const pluginReactRouter = (
     }
 
     // Public requests stay bare while Rspack resolves seeded virtual files.
-    const createVirtualModulePlugin = (publicPath: string) => {
+    const createVirtualModulePlugin = (
+      publicPath: string,
+      jsDistPath: string
+    ) => {
       return new rspack.experiments.VirtualModulesPlugin(
-        mapVirtualModules(modePlan.createVirtualModules(publicPath))
+        mapVirtualModules(modePlan.createVirtualModules(publicPath, jsDistPath))
       );
     };
 
     api.modifyRsbuildConfig(async (config, { mergeRsbuildConfig }) => {
+      // The RSC bootstrap script URL must reflect the user's web js distPath;
+      // the entry filename itself is deterministic because the plugin forces
+      // web `output.filename.js` to '[name].js' below.
+      const webDistPath = config.environments?.web?.output?.distPath;
+      const rootDistPath = config.output?.distPath;
+      const jsDistPath =
+        (typeof webDistPath === 'object' ? webDistPath.js : undefined) ??
+        (typeof rootDistPath === 'object' ? rootDistPath.js : undefined) ??
+        'static/js';
       const vmodPlugin = createVirtualModulePlugin(
-        normalizeAssetPrefix(config.output?.assetPrefix)
+        normalizeAssetPrefix(config.output?.assetPrefix),
+        jsDistPath
       );
       const useAsyncNodeChunkLoading =
         options.federation && resolvedServerOutput === 'commonjs';
