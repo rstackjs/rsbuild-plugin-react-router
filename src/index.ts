@@ -189,6 +189,7 @@ export const pluginReactRouter = (
 
     const {
       resolved: resolvedConfig,
+      userAndPresetConfig,
       presets: configPresets,
       hasConfiguredServerModuleFormat,
     } = await resolveReactRouterConfig(reactRouterUserConfig);
@@ -203,8 +204,10 @@ export const pluginReactRouter = (
       ssr,
       prerender: prerenderConfig,
       serverBuildFile,
+      serverBundles,
       serverModuleFormat,
       splitRouteModules,
+      subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
 
@@ -364,14 +367,22 @@ export const pluginReactRouter = (
     };
 
     const resolvedConfigWithRoutes: ResolvedReactRouterConfig = {
-      ...resolvedConfig,
       appDirectory: resolve(appDirectory),
+      basename,
       buildDirectory: resolve(buildDirectory),
-      routeDiscovery,
+      buildEnd,
+      future,
       prerender: prerenderConfig,
       routes,
-      unstable_routeConfig: routeConfig,
+      routeDiscovery,
+      serverBuildFile,
+      serverBundles,
+      serverModuleFormat,
+      ssr,
+      splitRouteModules,
+      subResourceIntegrity,
       allowedActionOrigins: allowedActionOrigins ?? false,
+      unstable_routeConfig: routeConfig,
     };
 
     const { buildEnd: _buildEnd, ...resolvedConfigForPreset } =
@@ -382,6 +393,10 @@ export const pluginReactRouter = (
           resolvedConfigForPreset as ReactRouterPresetResolvedConfig,
       });
     }
+    const buildEndReactRouterConfig: ResolvedReactRouterConfig = {
+      ...resolvedConfigWithRoutes,
+      future: userAndPresetConfig.future ?? {},
+    } as ResolvedReactRouterConfig;
 
     const isBuild = api.context.action === 'build';
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
@@ -623,7 +638,7 @@ export const pluginReactRouter = (
               routeChunkOptions: modePlan.routeChunkOptions,
               routeModuleAnalysis,
               buildManifest: modePlan.artifacts.buildManifest,
-              resolvedConfigWithRoutes,
+              buildEndReactRouterConfig,
               buildEnd,
             })
           )
@@ -760,15 +775,16 @@ export const pluginReactRouter = (
                     },
                   ],
                 },
-                ...(options.federation
-                  ? {
-                      output: {
-                        chunkLoading: 'import',
-                      },
-                    }
-                  : {}),
                 externalsType: modePlan.webExternalsType,
-                output: modePlan.webOutput,
+                output: {
+                  ...modePlan.webOutput,
+                  publicPath: normalizeAssetPrefix(config.output?.assetPrefix),
+                  ...(options.federation
+                    ? {
+                        chunkLoading: 'import',
+                      }
+                    : {}),
+                },
                 optimization: modePlan.webOptimization,
               },
             },

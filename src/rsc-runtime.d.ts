@@ -97,6 +97,10 @@ declare module 'virtual/react-router/unstable_rsc/bootstrap-scripts' {
   export default bootstrapScripts;
 }
 
+declare module 'virtual/react-router/unstable_rsc/server-manifest' {
+  export default function getServerManifest(): unknown;
+}
+
 declare module 'virtual:react-router/unstable_rsc/routes' {
   export { default } from 'virtual/react-router/unstable_rsc/routes';
 }
@@ -121,4 +125,8 @@ declare module 'virtual:react-router/unstable_rsc/inject-hmr-runtime' {}
 
 declare module 'virtual:react-router/unstable_rsc/bootstrap-scripts' {
   export { default } from 'virtual/react-router/unstable_rsc/bootstrap-scripts';
+}
+
+declare module 'virtual:react-router/unstable_rsc/server-manifest' {
+  export { default } from 'virtual/react-router/unstable_rsc/server-manifest';
 }

@@ -57,6 +57,9 @@ describe('RSC support helpers', () => {
     expect(
       modules['virtual/react-router/unstable_rsc/allowed-action-origins']
     ).toBe('export default ["https://app.example.com"];');
+    expect(
+      modules['virtual/react-router/unstable_rsc/server-manifest']
+    ).toContain('__webpack_require__.rscM?.serverManifest');
   });
 
   it('defaults RSC route discovery for SSR and SPA mode', () => {

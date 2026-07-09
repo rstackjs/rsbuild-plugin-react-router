@@ -75,7 +75,7 @@ type RunReactRouterPrerenderBuildOptions = {
   routeChunkOptions: RouteChunkManifestOptions | undefined;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
   buildManifest: Awaited<ReturnType<typeof getBuildManifest>>;
-  resolvedConfigWithRoutes: ResolvedReactRouterConfig;
+  buildEndReactRouterConfig: ResolvedReactRouterConfig;
   buildEnd: Config['buildEnd'];
 };
 
@@ -633,7 +633,7 @@ export const runReactRouterPrerenderBuild = async (
     routeChunkOptions,
     routeModuleAnalysis,
     buildManifest,
-    resolvedConfigWithRoutes,
+    buildEndReactRouterConfig,
     buildEnd,
     basename,
   } = options;
@@ -726,8 +726,8 @@ export const runReactRouterPrerenderBuild = async (
   if (buildEnd) {
     await buildEnd({
       buildManifest,
-      reactRouterConfig: resolvedConfigWithRoutes,
-      viteConfig: api.getNormalizedConfig(),
+      reactRouterConfig: buildEndReactRouterConfig,
+      rsbuildConfig: api.getNormalizedConfig(),
     });
   }
 };

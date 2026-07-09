@@ -489,8 +489,13 @@ export const rsbuildPreview = async ({
   // fall back to a static file server with an SPA fallback to `index.html`,
   // mirroring upstream's `ssr: false` preview handling.
   let serverBundlePath = path.join(cwd, "build/server/static/js/app.js");
+  let rscServerBundlePath = path.join(cwd, "build/server/index.js");
   let clientIndexPath = path.join(cwd, "build/client/index.html");
-  if (!existsSync(serverBundlePath) && existsSync(clientIndexPath)) {
+  if (
+    !existsSync(serverBundlePath) &&
+    !existsSync(rscServerBundlePath) &&
+    existsSync(clientIndexPath)
+  ) {
     return spaStaticPreview({ cwd, port });
   }
   return reactRouterServe({ cwd, port });

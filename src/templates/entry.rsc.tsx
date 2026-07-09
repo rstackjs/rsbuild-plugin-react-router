@@ -17,6 +17,7 @@ import basename from 'virtual/react-router/unstable_rsc/basename';
 import allowedActionOrigins from 'virtual/react-router/unstable_rsc/allowed-action-origins';
 import unstable_reactRouterServeConfig from 'virtual/react-router/unstable_rsc/react-router-serve-config';
 import bootstrapScripts from 'virtual/react-router/unstable_rsc/bootstrap-scripts';
+import getServerManifest from 'virtual/react-router/unstable_rsc/server-manifest';
 import { generateHTML } from './entry.rsc.ssr.js';
 
 export { unstable_reactRouterServeConfig };
@@ -36,8 +37,9 @@ export function fetchServer(
     allowedActionOrigins,
     basename,
     createTemporaryReferenceSet,
-    decodeAction,
-    decodeFormState,
+    decodeAction: body => decodeAction(body, getServerManifest()),
+    decodeFormState: (actionResult, body) =>
+      decodeFormState(actionResult, body, getServerManifest()),
     decodeReply,
     loadServerAction: (id: string) => Promise.resolve(loadServerActionSync(id)),
     request,

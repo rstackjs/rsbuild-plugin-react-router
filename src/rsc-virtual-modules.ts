@@ -19,6 +19,7 @@ const RSC_VIRTUAL_ALIAS_IDS = [
   'allowed-action-origins',
   'react-router-serve-config',
   'bootstrap-scripts',
+  'server-manifest',
 ] as const;
 
 type RscVirtualModulesOptions = {
@@ -100,6 +101,10 @@ export const createReactRouterRscVirtualModules = ({
     'virtual/react-router/unstable_rsc/bootstrap-scripts': defaultExport([
       `${bootstrapPublicPath}static/js/index.js`,
     ]),
+    'virtual/react-router/unstable_rsc/server-manifest': `export default function getServerManifest() {
+  return __webpack_require__.rscM?.serverManifest;
+}
+`,
     'virtual/react-router/rsc-internal-client': createRscInternalClientModule(),
   };
 };
