@@ -443,7 +443,13 @@ const findFiles = async (directory, predicate) => {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name === '.tmp') {
+    if (
+      entry.name === 'node_modules' ||
+      entry.name === '.tmp' ||
+      entry.name === '.react-router' ||
+      entry.name === 'test-results' ||
+      entry.name === 'playwright-report'
+    ) {
       continue;
     }
     const absolutePath = path.join(directory, entry.name);
