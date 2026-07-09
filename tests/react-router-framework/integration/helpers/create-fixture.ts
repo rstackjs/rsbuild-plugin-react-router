@@ -22,8 +22,8 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 
 import { type TemplateName, rsbuildConfig, reactRouterConfig } from "./rsbuild.js";
 import {
+  assertNoViteConfigFiles,
   finalizeFixtureProject,
-  normalizeFixtureFiles,
   prepareFixtureProjectDependencies,
   reactRouterServeBin,
   rsbuildBin,
@@ -548,9 +548,7 @@ export async function createFixtureProject(
   await cp(integrationTemplateDir, projectDir, { recursive: true });
 
   let hasBundlerConfig = Object.keys(init.files ?? {}).some(
-    (filename) =>
-      filename.startsWith("rsbuild.config.") ||
-      filename.startsWith("vite.config."),
+    (filename) => filename.startsWith("rsbuild.config."),
   );
 
   let hasReactRouterConfig = Object.keys(init.files ?? {}).some((filename) =>
@@ -560,7 +558,7 @@ export async function createFixtureProject(
   let { spaMode } = init;
 
   await writeTestFiles(
-    normalizeFixtureFiles({
+    assertNoViteConfigFiles({
       ...(hasBundlerConfig
         ? {}
         : {
@@ -627,7 +625,7 @@ async function writeTestFiles(
   files: Record<string, string> | undefined,
   dir: string,
 ) {
-  const normalizedFiles = normalizeFixtureFiles(files ?? {});
+  const normalizedFiles = assertNoViteConfigFiles(files ?? {});
   await Promise.all(
     Object.keys(normalizedFiles).map(async (filename) => {
       let filePath = path.join(dir, filename);

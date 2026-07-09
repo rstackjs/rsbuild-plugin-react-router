@@ -15,8 +15,8 @@ import type { Page } from "@playwright/test";
 import { test as base, expect } from "@playwright/test";
 import type { Config } from "@react-router/dev/config";
 import {
+  assertNoViteConfigFiles,
   finalizeFixtureProject,
-  normalizeFixtureFiles,
   prepareFixtureProjectDependencies,
   reactRouterServeBin,
   rsbuildBin,
@@ -372,11 +372,13 @@ export async function createProject(
 
   // user-defined files
   await Promise.all(
-    Object.entries(normalizeFixtureFiles(files)).map(async ([filename, contents]) => {
-      let filepath = path.join(projectDir, filename);
-      await mkdir(path.dirname(filepath), { recursive: true });
-      await writeFile(filepath, stripIndent(contents));
-    }),
+    Object.entries(assertNoViteConfigFiles(files)).map(
+      async ([filename, contents]) => {
+        let filepath = path.join(projectDir, filename);
+        await mkdir(path.dirname(filepath), { recursive: true });
+        await writeFile(filepath, stripIndent(contents));
+      },
+    ),
   );
 
   await finalizeFixtureProject({ projectDir, templateName });

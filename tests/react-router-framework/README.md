@@ -103,12 +103,12 @@ Tests author `rsbuild.config.ts` fixtures directly: the `rsbuildConfig` helper
 factory in `integration/helpers/rsbuild.ts` (formerly `viteConfig` in
 `helpers/vite.ts`) emits rsbuild config text (see its doc comment for the
 Vite -> rsbuild option mappings), and inline fixture configs are written as
-rsbuild configs with comments marking dropped Vite-only options. The adapter's
-`vite.config.*` interception remains only as a safety net and `console.warn`s
-loudly when it fires — new tests must not rely on it. The upstream
-`vite-7-template` / `vite-8-template` pair is collapsed into a single template,
-renamed to `rsbuild-template` (the Vite major split is meaningless for
-rsbuild).
+rsbuild configs with comments marking dropped Vite-only options. The adapter
+rejects `vite.config.*` fixture files and requires tests to author
+`rsbuild.config.ts` explicitly so test-specific options are preserved. The
+upstream `vite-7-template` / `vite-8-template` pair is collapsed into a single
+template, renamed to `rsbuild-template` (the Vite major split is meaningless
+for rsbuild).
 
 ## Intentional divergences from upstream
 
