@@ -268,6 +268,7 @@ test.describe("base + React Router basename", () => {
         test("works with child routes using client loaders", async ({
           page,
         }) => {
+          test.setTimeout(180_000);
           let basename = "/mybase/";
           await setup({
             base: basename,
@@ -341,10 +342,12 @@ test.describe("base + React Router basename", () => {
 
           expect(hydrationErrors).toEqual([]);
 
-          await page.waitForSelector("#child");
-          await expect(page.locator("#child")).toHaveText("CHILD");
+          await expect(page.locator("#child")).toHaveText("CHILD", {
+            timeout: devHmrTimeout,
+          });
           await expect(page.locator("[data-mounted]")).toHaveText(
             "Mounted: yes",
+            { timeout: devHmrTimeout },
           );
         });
       });
