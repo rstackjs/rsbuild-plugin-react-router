@@ -7,6 +7,17 @@ import stripIndent from "strip-indent";
 import type { TemplateName } from "./rsbuild.js";
 export { prepareFixtureProjectDependencies } from "./fixture-workspace-dependencies.js";
 
+// Templates that author their OWN rsbuild.config.ts in the template directory
+// (see integration/helpers/<name>/rsbuild.config.ts). The synthesizer below
+// must never generate a config for these: a synthesized config would be the
+// wrong bundler mode. `rsc-preview` is the data-mode RSC bundler template — it
+// ships an rsbuild.config.ts wired for `rsbuild-plugin-rsc` directly, NOT the
+// framework-mode `pluginReactRouterRSC`. Keep this in sync with the
+// TemplateName union in ./rsbuild.ts.
+const TEMPLATES_SHIPPING_OWN_CONFIG: ReadonlySet<TemplateName> = new Set<TemplateName>([
+  "rsc-preview",
+]);
+
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
 const reactRouterVersion = "^8.0.1";
@@ -103,10 +114,37 @@ export async function finalizeFixtureProject({
   );
 
   const rsbuildConfigPath = path.join(projectDir, "rsbuild.config.ts");
-  if (!existsSync(rsbuildConfigPath)) {
+  const configExists = existsSync(rsbuildConfigPath);
+
+  if (templateName != null && TEMPLATES_SHIPPING_OWN_CONFIG.has(templateName)) {
+    // This template is expected to carry its own rsbuild.config.ts. Never
+    // synthesize one — a generic synthesized config would be the wrong bundler
+    // mode (e.g. framework-mode `pluginReactRouterRSC` instead of the
+    // data-mode `rsbuild-plugin-rsc` setup rsc-preview needs). If the shipped
+    // config is missing, that is a corpus/template regression, so fail loudly
+    // and name the offending template rather than silently writing a
+    // wrong-mode config.
+    if (!configExists) {
+      throw new Error(
+        `[rsbuild-adapter] Template "${templateName}" is expected to ship its ` +
+          `own rsbuild.config.ts, but none was found at ${rsbuildConfigPath}. ` +
+          `Restore the template's rsbuild.config.ts instead of relying on the ` +
+          `synthesizer — a synthesized config would be the wrong bundler mode.`,
+      );
+    }
+    return;
+  }
+
+  if (!configExists) {
+    // Framework-mode templates don't ship a config; synthesize the right one.
+    // Only the framework RSC template (`rsc-framework`) gets
+    // `pluginReactRouterRSC`; every other framework template gets the standard
+    // `pluginReactRouter`. Matching the exact template name (rather than a
+    // loose `includes("rsc")`) avoids conflating rsc-framework with the
+    // data-mode rsc-preview template handled above.
     await writeFile(
       rsbuildConfigPath,
-      templateName?.includes("rsc")
+      templateName === "rsc-framework"
         ? rsbuildRscConfig({ port })
         : rsbuildConfig({ port }),
       "utf8",
@@ -117,6 +155,22 @@ export async function finalizeFixtureProject({
 async function writePackageJson(projectDir: string, templateName?: TemplateName) {
   const isRscTemplate = templateName?.includes("rsc") ?? false;
   const source = await readPackageJson(projectDir);
+  // The production server entry differs per template, so the "start" script has
+  // to match the actual entry file. Nothing in the harness actually runs this
+  // script — framework fixtures are served via react-router-serve (see
+  // reactRouterServe in rsbuild.ts) and rsc-preview is served by invoking
+  // server.js directly (see integration/rsc/utils.ts) — but we keep it pointed
+  // at the correct file so the generated package.json isn't a trap:
+  //   - rsc-framework ships start.js
+  //   - rsc-preview   ships server.js (NOT start.js)
+  // A loose `isRscTemplate ? node start.js` conflated the two and wrote a
+  // dangling `node start.js` for rsc-preview.
+  const startScript =
+    templateName === "rsc-framework"
+      ? "HOST=127.0.0.1 node start.js"
+      : templateName === "rsc-preview"
+        ? "HOST=127.0.0.1 node server.js"
+        : "HOST=127.0.0.1 react-router-serve ./build/server/static/js/app.js";
   const packageJson = {
     ...source,
     name: source.name ?? `rr-rsbuild-${Math.random().toString(32).slice(2)}`,
@@ -127,9 +181,7 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       dev:
         'NODE_OPTIONS="--experimental-vm-modules --experimental-global-webcrypto" rsbuild dev --host localhost',
       build: "rsbuild build",
-      start: isRscTemplate
-        ? "HOST=127.0.0.1 node start.js"
-        : "HOST=127.0.0.1 react-router-serve ./build/server/static/js/app.js",
+      start: startScript,
       typecheck: "react-router typegen && tsc",
     },
     dependencies: {
@@ -159,6 +211,16 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       "@vanilla-extract/webpack-plugin": "^2.3.27",
       rsbuild: "npm:@rsbuild/core@2.1.0",
       "rsbuild-plugin-react-router": `file:${repoRoot}`,
+      // rsbuild-plugin-rsc version pin. It is pre-1.0, so EVERY 0.x minor is a
+      // breaking change — bump all of these locations together:
+      //   1. package.json          -> dependencies["rsbuild-plugin-rsc"]
+      //   2. package.json          -> peerDependencies["rsbuild-plugin-rsc"]
+      //   3. scripts/sync-react-router-framework-tests.mjs -> packageVersionByName["rsbuild-plugin-rsc"]
+      //        (the source of truth for the fixture package.jsons — a sync
+      //         rewrites them from this map)
+      //   4. this file (rsbuild-adapter.ts) -> synthesized devDependency below
+      //   5. tests/react-router-framework/integration/helpers/rsc-framework/package.json
+      //   6. tests/react-router-framework/integration/helpers/rsc-preview/package.json
       ...(isRscTemplate ? { "rsbuild-plugin-rsc": "^0.1.1" } : {}),
       typescript: "^5.9.3",
     },

@@ -110,6 +110,25 @@ loudly when it fires — new tests must not rely on it. The upstream
 renamed to `rsbuild-template` (the Vite major split is meaningless for
 rsbuild).
 
+## Intentional divergences from upstream
+
+Some corpus files deliberately diverge from the upstream oracle to match how
+`rsbuild-plugin-react-router` actually behaves. These are **not** stale drift —
+do not "restore" them from upstream during a sync. Each is marked with an
+inline `Intentional divergence from upstream` comment at the site; the list
+here exists so a corpus sync doesn't blindly revert them.
+
+- **RSC route-module CSS mechanism** — in
+  `react-router-dev/__tests__/rsc-virtual-route-modules-test.ts`, the expected
+  transform output streams stylesheet links from a route module's
+  `entryCssFiles` array (populated by the rspack RSC runtime for modules marked
+  with the `'use server-entry'` directive) instead of upstream's
+  `import.meta.viteRsc.loadCss()` call. The upstream oracle is Vite-specific;
+  the rsbuild/rspack RSC flavor has no `import.meta.viteRsc`, so the `withCss`
+  helper and the `'use server-entry'` fixtures in that file encode the rsbuild
+  behavior. If a sync reintroduces `import.meta.viteRsc.loadCss()`, restore the
+  `entryCssFiles` / `'use server-entry'` form.
+
 ## Renames
 
 Because this corpus is repo-owned rather than a verbatim upstream mirror, the

@@ -249,6 +249,17 @@ const packageVersionByName = {
   'react-router': '^8.0.1',
   'react-server-dom-rspack': '0.0.2',
   'rsbuild-plugin-react-router': `^${rootPackageJson.version}`,
+  // rsbuild-plugin-rsc version pin. This map is the SOURCE OF TRUTH for the
+  // fixture package.jsons: a sync run normalizes every corpus package.json to
+  // these versions. The plugin is pre-1.0, so every 0.x minor is a breaking
+  // change — bump ALL of these together:
+  //   1. package.json          -> dependencies["rsbuild-plugin-rsc"]
+  //   2. package.json          -> peerDependencies["rsbuild-plugin-rsc"]
+  //   3. this file (packageVersionByName below)
+  //   4. tests/react-router-framework/integration/helpers/rsbuild-adapter.ts
+  //        (synthesized fixture devDependency)
+  //   5. tests/react-router-framework/integration/helpers/rsc-framework/package.json
+  //   6. tests/react-router-framework/integration/helpers/rsc-preview/package.json
   'rsbuild-plugin-rsc': '^0.1.1',
   typescript: '^5.9.3',
 };
