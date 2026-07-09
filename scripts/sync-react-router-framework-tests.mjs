@@ -62,9 +62,13 @@ export const adapterOwnedPaths = [
   'integration/helpers/fixtures.ts',
   'integration/helpers/global-setup.ts',
   'integration/helpers/global-teardown.ts',
+  'integration/helpers/rsbuild-config.ts',
   'integration/helpers/rsbuild.ts',
   'integration/helpers/test-resource-guard.ts',
   'integration/playwright.config.ts',
+  'integration/rsc/rsc-css-test.ts',
+  'integration/svgr-test.ts',
+  'integration/tailwind-test.ts',
 ];
 
 /**
@@ -77,6 +81,7 @@ export const adaptedCorpusPaths = [
   'integration/absolute-base-test.ts',
   'integration/action-test.ts',
   'integration/basename-test.ts',
+  'integration/bug-report-test.ts',
   'integration/build-test.ts',
   'integration/catch-boundary-data-test.ts',
   'integration/cli-test.ts',
@@ -103,6 +108,7 @@ export const adaptedCorpusPaths = [
   'integration/link-test.ts',
   'integration/loader-context-test.ts',
   'integration/manifests-test.ts',
+  'integration/matches-test.ts',
   'integration/mdx-test.ts',
   'integration/middleware-test.ts',
   'integration/node-env-test.ts',
@@ -128,6 +134,7 @@ export const adaptedCorpusPaths = [
   'integration/sri-test.ts',
   'integration/typegen-test.ts',
   'integration/unused-route-exports-test.ts',
+  'react-router-dev/__tests__/fixtures/basic/tsconfig.json',
   'react-router-dev/__tests__/rsc-virtual-route-modules-test.ts',
 ];
 
