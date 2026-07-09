@@ -45,6 +45,24 @@ export default defineConfig({
       output: {
         distPath: { root: "dist/client" },
       },
+      tools: {
+        rspack: {
+          // Client component modules ("use client") expose exports like
+          // `clientLoader`, `clientAction`, `HydrateFallback`, `ErrorBoundary`
+          // that are only referenced dynamically by the RSC runtime via client
+          // references (by export name) — never statically from the browser
+          // entry graph. Production tree-shaking (`usedExports`) would drop
+          // them and `mangleExports` would rename them, so the client would
+          // resolve them to `undefined` and render the wrong tree (a hydration
+          // mismatch, React #418). Disable both so every client export
+          // survives. Mirrors the framework plugin's `webOptimization`
+          // (src/mode-plan.ts).
+          optimization: {
+            usedExports: false,
+            mangleExports: false,
+          },
+        },
+      },
     },
   },
   // Production is handled by server.js. In dev the test runs `rsbuild dev`
