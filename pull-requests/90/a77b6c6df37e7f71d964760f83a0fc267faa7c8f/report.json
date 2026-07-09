@@ -1,0 +1,2516 @@
+{
+  "generatedAt": "2026-07-09T22:43:48.000Z",
+  "pullRequest": "90",
+  "base": {
+    "ref": "main",
+    "sha": "602a92960e62cbf8df6070e8f44ead3c7aea858c",
+    "benchmarkCommit": "602a92960e62cbf8df6070e8f44ead3c7aea858c"
+  },
+  "head": {
+    "ref": "chore/test-ci-hygiene",
+    "sha": "a77b6c6df37e7f71d964760f83a0fc267faa7c8f",
+    "benchmarkCommit": "a77b6c6df37e7f71d964760f83a0fc267faa7c8f"
+  },
+  "runUrl": "https://github.com/rstackjs/rsbuild-plugin-react-router/actions/runs/29053973688",
+  "profile": "full",
+  "mode": "dev",
+  "iterations": 10,
+  "warmup": 0,
+  "summary": {
+    "count": 7,
+    "baseWallMs": 23931.530860999992,
+    "headWallMs": 23426.35599699998,
+    "baseReadyMs": 15853.987668000003,
+    "headReadyMs": 15842.713457000005,
+    "baseRouteTotalMs": 2980.8398990000087,
+    "headRouteTotalMs": 3045.790401999995,
+    "baseUpdateMs": 3133.178834999999,
+    "headUpdateMs": 2802.4049769999947,
+    "wallDeltaPercent": -2.110917462548413,
+    "wallSpeedup": 1.0215643809077564,
+    "readyDeltaPercent": -0.07111277765627502,
+    "routeTotalDeltaPercent": 2.178932958518689,
+    "updateDeltaPercent": -10.557133040253166
+  },
+  "summaryGroups": [
+    {
+      "label": "All dev fixtures",
+      "count": 7,
+      "baseWallMs": 23931.530860999992,
+      "headWallMs": 23426.35599699998,
+      "baseReadyMs": 15853.987668000003,
+      "headReadyMs": 15842.713457000005,
+      "baseRouteTotalMs": 2980.8398990000087,
+      "headRouteTotalMs": 3045.790401999995,
+      "baseUpdateMs": 3133.178834999999,
+      "headUpdateMs": 2802.4049769999947,
+      "wallDeltaPercent": -2.110917462548413,
+      "wallSpeedup": 1.0215643809077564,
+      "readyDeltaPercent": -0.07111277765627502,
+      "routeTotalDeltaPercent": 2.178932958518689,
+      "updateDeltaPercent": -10.557133040253166
+    },
+    {
+      "label": "Large app",
+      "count": 1,
+      "baseWallMs": 11331.687051999994,
+      "headWallMs": 11451.82764199999,
+      "baseReadyMs": 6990.884787999996,
+      "headReadyMs": 7250.691686999999,
+      "baseRouteTotalMs": 1474.5734120000125,
+      "headRouteTotalMs": 1484.3448050000006,
+      "baseUpdateMs": 1690.0197889999981,
+      "headUpdateMs": 1613.9631739999895,
+      "wallDeltaPercent": 1.0602180368084833,
+      "wallSpeedup": 0.9895090466119683,
+      "readyDeltaPercent": 3.716366481192295,
+      "routeTotalDeltaPercent": 0.6626589710942166,
+      "updateDeltaPercent": -4.500338723549035
+    },
+    {
+      "label": "Standard fixtures",
+      "count": 6,
+      "baseWallMs": 12599.843809,
+      "headWallMs": 11974.528354999991,
+      "baseReadyMs": 8863.102880000008,
+      "headReadyMs": 8592.021770000007,
+      "baseRouteTotalMs": 1506.2664869999962,
+      "headRouteTotalMs": 1561.4455969999945,
+      "baseUpdateMs": 1443.1590460000007,
+      "headUpdateMs": 1188.4418030000052,
+      "wallDeltaPercent": -4.962882583936074,
+      "wallSpeedup": 1.0522204662648702,
+      "readyDeltaPercent": -3.0585350714105752,
+      "routeTotalDeltaPercent": 3.6633033049747694,
+      "updateDeltaPercent": -17.649977229189982
+    }
+  ],
+  "buildBenchmarks": [
+    {
+      "id": "large-355-ssr-esm",
+      "fixture": "large",
+      "routeCount": 355,
+      "variant": "ssr-esm",
+      "baseWallMs": 7526.259872999988,
+      "headWallMs": 7684.875526000003,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "wallDeltaPercent": 2.107496361759173,
+      "wallSpeedup": 0.9793600231437223,
+      "baseCpuMs": 20980,
+      "headCpuMs": 21470,
+      "baseRssKb": 1570896,
+      "headRssKb": 1557216,
+      "baseRunCount": 5,
+      "headRunCount": 5,
+      "headWallMeanMs": 7728.155091200004,
+      "headWallP95Ms": 7920.465760000006,
+      "devRouteSummaries": [],
+      "devUpdateRouteSummaries": [],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 215098.7,
+          "headTotalMs": 216999.5,
+          "deltaPercent": 0.8836873491099613,
+          "headWallMs": 903.2,
+          "headMaxMs": 186.4,
+          "count": 1780,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 190300.3,
+          "headTotalMs": 214984.4,
+          "deltaPercent": 12.971130366058281,
+          "headWallMs": 1630.8,
+          "headMaxMs": 260.1,
+          "count": 1780,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 101438.2,
+          "headTotalMs": 111933.6,
+          "deltaPercent": 10.346595266871859,
+          "headWallMs": 823.6,
+          "headMaxMs": 154.6,
+          "count": 1780,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 133.4,
+          "headTotalMs": 148.5,
+          "deltaPercent": 11.319340329835077,
+          "headWallMs": 148.5,
+          "headMaxMs": 52.9,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 0.5,
+          "headTotalMs": 0.5,
+          "deltaPercent": 0,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.5,
+          "headTotalMs": 0.5,
+          "deltaPercent": 0,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-1024-ssr-esm",
+      "fixture": "default",
+      "routeCount": 1024,
+      "variant": "ssr-esm",
+      "baseWallMs": 2842.7791760000036,
+      "headWallMs": 2924.5167099999962,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "wallDeltaPercent": 2.8752684939462383,
+      "wallSpeedup": 0.9720509259801793,
+      "baseCpuMs": 6910,
+      "headCpuMs": 6990,
+      "baseRssKb": 724376,
+      "headRssKb": 683088,
+      "baseRunCount": 5,
+      "headRunCount": 5,
+      "headWallMeanMs": 2942.8314269999987,
+      "headWallP95Ms": 3059.029781000001,
+      "devRouteSummaries": [],
+      "devUpdateRouteSummaries": [],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 596476.2,
+          "headTotalMs": 652676,
+          "deltaPercent": 9.421968554654828,
+          "headWallMs": 1449.2999999999997,
+          "headMaxMs": 264.1,
+          "count": 5125,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 461780.9,
+          "headTotalMs": 495757.89999999997,
+          "deltaPercent": 7.35781839396128,
+          "headWallMs": 1615,
+          "headMaxMs": 270.4,
+          "count": 5125,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 419844.9,
+          "headTotalMs": 402418.30000000005,
+          "deltaPercent": -4.150723279001359,
+          "headWallMs": 1016.1,
+          "headMaxMs": 208.1,
+          "count": 5125,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 258.7,
+          "headTotalMs": 152.8,
+          "deltaPercent": -40.935446463084645,
+          "headWallMs": 152.8,
+          "headMaxMs": 59,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 246.8,
+          "headTotalMs": 168.4,
+          "deltaPercent": -31.766612641815232,
+          "headWallMs": 168.4,
+          "headMaxMs": 47.8,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 0.5,
+          "headTotalMs": 0.5,
+          "deltaPercent": 0,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.5,
+          "headTotalMs": 0.5,
+          "deltaPercent": 0,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-1024-ssr-esm-split",
+      "fixture": "default",
+      "routeCount": 1024,
+      "variant": "ssr-esm-split",
+      "baseWallMs": 3850.5429180000065,
+      "headWallMs": 3816.889298000009,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "wallDeltaPercent": -0.8739967510212091,
+      "wallSpeedup": 1.0088170280488962,
+      "baseCpuMs": 9210,
+      "headCpuMs": 9180,
+      "baseRssKb": 850524,
+      "headRssKb": 850668,
+      "baseRunCount": 5,
+      "headRunCount": 5,
+      "headWallMeanMs": 3818.625334600001,
+      "headWallP95Ms": 4009.853421000007,
+      "devRouteSummaries": [],
+      "devUpdateRouteSummaries": [],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:chunk",
+          "baseTotalMs": 1709659.1999999997,
+          "headTotalMs": 1512640.3,
+          "deltaPercent": -11.523869786446312,
+          "headWallMs": 3097.8,
+          "headMaxMs": 385.6,
+          "count": 7690,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 1103533.8,
+          "headTotalMs": 981061.6,
+          "deltaPercent": -11.098182946458012,
+          "headWallMs": 3105.7999999999997,
+          "headMaxMs": 385.5,
+          "count": 5125,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 363849.4,
+          "headTotalMs": 445262.4,
+          "deltaPercent": 22.37546633304878,
+          "headWallMs": 1289.4,
+          "headMaxMs": 332.9,
+          "count": 5125,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 349447,
+          "headTotalMs": 334099.1,
+          "deltaPercent": -4.392053730608654,
+          "headWallMs": 926.5,
+          "headMaxMs": 167.8,
+          "count": 5125,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 181.7,
+          "headTotalMs": 169.1,
+          "deltaPercent": -6.934507429829387,
+          "headWallMs": 169.1,
+          "headMaxMs": 47.5,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 127.10000000000001,
+          "headTotalMs": 320,
+          "deltaPercent": 151.7702596380802,
+          "headWallMs": 320,
+          "headMaxMs": 142.6,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 0.5,
+          "headTotalMs": 0.5,
+          "deltaPercent": 0,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.4,
+          "headTotalMs": 0.5,
+          "deltaPercent": 24.999999999999993,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-sourcemaps",
+      "fixture": "default",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 1576.4987739999924,
+      "headWallMs": 1580.3052180000086,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "wallDeltaPercent": 0.24144922043664194,
+      "wallSpeedup": 0.9975913235262024,
+      "baseCpuMs": 3410,
+      "headCpuMs": 3390,
+      "baseRssKb": 476128,
+      "headRssKb": 480664,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 1574.7739161999984,
+      "headWallP95Ms": 1648.9880299999932,
+      "devRouteSummaries": [],
+      "devUpdateRouteSummaries": [],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 280894,
+          "headTotalMs": 274195.89999999997,
+          "deltaPercent": -2.384564996048344,
+          "headWallMs": 1466.4,
+          "headMaxMs": 169.9,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 108940.30000000002,
+          "headTotalMs": 131247.9,
+          "deltaPercent": 20.47690340489238,
+          "headWallMs": 1406.3000000000002,
+          "headMaxMs": 120.5,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 68671.7,
+          "headTotalMs": 73201.8,
+          "deltaPercent": 6.596749461568603,
+          "headWallMs": 665.8,
+          "headMaxMs": 72.7,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 125.80000000000003,
+          "headTotalMs": 128.2,
+          "deltaPercent": 1.907790143084231,
+          "headWallMs": 128.2,
+          "headMaxMs": 63.7,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 89.69999999999999,
+          "headTotalMs": 92.60000000000001,
+          "deltaPercent": 3.2329988851728206,
+          "headWallMs": 92.60000000000001,
+          "headMaxMs": 16.5,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 0.9999999999999999,
+          "headTotalMs": 0.9999999999999999,
+          "deltaPercent": 0,
+          "headWallMs": 0.9999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.8999999999999999,
+          "headTotalMs": 0.9999999999999999,
+          "deltaPercent": 11.111111111111109,
+          "headWallMs": 0.9999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-ssr-esm",
+      "fixture": "default",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 1447.217893000001,
+      "headWallMs": 1465.3734320000003,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "wallDeltaPercent": 1.2545131654200323,
+      "wallSpeedup": 0.9876102987787762,
+      "baseCpuMs": 3080,
+      "headCpuMs": 3100,
+      "baseRssKb": 432592,
+      "headRssKb": 422000,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 1478.9902003,
+      "headWallP95Ms": 1593.5424999999996,
+      "devRouteSummaries": [],
+      "devUpdateRouteSummaries": [],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 272673.3,
+          "headTotalMs": 277840.5,
+          "deltaPercent": 1.8950150234731498,
+          "headWallMs": 1461.5,
+          "headMaxMs": 143.2,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 82065.5,
+          "headTotalMs": 73686.2,
+          "deltaPercent": -10.210502586348714,
+          "headWallMs": 952.3,
+          "headMaxMs": 59.6,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 49783,
+          "headTotalMs": 57014.9,
+          "deltaPercent": 14.5268465138702,
+          "headWallMs": 562.4,
+          "headMaxMs": 61.6,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 94.9,
+          "headTotalMs": 92.9,
+          "deltaPercent": -2.107481559536354,
+          "headWallMs": 92.9,
+          "headMaxMs": 66.9,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 86.5,
+          "headTotalMs": 91.60000000000001,
+          "deltaPercent": 5.895953757225443,
+          "headWallMs": 91.60000000000001,
+          "headMaxMs": 15.8,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 0.9999999999999999,
+          "headTotalMs": 0.9999999999999999,
+          "deltaPercent": 0,
+          "headWallMs": 0.9999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.9999999999999999,
+          "headTotalMs": 0.9999999999999999,
+          "deltaPercent": 0,
+          "headWallMs": 0.9999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-ssr-esm-split",
+      "fixture": "default",
+      "routeCount": 256,
+      "variant": "ssr-esm-split",
+      "baseWallMs": 1711.943901000006,
+      "headWallMs": 1713.1243699999977,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "wallDeltaPercent": 0.06895488802537071,
+      "wallSpeedup": 0.9993109262697654,
+      "baseCpuMs": 3740,
+      "headCpuMs": 3770,
+      "baseRssKb": 476172,
+      "headRssKb": 478512,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 1713.3416041000005,
+      "headWallP95Ms": 1841.9262159999998,
+      "devRouteSummaries": [],
+      "devUpdateRouteSummaries": [],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:chunk",
+          "baseTotalMs": 547981,
+          "headTotalMs": 541025.7000000001,
+          "deltaPercent": -1.269259335633887,
+          "headWallMs": 2130.2,
+          "headMaxMs": 179.4,
+          "count": 3860,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 363851.50000000006,
+          "headTotalMs": 358527.0999999999,
+          "deltaPercent": -1.463344248958748,
+          "headWallMs": 2122,
+          "headMaxMs": 179.1,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 98029.40000000001,
+          "headTotalMs": 107555.69999999998,
+          "deltaPercent": 9.717798946030449,
+          "headWallMs": 1597.4,
+          "headMaxMs": 118.7,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 54785.799999999996,
+          "headTotalMs": 51586.200000000004,
+          "deltaPercent": -5.8401994677452755,
+          "headWallMs": 612.2,
+          "headMaxMs": 66.2,
+          "count": 2570,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 128.6,
+          "headTotalMs": 116.49999999999999,
+          "deltaPercent": -9.4090202177294,
+          "headWallMs": 116.49999999999999,
+          "headMaxMs": 17.5,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 67.9,
+          "headTotalMs": 143.3,
+          "deltaPercent": 111.04565537555229,
+          "headWallMs": 143.3,
+          "headMaxMs": 47,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 0.9999999999999999,
+          "headTotalMs": 0.9999999999999999,
+          "deltaPercent": 0,
+          "headWallMs": 0.9999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.9999999999999999,
+          "headTotalMs": 0.9999999999999999,
+          "deltaPercent": 0,
+          "headWallMs": 0.9999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    },
+    {
+      "id": "synthetic-48-ssr-esm",
+      "fixture": "default",
+      "routeCount": 48,
+      "variant": "ssr-esm",
+      "baseWallMs": 970.1141619999999,
+      "headWallMs": 946.5510869999998,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "wallDeltaPercent": -2.4288971260271146,
+      "wallSpeedup": 1.0248936114739258,
+      "baseCpuMs": 1590,
+      "headCpuMs": 1580,
+      "baseRssKb": 321680,
+      "headRssKb": 325276,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 961.6385229000001,
+      "headWallP95Ms": 1113.2471530000003,
+      "devRouteSummaries": [],
+      "devUpdateRouteSummaries": [],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 201.8,
+          "headTotalMs": 203.8,
+          "deltaPercent": 0.9910802775024776,
+          "headWallMs": 203.8,
+          "headMaxMs": 4.9,
+          "count": 490,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 109.5,
+          "headTotalMs": 112.8,
+          "deltaPercent": 3.0136986301369837,
+          "headWallMs": 112.8,
+          "headMaxMs": 2.9,
+          "count": 490,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 70.30000000000001,
+          "headTotalMs": 69.89999999999999,
+          "deltaPercent": -0.5689900426742814,
+          "headWallMs": 69.89999999999999,
+          "headMaxMs": 2.5,
+          "count": 490,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 47.79999999999999,
+          "headTotalMs": 69.39999999999999,
+          "deltaPercent": 45.18828451882847,
+          "headWallMs": 69.39999999999999,
+          "headMaxMs": 11.5,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 12.500000000000002,
+          "headTotalMs": 14.9,
+          "deltaPercent": 19.199999999999985,
+          "headWallMs": 14.9,
+          "headMaxMs": 3.7,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 0.9999999999999999,
+          "headTotalMs": 0.9999999999999999,
+          "deltaPercent": 0,
+          "headWallMs": 0.9999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.1,
+          "headTotalMs": 0.2,
+          "deltaPercent": 100,
+          "headWallMs": 0.2,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "large-355-ssr-esm",
+      "fixture": "large",
+      "routeCount": 355,
+      "variant": "ssr-esm",
+      "baseWallMs": 11331.687051999994,
+      "headWallMs": 11451.82764199999,
+      "baseReadyMs": 6990.884787999996,
+      "headReadyMs": 7250.691686999999,
+      "baseRouteTotalMs": 1474.5734120000125,
+      "headRouteTotalMs": 1484.3448050000006,
+      "baseUpdateMs": 1690.0197889999981,
+      "headUpdateMs": 1613.9631739999895,
+      "updateDeltaPercent": -4.500338723549035,
+      "wallDeltaPercent": 1.0602180368084833,
+      "wallSpeedup": 0.9895090466119683,
+      "baseCpuMs": null,
+      "headCpuMs": null,
+      "baseRssKb": null,
+      "headRssKb": null,
+      "baseRunCount": 5,
+      "headRunCount": 5,
+      "headWallMeanMs": 11686.410110399995,
+      "headWallP95Ms": 12496.600972999993,
+      "devRouteSummaries": [
+        {
+          "path": "/",
+          "count": 5,
+          "baseMedianMs": 1331.5994959999953,
+          "headMedianMs": 1342.9736810000031,
+          "deltaPercent": 0.8541746248909586,
+          "headMeanMs": 1339.8439515999985,
+          "headP95Ms": 1371.8016549999884,
+          "headMedianBytes": 10385,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0001",
+          "count": 5,
+          "baseMedianMs": 20.57770999999775,
+          "headMedianMs": 20.37595099999453,
+          "deltaPercent": -0.9804735318130321,
+          "headMeanMs": 20.525267399998846,
+          "headP95Ms": 21.928118999989238,
+          "headMedianBytes": 10998,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0002",
+          "count": 5,
+          "baseMedianMs": 21.277509999999893,
+          "headMedianMs": 18.412964999995893,
+          "deltaPercent": -13.462783004233176,
+          "headMeanMs": 18.76872980000626,
+          "headP95Ms": 21.038186000019778,
+          "headMedianBytes": 10848,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0010",
+          "count": 5,
+          "baseMedianMs": 19.612699000004795,
+          "headMedianMs": 22.21027400001185,
+          "deltaPercent": 13.24435254936824,
+          "headMeanMs": 22.56125100000063,
+          "headP95Ms": 25.438985999993747,
+          "headMedianBytes": 10920,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0050",
+          "count": 5,
+          "baseMedianMs": 27.725030999994488,
+          "headMedianMs": 21.345871999990777,
+          "deltaPercent": -23.008663182396365,
+          "headMeanMs": 21.286407999997028,
+          "headP95Ms": 22.131626999995206,
+          "headMedianBytes": 10997,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0100",
+          "count": 5,
+          "baseMedianMs": 17.10558200000378,
+          "headMedianMs": 21.60386900001322,
+          "deltaPercent": 26.29718766662512,
+          "headMeanMs": 21.25878140000568,
+          "headP95Ms": 22.804210000002058,
+          "headMedianBytes": 10847,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0200",
+          "count": 5,
+          "baseMedianMs": 16.544889000011608,
+          "headMedianMs": 16.543912999986787,
+          "deltaPercent": -0.005899102888027796,
+          "headMeanMs": 16.908726600001682,
+          "headP95Ms": 18.23497900000075,
+          "headMedianBytes": 10993,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0354",
+          "count": 5,
+          "baseMedianMs": 21.15206799999578,
+          "headMedianMs": 22.385966999980155,
+          "deltaPercent": 5.833467441503225,
+          "headMeanMs": 22.117719399995984,
+          "headP95Ms": 23.818566000001738,
+          "headMedianBytes": 10841,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "devUpdateRouteSummaries": [
+        {
+          "path": "/",
+          "count": 5,
+          "baseMedianMs": 915.3632719999878,
+          "headMedianMs": 959.2984969999961,
+          "deltaPercent": 4.799758341189916,
+          "headMeanMs": 955.4139275999914,
+          "headP95Ms": 965.9223809999821,
+          "headMedianBytes": 10384,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 1369.2999999999997,
+          "headTotalMs": 1331.4,
+          "deltaPercent": -2.767837581245866,
+          "headWallMs": 1331.4,
+          "headMaxMs": 12,
+          "count": 1785,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 698.5000000000002,
+          "headTotalMs": 721.1,
+          "deltaPercent": 3.2355046528274567,
+          "headWallMs": 721.1,
+          "headMaxMs": 12.4,
+          "count": 1785,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 277.9,
+          "headTotalMs": 275,
+          "deltaPercent": -1.043540842029499,
+          "headWallMs": 275,
+          "headMaxMs": 4.6,
+          "count": 1785,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 90.9,
+          "headTotalMs": 83.5,
+          "deltaPercent": -8.140814081408147,
+          "headWallMs": 83.5,
+          "headMaxMs": 24.9,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 12.000000000000002,
+          "headTotalMs": 12.100000000000001,
+          "deltaPercent": 0.8333333333333302,
+          "headWallMs": 12.100000000000001,
+          "headMaxMs": 1.8,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.1,
+          "headTotalMs": 0.5,
+          "deltaPercent": 400,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-1024-ssr-esm",
+      "fixture": "default",
+      "routeCount": 1024,
+      "variant": "ssr-esm",
+      "baseWallMs": 3753.606573000001,
+      "headWallMs": 3593.755250000002,
+      "baseReadyMs": 2664.4085600000035,
+      "headReadyMs": 2600.3795669999963,
+      "baseRouteTotalMs": 417.66379600000073,
+      "headRouteTotalMs": 439.76577800000086,
+      "baseUpdateMs": 430.1039210000017,
+      "headUpdateMs": 378.49181600000156,
+      "updateDeltaPercent": -11.99991501588751,
+      "wallDeltaPercent": -4.258606220210253,
+      "wallSpeedup": 1.044480303159209,
+      "baseCpuMs": null,
+      "headCpuMs": null,
+      "baseRssKb": null,
+      "headRssKb": null,
+      "baseRunCount": 5,
+      "headRunCount": 5,
+      "headWallMeanMs": 3636.5853586,
+      "headWallP95Ms": 4106.472591999998,
+      "devRouteSummaries": [
+        {
+          "path": "/",
+          "count": 5,
+          "baseMedianMs": 193.8854769999998,
+          "headMedianMs": 228.64797999999792,
+          "deltaPercent": 17.929400147901813,
+          "headMeanMs": 219.60944860000018,
+          "headP95Ms": 240.97410300000047,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0002",
+          "count": 5,
+          "baseMedianMs": 32.0064280000006,
+          "headMedianMs": 33.32122500000696,
+          "deltaPercent": 4.107915447504297,
+          "headMeanMs": 32.540446400001386,
+          "headP95Ms": 34.14511700000003,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0003",
+          "count": 5,
+          "baseMedianMs": 42.519806999996945,
+          "headMedianMs": 45.3510869999991,
+          "deltaPercent": 6.658732011653664,
+          "headMeanMs": 44.44390200000271,
+          "headP95Ms": 47.70143200000166,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0011",
+          "count": 5,
+          "baseMedianMs": 27.65744899999845,
+          "headMedianMs": 28.24989800000185,
+          "deltaPercent": 2.1420956068776684,
+          "headMeanMs": 28.08876700000037,
+          "headP95Ms": 32.25794400000086,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0051",
+          "count": 5,
+          "baseMedianMs": 26.290102999999363,
+          "headMedianMs": 29.764882000003126,
+          "deltaPercent": 13.217061188401766,
+          "headMeanMs": 31.56747300000061,
+          "headP95Ms": 40.17812799999956,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0101",
+          "count": 5,
+          "baseMedianMs": 29.105235000002722,
+          "headMedianMs": 30.43860400000267,
+          "deltaPercent": 4.581199911286829,
+          "headMeanMs": 36.00856780000104,
+          "headP95Ms": 59.45830600000045,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0201",
+          "count": 5,
+          "baseMedianMs": 29.03688599999441,
+          "headMedianMs": 28.746899999998277,
+          "deltaPercent": -0.9986814701693199,
+          "headMeanMs": 28.86250260000088,
+          "headP95Ms": 31.07911199999944,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-1024",
+          "count": 5,
+          "baseMedianMs": 20.981755000000703,
+          "headMedianMs": 22.452190999996674,
+          "deltaPercent": 7.0081649509105475,
+          "headMeanMs": 22.795801399997437,
+          "headP95Ms": 25.879402999999,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "devUpdateRouteSummaries": [
+        {
+          "path": "/",
+          "count": 5,
+          "baseMedianMs": 144.77521900000283,
+          "headMedianMs": 126.46279300000242,
+          "deltaPercent": -12.648867759612958,
+          "headMeanMs": 127.01399540000057,
+          "headP95Ms": 140.98379600000044,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 1715.6999999999998,
+          "headTotalMs": 1688.4,
+          "deltaPercent": -1.5911872705018204,
+          "headWallMs": 1688.4,
+          "headMaxMs": 11.5,
+          "count": 5130,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 773.8999999999999,
+          "headTotalMs": 784.9,
+          "deltaPercent": 1.4213722703191776,
+          "headWallMs": 784.9,
+          "headMaxMs": 8.2,
+          "count": 5130,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 389.2,
+          "headTotalMs": 422.49999999999994,
+          "deltaPercent": 8.55601233299074,
+          "headWallMs": 422.49999999999994,
+          "headMaxMs": 5.7,
+          "count": 5130,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 156.5,
+          "headTotalMs": 110.8,
+          "deltaPercent": -29.201277955271564,
+          "headWallMs": 110.8,
+          "headMaxMs": 50.6,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 155.5,
+          "headTotalMs": 159.5,
+          "deltaPercent": 2.572347266881029,
+          "headWallMs": 159.5,
+          "headMaxMs": 33.9,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 55.099999999999994,
+          "headTotalMs": 46.199999999999996,
+          "deltaPercent": -16.1524500907441,
+          "headWallMs": 46.199999999999996,
+          "headMaxMs": 6.8,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.30000000000000004,
+          "headTotalMs": 0.5,
+          "deltaPercent": 66.66666666666664,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-1024-ssr-esm-split",
+      "fixture": "default",
+      "routeCount": 1024,
+      "variant": "ssr-esm-split",
+      "baseWallMs": 3638.1994239999985,
+      "headWallMs": 3551.503291000001,
+      "baseReadyMs": 2472.126535000003,
+      "headReadyMs": 2514.8338120000117,
+      "baseRouteTotalMs": 439.1945180000039,
+      "headRouteTotalMs": 465.0242869999929,
+      "baseUpdateMs": 406.69905599999765,
+      "headUpdateMs": 426.84232399999746,
+      "updateDeltaPercent": 4.952868147301508,
+      "wallDeltaPercent": -2.3829406499295205,
+      "wallSpeedup": 1.0244111087323775,
+      "baseCpuMs": null,
+      "headCpuMs": null,
+      "baseRssKb": null,
+      "headRssKb": null,
+      "baseRunCount": 5,
+      "headRunCount": 5,
+      "headWallMeanMs": 3551.344606600002,
+      "headWallP95Ms": 3682.5468390000024,
+      "devRouteSummaries": [
+        {
+          "path": "/",
+          "count": 5,
+          "baseMedianMs": 197.4467399999994,
+          "headMedianMs": 238.62901899999997,
+          "deltaPercent": 20.85741147207631,
+          "headMeanMs": 234.6089472000007,
+          "headP95Ms": 255.61878300001263,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0002",
+          "count": 5,
+          "baseMedianMs": 31.942305000004126,
+          "headMedianMs": 33.37036099999386,
+          "deltaPercent": 4.470735596537423,
+          "headMeanMs": 33.49186760000011,
+          "headP95Ms": 35.813481000004685,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0003",
+          "count": 5,
+          "baseMedianMs": 41.945507999989786,
+          "headMedianMs": 44.32279999999446,
+          "deltaPercent": 5.667572317887416,
+          "headMeanMs": 47.945705799997086,
+          "headP95Ms": 68.63654300000053,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0011",
+          "count": 5,
+          "baseMedianMs": 27.527694000003976,
+          "headMedianMs": 28.115254999996978,
+          "deltaPercent": 2.1344359610831085,
+          "headMeanMs": 34.85274839999911,
+          "headP95Ms": 65.80277000000206,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0051",
+          "count": 5,
+          "baseMedianMs": 26.840603000004194,
+          "headMedianMs": 28.49736199999461,
+          "deltaPercent": 6.172584870727968,
+          "headMeanMs": 27.751049999997484,
+          "headP95Ms": 29.74848799999745,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0101",
+          "count": 5,
+          "baseMedianMs": 27.741529000006267,
+          "headMedianMs": 28.091544999995676,
+          "deltaPercent": 1.2617040682556842,
+          "headMeanMs": 29.23966080000391,
+          "headP95Ms": 34.62491500000033,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0201",
+          "count": 5,
+          "baseMedianMs": 29.624697000006563,
+          "headMedianMs": 28.698349999998754,
+          "deltaPercent": -3.1269416865516075,
+          "headMeanMs": 28.976989600001254,
+          "headP95Ms": 33.12690399999701,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-1024",
+          "count": 5,
+          "baseMedianMs": 21.262499000004027,
+          "headMedianMs": 23.172331000001577,
+          "deltaPercent": 8.982161504144873,
+          "headMeanMs": 22.18605920000409,
+          "headP95Ms": 23.34334900000249,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "devUpdateRouteSummaries": [
+        {
+          "path": "/",
+          "count": 5,
+          "baseMedianMs": 128.68969199999992,
+          "headMedianMs": 137.3225620000012,
+          "deltaPercent": 6.708283985947593,
+          "headMeanMs": 135.37986219999874,
+          "headP95Ms": 144.348238999999,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 1677.9,
+          "headTotalMs": 1701.8,
+          "deltaPercent": 1.4243995470528554,
+          "headWallMs": 1701.8,
+          "headMaxMs": 13.3,
+          "count": 5130,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 779.7,
+          "headTotalMs": 770.9999999999999,
+          "deltaPercent": -1.1158137745286851,
+          "headWallMs": 770.9999999999999,
+          "headMaxMs": 7.8,
+          "count": 5130,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 423.9,
+          "headTotalMs": 444.59999999999997,
+          "deltaPercent": 4.883227176220804,
+          "headWallMs": 444.59999999999997,
+          "headMaxMs": 6,
+          "count": 5130,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 158.6,
+          "headTotalMs": 148.8,
+          "deltaPercent": -6.179066834804529,
+          "headWallMs": 148.8,
+          "headMaxMs": 30.7,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 144.5,
+          "headTotalMs": 49.4,
+          "deltaPercent": -65.81314878892734,
+          "headWallMs": 49.4,
+          "headMaxMs": 13.2,
+          "count": 5,
+          "reports": 5
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 44.099999999999994,
+          "headTotalMs": 49.3,
+          "deltaPercent": 11.791383219954657,
+          "headWallMs": 49.3,
+          "headMaxMs": 6.3,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.4,
+          "headTotalMs": 0.5,
+          "deltaPercent": 24.999999999999993,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 5,
+          "reports": 5
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-sourcemaps",
+      "fixture": "default",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 1572.4132939999981,
+      "headWallMs": 1528.909886999987,
+      "baseReadyMs": 1152.484362999996,
+      "headReadyMs": 1135.1072120000026,
+      "baseRouteTotalMs": 191.69729699999152,
+      "headRouteTotalMs": 175.36132100000395,
+      "baseUpdateMs": 151.84332600000198,
+      "headUpdateMs": 127.89394700000412,
+      "updateDeltaPercent": -15.772427824715555,
+      "wallDeltaPercent": -2.766664919840796,
+      "wallSpeedup": 1.0284538725074066,
+      "baseCpuMs": null,
+      "headCpuMs": null,
+      "baseRssKb": null,
+      "headRssKb": null,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 1528.405622899998,
+      "headWallP95Ms": 1632.5662299999967,
+      "devRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 109.18772800000443,
+          "headMedianMs": 91.5313499999902,
+          "deltaPercent": -16.170661596707564,
+          "headMeanMs": 94.30078160000122,
+          "headP95Ms": 110.19530200000736,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "baseMedianMs": 11.838646999996854,
+          "headMedianMs": 12.033137000005809,
+          "deltaPercent": 1.6428397603966596,
+          "headMeanMs": 12.27277300000278,
+          "headP95Ms": 15.350793999998132,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "baseMedianMs": 10.431995000006282,
+          "headMedianMs": 10.29636200000823,
+          "deltaPercent": -1.3001635832644667,
+          "headMeanMs": 10.378515099998912,
+          "headP95Ms": 11.028594000003068,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "baseMedianMs": 12.213544999991427,
+          "headMedianMs": 9.771886999995331,
+          "deltaPercent": -19.99139479977197,
+          "headMeanMs": 10.5562488999989,
+          "headP95Ms": 13.306137000006856,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0051",
+          "count": 10,
+          "baseMedianMs": 10.611230999988038,
+          "headMedianMs": 13.651322000005166,
+          "deltaPercent": 28.649748554343553,
+          "headMeanMs": 12.738995300001989,
+          "headP95Ms": 15.438389000002644,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0101",
+          "count": 10,
+          "baseMedianMs": 12.0176819999906,
+          "headMedianMs": 12.317419999992126,
+          "deltaPercent": 2.494141549108721,
+          "headMeanMs": 12.27290309999662,
+          "headP95Ms": 14.335596999997506,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0201",
+          "count": 10,
+          "baseMedianMs": 13.009762000001501,
+          "headMedianMs": 9.544714999996359,
+          "deltaPercent": -26.634207451333413,
+          "headMeanMs": 9.888893099999404,
+          "headP95Ms": 12.934602000008454,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0256",
+          "count": 10,
+          "baseMedianMs": 13.457406999994419,
+          "headMedianMs": 15.106269000010798,
+          "deltaPercent": 12.252449524764044,
+          "headMeanMs": 14.6438582999981,
+          "headP95Ms": 16.355681000000914,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "devUpdateRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 53.220401000013226,
+          "headMedianMs": 48.62789600000542,
+          "deltaPercent": -8.629219084626332,
+          "headMeanMs": 48.66176510000078,
+          "headP95Ms": 59.96796599999652,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 1128.2999999999997,
+          "headTotalMs": 1152.8,
+          "deltaPercent": 2.171408313391849,
+          "headWallMs": 1152.8,
+          "headMaxMs": 18.2,
+          "count": 2580,
+          "reports": 20
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 536.1999999999999,
+          "headTotalMs": 553.4999999999999,
+          "deltaPercent": 3.226408056695255,
+          "headWallMs": 553.4999999999999,
+          "headMaxMs": 7.6,
+          "count": 2580,
+          "reports": 20
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 267.8999999999999,
+          "headTotalMs": 279.1999999999999,
+          "deltaPercent": 4.217991787980574,
+          "headWallMs": 279.1999999999999,
+          "headMaxMs": 4.5,
+          "count": 2580,
+          "reports": 20
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 104.09999999999998,
+          "headTotalMs": 113.60000000000001,
+          "deltaPercent": 9.125840537944313,
+          "headWallMs": 113.60000000000001,
+          "headMaxMs": 15.8,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 88.1,
+          "headTotalMs": 192.39999999999998,
+          "deltaPercent": 118.38819523269011,
+          "headWallMs": 192.39999999999998,
+          "headMaxMs": 79.9,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 16.699999999999996,
+          "headTotalMs": 16.4,
+          "deltaPercent": -1.7964071856287258,
+          "headWallMs": 16.4,
+          "headMaxMs": 1.2,
+          "count": 20,
+          "reports": 20
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.7,
+          "headTotalMs": 0.7,
+          "deltaPercent": 0,
+          "headWallMs": 0.7,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-ssr-esm",
+      "fixture": "default",
+      "routeCount": 256,
+      "variant": "ssr-esm",
+      "baseWallMs": 1527.9089480000002,
+      "headWallMs": 1297.380301000001,
+      "baseReadyMs": 1053.3659920000027,
+      "headReadyMs": 929.6629140000005,
+      "baseRouteTotalMs": 186.6584699999985,
+      "headRouteTotalMs": 191.23832499999844,
+      "baseUpdateMs": 252.17024499999934,
+      "headUpdateMs": 101.52036800000133,
+      "updateDeltaPercent": -59.741337444470666,
+      "wallDeltaPercent": -15.087852407812402,
+      "wallSpeedup": 1.1776877965715304,
+      "baseCpuMs": null,
+      "headCpuMs": null,
+      "baseRssKb": null,
+      "headRssKb": null,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 1307.5629411,
+      "headWallP95Ms": 1413.3908219999994,
+      "devRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 104.16609700000117,
+          "headMedianMs": 106.35986500000035,
+          "deltaPercent": 2.1060287974494782,
+          "headMeanMs": 106.16380480000062,
+          "headP95Ms": 111.65871899999911,
+          "headMedianBytes": 2552,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "baseMedianMs": 12.157701000000088,
+          "headMedianMs": 12.392410000000382,
+          "deltaPercent": 1.9305376896527715,
+          "headMeanMs": 13.586142700000163,
+          "headP95Ms": 20.566694000001007,
+          "headMedianBytes": 2933,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "baseMedianMs": 10.510338000000047,
+          "headMedianMs": 10.415766999998596,
+          "deltaPercent": -0.8997902826859712,
+          "headMeanMs": 10.587723800000276,
+          "headP95Ms": 12.639053999999305,
+          "headMedianBytes": 2933,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "baseMedianMs": 9.968933000000106,
+          "headMedianMs": 11.827073000000382,
+          "deltaPercent": 18.639306734233806,
+          "headMeanMs": 11.485970300000009,
+          "headP95Ms": 13.794473999998445,
+          "headMedianBytes": 3011,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0051",
+          "count": 10,
+          "baseMedianMs": 10.665587000003143,
+          "headMedianMs": 10.957378999999491,
+          "deltaPercent": 2.735826916945713,
+          "headMeanMs": 10.798566599999504,
+          "headP95Ms": 11.305128999998487,
+          "headMedianBytes": 2933,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0101",
+          "count": 10,
+          "baseMedianMs": 12.926113999998051,
+          "headMedianMs": 12.910576000002038,
+          "deltaPercent": -0.12020627387330472,
+          "headMeanMs": 12.884088800000427,
+          "headP95Ms": 14.508804999999484,
+          "headMedianBytes": 3011,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0201",
+          "count": 10,
+          "baseMedianMs": 9.687827999998262,
+          "headMedianMs": 12.332330999997794,
+          "deltaPercent": 27.297171254485587,
+          "headMeanMs": 11.571363899999778,
+          "headP95Ms": 14.203026999999565,
+          "headMedianBytes": 2933,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0256",
+          "count": 10,
+          "baseMedianMs": 13.462750999999116,
+          "headMedianMs": 12.771810000002006,
+          "deltaPercent": -5.1322422883492065,
+          "headMeanMs": 12.609430700000484,
+          "headP95Ms": 14.0947840000008,
+          "headMedianBytes": 3011,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "devUpdateRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 54.51202600000033,
+          "headMedianMs": 54.80614500000047,
+          "deltaPercent": 0.5395488327660675,
+          "headMeanMs": 59.480210800000165,
+          "headP95Ms": 106.5963359999987,
+          "headMedianBytes": 2552,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 1060.8999999999999,
+          "headTotalMs": 1149.4,
+          "deltaPercent": 8.341973795833749,
+          "headWallMs": 1149.4,
+          "headMaxMs": 13.2,
+          "count": 2581,
+          "reports": 21
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 455.90000000000003,
+          "headTotalMs": 449.7,
+          "deltaPercent": -1.359947356876518,
+          "headWallMs": 449.7,
+          "headMaxMs": 8.1,
+          "count": 2580,
+          "reports": 20
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 293.09999999999997,
+          "headTotalMs": 287.19999999999993,
+          "deltaPercent": -2.0129648584101107,
+          "headWallMs": 287.19999999999993,
+          "headMaxMs": 4.4,
+          "count": 2581,
+          "reports": 21
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 158.09999999999997,
+          "headTotalMs": 109.6,
+          "deltaPercent": -30.676786843769754,
+          "headWallMs": 109.6,
+          "headMaxMs": 45.4,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 120.1,
+          "headTotalMs": 112.49999999999999,
+          "deltaPercent": -6.32805995004164,
+          "headWallMs": 112.49999999999999,
+          "headMaxMs": 16.1,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 17,
+          "headTotalMs": 18.2,
+          "deltaPercent": 7.05882352941176,
+          "headWallMs": 18.2,
+          "headMaxMs": 1.3,
+          "count": 21,
+          "reports": 21
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.6,
+          "headTotalMs": 0.7999999999999999,
+          "deltaPercent": 33.33333333333333,
+          "headWallMs": 0.7999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    },
+    {
+      "id": "synthetic-256-ssr-esm-split",
+      "fixture": "default",
+      "routeCount": 256,
+      "variant": "ssr-esm-split",
+      "baseWallMs": 1382.2170590000023,
+      "headWallMs": 1325.2860409999994,
+      "baseReadyMs": 1009.1704000000027,
+      "headReadyMs": 942.284977999996,
+      "baseRouteTotalMs": 175.78624000000127,
+      "headRouteTotalMs": 193.98037199999817,
+      "baseUpdateMs": 127.69689199999993,
+      "headUpdateMs": 102.38996300000144,
+      "updateDeltaPercent": -19.817967848425397,
+      "wallDeltaPercent": -4.118818938697736,
+      "wallSpeedup": 1.042957532365651,
+      "baseCpuMs": null,
+      "headCpuMs": null,
+      "baseRssKb": null,
+      "headRssKb": null,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 1348.271327699998,
+      "headWallP95Ms": 1519.9827480000022,
+      "devRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 95.307581999994,
+          "headMedianMs": 107.40344300000288,
+          "deltaPercent": 12.69139426914602,
+          "headMeanMs": 106.83439240000007,
+          "headP95Ms": 113.89338499999576,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "baseMedianMs": 11.833091000000422,
+          "headMedianMs": 12.457531000000017,
+          "deltaPercent": 5.27706581483716,
+          "headMeanMs": 13.269112600000517,
+          "headP95Ms": 23.956990999999107,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "baseMedianMs": 10.43057399999816,
+          "headMedianMs": 10.712544000001799,
+          "deltaPercent": 2.7033028096410505,
+          "headMeanMs": 10.608635700001468,
+          "headP95Ms": 11.072070000001986,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "baseMedianMs": 11.661957999996957,
+          "headMedianMs": 12.327233999996679,
+          "deltaPercent": 5.704668118337376,
+          "headMeanMs": 11.89937690000006,
+          "headP95Ms": 13.209991000003356,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0051",
+          "count": 10,
+          "baseMedianMs": 10.621187000004284,
+          "headMedianMs": 10.88127400000667,
+          "deltaPercent": 2.4487564337421155,
+          "headMeanMs": 10.864332200001082,
+          "headP95Ms": 11.534902999999758,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0101",
+          "count": 10,
+          "baseMedianMs": 12.348720000001776,
+          "headMedianMs": 12.480171999995946,
+          "deltaPercent": 1.0644989925607717,
+          "headMeanMs": 12.782308399999602,
+          "headP95Ms": 15.028040999997756,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0201",
+          "count": 10,
+          "baseMedianMs": 12.047359999996843,
+          "headMedianMs": 13.174170000005688,
+          "deltaPercent": 9.353169491151094,
+          "headMeanMs": 13.104808500000946,
+          "headP95Ms": 19.908469000001787,
+          "headMedianBytes": 2932,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0256",
+          "count": 10,
+          "baseMedianMs": 12.826461999997264,
+          "headMedianMs": 12.910641000002215,
+          "deltaPercent": 0.6562916570833744,
+          "headMeanMs": 12.96578900000095,
+          "headP95Ms": 14.81438899999921,
+          "headMedianBytes": 3010,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "devUpdateRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 52.65241000000242,
+          "headMedianMs": 54.44481999999698,
+          "deltaPercent": 3.404231639149051,
+          "headMeanMs": 62.40677500000165,
+          "headP95Ms": 112.64156700000603,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 1029.1999999999998,
+          "headTotalMs": 1089.3999999999999,
+          "deltaPercent": 5.849203264671595,
+          "headWallMs": 1089.3999999999999,
+          "headMaxMs": 14.6,
+          "count": 2582,
+          "reports": 22
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 438.59999999999997,
+          "headTotalMs": 453.70000000000005,
+          "deltaPercent": 3.442772457820356,
+          "headWallMs": 453.70000000000005,
+          "headMaxMs": 5,
+          "count": 2580,
+          "reports": 20
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 284.09999999999997,
+          "headTotalMs": 304.89999999999986,
+          "deltaPercent": 7.321365716297043,
+          "headWallMs": 304.89999999999986,
+          "headMaxMs": 4.6,
+          "count": 2582,
+          "reports": 22
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 117.1,
+          "headTotalMs": 130,
+          "deltaPercent": 11.016225448334763,
+          "headWallMs": 130,
+          "headMaxMs": 16.3,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 75.1,
+          "headTotalMs": 61.49999999999999,
+          "deltaPercent": -18.109187749667115,
+          "headWallMs": 61.49999999999999,
+          "headMaxMs": 29.9,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 17.9,
+          "headTotalMs": 19.1,
+          "deltaPercent": 6.703910614525157,
+          "headWallMs": 19.1,
+          "headMaxMs": 1.3,
+          "count": 22,
+          "reports": 22
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.7999999999999999,
+          "headTotalMs": 0.7999999999999999,
+          "deltaPercent": 0,
+          "headWallMs": 0.7999999999999999,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    },
+    {
+      "id": "synthetic-48-ssr-esm",
+      "fixture": "default",
+      "routeCount": 48,
+      "variant": "ssr-esm",
+      "baseWallMs": 725.4985109999998,
+      "headWallMs": 677.6935850000009,
+      "baseReadyMs": 511.5470299999997,
+      "headReadyMs": 469.75328700000046,
+      "baseRouteTotalMs": 95.26616600000034,
+      "headRouteTotalMs": 96.07551400000011,
+      "baseUpdateMs": 74.64560600000004,
+      "headUpdateMs": 51.30338499999925,
+      "updateDeltaPercent": -31.27072342342666,
+      "wallDeltaPercent": -6.589252117706813,
+      "wallSpeedup": 1.0705406205077164,
+      "baseCpuMs": null,
+      "headCpuMs": null,
+      "baseRssKb": null,
+      "headRssKb": null,
+      "baseRunCount": 10,
+      "headRunCount": 10,
+      "headWallMeanMs": 681.2155459000003,
+      "headWallP95Ms": 730.053946,
+      "devRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 65.7741619999997,
+          "headMedianMs": 68.18680800000038,
+          "deltaPercent": 3.668075619117258,
+          "headMeanMs": 67.86320890000006,
+          "headP95Ms": 75.64722299999994,
+          "headMedianBytes": 2552,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0002",
+          "count": 10,
+          "baseMedianMs": 8.704829999999674,
+          "headMedianMs": 8.410095000000183,
+          "deltaPercent": -3.3858788741365693,
+          "headMeanMs": 8.450276400000167,
+          "headP95Ms": 9.601905000000443,
+          "headMedianBytes": 2933,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0003",
+          "count": 10,
+          "baseMedianMs": 6.848888999999872,
+          "headMedianMs": 6.565832000000228,
+          "deltaPercent": -4.132889290506087,
+          "headMeanMs": 6.749054400000205,
+          "headP95Ms": 7.879700999999841,
+          "headMedianBytes": 2933,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0011",
+          "count": 10,
+          "baseMedianMs": 6.93631699999969,
+          "headMedianMs": 6.650673999999526,
+          "deltaPercent": -4.118078801764344,
+          "headMeanMs": 6.631084200000077,
+          "headP95Ms": 7.518758999999591,
+          "headMedianBytes": 3011,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        },
+        {
+          "path": "/route-0048",
+          "count": 10,
+          "baseMedianMs": 6.986790999999357,
+          "headMedianMs": 6.835761000000275,
+          "deltaPercent": -2.161650462982161,
+          "headMeanMs": 6.912538300000233,
+          "headP95Ms": 7.850095000000692,
+          "headMedianBytes": 2936,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "devUpdateRouteSummaries": [
+        {
+          "path": "/",
+          "count": 10,
+          "baseMedianMs": 33.5214390000001,
+          "headMedianMs": 30.715274000000136,
+          "deltaPercent": -8.371254587250734,
+          "headMeanMs": 31.498117099999945,
+          "headP95Ms": 47.36267100000077,
+          "headMedianBytes": 2551,
+          "statuses": [
+            "200"
+          ],
+          "failures": 0
+        }
+      ],
+      "pluginOperations": [
+        {
+          "environment": "web",
+          "operation": "route:module",
+          "baseTotalMs": 385.8999999999999,
+          "headTotalMs": 324.2,
+          "deltaPercent": -15.988598082404753,
+          "headWallMs": 324.2,
+          "headMaxMs": 7.3,
+          "count": 501,
+          "reports": 21
+        },
+        {
+          "environment": "node",
+          "operation": "route:module",
+          "baseTotalMs": 122.39999999999999,
+          "headTotalMs": 128.8,
+          "deltaPercent": 5.2287581699346575,
+          "headWallMs": 128.8,
+          "headMaxMs": 3.3,
+          "count": 500,
+          "reports": 20
+        },
+        {
+          "environment": "web",
+          "operation": "route:client-entry",
+          "baseTotalMs": 85.80000000000003,
+          "headTotalMs": 89.60000000000001,
+          "deltaPercent": 4.428904428904408,
+          "headWallMs": 89.60000000000001,
+          "headMaxMs": 2.6,
+          "count": 501,
+          "reports": 21
+        },
+        {
+          "environment": "node",
+          "operation": "module:client-only-stub",
+          "baseTotalMs": 83.8,
+          "headTotalMs": 79.60000000000001,
+          "deltaPercent": -5.01193317422433,
+          "headWallMs": 79.60000000000001,
+          "headMaxMs": 14.9,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "node",
+          "operation": "manifest:transform",
+          "baseTotalMs": 36.00000000000001,
+          "headTotalMs": 35.199999999999996,
+          "deltaPercent": -2.2222222222222534,
+          "headWallMs": 35.199999999999996,
+          "headMaxMs": 5.4,
+          "count": 10,
+          "reports": 10
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:stage",
+          "baseTotalMs": 4.3,
+          "headTotalMs": 4.8,
+          "deltaPercent": 11.627906976744185,
+          "headWallMs": 4.8,
+          "headMaxMs": 0.4,
+          "count": 21,
+          "reports": 21
+        },
+        {
+          "environment": "web",
+          "operation": "manifest:transform",
+          "baseTotalMs": 0.9999999999999999,
+          "headTotalMs": 0.5,
+          "deltaPercent": -49.99999999999999,
+          "headWallMs": 0.5,
+          "headMaxMs": 0.1,
+          "count": 10,
+          "reports": 10
+        }
+      ]
+    }
+  ],
+  "syntheticBenchmark": {
+    "profile": "cold",
+    "baseMedianSeconds": 87.277902759,
+    "headMedianSeconds": 84.35812404900001,
+    "headMeanSeconds": 84.35812404900001,
+    "headP95Seconds": null,
+    "deltaPercent": -3.3453813825732706,
+    "speedup": 1.034611707442712,
+    "baseReadyMs": null,
+    "headReadyMs": null,
+    "readyDeltaPercent": null,
+    "baseRouteTotalMs": null,
+    "headRouteTotalMs": null,
+    "routeTotalDeltaPercent": null,
+    "baseUpdateMs": null,
+    "headUpdateMs": null,
+    "updateDeltaPercent": null,
+    "runs": 2,
+    "node": "v22.23.1",
+    "platform": "linux-x64"
+  },
+  "syntheticBenchmarks": [
+    {
+      "profile": "cold",
+      "baseMedianSeconds": 87.277902759,
+      "headMedianSeconds": 84.35812404900001,
+      "headMeanSeconds": 84.35812404900001,
+      "headP95Seconds": null,
+      "deltaPercent": -3.3453813825732706,
+      "speedup": 1.034611707442712,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "readyDeltaPercent": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "routeTotalDeltaPercent": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "runs": 2,
+      "node": "v22.23.1",
+      "platform": "linux-x64"
+    },
+    {
+      "profile": "dev",
+      "baseMedianSeconds": 70.16644764450001,
+      "headMedianSeconds": 75.8184909265,
+      "headMeanSeconds": 75.8184909265,
+      "headP95Seconds": null,
+      "deltaPercent": 8.055193716854824,
+      "speedup": 0.9254529704702353,
+      "baseReadyMs": 63006.9346835,
+      "headReadyMs": 68161.30233350003,
+      "readyDeltaPercent": 8.180635474319994,
+      "baseRouteTotalMs": 1959.535011,
+      "headRouteTotalMs": 2095.2499214999843,
+      "routeTotalDeltaPercent": 6.925873216765117,
+      "baseUpdateMs": 3583.8987804999924,
+      "headUpdateMs": 3836.3184385000204,
+      "updateDeltaPercent": 7.043158120799737,
+      "runs": 2,
+      "node": "v22.23.1",
+      "platform": "linux-x64"
+    },
+    {
+      "profile": "warm",
+      "baseMedianSeconds": 61.060715193500016,
+      "headMedianSeconds": 63.205159438,
+      "headMeanSeconds": 63.205159438,
+      "headP95Seconds": null,
+      "deltaPercent": 3.511986778576522,
+      "speedup": 0.9660716899764561,
+      "baseReadyMs": null,
+      "headReadyMs": null,
+      "readyDeltaPercent": null,
+      "baseRouteTotalMs": null,
+      "headRouteTotalMs": null,
+      "routeTotalDeltaPercent": null,
+      "baseUpdateMs": null,
+      "headUpdateMs": null,
+      "updateDeltaPercent": null,
+      "runs": 2,
+      "node": "v22.23.1",
+      "platform": "linux-x64"
+    }
+  ]
+}
