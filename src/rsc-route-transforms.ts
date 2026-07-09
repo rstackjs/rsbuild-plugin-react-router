@@ -1,7 +1,10 @@
 import { dirname } from 'pathe';
 
 import { generate, parse } from './yuku.js';
-import { CLIENT_NON_COMPONENT_EXPORTS } from './constants.js';
+import {
+  CLIENT_NON_COMPONENT_EXPORTS,
+  SERVER_ONLY_ROUTE_EXPORTS,
+} from './constants.js';
 import { getExportNames } from './export-utils.js';
 import {
   getExportedName,
@@ -43,10 +46,7 @@ const CLIENT_ROUTE_EXPORTS = [
 
 const SERVER_ROUTE_EXPORTS = [
   ...RSC_SERVER_COMPONENT_EXPORTS,
-  'loader',
-  'action',
-  'middleware',
-  'headers',
+  ...SERVER_ONLY_ROUTE_EXPORTS,
 ] as const;
 
 const CLIENT_ROUTE_EXPORTS_SET = new Set<string>(CLIENT_ROUTE_EXPORTS);
@@ -187,20 +187,18 @@ const getRouteChunks = ({
   RscRouteTransformOptions,
   'code' | 'resourcePath' | 'isRootRoute' | 'routeChunkCache'
 >) => {
+  const emptyRouteChunks = () => ({
+    chunkedExports: [] as RouteChunkExportName[],
+    hasRouteChunks: false,
+    hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
+  });
+
   if (isRootRoute) {
-    return {
-      chunkedExports: [] as RouteChunkExportName[],
-      hasRouteChunks: false,
-      hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
-    };
+    return emptyRouteChunks();
   }
 
   if (!routeChunkExportNames.some(exportName => code.includes(exportName))) {
-    return {
-      chunkedExports: [] as RouteChunkExportName[],
-      hasRouteChunks: false,
-      hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
-    };
+    return emptyRouteChunks();
   }
 
   return detectRouteChunks(code, routeChunkCache, resourcePath);

@@ -99,6 +99,19 @@ export type ReactRouterRSCPluginOptions = Omit<PluginOptions, 'rsc'> & {
   rsc?: Exclude<NonNullable<PluginOptions['rsc']>, boolean>;
 };
 
+export type PrerenderPathsConfig =
+  | boolean
+  | string[]
+  | ((args: {
+      getStaticPaths: () => string[];
+    }) => boolean | string[] | Promise<boolean | string[]>);
+
+export type PrerenderConfigObject = {
+  paths: PrerenderPathsConfig;
+  concurrency?: number;
+  unstable_concurrency?: number;
+};
+
 export type RouteManifestItem = Omit<Route, 'file' | 'children'> & {
   module: string;
   clientActionModule?: string;

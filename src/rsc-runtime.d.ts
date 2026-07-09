@@ -1,3 +1,10 @@
+interface ImportMeta {
+  webpackHot?: {
+    accept(): void;
+    on(event: string, handler: () => void): void;
+  };
+}
+
 declare module 'react-server-dom-rspack/client.browser' {
   export function createFromReadableStream<T>(
     stream: ReadableStream<Uint8Array>,

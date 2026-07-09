@@ -8,6 +8,7 @@ import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { getPackageVersion, parseVersionMajorMinor } from './plugin-utils.js';
+import type { PrerenderConfigObject } from './types.js';
 
 export type BuildEndHook = {
   bivarianceHack(args: {
@@ -45,11 +46,7 @@ type FutureConfig = {
 
 type PrerenderConfig =
   | ReactRouterConfig['prerender']
-  | ({
-      paths: ReactRouterConfig['prerender'];
-      concurrency?: number;
-      unstable_concurrency?: number;
-    } & Record<string, unknown>)
+  | PrerenderConfigObject
   | undefined;
 
 type RouteManifestEntry = {

@@ -85,11 +85,6 @@ export const getRscPrerenderRequests = ({
   }));
 };
 
-export const getRscPrerenderRequestPaths = (
-  options: Parameters<typeof getRscPrerenderRequests>[0]
-): string[] =>
-  getRscPrerenderRequests(options).map(request => request.requestPath);
-
 /**
  * Reassembles the RSC payload from the inline flight data scripts that
  * `react-router`'s HTML stream injects into server-rendered documents.

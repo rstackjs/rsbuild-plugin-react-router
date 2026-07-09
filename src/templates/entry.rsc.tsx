@@ -70,12 +70,4 @@ const handler: RscRequestHandler = {
 
 export default handler;
 
-const hot = (
-  import.meta as unknown as {
-    webpackHot?: {
-      accept(): void;
-    };
-  }
-).webpackHot;
-
-hot?.accept();
+import.meta.webpackHot?.accept();

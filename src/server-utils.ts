@@ -88,7 +88,7 @@ function generateStaticTemplate(
  */
 function generateServerBuild(
   routes: Record<string, Route>,
-  options: ServerBuildOptions & { federation?: boolean }
+  options: ServerBuildOptions
 ): string {
   return generateStaticTemplate(routes, options);
 }

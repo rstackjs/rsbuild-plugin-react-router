@@ -44,7 +44,6 @@ type CreateClassicVirtualModulesOptions = {
   basename: string;
   devHmrRuntimeModule?: string;
   entryServerPath: string;
-  federation?: boolean;
   future: Config['future'];
   prerenderPaths: string[];
   publicPath: string;
@@ -193,7 +192,6 @@ export const createClassicVirtualModules = ({
   basename,
   devHmrRuntimeModule,
   entryServerPath,
-  federation,
   future,
   prerenderPaths,
   publicPath,
@@ -208,7 +206,6 @@ export const createClassicVirtualModules = ({
     basename,
     appDirectory,
     ssr,
-    federation,
     future,
     allowedActionOrigins,
     prerender: prerenderPaths,

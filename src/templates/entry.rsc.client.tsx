@@ -63,15 +63,7 @@ if (document.readyState === 'loading') {
   hydrate();
 }
 
-const hot = (
-  import.meta as unknown as {
-    webpackHot?: {
-      on(event: string, handler: () => void): void;
-    };
-  }
-).webpackHot;
-
-hot?.on('rsc:update', () => {
+import.meta.webpackHot?.on('rsc:update', () => {
   requestAnimationFrame(() => {
     (
       window as typeof window & { __reactRouterDataRouter?: DataRouter }

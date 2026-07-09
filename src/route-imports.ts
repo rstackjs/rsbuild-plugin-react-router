@@ -8,25 +8,6 @@ import {
 } from './constants.js';
 import type { Route } from './types.js';
 
-type QuerylessRouteImportResolveData = {
-  request?: string;
-  context?: string;
-  contextInfo?: {
-    issuer?: string;
-  };
-};
-
-type QuerylessRouteImportFactory = {
-  hooks: {
-    beforeResolve: {
-      tap: (
-        pluginName: string,
-        handler: (data: QuerylessRouteImportResolveData) => void
-      ) => void;
-    };
-  };
-};
-
 type QuerylessRouteImportPlugin = {
   name: string;
   apply(compiler: Rspack.Compiler): void;
@@ -106,8 +87,7 @@ export const createQuerylessRouteImportPlugin = (
   name: `${PLUGIN_NAME}:queryless-route-imports`,
   apply(compiler: Rspack.Compiler) {
     compiler.hooks.normalModuleFactory.tap(PLUGIN_NAME, factory => {
-      const typedFactory = factory as QuerylessRouteImportFactory;
-      typedFactory.hooks.beforeResolve.tap(PLUGIN_NAME, data => {
+      factory.hooks.beforeResolve.tap(PLUGIN_NAME, data => {
         const resolvedRequest = resolveQuerylessRouteImportRequest({
           compilerName: compiler.options?.name,
           context: data?.context ?? data?.contextInfo?.issuer,

@@ -44,7 +44,6 @@ describe('RSC support helpers', () => {
           path: '',
         },
       },
-      ssr: true,
     });
 
     expect(modules['virtual/react-router/server-build']).toBeUndefined();

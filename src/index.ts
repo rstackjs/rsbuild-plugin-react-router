@@ -477,7 +477,6 @@ export const pluginReactRouter = (
           assetsBuildDirectory,
           defaultEntryName: devServerBuildEntryName,
           entryServerPath: finalEntryServerPath,
-          federation: options.federation,
           finalEntryClientPath,
           future,
           hasServerApp,

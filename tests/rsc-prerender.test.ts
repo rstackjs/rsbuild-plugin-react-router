@@ -5,7 +5,6 @@ import {
   getRscHtmlFilePath,
   getRscPayloadFilePath,
   getRscPrerenderRequests,
-  getRscPrerenderRequestPaths,
   normalizeRscPrerenderBasename,
 } from '../src/rsc-prerender';
 
@@ -27,41 +26,41 @@ describe('normalizeRscPrerenderBasename', () => {
 describe('getRscPrerenderRequestPaths', () => {
   it('returns the prerender paths for ssr builds', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/', '/about'],
         ssr: true,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/', '/about']);
   });
 
   it('adds the SPA fallback document when ssr is disabled', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/'],
         ssr: false,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/', SPA_FALLBACK_REQUEST_PATH]);
   });
 
   it('prerenders only the SPA fallback for ssr:false without prerender paths', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: [],
         ssr: false,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual([SPA_FALLBACK_REQUEST_PATH]);
   });
 
   it('joins paths with the basename', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/', '/products/1'],
         ssr: true,
         basename: '/base',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/base/', '/base/products/1']);
   });
 
@@ -82,11 +81,11 @@ describe('getRscPrerenderRequestPaths', () => {
 
   it('deduplicates paths', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/', '/'],
         ssr: true,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/']);
   });
 });

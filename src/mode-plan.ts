@@ -92,7 +92,6 @@ type CreateClassicModePlanOptions = ModePlanContext & {
   devHmr?: DevHmrPlanOptions;
   defaultEntryName: string;
   entryServerPath: string;
-  federation?: boolean;
   finalEntryClientPath: string;
   future: Config['future'];
   hasServerApp: boolean;
@@ -196,7 +195,6 @@ const createRscModePlan = async ({
         publicPath,
         routeDiscovery,
         routes,
-        ssr,
       }),
     createResolveConfig: (rootPath: string) => ({
       modules: [resolve(rootPath, 'node_modules'), 'node_modules'],
@@ -239,7 +237,6 @@ const createClassicModePlan = async ({
   defaultEntryName,
   devHmr,
   entryServerPath,
-  federation,
   finalEntryClientPath,
   future,
   hasServerApp,
@@ -328,7 +325,6 @@ const createClassicModePlan = async ({
         basename,
         devHmrRuntimeModule: devHmr?.runtimeModule,
         entryServerPath,
-        federation,
         future,
         prerenderPaths: artifacts.prerenderPaths,
         publicPath,
