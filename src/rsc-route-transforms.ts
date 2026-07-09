@@ -101,6 +101,33 @@ const removeSideEffectStyleImports = (program: ProgramNode): void => {
   });
 };
 
+const programHasSideEffectStyleImports = (program: ProgramNode): boolean =>
+  (program.body ?? []).some((statement: AnyNode) => {
+    if (statement.type !== 'ImportDeclaration') {
+      return false;
+    }
+    if ((statement.specifiers ?? []).length > 0) {
+      return false;
+    }
+    const source = statement.source;
+    return (
+      typeof source?.value === 'string' &&
+      STYLE_SIDE_EFFECT_IMPORT_SOURCE.test(source.value)
+    );
+  });
+
+// Synthetic export appended to a *client* route's server module so the native
+// rspack `RscServerPlugin` records the route's bundled CSS in `entryCssFiles`.
+// A client route's default component is a client reference whose bundled
+// (non-vanilla) side-effect CSS is hoisted into the initial browser entry chunk
+// rather than the reference's own async chunk, so the reference's `cssFiles`
+// never captures it and no `<link>` is streamed. Marking the server module
+// `'use server-entry'` and giving it a component export makes the RSC runtime
+// attribute that module graph's CSS to this carrier, which
+// `createServerRouteEntry` then streams as stylesheet links (mirrors the
+// server-component path).
+const RSC_ROUTE_STYLE_ENTRY_EXPORT = 'RscRouteStyleEntry___';
+
 type RscRouteTransformOptions = {
   code: string;
   resourcePath: string;
@@ -563,14 +590,52 @@ const createServerRouteEntry = async (
   validateRscRouteExportPlan(plan, options);
   const lines: string[] = [];
   let needsReactImport = false;
+  let needsEnsureHmrImport = false;
+  let needsStyleEntryImport = false;
+
+  // A client route whose default component is a client reference: its bundled
+  // (non-vanilla) side-effect CSS is orphaned in the initial browser entry
+  // chunk, so nothing streams a `<link>` for it (see `createServerRouteModule`,
+  // which promotes the server module to a `'use server-entry'` CSS carrier).
+  // When that carrier exists, wrap the default component so its
+  // `entryCssFiles` are streamed as stylesheet links at first paint.
+  const hasServerComponent = plan.exportNames.some(isServerComponentExport);
+  const streamsClientRouteCss =
+    !hasServerComponent &&
+    plan.exportNames.includes('default') &&
+    programHasSideEffectStyleImports(
+      getProgram(parse(options.code, { sourceType: 'module' }))
+    );
 
   for (const exportName of plan.exportNames) {
+    if (streamsClientRouteCss && exportName === 'default') {
+      needsReactImport = true;
+      needsStyleEntryImport = true;
+      lines.push(
+        `import RscClientRouteDefault___ from ${JSON.stringify(
+          plan.clientTargetFor('default')
+        )};`
+      );
+      lines.push('export default function RscClientRouteWithStyles___(props) {');
+      lines.push('  return React.createElement(React.Fragment, null,');
+      lines.push(
+        `    ...(${RSC_ROUTE_STYLE_ENTRY_EXPORT}.entryCssFiles ?? []).map(href =>`
+      );
+      lines.push(
+        '      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),'
+      );
+      lines.push('    React.createElement(RscClientRouteDefault___, props),');
+      lines.push('  );');
+      lines.push('}');
+      continue;
+    }
     if (isClientRouteExport(exportName)) {
       lines.push(createReexport(exportName, plan.clientTargetFor(exportName)));
       continue;
     }
     if (isServerComponentExport(exportName)) {
       needsReactImport = true;
+      needsEnsureHmrImport = true;
       lines.push(
         `import { ${exportName} as ${exportName}WithoutClientChunk } from ${JSON.stringify(
           plan.serverTarget
@@ -609,11 +674,25 @@ const createServerRouteEntry = async (
     );
   }
 
-  const prefix = needsReactImport
-    ? `import * as React from "react";\nimport { EnsureClientRouteModuleForHMR___ } from ${JSON.stringify(
+  const prefixParts: string[] = [];
+  if (needsReactImport) {
+    prefixParts.push('import * as React from "react";');
+  }
+  if (needsEnsureHmrImport) {
+    prefixParts.push(
+      `import { EnsureClientRouteModuleForHMR___ } from ${JSON.stringify(
         plan.sharedClientTarget
-      )};\n`
-    : '';
+      )};`
+    );
+  }
+  if (needsStyleEntryImport) {
+    prefixParts.push(
+      `import { ${RSC_ROUTE_STYLE_ENTRY_EXPORT} } from ${JSON.stringify(
+        plan.serverTarget
+      )};`
+    );
+  }
+  const prefix = prefixParts.length > 0 ? `${prefixParts.join('\n')}\n` : '';
   return {
     code: `${prefix}${lines.join('\n')}\n`,
     map: null,
@@ -806,12 +885,23 @@ const createServerRouteModule = async (
   const hasServerComponentExport = RSC_SERVER_COMPONENT_EXPORTS.some(name =>
     exportNames.has(name)
   );
-  return {
-    code: hasServerComponentExport
-      ? `'use server-entry';\n${generated.code}`
-      : generated.code,
-    map: null,
-  };
+  if (hasServerComponentExport) {
+    return { code: `'use server-entry';\n${generated.code}`, map: null };
+  }
+  // Client route with bundled side-effect CSS: the pruned server module still
+  // carries those `import "./x.css"` side effects (specifier-less style imports
+  // survive `removeUnusedImports`). Promote it to a `'use server-entry'` module
+  // with a null-rendering carrier component so the RSC runtime attaches this
+  // graph's CSS as the carrier's `entryCssFiles`. `createServerRouteEntry`
+  // streams those links so the client route's bundled CSS renders at first
+  // paint without JavaScript.
+  if (programHasSideEffectStyleImports(getProgram(ast))) {
+    return {
+      code: `'use server-entry';\n${generated.code}\nexport function ${RSC_ROUTE_STYLE_ENTRY_EXPORT}() { return null; }\n`,
+      map: null,
+    };
+  }
+  return { code: generated.code, map: null };
 };
 
 export const transformRscRouteModule = async (

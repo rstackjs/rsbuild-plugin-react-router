@@ -256,8 +256,19 @@ describe("route entry", () => {
     it("transforms full client modules", async () => {
       const transformed = await transform(fullClientModule, "/test.js");
       assert.ok(transformed);
+      // Intentional divergence from the upstream Vite oracle: a client route
+      // that imports side-effect CSS (`import "./side-effect.css"`) has its
+      // bundled (non-vanilla) CSS orphaned in the initial browser entry chunk,
+      // so the client reference's `cssFiles` never captures it. The rsbuild
+      // flavor promotes the server module to a `'use server-entry'` CSS carrier
+      // (see `createServerRouteModule`) and wraps the `default` component here
+      // so the carrier's `entryCssFiles` stream as stylesheet links at first
+      // paint (mirrors the server-component `withCss` path). Without a
+      // side-effect style import, `default` is re-exported unchanged.
       expect(transformed.code).toBe(
         [
+          'import * as React from "react";',
+          'import { RscRouteStyleEntry___ } from "/test.js?server-route-module=";',
           'export { loader } from "/test.js?server-route-module=";',
           'export { action } from "/test.js?server-route-module=";',
           'export { headers } from "/test.js?server-route-module=";',
@@ -265,7 +276,14 @@ describe("route entry", () => {
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
           'export { links } from "/test.js?client-route-module=data";',
           'export { meta } from "/test.js?client-route-module=data";',
-          'export { default } from "/test.js?client-route-module=route";',
+          'import RscClientRouteDefault___ from "/test.js?client-route-module=route";',
+          'export default function RscClientRouteWithStyles___(props) {',
+          '  return React.createElement(React.Fragment, null,',
+          '    ...(RscRouteStyleEntry___.entryCssFiles ?? []).map(href =>',
+          '      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),',
+          '    React.createElement(RscClientRouteDefault___, props),',
+          '  );',
+          '}',
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export { HydrateFallback } from "/test.js?client-route-module=HydrateFallback";\n',
@@ -321,8 +339,13 @@ describe("route entry", () => {
     it("transforms unsplittable modules", async () => {
       const transformed = await transform(unsplittableModule, "/test.js");
       assert.ok(transformed);
+      // Same client-route CSS carrier divergence as "transforms full client
+      // modules": the side-effect CSS import makes `default` render through the
+      // `RscRouteStyleEntry___` `entryCssFiles` wrapper.
       expect(transformed.code).toBe(
         [
+          'import * as React from "react";',
+          'import { RscRouteStyleEntry___ } from "/test.js?server-route-module=";',
           'export { test } from "/test.js?server-route-module=";',
           'export { loader } from "/test.js?server-route-module=";',
           'export { action } from "/test.js?server-route-module=";',
@@ -331,7 +354,14 @@ describe("route entry", () => {
           'export { clientAction } from "/test.js?client-route-module=route";',
           'export { links } from "/test.js?client-route-module=data";',
           'export { meta } from "/test.js?client-route-module=data";',
-          'export { default } from "/test.js?client-route-module=route";',
+          'import RscClientRouteDefault___ from "/test.js?client-route-module=route";',
+          'export default function RscClientRouteWithStyles___(props) {',
+          '  return React.createElement(React.Fragment, null,',
+          '    ...(RscRouteStyleEntry___.entryCssFiles ?? []).map(href =>',
+          '      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),',
+          '    React.createElement(RscClientRouteDefault___, props),',
+          '  );',
+          '}',
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export { HydrateFallback } from "/test.js?client-route-module=route";\n',
@@ -348,14 +378,24 @@ describe("server-route-module", () => {
       "/test.js?server-route-module=",
     );
     assert.ok(transformed);
+    // Intentional divergence from the upstream Vite oracle: a client route's
+    // pruned server module retains its side-effect CSS imports (specifier-less
+    // style imports survive `removeUnusedImports`). The rsbuild flavor promotes
+    // it to a `'use server-entry'` module with a null-rendering
+    // `RscRouteStyleEntry___` carrier so the RSC runtime attaches this graph's
+    // CSS as the carrier's `entryCssFiles`, which `createServerRouteEntry`
+    // streams as first-paint stylesheet links. A server module WITHOUT any
+    // side-effect style import keeps its plain (directive-free) form.
     expect(transformed.code).toBe(
       [
+        "'use server-entry';",
         'import "./side-effect.css";',
         'import { server } from "./server";',
         'import { shared } from "./shared";',
         "export function loader() {\n  console.log(server, shared);\n}",
         "export function action() {\n  console.log(server, shared);\n}",
         "export function headers() {\n  console.log(server, shared);\n}",
+        "export function RscRouteStyleEntry___() { return null; }\n",
       ].join("\n"),
     );
   });
