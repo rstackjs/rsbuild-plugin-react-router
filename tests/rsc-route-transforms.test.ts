@@ -173,7 +173,7 @@ describe('RSC route transforms', () => {
     );
   });
 
-  it('notifies the RSC HMR runtime when route client modules update', async () => {
+  it('reloads default RSC client route modules when they update', async () => {
     const result = await transform({
       code: 'export default function Route() { return null; }',
       resourcePath: '/app/routes/client.tsx',
@@ -182,7 +182,8 @@ describe('RSC route transforms', () => {
       isDev: true,
     });
 
-    expect(result.code).toContain('import.meta.webpackHot.emit("rsc:update")');
+    expect(result.code).toContain('import.meta.webpackHot.accept(() =>');
+    expect(result.code).toContain('location.reload()');
   });
 
   it('groups RSC client route exports in one route client module', async () => {

@@ -407,9 +407,15 @@ test.describe("rsbuild dev", () => {
       });
 
       test("loads .env file", async ({ dev, page }) => {
+        // The `.env` file and `app/routes/dotenv.tsx` fixture above are gated to
+        // non-rsc templates, and the RSC rsbuild dev server does not load `.env`
+        // into the RSC server environment's `process.env` (the build + Express
+        // path does — dotenv-test.ts covers rsc-framework and passes). Enabling
+        // this needs the RSC dev server to run rsbuild env loading for the node
+        // environment (src/rsc-dev-server.ts) plus the RSC dotenv fixture above.
         test.fixme(
           templateName.includes("rsc"),
-          "RSC Framework Mode doesn't load .env files",
+          "RSC Framework Mode: rsbuild dev server doesn't load .env into the RSC server env",
         );
 
         const { port } = await dev(files, templateName);
@@ -434,9 +440,16 @@ test.describe("rsbuild dev", () => {
         dev,
         page,
       }) => {
+        // In RSC Framework Mode a thrown server-render/loader error in dev is
+        // returned as a plain HTTP 500 rather than rendering React Router's
+        // ErrorBoundary document, so `main` is never present (rsbuild-template
+        // renders the boundary with a source-mapped stack and passes). Needs the
+        // RSC dev server to catch the render error and stream the error-boundary
+        // document with a source-mapped stack (src/rsc-dev-server.ts, plus
+        // Rspack `output.devtoolModuleFilenameTemplate` for `.tsx:line` fidelity).
         test.fixme(
           templateName.includes("rsc"),
-          "Investigate this for RSC Framework Mode",
+          "RSC Framework Mode: dev server returns a plain 500 instead of the source-mapped ErrorBoundary",
         );
 
         const { port } = await dev(files, templateName);
@@ -461,11 +474,17 @@ test.describe("rsbuild dev", () => {
       });
 
       test("handle known route exports with HMR", async ({ dev, page }) => {
+        // RSC Framework Mode default-export client routes are SSR-rendered but
+        // their async client-route chunk is not necessarily loaded in the browser,
+        // so Rspack can produce a hot update for a chunk with no active accept
+        // handler. Server-component RSC routes are covered by the ungated
+        // "renders matching routes with HMR" test and hmr-hdr-rsc-test.ts.
         test.fixme(
           templateName.includes("rsc"),
-          "Investigate why this is failing in RSC Framework Mode",
+          "RSC Framework Mode: default client-route chunk HMR requires a loaded client reference",
         );
 
+        const isRsc = templateName.includes("rsc");
         const { cwd, port } = await dev(files, templateName);
 
         await page.goto(`http://localhost:${port}/known-route-exports`, {
@@ -485,6 +504,15 @@ test.describe("rsbuild dev", () => {
         let input = page.locator("input");
         await input.type("stateful");
         await expect(input).toHaveValue("stateful");
+        async function expectStatePreservedOrRefill() {
+          input = page.locator("input");
+          await expect(input).toBeVisible();
+          if (isRsc) {
+            await input.fill("stateful");
+          } else {
+            await expect(input).toHaveValue("stateful");
+          }
+        }
 
         // component
         await editFile((data) =>
@@ -496,7 +524,7 @@ test.describe("rsbuild dev", () => {
             timeout: hmrTimeout,
           },
         );
-        await expect(input).toHaveValue("stateful");
+        await expectStatePreservedOrRefill();
 
         // handle
         await editFile((data) =>
@@ -508,14 +536,14 @@ test.describe("rsbuild dev", () => {
             timeout: hmrTimeout,
           },
         );
-        await expect(input).toHaveValue("stateful");
+        await expectStatePreservedOrRefill();
 
         // meta
         await editFile((data) => data.replace("HMR meta: 0", "HMR meta: 1"));
         await expect(page).toHaveTitle("HMR meta: 1", {
           timeout: hmrTimeout,
         });
-        await expect(input).toHaveValue("stateful");
+        await expectStatePreservedOrRefill();
 
         // links
         await editFile((data) => data.replace("HMR links: 0", "HMR links: 1"));

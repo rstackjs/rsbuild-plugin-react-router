@@ -66,15 +66,29 @@ if (document.readyState === 'loading') {
 const hot = (
   import.meta as unknown as {
     webpackHot?: {
-      on(event: string, handler: () => void): void;
+      on(
+        event: string,
+        handler: (payload?: { reload?: boolean }) => void
+      ): void;
     };
   }
 ).webpackHot;
 
-hot?.on('rsc:update', () => {
+hot?.on('rsc:update', payload => {
   requestAnimationFrame(() => {
-    (
+    if (payload?.reload) {
+      window.location.reload();
+      return;
+    }
+    const router = (
       window as typeof window & { __reactRouterDataRouter?: DataRouter }
-    ).__reactRouterDataRouter?.revalidate();
+    ).__reactRouterDataRouter;
+    void router?.navigate(
+      window.location.pathname + window.location.search + window.location.hash,
+      {
+        replace: true,
+        preventScrollReset: true,
+      }
+    );
   });
 });

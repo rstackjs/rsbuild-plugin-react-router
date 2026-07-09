@@ -86,9 +86,16 @@ export const createReactRouterRscVirtualModules = ({
     'virtual/react-router/unstable_rsc/inject-hmr-runtime': !isBuild
       ? `if (import.meta.webpackHot) {
   import.meta.webpackHot.accept();
-  import.meta.webpackHot.on("rsc:update", () => {
+  import.meta.webpackHot.on("rsc:update", payload => {
     requestAnimationFrame(() => {
-      globalThis.__reactRouterDataRouter?.revalidate?.();
+      if (payload?.reload) {
+        location.reload();
+        return;
+      }
+      globalThis.__reactRouterDataRouter?.navigate?.(
+        location.pathname + location.search + location.hash,
+        { replace: true, preventScrollReset: true }
+      );
     });
   });
 }`

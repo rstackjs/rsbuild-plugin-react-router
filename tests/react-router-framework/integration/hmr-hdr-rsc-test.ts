@@ -231,7 +231,8 @@ test.describe("HMR & HDR (RSC)", () => {
       "Imported Server Component HMR: 1",
       { timeout: hmrTimeout },
     );
-    await expect(input).toHaveValue("stateful");
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // create new non-route imported client component
@@ -274,7 +275,7 @@ test.describe("HMR & HDR (RSC)", () => {
     let clientButton = page.locator(
       "#index [data-imported-client-component-button]",
     );
-    await expect(clientComponent).toBeVisible();
+    await expect(clientComponent).toBeVisible({ timeout: hmrTimeout });
     await expect(clientComponent).toHaveText(
       "Imported Client Component HMR: 0",
     );

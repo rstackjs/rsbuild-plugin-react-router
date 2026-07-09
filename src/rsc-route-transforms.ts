@@ -626,6 +626,12 @@ const createClientRouteModule = async (
     clientModuleCode += `}\n`;
   }
 
+  const rscUpdateAction =
+    clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK &&
+    plan.exportNameSet.has('default')
+      ? 'location.reload();'
+      : 'globalThis.__reactRouterDataRouter?.navigate?.(location.pathname + location.search + location.hash, { replace: true, preventScrollReset: true });';
+
   return {
     code:
       clientModuleCode +
@@ -633,7 +639,7 @@ const createClientRouteModule = async (
         ? `\n${ENSURE_CLIENT_ROUTE_MODULE_CHUNK_FOR_HMR}`
         : '') +
       (options.isDev
-        ? `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(() => { import.meta.webpackHot.emit("rsc:update"); }); }\n`
+        ? `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(() => { requestAnimationFrame(() => { ${rscUpdateAction} }); }); }\n`
         : ''),
     map: null,
   };

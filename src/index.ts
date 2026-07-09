@@ -516,6 +516,48 @@ export const pluginReactRouter = (
 
     const { manifestChunkNames } = modePlan;
 
+    let sendRscDevUpdate: (() => void) | undefined;
+    let scheduledRscDevUpdate: ReturnType<typeof setTimeout> | undefined;
+    let hasPendingRscNodeUpdate = false;
+    if (isRscMode && !isBuild) {
+      api.onBeforeStartDevServer(({ server }) => {
+        sendRscDevUpdate = () =>
+          server.sockWrite('custom', {
+            event: 'rsc:update',
+          });
+      });
+      api.onCloseDevServer(() => {
+        if (scheduledRscDevUpdate) {
+          clearTimeout(scheduledRscDevUpdate);
+          scheduledRscDevUpdate = undefined;
+        }
+        hasPendingRscNodeUpdate = false;
+        sendRscDevUpdate = undefined;
+      });
+      api.onAfterEnvironmentCompile(({ environment, stats }) => {
+        if (
+          (environment.name !== 'node' && environment.name !== 'web') ||
+          stats?.hasErrors()
+        ) {
+          return;
+        }
+        if (environment.name === 'node') {
+          hasPendingRscNodeUpdate = true;
+        }
+        if (!hasPendingRscNodeUpdate) {
+          return;
+        }
+        if (scheduledRscDevUpdate) {
+          clearTimeout(scheduledRscDevUpdate);
+        }
+        scheduledRscDevUpdate = setTimeout(() => {
+          scheduledRscDevUpdate = undefined;
+          hasPendingRscNodeUpdate = false;
+          sendRscDevUpdate?.();
+        }, 1000);
+      });
+    }
+
     const devBackgroundResources = registerReactRouterDevBackgroundResources({
       api,
       isBuild,

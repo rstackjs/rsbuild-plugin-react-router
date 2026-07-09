@@ -126,16 +126,6 @@ const pendingRouteUpdates = new Map();
 let flushTimeout;
 let pendingRevalidation = false;
 
-function setNeedsHdrNavigation() {
-  window.__reactRouterNeedsHdrNavigation = true;
-}
-
-function consumeNeedsHdrNavigation() {
-  const needsNavigation = window.__reactRouterNeedsHdrNavigation === true;
-  window.__reactRouterNeedsHdrNavigation = false;
-  return needsNavigation;
-}
-
 function getCurrentRouterPath(router) {
   const basename = router.basename || '/';
   let pathname = window.location.pathname;
@@ -248,7 +238,11 @@ function patchCurrentRouteMatches(router, routes) {
 
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
-    return { nextManifest: undefined, shouldRefreshRouteState: false };
+    return {
+      nextManifest: undefined,
+      shouldRefreshRouteState: false,
+      shouldRevalidateRouteState: false,
+    };
   }
 
   // Targeted clone: shallow-copy the manifest and its routes map, then deep-copy
@@ -275,10 +269,8 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     }
   }
 
-  const shouldRefreshRouteState = routesToRevalidate.size === 0;
-  if (routesToRevalidate.size > 0) {
-    setNeedsHdrNavigation();
-  }
+  const shouldRefreshRouteState = true;
+  const shouldRevalidateRouteState = routesToRevalidate.size > 0;
   if (
     typeof router.createRoutesForHMR === 'function' &&
     typeof router._internalSetRoutes === 'function'
@@ -294,33 +286,33 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     patchCurrentRouteMatches(router, routes);
   }
 
-  return { nextManifest, shouldRefreshRouteState };
+  return { nextManifest, shouldRefreshRouteState, shouldRevalidateRouteState };
 }
 
 async function revalidateRouter(router) {
   try {
     window.__reactRouterHdrActive = true;
-    if (consumeNeedsHdrNavigation() && typeof router.navigate === 'function') {
+    if (typeof router.navigate === 'function') {
       await router.navigate(getCurrentRouterPath(router), {
         replace: true,
         preventScrollReset: true,
       });
-    } else {
-      await router.revalidate();
+      return;
     }
+    await router.revalidate();
   } finally {
     window.__reactRouterHdrActive = false;
   }
 }
 
-async function refreshRouteState(router) {
+async function refreshRouteState(router, shouldRevalidate) {
   if (typeof router.navigate !== 'function') {
     return;
   }
   await router.navigate(getCurrentRouterPath(router), {
     replace: true,
     preventScrollReset: true,
-    defaultShouldRevalidate: false,
+    ...(shouldRevalidate ? {} : { defaultShouldRevalidate: false }),
   });
 }
 
@@ -342,21 +334,26 @@ async function flush() {
     return;
   }
 
-  const shouldRevalidate = pendingRevalidation;
+  let shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  const { nextManifest, shouldRefreshRouteState } = applyPendingRouteUpdates(
-    router,
-    routeModules,
-    manifest,
-    context
-  );
+  const {
+    nextManifest,
+    shouldRefreshRouteState,
+    shouldRevalidateRouteState,
+  } = applyPendingRouteUpdates(router, routeModules, manifest, context);
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
   }
+  if (shouldRefreshRouteState) {
+    const revalidateWithRouteState =
+      shouldRevalidate && shouldRevalidateRouteState;
+    await refreshRouteState(router, revalidateWithRouteState);
+    if (revalidateWithRouteState) {
+      shouldRevalidate = false;
+    }
+  }
   if (shouldRevalidate) {
     await revalidateRouter(router);
-  } else if (shouldRefreshRouteState) {
-    await refreshRouteState(router);
   }
   performReactRefresh();
 }
