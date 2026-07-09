@@ -27,6 +27,7 @@ type RscManifest = Record<
 
 const compileVariant = async (withCss: boolean) => {
   const root = await mkdtemp(join(tmpdir(), 'rspack-rsc-css-reference-'));
+  try {
   const serverOutput = join(root, 'dist/server');
   const clientOutput = join(root, 'dist/client');
   const rscEntry = join(root, 'entry.rsc.tsx');
@@ -143,43 +144,47 @@ export { dataFn } from './data.client';
     },
   ]);
 
-  try {
-    const stats = await new Promise<MultiStats>((resolve, reject) => {
-      compiler.run((error, value) => {
-        if (error) {
-          reject(error);
-        } else if (!value) {
-          reject(new Error('Rspack completed without stats'));
-        } else {
-          resolve(value);
-        }
+    try {
+      const stats = await new Promise<MultiStats>((resolve, reject) => {
+        compiler.run((error, value) => {
+          if (error) {
+            reject(error);
+          } else if (!value) {
+            reject(new Error('Rspack completed without stats'));
+          } else {
+            resolve(value);
+          }
+        });
       });
-    });
-    if (stats.hasErrors()) {
-      const { errors } = stats.toJson({ all: false, errors: true });
-      throw new Error(`Rspack compilation failed:\n${JSON.stringify(errors, null, 2)}`);
-    }
+      if (stats.hasErrors()) {
+        const { errors } = stats.toJson({ all: false, errors: true });
+        throw new Error(
+          `Rspack compilation failed:\n${JSON.stringify(errors, null, 2)}`
+        );
+      }
 
-    const serverBundle = pathToFileURL(join(serverOutput, 'main.cjs')).href;
-    const serverExports = (await import(
-      `${serverBundle}?variant=${withCss ? 'css' : 'control'}-${Date.now()}`
-    )) as { dataFn: ClientReference };
-    const manifestEntry = manifest?.main;
-    if (!manifestEntry) {
-      throw new Error('Rspack did not produce an RSC manifest for main');
-    }
-    const cssFiles = Object.values(manifestEntry.clientManifest).flatMap(
-      value => value.cssFiles ?? []
-    );
+      const serverBundle = pathToFileURL(join(serverOutput, 'main.cjs')).href;
+      const serverExports = (await import(
+        `${serverBundle}?variant=${withCss ? 'css' : 'control'}-${Date.now()}`
+      )) as { dataFn: ClientReference };
+      const manifestEntry = manifest?.main;
+      if (!manifestEntry) {
+        throw new Error('Rspack did not produce an RSC manifest for main');
+      }
+      const cssFiles = Object.values(manifestEntry.clientManifest).flatMap(
+        value => value.cssFiles ?? []
+      );
 
-    return {
-      cssFiles,
-      dataFn: serverExports.dataFn,
-    };
+      return {
+        cssFiles,
+        dataFn: serverExports.dataFn,
+      };
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        compiler.close(error => (error ? reject(error) : resolve()));
+      });
+    }
   } finally {
-    await new Promise<void>((resolve, reject) => {
-      compiler.close(error => (error ? reject(error) : resolve()));
-    });
     await rm(root, { recursive: true, force: true });
   }
 };
