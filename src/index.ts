@@ -83,6 +83,7 @@ import {
   registerReactRouterDevBackgroundResources,
 } from './dev-background-resources.js';
 
+export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
 
