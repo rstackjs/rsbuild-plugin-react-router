@@ -1,5 +1,8 @@
 export const PLUGIN_NAME = 'rsbuild:react-router';
 
+/** Default web `output.distPath.js` segment when the user has not customized it. */
+export const DEFAULT_JS_DIST_PATH = 'static/js';
+
 export const JS_EXTENSIONS = [
   '.tsx',
   '.ts',

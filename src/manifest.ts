@@ -3,7 +3,11 @@ import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import * as Effect from 'effect/Effect';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
 import { combineURLs, createRouteId } from './plugin-utils.js';
-import { SERVER_EXPORTS, CLIENT_EXPORTS } from './constants.js';
+import {
+  CLIENT_EXPORTS,
+  DEFAULT_JS_DIST_PATH,
+  SERVER_EXPORTS,
+} from './constants.js';
 import {
   buildManifestChunkValidity,
   createEmptyRouteChunkByExportName,
@@ -273,7 +277,7 @@ type RouteManifestAnalysis = {
   > | null;
 };
 
-const DEFAULT_MANIFEST_DIR = 'static/js';
+const DEFAULT_MANIFEST_DIR = DEFAULT_JS_DIST_PATH;
 const CSS_IMPORT_RE = /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/;
 
 const createChunkAssetResolver = (

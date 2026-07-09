@@ -2,6 +2,7 @@ import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
 import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
+import { escapeHtml } from './plugin-utils.js';
 import {
   beginDevCompilerAttempt,
   clearDevCompilerStart,
@@ -66,12 +67,6 @@ type CreateControllerOptions = {
    */
   onNodeRebuildCommitted?: () => void;
 };
-
-const escapeHtml = (value: string): string =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
 
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
 

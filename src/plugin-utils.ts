@@ -60,6 +60,12 @@ export const getPackageVersion = (
   }
 };
 
+export const escapeHtml = (value: string): string =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+
 export function combineURLs(baseURL: string, relativeURL: string): string {
   return relativeURL
     ? `${baseURL.replace(/\/+$/, '')}/${relativeURL.replace(/^\/+/, '')}`

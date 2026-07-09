@@ -1,9 +1,7 @@
 import { createRequestListener } from '@remix-run/node-fetch-server';
 import type { RsbuildConfig } from '@rsbuild/core';
 import { installDevServerSourceMapSupport } from './dev-source-maps.js';
-
-const escapeHtml = (value: string): string =>
-  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+import { escapeHtml } from './plugin-utils.js';
 
 /**
  * Turns an error thrown by the RSC server build into a source-mapped 500 HTML

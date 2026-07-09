@@ -6,7 +6,11 @@ import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
-import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
+import {
+  DEFAULT_JS_DIST_PATH,
+  JS_EXTENSIONS,
+  PLUGIN_NAME,
+} from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 import {
   findEntryFile,
@@ -724,7 +728,7 @@ export const pluginReactRouter = (
       const jsDistPath =
         (typeof webDistPath === 'object' ? webDistPath.js : undefined) ??
         (typeof rootDistPath === 'object' ? rootDistPath.js : undefined) ??
-        'static/js';
+        DEFAULT_JS_DIST_PATH;
       const vmodPlugin = createVirtualModulePlugin(
         normalizeAssetPrefix(config.output?.assetPrefix),
         jsDistPath

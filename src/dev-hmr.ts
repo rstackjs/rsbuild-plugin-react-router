@@ -212,6 +212,9 @@ function getRouteById(routes, routeId) {
   }
 }
 
+// Deliberate coupling to React Router's private dev API: patching the live
+// match objects is the only way to swap route implementations without a
+// navigation. The typeof guard below degrades to a no-op if RR removes it.
 function patchCurrentRouteMatches(router, routes) {
   if (
     !router.state ||
@@ -238,10 +241,7 @@ function patchCurrentRouteMatches(router, routes) {
 
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
-    return {
-      nextManifest: undefined,
-      shouldRefreshRouteState: false,
-    };
+    return { nextManifest: undefined };
   }
 
   // Targeted clone: shallow-copy the manifest and its routes map, then deep-copy
@@ -268,7 +268,6 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     }
   }
 
-  const shouldRefreshRouteState = true;
   if (
     typeof router.createRoutesForHMR === 'function' &&
     typeof router._internalSetRoutes === 'function'
@@ -284,7 +283,7 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     patchCurrentRouteMatches(router, routes);
   }
 
-  return { nextManifest, shouldRefreshRouteState };
+  return { nextManifest };
 }
 
 async function revalidateRouter(router) {
@@ -299,9 +298,7 @@ async function revalidateRouter(router) {
         replace: true,
         preventScrollReset: true,
       });
-      return;
     }
-    await router.revalidate();
   } finally {
     window.__reactRouterHdrActive = false;
   }
@@ -339,14 +336,14 @@ async function flush() {
 
   let shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  const {
-    nextManifest,
-    shouldRefreshRouteState,
-  } = applyPendingRouteUpdates(router, routeModules, manifest, context);
+  const { nextManifest } = applyPendingRouteUpdates(
+    router,
+    routeModules,
+    manifest,
+    context
+  );
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
-  }
-  if (shouldRefreshRouteState) {
     await refreshRouteState(router);
     shouldRevalidate = false;
   }
