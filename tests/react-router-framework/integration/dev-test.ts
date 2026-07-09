@@ -425,16 +425,16 @@ test.describe("rsbuild dev", () => {
         dev,
         page,
       }) => {
-        // In RSC Framework Mode a thrown server-render/loader error in dev is
-        // returned as a plain HTTP 500 rather than rendering React Router's
-        // ErrorBoundary document, so `main` is never present (rsbuild-template
-        // renders the boundary with a source-mapped stack and passes). Needs the
-        // RSC dev server to catch the render error and stream the error-boundary
-        // document with a source-mapped stack (src/rsc-dev-server.ts, plus
-        // Rspack `output.devtoolModuleFilenameTemplate` for `.tsx:line` fidelity).
+        // The RSC dev server now streams a source-mapped error document on
+        // handler throws (src/rsc-dev-server.ts renderDevServerError), but this
+        // test still can't pass in RSC Framework Mode: the crash condition
+        // never fires because `useLocation().search` is empty during the RSC
+        // server render pass (verified against compiled output where
+        // `import.meta.env.SSR` is correctly `true`). Needs the request URL's
+        // search threaded into the RSC render location.
         test.fixme(
           templateName.includes("rsc"),
-          "RSC Framework Mode: dev server returns a plain 500 instead of the source-mapped ErrorBoundary",
+          "RSC Framework Mode: useLocation().search is empty during the RSC server render",
         );
 
         const { port } = await dev(files, templateName);
