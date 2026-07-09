@@ -48,6 +48,7 @@ const RSC_HMR_NAVIGATE_SNIPPET = `const router = globalThis.__reactRouterDataRou
                   let pathname = location.pathname;
                   if (basename !== "/" && pathname.startsWith(basename)) {
                     pathname = pathname.slice(basename.length) || "/";
+                    if (pathname[0] !== "/") pathname = "/" + pathname;
                   }
                   router.navigate(pathname + location.search + location.hash, { replace: true, preventScrollReset: true });
                 }`;
@@ -863,9 +864,20 @@ const createClientRouteModule = async (
       // message. The <main><pre> shape matches RemixRootDefaultErrorBoundary,
       // which the dev error-stacktrace integration test asserts on.
       clientModuleCode += `import { useRouteError as __rr_useRouteError } from "react-router";\n`;
+      // Errors carry a (source-mapped) stack; non-Error rejections (e.g. a
+      // react-router ErrorResponse) do not, and `String(plainObject)` collapses
+      // to "[object Object]". Fall back to a pretty-printed JSON dump so the
+      // boundary surfaces the actual payload instead of an opaque marker.
+      clientModuleCode += `function __rr_formatRouteError(error) {\n`;
+      clientModuleCode += `  if (error && error.stack) return String(error.stack);\n`;
+      clientModuleCode += `  if (error && typeof error === "object") {\n`;
+      clientModuleCode += `    try { return JSON.stringify(error, null, 2); } catch (e) { return String(error); }\n`;
+      clientModuleCode += `  }\n`;
+      clientModuleCode += `  return String(error);\n`;
+      clientModuleCode += `}\n`;
       clientModuleCode += `export function ErrorBoundary() {\n`;
       clientModuleCode += `  const error = __rr_useRouteError();\n`;
-      clientModuleCode += `  return __rr_createElement("main", null, __rr_createElement("pre", null, String((error && error.stack) || error)));\n`;
+      clientModuleCode += `  return __rr_createElement("main", null, __rr_createElement("pre", null, __rr_formatRouteError(error)));\n`;
       clientModuleCode += `}\n`;
     } else {
       clientModuleCode += `export function ErrorBoundary() {\n`;

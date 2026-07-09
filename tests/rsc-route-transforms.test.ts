@@ -72,6 +72,56 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain('"Unexpected Server Error"');
   });
 
+  it('renders non-Error route rejections in the dev root ErrorBoundary', async () => {
+    // A react-router ErrorResponse (a plain object, no `.stack`) previously
+    // collapsed to "[object Object]" via String(error). The dev boundary must
+    // pretty-print such objects so the real payload is visible.
+    const result = await transform({
+      code: `
+        export default function Root() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/root.tsx',
+      resourceQuery: '?client-route-module=shared',
+      isRootRoute: true,
+      routeId: 'root',
+      isServerEnvironment: true,
+      isDev: true,
+    });
+
+    expect(result.code).toContain('export function ErrorBoundary()');
+    expect(result.code).toContain('function __rr_formatRouteError(error)');
+    // Errors keep their (source-mapped) stack.
+    expect(result.code).toContain('if (error && error.stack) return String(error.stack)');
+    // Non-Error objects fall back to a JSON dump instead of "[object Object]".
+    expect(result.code).toContain('JSON.stringify(error, null, 2)');
+
+    // Behavioral check: exercise the emitted formatter against an
+    // ErrorResponse-shaped object and a real Error.
+    const fnMatch = result.code.match(
+      /function __rr_formatRouteError[\s\S]*?\n\}\n/
+    );
+    expect(fnMatch).not.toBeNull();
+    const format = new Function(
+      'error',
+      `${fnMatch![0]}\nreturn __rr_formatRouteError(error);`
+    ) as (error: unknown) => string;
+
+    const errorResponse = {
+      status: 404,
+      statusText: 'Not Found',
+      data: 'Error: No route matches URL',
+      internal: true,
+    };
+    const formatted = format(errorResponse);
+    expect(formatted).not.toBe('[object Object]');
+    expect(formatted).toContain('"status": 404');
+
+    const realError = new Error('boom');
+    expect(format(realError)).toContain('Error: boom');
+  });
+
   it('targets client route chunks from the client route module query', async () => {
     const result = await transform({
       code: `
@@ -187,6 +237,11 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain(
       'router.navigate(pathname + location.search + location.hash'
     );
+    // A trailing-slash basename (e.g. "/mybase/") consumes the leading slash
+    // when stripped, producing a relative `to` that react-router resolves
+    // against the current location and doubles into the URL (which route
+    // discovery then 404s). Re-assert absolute after stripping.
+    expect(result.code).toContain('if (pathname[0] !== "/") pathname = "/" + pathname');
   });
 
   it('strips side-effect style imports from the data route chunk', async () => {

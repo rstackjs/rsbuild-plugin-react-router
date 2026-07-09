@@ -90,6 +90,10 @@ hot?.on('rsc:update', () => {
       let pathname = window.location.pathname;
       if (basename !== '/' && pathname.startsWith(basename)) {
         pathname = pathname.slice(basename.length) || '/';
+        // A trailing-slash basename (e.g. "/mybase/") consumes the leading
+        // slash, yielding a relative path that react-router resolves against
+        // the current location and doubles. Force it back to absolute.
+        if (pathname[0] !== '/') pathname = '/' + pathname;
       }
       void router.navigate(
         pathname + window.location.search + window.location.hash,
