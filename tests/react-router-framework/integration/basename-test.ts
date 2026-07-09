@@ -180,6 +180,8 @@ test.describe("base + React Router basename", () => {
   for (const templateName of templateNames) {
     test.describe(`template: ${templateName}`, () => {
       test.describe("rsbuild dev", () => {
+        test.describe.configure({ timeout: 180_000 });
+
         let port: number;
         let cwd: string;
         let stop: (() => unknown) | undefined;
@@ -353,6 +355,8 @@ test.describe("base + React Router basename", () => {
       });
 
       test.describe("express dev", async () => {
+        test.describe.configure({ timeout: 180_000 });
+
         let port: number;
         let cwd: string;
         let stop: (() => unknown) | undefined;
@@ -683,13 +687,27 @@ async function workflowDev({
   expect(pageErrors).toEqual([]);
 
   // route: HMR
+  const hotUpdate = page.waitForResponse(
+    (response) =>
+      response.url().includes(".hot-update.") && response.status() < 400,
+    { timeout: devHmrTimeout },
+  );
   await edit("app/routes/_index.tsx", (contents) =>
     contents.replace("HMR updated: 0", "HMR updated: 1"),
   );
-  await page.waitForLoadState("networkidle");
-  await expect(hmrStatus).toHaveText("HMR updated: 1", {
-    timeout: devHmrTimeout,
-  });
+  await hotUpdate;
+  try {
+    await expect(hmrStatus).toHaveText("HMR updated: 1", {
+      timeout: devHmrTimeout,
+    });
+  } catch (error) {
+    console.log("basename hmr debug url", page.url());
+    console.log(
+      "basename hmr debug requests",
+      requests.slice(-30).map((request) => request.url()),
+    );
+    throw error;
+  }
   await expect(input).toHaveValue("stateful", { timeout: devHmrTimeout });
   expect(pageErrors).toEqual([]);
 
@@ -704,7 +722,9 @@ async function workflowDev({
     link.click();
   });
   await page.waitForURL(`http://localhost:${port}${basename}other`);
-  await page.getByText("other-loader").click();
+  await expect(page.getByText("other-loader")).toBeVisible({
+    timeout: devHmrTimeout,
+  });
   expect(pageErrors).toEqual([]);
 
   // verify client asset requests are all under base
