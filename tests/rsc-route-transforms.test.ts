@@ -8,6 +8,10 @@ const routeChunkConfig: RouteChunkConfig = {
   appDirectory: '/app',
   rootRouteFile: 'root.tsx',
 };
+const enforceRouteChunkConfig: RouteChunkConfig = {
+  ...routeChunkConfig,
+  splitRouteModules: 'enforce',
+};
 const routeByFilePath = new Map<string, Route>([
   ['/app/routes/client.tsx', { id: 'routes/client', file: 'routes/client.tsx' }],
   ['/app/routes/target.tsx', { id: 'routes/target', file: 'routes/target.tsx' }],
@@ -143,6 +147,29 @@ describe('RSC route transforms', () => {
     );
     expect(result.code).toContain(
       'export { default } from "/app/routes/client.tsx?client-route-module=route";'
+    );
+  });
+
+  it('rejects unsplittable clientMiddleware exports in enforce mode', async () => {
+    await expect(
+      transform({
+        code: `
+          const shared = true;
+          export const clientMiddleware = [
+            async ({ request }, next) => {
+              return shared ? next() : undefined;
+            },
+          ];
+          export default function Route() {
+            return shared ? null : null;
+          }
+        `,
+        resourcePath: '/app/routes/client.tsx',
+        routeId: 'routes/client',
+        routeChunkConfig: enforceRouteChunkConfig,
+      })
+    ).rejects.toThrowError(
+      /Error splitting route module: routes\/client[\s\S]*- clientMiddleware[\s\S]*This export[\s\S]*its own chunk[\s\S]*it shares/
     );
   });
 
