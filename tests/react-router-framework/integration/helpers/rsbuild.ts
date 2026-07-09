@@ -382,6 +382,7 @@ export const build = ({
     env: withFrameworkTestRunEnv({
       ...process.env,
       ...colorEnv,
+      NODE_ENV: "production",
       ...env,
     }),
   });
