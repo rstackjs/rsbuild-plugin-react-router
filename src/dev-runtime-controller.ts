@@ -551,6 +551,13 @@ export const createReactRouterDevRuntimeController = ({
     },
 
     createBuildLoader(entryName?: string): () => Promise<ServerBuild> {
+      // Pin the loader to the dev-server session active at creation time. Once a
+      // loader is handed to React Router for session N it must keep serving N (or
+      // fail loudly with 'not registered' once N closes) and never silently migrate
+      // to a replacement session — this preserves SSR generation/session coherency.
+      // The live fallback below applies ONLY when no session exists yet at creation
+      // (boundServer === undefined), i.e. a loader built during config setup before
+      // the dev server has started; there is no session to stay coherent with yet.
       const boundServer = sessions.getActiveBinding()?.server;
       return () => {
         const server = boundServer ?? sessions.getActiveBinding()?.server;
