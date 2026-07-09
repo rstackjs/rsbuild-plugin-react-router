@@ -111,8 +111,11 @@ export default {
 ```
 
 Use `ReactRouterRsbuildConfig` for Rsbuild projects so plugin-supported
-configuration such as `splitRouteModules` remains typed across React Router 7
-and 8 releases.
+configuration such as `splitRouteModules` stays typed across React Router 7
+and 8 releases. The underlying route and config types come from
+`@react-router/dev`, which framework-mode apps already install for
+`routes.ts` helpers and typegen; it is declared as an optional peer
+dependency.
 
 Commonly used options:
 
@@ -182,7 +185,7 @@ For static sites with multiple pages, you can prerender specific routes at build
 
 ```ts
 // react-router.config.ts
-import type { Config } from '@react-router/dev/config';
+import type { ReactRouterRsbuildConfig } from 'rsbuild-plugin-react-router';
 
 export default {
   ssr: false,
@@ -194,7 +197,7 @@ export default {
     '/docs/advanced',
     '/projects',
   ],
-} satisfies Config;
+} satisfies ReactRouterRsbuildConfig;
 ```
 
 When `prerender` is specified:
@@ -213,7 +216,7 @@ export default {
   ssr: false,
   prerender: ({ getStaticPaths }) =>
     getStaticPaths().filter(path => path !== '/admin'),
-} satisfies Config;
+} satisfies ReactRouterRsbuildConfig;
 ```
 
 Prerendering defaults to one path at a time, matching React Router. Use
@@ -227,7 +230,7 @@ export default {
     paths: ['/', '/about'],
     concurrency: 4,
   },
-} satisfies Config;
+} satisfies ReactRouterRsbuildConfig;
 ```
 
 For builds with 256+ routes, detailed file-size reporting is compacted to totals

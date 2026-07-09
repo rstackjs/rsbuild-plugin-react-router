@@ -79,9 +79,9 @@ import {
 import { createReactRouterModePlan } from './mode-plan.js';
 import { createQuerylessRouteImportPlugin } from './route-imports.js';
 
+export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
-export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
 export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
 
 const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
