@@ -458,7 +458,13 @@ export const createDev =
       nodeArgs[0] === rsbuildBin && nodeArgs[1] === "dev"
         ? [...nodeArgs, "--port", String(port)]
         : nodeArgs;
-    let proc = node(args, { cwd, env });
+    let proc = node(args, {
+      cwd,
+      env: {
+        NODE_ENV: "development",
+        ...env,
+      },
+    });
     await waitForServer(proc, { port, basename });
     return () => stopProcess(proc);
   };
