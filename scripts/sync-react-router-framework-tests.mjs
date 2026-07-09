@@ -139,9 +139,8 @@ export const adaptedCorpusPaths = [
  * directory names that say "vite" are misleading under rsbuild, so they were
  * renamed to rsbuild-flavored names via `git mv` (history preserved). This map
  * is exported into UPSTREAM.json as `renames` so the provenance of each moved
- * path stays discoverable. A separate repurpose of this sync script is planned;
- * for now the map is descriptive metadata only (the sync flow does not consume
- * it to move files).
+ * path stays discoverable. The sync flow applies this map before restoring the
+ * declared local overlay.
  */
 export const corpusRenames = {
   // Earlier collapse: the upstream Vite 7 / Vite 8 template pair was merged into
@@ -191,6 +190,35 @@ export const corpusRenames = {
     'integration/unused-route-exports-test.ts',
 };
 
+/**
+ * Applies repo-owned corpus path renames to a freshly copied upstream tree.
+ * The Vite 8 template is intentionally discarded: the corpus keeps the Vite 7
+ * template bytes as the single Rsbuild template baseline.
+ *
+ * @param {string} workRoot
+ */
+export const applyCorpusRenames = async workRoot => {
+  const collapsedTemplatePath = 'integration/helpers/vite-8-template';
+  await rm(path.join(workRoot, collapsedTemplatePath), {
+    force: true,
+    recursive: true,
+  });
+
+  for (const [source, target] of Object.entries(corpusRenames)) {
+    if (source === collapsedTemplatePath) {
+      continue;
+    }
+    const sourcePath = path.join(workRoot, source);
+    if (!existsSync(sourcePath)) {
+      continue;
+    }
+    const targetPath = path.join(workRoot, target);
+    await mkdir(path.dirname(targetPath), { recursive: true });
+    await rm(targetPath, { force: true, recursive: true });
+    await rename(sourcePath, targetPath);
+  }
+};
+
 export const removedUpstreamPaths = [
   'integration/helpers/vite-plugin-cloudflare-template',
   'integration/vite-plugin-cloudflare-test.ts',
@@ -198,11 +226,7 @@ export const removedUpstreamPaths = [
 ];
 
 const preservedCorpusPaths = [
-  ...new Set([
-    ...adapterOwnedPaths,
-    ...adaptedCorpusPaths,
-    ...Object.values(corpusRenames),
-  ]),
+  ...new Set([...adapterOwnedPaths, ...adaptedCorpusPaths]),
 ];
 
 const defaultSource = '/home/zack/projects/react-router';
@@ -213,6 +237,8 @@ const sourceRoot = path.resolve(
 );
 const normalizeOnly = process.argv.includes('--normalize-only');
 const updatePin = process.argv.includes('--update-pin');
+const isDirectExecution =
+  process.argv[1] && path.resolve(process.argv[1]) === scriptPath;
 
 const toCorpusRelativePath = (root, absolutePath) =>
   path.relative(root, absolutePath).split(path.sep).join('/');
@@ -344,10 +370,7 @@ const copyUpstreamTests = async (workRoot = targetRoot) => {
     });
   }
 
-  for (const sourcePath of [
-    ...Object.keys(corpusRenames),
-    ...removedUpstreamPaths,
-  ]) {
+  for (const sourcePath of removedUpstreamPaths) {
     await rm(path.join(workRoot, sourcePath), {
       force: true,
       recursive: true,
@@ -569,12 +592,13 @@ const writeManifest = async ref => {
   return { corpusVerified, untrackedDriftPaths };
 };
 
-if (!normalizeOnly) {
+if (isDirectExecution && !normalizeOnly) {
   const ref = await enforcePinnedRef();
   await rm(scratchRoot, { force: true, recursive: true });
   await mkdir(stagedTargetRoot, { recursive: true });
   await preserveAdapterFiles(targetRoot);
   await copyUpstreamTests(stagedTargetRoot);
+  await applyCorpusRenames(stagedTargetRoot);
   await restoreAdapterFiles(stagedTargetRoot);
 
   for (const packageJsonPath of await findFiles(
@@ -620,7 +644,7 @@ if (!normalizeOnly) {
     console.log(`Updated pinned upstream ref to ${ref}`);
   }
   await rm(scratchRoot, { force: true, recursive: true });
-} else {
+} else if (isDirectExecution) {
   await rm(scratchRoot, { force: true, recursive: true });
   await copyCorpusTree(targetRoot, stagedTargetRoot);
   for (const packageJsonPath of await findFiles(
