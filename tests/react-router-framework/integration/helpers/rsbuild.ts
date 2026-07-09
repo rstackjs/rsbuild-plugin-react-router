@@ -158,6 +158,10 @@ export const rsbuildConfig = {
           "",
         ]
       : [];
+    const modePrelude = [
+      `const mode = process.env.NODE_ENV ?? (process.argv.some((arg) => arg === "build" || arg === "preview") ? "production" : "development");`,
+      "",
+    ];
 
     const config = [
       ...configSection("server", [
@@ -185,7 +189,7 @@ export const rsbuildConfig = {
       ]),
       ...configSection("source", [
         `define: {`,
-        `  "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "development"),`,
+        `  "process.env.NODE_ENV": JSON.stringify(mode),`,
         ...(args.envPrefixes ? [`  ...publicVars,`] : []),
         `},`,
       ]),
@@ -207,6 +211,7 @@ export const rsbuildConfig = {
     return [
       ...imports,
       "",
+      ...modePrelude,
       ...prelude,
       "export default defineConfig({",
       ...config.map((line) => `  ${line}`),
