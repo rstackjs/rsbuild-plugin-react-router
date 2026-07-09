@@ -11,11 +11,11 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from '@rstest/core';
 
-// Node < 22 lacks native type-stripping for .mts files, so spawning `node`
-// directly on .mts scripts fails with ERR_UNKNOWN_FILE_EXTENSION. CI runs
-// Node 22+, so only skip these locally on older Node versions.
-const nodeMajor = Number(process.versions.node.split('.')[0]);
-const skipOnOldNode = nodeMajor < 22;
+// Spawning `node` directly on .mts scripts needs the runtime to strip types
+// by default (Node >= 22.18 / 23.6); otherwise the spawn fails with
+// ERR_UNKNOWN_FILE_EXTENSION. The spawns use `process.execPath`, so this
+// process's feature flag matches the spawned binary.
+const skipOnOldNode = !process.features?.typescript;
 
 describe('benchmark fixture generator', () => {
   it('creates a deterministic synthetic React Router app', async () => {
