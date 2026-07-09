@@ -1,14 +1,6 @@
 import { createRequestListener } from '@remix-run/node-fetch-server';
 import type { RsbuildConfig } from '@rsbuild/core';
 
-type RscDevServer = {
-  environments: {
-    node: {
-      loadBundle<T>(entryName: string): Promise<T>;
-    };
-  };
-};
-
 type RscServerBuild = {
   default?: {
     fetch?: (request: Request) => Promise<Response>;
@@ -53,11 +45,20 @@ export function createReactRouterRscDevServerSetup({
   entryName,
   pluginName,
 }: RscDevServerSetupOptions): RscDevServerSetup {
-  return ({ server }) => {
-    const devServer = server as unknown as RscDevServer;
+  return context => {
+    // `ServerSetupContext` is a discriminated union on `action`; only the
+    // `'dev'` server exposes the typed `environments` API (`loadBundle`), while
+    // the `'preview'` server (`RsbuildPreviewServer`) does not. Excluding the
+    // preview branch narrows `context` to the dev variant, so `server` is a
+    // fully typed `RsbuildDevServer` — no casts, and `loadBundle` is only ever
+    // reached on the server that actually provides it.
+    if (context.action === 'preview') {
+      return;
+    }
+    const { server } = context;
     const listener = createRequestListener(async request => {
       const build =
-        await devServer.environments.node.loadBundle<RscServerBuild>(entryName);
+        await server.environments.node.loadBundle<RscServerBuild>(entryName);
       const handler = build.default?.fetch;
       if (typeof handler !== 'function') {
         throw new Error(
