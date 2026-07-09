@@ -249,7 +249,7 @@ export const resolvePrerenderPaths = async (
         [
           'Warning: Paths with dynamic/splat params cannot be prerendered when using `prerender: true`.',
           'You may want to use the `prerender()` API to prerender the following paths:',
-          ...paramRoutes.map(path => `  - ${path.replace(/^\//, '')}`),
+          ...paramRoutes.map(path => `  - ${path.replace(/^\/(?=[:*])/, '')}`),
         ].join('\n')
       );
     }
