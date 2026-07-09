@@ -135,15 +135,8 @@ const createDataRequestPath = (
 const createDataOutputPath = (
   prerenderPath: string,
   trailingSlashAwareDataRequests: boolean
-): string => {
-  if (trailingSlashAwareDataRequests) {
-    return prerenderPath.endsWith('/')
-      ? `${prerenderPath}_.data`
-      : `${prerenderPath}.data`;
-  }
-
-  return createDataRequestPath(prerenderPath, trailingSlashAwareDataRequests);
-};
+): string =>
+  createDataRequestPath(prerenderPath, trailingSlashAwareDataRequests);
 
 const createDataHandlerRequestPath = (
   prerenderPath: string,
