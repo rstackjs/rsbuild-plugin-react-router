@@ -279,6 +279,68 @@ describe('RSC route transforms', () => {
     expect(result.code).not.toContain('export default function Route()');
   });
 
+  it('marks server-first route modules as server entries so RSC collects their CSS', async () => {
+    const result = await transform({
+      code: `
+        import "./styles.css";
+        export function ServerComponent() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?server-route-module=',
+      routeId: 'routes/server',
+      isServerEnvironment: true,
+    });
+
+    expect(result.code).toContain("'use server-entry';");
+    expect(result.code).toContain('import "./styles.css"');
+    expect(result.code).toContain('export function ServerComponent()');
+  });
+
+  it('does not mark data-only server route modules as server entries', async () => {
+    const result = await transform({
+      code: `
+        export async function loader() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?server-route-module=',
+      routeId: 'routes/server',
+      isServerEnvironment: true,
+    });
+
+    expect(result.code).not.toContain('use server-entry');
+    expect(result.code).toContain('export async function loader()');
+  });
+
+  it('streams server-entry CSS links from server-first route entries', async () => {
+    const result = await transform({
+      code: `
+        export function ServerComponent() {
+          return null;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      routeId: 'routes/server',
+      isServerEnvironment: true,
+    });
+
+    expect(result.code).toContain(
+      'import { ServerComponent as ServerComponentWithoutClientChunk } from "/app/routes/server.tsx?server-route-module="'
+    );
+    expect(result.code).toContain(
+      '...(ServerComponentWithoutClientChunk.entryCssFiles ?? []).map(href =>'
+    );
+    expect(result.code).toContain(
+      'React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })'
+    );
+    expect(result.code).toContain(
+      'React.createElement(ServerComponentWithoutClientChunk, props)'
+    );
+  });
+
   it('preserves client component initializer side effects in server route modules', async () => {
     const result = await transform({
       code: `

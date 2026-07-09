@@ -229,11 +229,17 @@ describe("route entry", () => {
   });
 
   describe("server environment", () => {
+    // Intentional divergence from the upstream Vite oracle: the rsbuild
+    // flavor streams `entryCssFiles` links (via the `'use server-entry'`
+    // mechanism) instead of upstream's `import.meta.viteRsc.loadCss()`.
     function withCss(name: string) {
       return [
         `import { ${name} as ${name}WithoutClientChunk } from "/test.js?server-route-module=";`,
         `export function ${name}(props) {`,
         `  return React.createElement(React.Fragment, null,`,
+        `    ...(${name}WithoutClientChunk.entryCssFiles ?? []).map(href =>`,
+        `      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),`,
+        `    React.createElement(EnsureClientRouteModuleForHMR___, null),`,
         `    React.createElement(${name}WithoutClientChunk, props),`,
         `  );`,
         `}`,
@@ -275,18 +281,10 @@ describe("route entry", () => {
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
           'export { links } from "/test.js?client-route-module=route";',
           'export { meta } from "/test.js?client-route-module=route";',
-          ...withCss("ServerComponent").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerComponent").slice(3),
-          ...withCss("ServerLayout").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerLayout").slice(3),
-          ...withCss("ServerErrorBoundary").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerErrorBoundary").slice(3),
-          ...withCss("ServerHydrateFallback").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerHydrateFallback").slice(3),
+          ...withCss("ServerComponent"),
+          ...withCss("ServerLayout"),
+          ...withCss("ServerErrorBoundary"),
+          ...withCss("ServerHydrateFallback"),
         ].join("\n") + "\n",
       );
     });
@@ -305,9 +303,7 @@ describe("route entry", () => {
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
           'export { links } from "/test.js?client-route-module=route";',
           'export { meta } from "/test.js?client-route-module=route";',
-          ...withCss("ServerComponent").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerComponent").slice(3),
+          ...withCss("ServerComponent"),
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export { HydrateFallback } from "/test.js?client-route-module=HydrateFallback";',
@@ -365,6 +361,9 @@ describe("server-route-module", () => {
     assert.ok(transformed);
     expect(transformed.code).toBe(
       [
+        // rsbuild flavor: server-component modules carry `'use server-entry'`
+        // so the rspack RSC runtime records `entryCssFiles` for them.
+        "'use server-entry';",
         'import "./side-effect.css";',
         'import { server } from "./server";',
         'import { shared } from "./shared";',
@@ -387,6 +386,7 @@ describe("server-route-module", () => {
     assert.ok(transformed);
     expect(transformed.code).toBe(
       [
+        "'use server-entry';",
         'import "./side-effect.css";',
         'import { server } from "./server";',
         'import { shared } from "./shared";',

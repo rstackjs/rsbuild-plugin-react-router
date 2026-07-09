@@ -529,6 +529,18 @@ const createServerRouteEntry = async (
       );
       lines.push(`export function ${exportName}(props) {`);
       lines.push('  return React.createElement(React.Fragment, null,');
+      // The server route module carries the `'use server-entry'` directive, so
+      // the rspack RSC runtime wraps its component export with
+      // `createServerEntry`, attaching `entryCssFiles` for the CSS the module
+      // graph contributes. Render those as stylesheet links at the top of the
+      // stream (mirrors upstream's `import.meta.viteRsc.loadCss()`); React's
+      // float support hoists them into `<head>`.
+      lines.push(
+        `    ...(${exportName}WithoutClientChunk.entryCssFiles ?? []).map(href =>`
+      );
+      lines.push(
+        '      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),'
+      );
       lines.push(
         '    React.createElement(EnsureClientRouteModuleForHMR___, null),'
       );
@@ -672,10 +684,10 @@ const rewriteRscClientRouteImports = (
   }
 };
 
-const createServerRouteModule = (
+const createServerRouteModule = async (
   code: string,
   sourceFileName: string
-): RscRouteTransformResult => {
+): Promise<RscRouteTransformResult> => {
   const ast = parse(code, { sourceType: 'module' });
   const removedClientLogicExports = removeExports(
     ast,
@@ -696,8 +708,19 @@ const createServerRouteModule = (
     filename: sourceFileName,
     sourceFileName,
   });
+  // Server-first routes import their CSS from the server (RSC) layer, so it
+  // never reaches the client compilation's `<Links>`. Mark modules that export
+  // a server component with the `'use server-entry'` directive so the rspack
+  // RSC runtime records the module graph's CSS in `entryCssFiles`; the server
+  // route entry then streams those links (see `createServerRouteEntry`).
+  const exportNames = new Set(await getExportNames(code));
+  const hasServerComponentExport = RSC_SERVER_COMPONENT_EXPORTS.some(name =>
+    exportNames.has(name)
+  );
   return {
-    code: generated.code,
+    code: hasServerComponentExport
+      ? `'use server-entry';\n${generated.code}`
+      : generated.code,
     map: null,
   };
 };
