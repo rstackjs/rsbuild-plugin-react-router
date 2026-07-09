@@ -59,6 +59,7 @@ import {
 import {
   registerRouteModuleTransformRules,
   shouldUseApiRouteModuleTransforms,
+  shouldUseApiRouteModuleTransformsForAction,
 } from './route-module-transform-rules.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
@@ -106,7 +107,7 @@ const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
-const useApiRouteModuleTransforms = shouldUseApiRouteModuleTransforms();
+const supportsApiRouteModuleTransforms = shouldUseApiRouteModuleTransforms();
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -377,6 +378,11 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
+    const useApiRouteModuleTransforms =
+      shouldUseApiRouteModuleTransformsForAction({
+        isBuild,
+        supportsApiRouteModuleTransforms,
+      });
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
       isBuild,
     });

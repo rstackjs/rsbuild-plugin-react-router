@@ -15,6 +15,14 @@ export const shouldUseApiRouteModuleTransforms = (): boolean =>
     )
   ) || process.env.RSTEST === 'true';
 
+export const shouldUseApiRouteModuleTransformsForAction = ({
+  isBuild,
+  supportsApiRouteModuleTransforms,
+}: {
+  isBuild: boolean;
+  supportsApiRouteModuleTransforms: boolean;
+}): boolean => isBuild || supportsApiRouteModuleTransforms;
+
 const getRouteModuleTransformParallel = (
   parallelRouteTransform: PluginOptions['parallelRouteTransform']
 ): Rspack.RuleSetLoaderWithOptions['parallel'] => {

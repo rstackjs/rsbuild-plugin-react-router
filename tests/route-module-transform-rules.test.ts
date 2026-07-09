@@ -1,5 +1,8 @@
 import { describe, expect, it } from '@rstest/core';
-import { registerRouteModuleTransformRules } from '../src/route-module-transform-rules';
+import {
+  registerRouteModuleTransformRules,
+  shouldUseApiRouteModuleTransformsForAction,
+} from '../src/route-module-transform-rules';
 
 const createRuleConfig = (
   parallelRouteTransform: boolean | number | undefined
@@ -33,6 +36,27 @@ const createRuleConfig = (
 };
 
 describe('route module transform rules', () => {
+  it('uses api route-module transforms for production builds', () => {
+    expect(
+      shouldUseApiRouteModuleTransformsForAction({
+        isBuild: true,
+        supportsApiRouteModuleTransforms: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldUseApiRouteModuleTransformsForAction({
+        isBuild: false,
+        supportsApiRouteModuleTransforms: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldUseApiRouteModuleTransformsForAction({
+        isBuild: false,
+        supportsApiRouteModuleTransforms: true,
+      })
+    ).toBe(true);
+  });
+
   it('registers route module loader rules with loader options', () => {
     const config = createRuleConfig(true);
     const [queryRule, routeRule] = config.module.rules;
