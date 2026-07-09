@@ -132,6 +132,62 @@ const programHasSideEffectStyleImports = (program: ProgramNode): boolean =>
     );
   });
 
+// A vanilla-extract style imported for its VALUE exports — the generated scoped
+// class names, e.g. `import * as s from "./x.css"` consumed as `s.index`, or
+// `import { index } from "./x.css"`. Vanilla-extract files live on disk as
+// `x.css.ts`/`x.css.js` but are imported through the `.css` specifier, so match
+// the specifier's `.css` extension. Plain side-effect `.css` imports have no
+// value specifiers and never reach this predicate; CSS Modules (`.module.css`,
+// handled by rspack's native CSS pipeline and retained) and `?url` asset imports
+// are excluded so only vanilla's value imports qualify.
+const isVanillaValueImportSource = (source: string): boolean => {
+  const queryIndex = source.indexOf('?');
+  const pathPart = queryIndex === -1 ? source : source.slice(0, queryIndex);
+  const query = queryIndex === -1 ? '' : source.slice(queryIndex + 1);
+  if (!pathPart.endsWith('.css') || pathPart.endsWith('.module.css')) {
+    return false;
+  }
+  // `?url` (and any query flagging an asset-URL import) never carries value
+  // exports; keep those on the existing `?url` relocation path.
+  return !/(^|&)url(&|=|$)/.test(query);
+};
+
+// Collect the sources of vanilla-extract value imports that lack a co-located
+// bare side-effect import of the same file.
+//
+// On a server-component route, the component consuming those class names renders
+// only in the RSC (node) compilation. Because the module is imported for its JS
+// value (not as a `import "./x.css"` side effect), rspack tree-shakes the style
+// module's CSS-emitting side effect out of the graph the client build and the
+// RSC runtime's `entryCssFiles` are derived from — the class name is applied but
+// no stylesheet defines it (padding stays `0px`). A plain `globalStyle`
+// side-effect import (`import "./x.css"`) is retained and extracts fine; adding
+// a matching bare side-effect import for value imports forces the scoped CSS
+// back into the module graph so it extracts to a client asset and streams as a
+// `<link>` at first paint, mirroring the global-style path.
+const collectVanillaValueImportSources = (program: ProgramNode): string[] => {
+  const valueSources = new Set<string>();
+  const bareSources = new Set<string>();
+  for (const statement of program.body ?? []) {
+    if (statement.type !== 'ImportDeclaration') {
+      continue;
+    }
+    const source = statement.source;
+    if (typeof source?.value !== 'string') {
+      continue;
+    }
+    if (!isVanillaValueImportSource(source.value)) {
+      continue;
+    }
+    if ((statement.specifiers ?? []).length > 0) {
+      valueSources.add(source.value);
+    } else {
+      bareSources.add(source.value);
+    }
+  }
+  return [...valueSources].filter(source => !bareSources.has(source));
+};
+
 // Synthetic export appended to a *client* route's server module so the native
 // rspack `RscServerPlugin` records the route's bundled CSS in `entryCssFiles`.
 // A client route's default component is a client reference whose bundled
@@ -724,6 +780,18 @@ const createClientRouteModule = async (
   const ast = parse(code, { sourceType: 'module' });
   const program = getProgram(ast);
   const plan = await createRscRouteExportPlan(options);
+  // Captured before export/import pruning: on a server-component route the
+  // component consuming a vanilla-extract style's class names is a server export
+  // stripped from the client module below, so its value import is pruned and the
+  // scoped CSS never enters the client compilation. Re-adding it as a bare
+  // side-effect import (see `collectVanillaValueImportSources`) makes the client
+  // build extract the stylesheet — matching a plain `import "./x.css"` global
+  // style — so the server route entry's `entryCssFiles` link resolves.
+  const vanillaValueImportSources =
+    plan.exportNames.some(isServerComponentExport) &&
+    clientRouteChunk !== ROUTE_CLIENT_DATA_CHUNK
+      ? collectVanillaValueImportSources(program)
+      : [];
   if (clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK) {
     stripPreservedDependencyExports(
       program,
@@ -775,7 +843,13 @@ const createClientRouteModule = async (
     filename: sourceFileName,
     sourceFileName,
   });
-  let clientModuleCode = `"use client";\n${generated.code}`;
+  const vanillaSideEffectImports =
+    vanillaValueImportSources.length > 0
+      ? `${vanillaValueImportSources
+          .map(source => `import ${JSON.stringify(source)};`)
+          .join('\n')}\n`
+      : '';
+  let clientModuleCode = `"use client";\n${vanillaSideEffectImports}${generated.code}`;
 
   if (clientRouteChunk === 'shared' && plan.needsDefaultRootErrorBoundary) {
     const hasRootLayout =
@@ -918,7 +992,23 @@ const createServerRouteModule = async (
     exportNames.has(name)
   );
   if (hasServerComponentExport) {
-    return { code: `'use server-entry';\n${generated.code}`, map: null };
+    // Force-retain the CSS side effect of any vanilla-extract style imported for
+    // its class-name values, so the server component's scoped styles reach the
+    // client build and stream as `<link>`s (see
+    // `collectVanillaValueImportSources`). Placed after the `'use server-entry'`
+    // directive prologue and before the pruned body.
+    const vanillaSideEffectImports = collectVanillaValueImportSources(
+      getProgram(ast)
+    )
+      .map(source => `import ${JSON.stringify(source)};`)
+      .join('\n');
+    const prefix = vanillaSideEffectImports
+      ? `${vanillaSideEffectImports}\n`
+      : '';
+    return {
+      code: `'use server-entry';\n${prefix}${generated.code}`,
+      map: null,
+    };
   }
   // Client route with bundled side-effect CSS: the pruned server module still
   // carries those `import "./x.css"` side effects (specifier-less style imports

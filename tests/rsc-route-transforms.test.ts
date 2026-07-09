@@ -286,6 +286,70 @@ describe('RSC route transforms', () => {
     expect(result.code).not.toContain('export default function Route()');
   });
 
+  it('re-adds a bare vanilla style import to the shared client chunk of a server-first route', async () => {
+    const result = await transform({
+      code: `
+        import * as localStyles from "./styles-vanilla-local.css";
+        export function ServerComponent() {
+          return localStyles.index;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?client-route-module=shared',
+      routeId: 'routes/server',
+      isServerEnvironment: true,
+    });
+
+    // The server component (and its value import) is stripped from the client
+    // module, so a bare side-effect import is re-added to make the client build
+    // extract the scoped stylesheet the server entry's `entryCssFiles` links.
+    expect(result.code).toContain('"use client";');
+    expect(result.code).toContain('import "./styles-vanilla-local.css";');
+    expect(result.code).not.toContain('export function ServerComponent()');
+  });
+
+  it('does not re-add the vanilla style import to the data client chunk of a server-first route', async () => {
+    const result = await transform({
+      code: `
+        import * as localStyles from "./styles-vanilla-local.css";
+        export function loader() {
+          return null;
+        }
+        export function ServerComponent() {
+          return localStyles.index;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?client-route-module=data',
+      routeId: 'routes/server',
+      isServerEnvironment: true,
+    });
+
+    // The data chunk keeps `cssFiles` empty so RSC never wraps data exports in a
+    // CSS-injecting component; the vanilla import must not leak into it.
+    expect(result.code).not.toContain('import "./styles-vanilla-local.css";');
+  });
+
+  it('does not re-add vanilla style imports to client (non-server-component) route chunks', async () => {
+    const result = await transform({
+      code: `
+        import * as localStyles from "./styles-vanilla-local.css";
+        export default function Route() {
+          return localStyles.index;
+        }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=route',
+      routeId: 'routes/client',
+      isServerEnvironment: true,
+    });
+
+    // A client route's component stays in the client graph, so its vanilla value
+    // import extracts normally — no synthetic bare import is added.
+    expect(result.code).not.toContain('import "./styles-vanilla-local.css";');
+    expect(result.code).toContain('export default function Route()');
+  });
+
   it('rewrites RSC client route module imports to shared client modules', async () => {
     const result = await transform({
       code: `
@@ -350,6 +414,52 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain("'use server-entry';");
     expect(result.code).toContain('import "./styles.css"');
     expect(result.code).toContain('export function ServerComponent()');
+  });
+
+  it('re-adds a bare side-effect import for value-imported vanilla styles in server-first route modules', async () => {
+    const result = await transform({
+      code: `
+        import * as localStyles from "./styles-vanilla-local.css";
+        export function ServerComponent() {
+          return localStyles.index;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?server-route-module=',
+      routeId: 'routes/server',
+      isServerEnvironment: true,
+    });
+
+    // The value import (used for the scoped class name) survives, and a bare
+    // side-effect import of the same file is added so the vanilla CSS side
+    // effect is retained in the server graph and recorded in `entryCssFiles`.
+    expect(result.code).toContain("'use server-entry';");
+    expect(result.code).toContain(
+      'import * as localStyles from "./styles-vanilla-local.css"'
+    );
+    expect(result.code).toContain('import "./styles-vanilla-local.css";');
+  });
+
+  it('does not re-add bare imports for CSS Modules or `?url` value imports in server-first route modules', async () => {
+    const result = await transform({
+      code: `
+        import moduleStyles from "./styles.module.css";
+        import cssUrl from "./styles.css?url";
+        export function ServerComponent() {
+          return moduleStyles.index + cssUrl;
+        }
+      `,
+      resourcePath: '/app/routes/server.tsx',
+      resourceQuery: '?server-route-module=',
+      routeId: 'routes/server',
+      isServerEnvironment: true,
+    });
+
+    // CSS Modules are handled by the native CSS pipeline and `?url` imports ride
+    // the asset-relocation path; neither should gain a synthetic bare import.
+    expect(result.code).not.toContain('import "./styles.module.css";');
+    expect(result.code).not.toContain('import "./styles.css?url";');
+    expect(result.code).not.toContain('import "./styles.css";');
   });
 
   it('does not mark data-only server route modules as server entries', async () => {
