@@ -256,6 +256,11 @@ export const registerBuildOutputTransforms = ({
             routeChunkConfig,
           });
 
+          // Invariant with the transformRouteModule registration below: in
+          // split-chunk production builds, web route modules are transformed
+          // HERE (on the main chunk) and the shared registration is scoped to
+          // ['node']. If either gate changes, web modules get transformed
+          // twice or not at all.
           if (
             !isBuild ||
             getRouteChunkNameFromModuleId(args.resource) !== 'main'
@@ -366,6 +371,10 @@ export const registerBuildOutputTransforms = ({
       resourceQuery: {
         not: /__react-router-build-client-route|react-router-route|route-chunk=/,
       },
+      // Invariant with the route-chunk= handler above: when split-chunk
+      // production builds transform web modules on the main chunk, this
+      // registration must stay scoped to ['node'] so web modules are not
+      // transformed twice.
       environments: isBuild && splitRouteModules ? ['node'] : undefined,
       order: 'post',
     },

@@ -2,6 +2,7 @@ import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import * as EffectDeferred from 'effect/Deferred';
 import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
+import { HMR_PATCHABLE_ROUTE_FLAGS } from './route-artifacts.js';
 import {
   evaluateServerBuilds,
   getEnvironmentStats,
@@ -227,13 +228,8 @@ const hasSameRouteMetadata = (
   }
   // Without a client-side HMR runtime these flags can only reach the browser
   // through a full reload.
-  return (
-    previous.hasErrorBoundary === next.hasErrorBoundary &&
-    previous.hasAction === next.hasAction &&
-    previous.hasClientAction === next.hasClientAction &&
-    previous.hasClientLoader === next.hasClientLoader &&
-    previous.hasClientMiddleware === next.hasClientMiddleware &&
-    previous.hasLoader === next.hasLoader
+  return HMR_PATCHABLE_ROUTE_FLAGS.every(
+    flag => previous[flag] === next[flag]
   );
 };
 

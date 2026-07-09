@@ -81,7 +81,7 @@ export const registerReactRouterRscRouteTransforms = ({
   api.transform(
     {
       test: path =>
-        routeByFilePath.has(resolve(path)) && !mdxRoutePattern.test(path),
+        !mdxRoutePattern.test(path) && routeByFilePath.has(resolve(path)),
       order: 'pre',
     },
     transformRoute

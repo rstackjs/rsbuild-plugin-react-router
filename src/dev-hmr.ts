@@ -198,17 +198,13 @@ function applyRouteModuleUpdate(routeId, update, routeEntry, routeModules) {
   const imported = update.getRouteModuleExports();
   registerReactRouterRouteExports(routeId, imported);
   const current = routeModules[routeId];
+  const preserveIdentity = key =>
+    imported[key] ? (current && current[key]) || imported[key] : imported[key];
   routeModules[routeId] = {
     ...imported,
-    default: imported.default
-      ? (current && current.default) || imported.default
-      : imported.default,
-    ErrorBoundary: imported.ErrorBoundary
-      ? (current && current.ErrorBoundary) || imported.ErrorBoundary
-      : imported.ErrorBoundary,
-    HydrateFallback: imported.HydrateFallback
-      ? (current && current.HydrateFallback) || imported.HydrateFallback
-      : imported.HydrateFallback,
+    default: preserveIdentity('default'),
+    ErrorBoundary: preserveIdentity('ErrorBoundary'),
+    HydrateFallback: preserveIdentity('HydrateFallback'),
   };
 }
 

@@ -155,27 +155,23 @@ export const relocateServerAssetsToClient = async ({
     const sourceBuffer = asset.source.buffer();
     const sourceDigest = digestBuffer(sourceBuffer);
     const cachedDigest = relocatedDestinations?.get(destination);
-    if (cachedDigest === sourceDigest) {
+    const alreadyRelocated =
+      cachedDigest === sourceDigest ||
+      (existsSyncFn(destination) &&
+        digestBuffer(await readFileFn(destination)) === sourceDigest);
+    if (alreadyRelocated) {
       skipped.push(asset.name);
     } else {
-      let existingDigest: string | undefined;
-      if (existsSyncFn(destination)) {
-        existingDigest = digestBuffer(await readFileFn(destination));
+      await mkdirFn(dirname(destination));
+      const temporaryDestination = `${destination}.tmp-${process.pid}-${Date.now()}`;
+      await writeFileFn(temporaryDestination, sourceBuffer);
+      try {
+        await renameFn(temporaryDestination, destination);
+      } catch (error) {
+        await rmFn(temporaryDestination, { force: true });
+        throw error;
       }
-      if (existingDigest === sourceDigest) {
-        skipped.push(asset.name);
-      } else {
-        await mkdirFn(dirname(destination));
-        const temporaryDestination = `${destination}.tmp-${process.pid}-${Date.now()}`;
-        await writeFileFn(temporaryDestination, sourceBuffer);
-        try {
-          await renameFn(temporaryDestination, destination);
-        } catch (error) {
-          await rmFn(temporaryDestination, { force: true });
-          throw error;
-        }
-        written.push(asset.name);
-      }
+      written.push(asset.name);
     }
     relocatedDestinations?.set(destination, sourceDigest);
     // Remove the static asset from the server build so it is not shipped

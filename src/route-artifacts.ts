@@ -1,7 +1,9 @@
 import { basename } from 'pathe';
 
 import {
+  CLIENT_EXPORTS,
   CLIENT_ROUTE_EXPORTS_SET,
+  SERVER_EXPORTS,
   SERVER_ONLY_ROUTE_EXPORTS_SET,
 } from './constants.js';
 import { getExportNames } from './export-utils.js';
@@ -49,26 +51,33 @@ type RouteChunkArtifact = {
   map: null;
 };
 
-type RouteHmrMetadata = {
-  hasAction: boolean;
-  hasClientAction: boolean;
-  hasClientLoader: boolean;
-  hasClientMiddleware: boolean;
-  hasErrorBoundary: boolean;
-  hasLoader: boolean;
-};
+// Shared with the dev manifest differ: exactly the route flags the client HMR
+// runtime can patch in place without a full reload.
+export const HMR_PATCHABLE_ROUTE_FLAGS = [
+  'hasAction',
+  'hasClientAction',
+  'hasClientLoader',
+  'hasClientMiddleware',
+  'hasErrorBoundary',
+  'hasLoader',
+] as const;
+
+type RouteHmrMetadata = Record<
+  (typeof HMR_PATCHABLE_ROUTE_FLAGS)[number],
+  boolean
+>;
 
 export const buildRouteHmrMetadata = (
   exportNames: readonly string[]
 ): RouteHmrMetadata => {
   const exports = new Set(exportNames);
   return {
-    hasAction: exports.has('action'),
-    hasClientAction: exports.has('clientAction'),
-    hasClientLoader: exports.has('clientLoader'),
-    hasClientMiddleware: exports.has('clientMiddleware'),
-    hasErrorBoundary: exports.has('ErrorBoundary'),
-    hasLoader: exports.has('loader'),
+    hasAction: exports.has(SERVER_EXPORTS.action),
+    hasClientAction: exports.has(CLIENT_EXPORTS.clientAction),
+    hasClientLoader: exports.has(CLIENT_EXPORTS.clientLoader),
+    hasClientMiddleware: exports.has(CLIENT_EXPORTS.clientMiddleware),
+    hasErrorBoundary: exports.has(CLIENT_EXPORTS.ErrorBoundary),
+    hasLoader: exports.has(SERVER_EXPORTS.loader),
   };
 };
 
