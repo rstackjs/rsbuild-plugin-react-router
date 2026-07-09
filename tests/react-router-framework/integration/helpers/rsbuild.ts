@@ -184,7 +184,10 @@ export const rsbuildConfig = {
           : []),
       ]),
       ...configSection("source", [
-        ...(args.envPrefixes ? [`define: publicVars,`] : []),
+        `define: {`,
+        `  "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "development"),`,
+        ...(args.envPrefixes ? [`  ...publicVars,`] : []),
+        `},`,
       ]),
       ...(args.vanillaExtract
         ? [
