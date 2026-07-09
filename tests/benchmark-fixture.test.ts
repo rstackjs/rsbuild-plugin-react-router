@@ -360,31 +360,10 @@ describe('benchmark fixture generator', () => {
     }
   });
 
-  it('requires native TypeScript support for benchmark CLIs', () => {
-    const result = spawnSync(
-      process.execPath,
-      [
-        '--no-experimental-strip-types',
-        'scripts/benchmark/run.mjs',
-        'scripts/bench-builds.mts',
-      ],
-      {
-        cwd: process.cwd(),
-        encoding: 'utf8',
-      }
-    );
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain(
-      'Benchmark scripts require Node 22.18+ or 23.6+ with native TypeScript support.'
-    );
-  });
-
   it('accepts equals-form CLI options before benchmark selection', () => {
     const result = spawnSync(
       process.execPath,
       [
-        'scripts/benchmark/run.mjs',
         'scripts/bench-builds.mts',
         '--profile=smoke',
         '--iterations=1',
@@ -410,7 +389,6 @@ describe('benchmark fixture generator', () => {
     const result = spawnSync(
       process.execPath,
       [
-        'scripts/benchmark/run.mjs',
         'scripts/bench-builds.mts',
         '--profile=large',
         '--iterations=1',
@@ -700,7 +678,6 @@ describe('benchmark fixture generator', () => {
       const result = spawnSync(
         process.execPath,
         [
-          'scripts/benchmark/run.mjs',
           'scripts/report-benchmark-ci.mts',
           '--base',
           join(root, 'base.json'),

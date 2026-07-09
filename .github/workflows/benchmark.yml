@@ -140,7 +140,7 @@ jobs:
         env:
           REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
         run: |
-          node "$GITHUB_WORKSPACE/head/scripts/benchmark/run.mjs" scripts/bench-builds.mts \
+          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mts" \
             --profile "$BENCHMARK_PROFILE" \
             --mode build \
             --iterations "$BENCHMARK_BUILD_ITERATIONS" \
@@ -154,7 +154,7 @@ jobs:
       - name: Benchmark head production build
         working-directory: head
         run: |
-          node scripts/benchmark/run.mjs scripts/bench-builds.mts \
+          node scripts/bench-builds.mts \
             --profile "$BENCHMARK_PROFILE" \
             --mode build \
             --iterations "$BENCHMARK_BUILD_ITERATIONS" \
@@ -171,7 +171,7 @@ jobs:
         env:
           REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
         run: |
-          node "$GITHUB_WORKSPACE/head/scripts/benchmark/run.mjs" scripts/bench-builds.mts \
+          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mts" \
             --profile "$BENCHMARK_PROFILE" \
             --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
@@ -186,7 +186,7 @@ jobs:
       - name: Benchmark head dev
         working-directory: head
         run: |
-          node scripts/benchmark/run.mjs scripts/bench-builds.mts \
+          node scripts/bench-builds.mts \
             --profile "$BENCHMARK_PROFILE" \
             --mode "$BENCHMARK_MODE" \
             --iterations "$BENCHMARK_ITERATIONS" \
@@ -232,7 +232,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          node scripts/benchmark/run.mjs scripts/report-benchmark-ci.mts \
+          node scripts/report-benchmark-ci.mts \
             --base "$GITHUB_WORKSPACE/benchmark-output/dev/base/baseline.json" \
             --head "$GITHUB_WORKSPACE/benchmark-output/dev/head/baseline.json" \
             --build-base "$GITHUB_WORKSPACE/benchmark-output/build/base/baseline.json" \
