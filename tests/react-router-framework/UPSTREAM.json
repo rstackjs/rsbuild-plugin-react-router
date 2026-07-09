@@ -1,12 +1,12 @@
 {
   "repository": "https://github.com/remix-run/react-router",
   "ref": "4cf6e62d0cdf9d7f6e09b0ea10077d7fb0e1b438",
-  "syncedAt": "2026-07-06T23:45:02.592Z",
+  "syncedAt": "2026-07-09T20:23:01.258Z",
   "sourceDirs": [
     "integration",
     "packages/react-router-dev/__tests__"
   ],
-  "fileCount": 164,
+  "fileCount": 170,
   "adapterOwnedFiles": [
     "README.md",
     "UPSTREAM.json",
@@ -18,14 +18,19 @@
     "integration/helpers/fixtures.ts",
     "integration/helpers/global-setup.ts",
     "integration/helpers/global-teardown.ts",
+    "integration/helpers/rsbuild-config.ts",
     "integration/helpers/rsbuild.ts",
     "integration/helpers/test-resource-guard.ts",
-    "integration/playwright.config.ts"
+    "integration/playwright.config.ts",
+    "integration/rsc/rsc-css-test.ts",
+    "integration/svgr-test.ts",
+    "integration/tailwind-test.ts"
   ],
   "adaptedCorpusFiles": [
     "integration/absolute-base-test.ts",
     "integration/action-test.ts",
     "integration/basename-test.ts",
+    "integration/bug-report-test.ts",
     "integration/build-test.ts",
     "integration/catch-boundary-data-test.ts",
     "integration/cli-test.ts",
@@ -52,6 +57,7 @@
     "integration/link-test.ts",
     "integration/loader-context-test.ts",
     "integration/manifests-test.ts",
+    "integration/matches-test.ts",
     "integration/mdx-test.ts",
     "integration/middleware-test.ts",
     "integration/node-env-test.ts",
@@ -77,6 +83,7 @@
     "integration/sri-test.ts",
     "integration/typegen-test.ts",
     "integration/unused-route-exports-test.ts",
+    "react-router-dev/__tests__/fixtures/basic/tsconfig.json",
     "react-router-dev/__tests__/rsc-virtual-route-modules-test.ts"
   ],
   "renames": {
@@ -112,10 +119,13 @@
     "integration/vite-unused-route-exports-test.ts": "integration/unused-route-exports-test.ts"
   },
   "removedUpstreamFiles": [
+    "integration/helpers/rsc-vite-framework/vite.config.ts",
+    "integration/helpers/rsc-vite/vite.config.ts",
+    "integration/helpers/vite-7-template/vite.config.ts",
     "integration/helpers/vite-plugin-cloudflare-template",
     "integration/vite-plugin-cloudflare-test.ts",
     "integration/vite-plugin-order-validation-test.ts"
   ],
   "corpusVerified": true,
-  "preservedLocalPathCount": 69
+  "preservedLocalPathCount": 75
 }

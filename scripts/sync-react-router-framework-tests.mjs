@@ -227,6 +227,9 @@ export const applyCorpusRenames = async workRoot => {
 };
 
 export const removedUpstreamPaths = [
+  'integration/helpers/rsc-vite-framework/vite.config.ts',
+  'integration/helpers/rsc-vite/vite.config.ts',
+  'integration/helpers/vite-7-template/vite.config.ts',
   'integration/helpers/vite-plugin-cloudflare-template',
   'integration/vite-plugin-cloudflare-test.ts',
   'integration/vite-plugin-order-validation-test.ts',
