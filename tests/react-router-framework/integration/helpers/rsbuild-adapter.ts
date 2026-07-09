@@ -18,7 +18,7 @@ const TEMPLATES_SHIPPING_OWN_CONFIG: ReadonlySet<TemplateName> = new Set<Templat
   "rsc-preview",
 ]);
 
-const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
 const reactRouterVersion = "^8.0.1";
 
@@ -105,7 +105,7 @@ export async function finalizeFixtureProject({
   templateName?: TemplateName;
 }) {
   await writePackageJson(projectDir, templateName);
-  await writeTsconfig(projectDir);
+  await ensureTsconfig(projectDir);
 
   await Promise.all(
     ["vite.config.ts", "vite.config.js", "vite.config.mjs"].map(file =>
@@ -251,8 +251,10 @@ async function readPackageJson(projectDir: string): Promise<Record<string, any>>
   }
 }
 
-async function writeTsconfig(projectDir: string) {
+async function ensureTsconfig(projectDir: string) {
   const tsconfigPath = path.join(projectDir, "tsconfig.json");
+  if (existsSync(tsconfigPath)) return;
+
   await mkdir(projectDir, { recursive: true });
   await writeFile(
     tsconfigPath,
