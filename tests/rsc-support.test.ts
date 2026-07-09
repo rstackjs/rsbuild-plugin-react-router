@@ -52,9 +52,11 @@ describe('RSC support helpers', () => {
     expect(
       modules['virtual/react-router/unstable_rsc/bootstrap-scripts']
     ).toContain('/assets/custom/js/index.js');
+    // The RSC HMR runtime only self-accepts; the single `rsc:update` navigate
+    // handler now lives in the RSC client entry, not this virtual module.
     expect(
       modules['virtual/react-router/unstable_rsc/inject-hmr-runtime']
-    ).toContain('rsc:update');
+    ).toContain('import.meta.webpackHot.accept()');
     expect(
       modules['virtual/react-router/unstable_rsc/allowed-action-origins']
     ).toBe('export default ["https://app.example.com"];');

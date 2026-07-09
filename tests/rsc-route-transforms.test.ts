@@ -189,6 +189,29 @@ describe('RSC route transforms', () => {
     );
   });
 
+  it('strips side-effect style imports from the data route chunk', async () => {
+    // The `?client-route-module=data` chunk carries only route data exports and
+    // must keep its client-manifest `cssFiles` empty so the native rspack
+    // `RscServerPlugin` never wraps these non-component exports in a
+    // CSS-injecting component wrapper. Assert the bare style side-effect import
+    // is dropped from the emitted data chunk.
+    const result = await transform({
+      code: `
+        import "./styles.css";
+        export const meta = () => [];
+        export const links = () => [];
+        export default function Route() { return null; }
+      `,
+      resourcePath: '/app/routes/client.tsx',
+      resourceQuery: '?client-route-module=data',
+      routeId: 'routes/client',
+    });
+
+    expect(result.code).not.toContain('.css');
+    expect(result.code).toContain('export const meta');
+    expect(result.code).toContain('export const links');
+  });
+
   it('groups RSC client route exports in one route client module', async () => {
     const result = await transform({
       code: `

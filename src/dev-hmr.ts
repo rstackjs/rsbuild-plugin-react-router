@@ -241,7 +241,11 @@ function patchCurrentRouteMatches(router, routes) {
 
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
-    return { nextManifest: undefined };
+    return {
+      nextManifest: undefined,
+      shouldRefreshRouteState: false,
+      routesToRevalidate: new Set(),
+    };
   }
 
   // Targeted clone: shallow-copy the manifest and its routes map, then deep-copy
@@ -252,6 +256,7 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   // Object.assign in flush(), matching the previous clone-everything behavior.
   const nextManifest = { ...manifest, routes: { ...manifest.routes } };
   const routesToRevalidate = new Set();
+  let shouldRefreshRouteState = false;
   for (const { routeId, update } of takePendingRouteUpdates()) {
     const existingEntry = nextManifest.routes[routeId];
     if (!existingEntry) continue;
@@ -265,6 +270,16 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
       routeEntry.hasClientMiddleware
     ) {
       routesToRevalidate.add(routeId);
+    }
+    if (
+      existingEntry.hasLoader ||
+      existingEntry.hasClientLoader ||
+      existingEntry.hasClientMiddleware ||
+      routeEntry.hasLoader ||
+      routeEntry.hasClientLoader ||
+      routeEntry.hasClientMiddleware
+    ) {
+      shouldRefreshRouteState = true;
     }
   }
 
@@ -283,7 +298,7 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     patchCurrentRouteMatches(router, routes);
   }
 
-  return { nextManifest };
+  return { nextManifest, shouldRefreshRouteState, routesToRevalidate };
 }
 
 async function revalidateRouter(router) {
@@ -336,14 +351,20 @@ async function flush() {
 
   let shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  const { nextManifest } = applyPendingRouteUpdates(
-    router,
-    routeModules,
-    manifest,
-    context
-  );
+  const { nextManifest, shouldRefreshRouteState, routesToRevalidate } =
+    applyPendingRouteUpdates(router, routeModules, manifest, context);
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
+  }
+  // Only run the full route-state revalidate (refetch every loader) when an
+  // updated route is actually loader-bearing (routesToRevalidate) or an HDR
+  // revalidation is already pending. A component-only edit -- including one that
+  // removes a route's loader -- skips the refetch so a visual change does not
+  // re-run all loaders.
+  if (
+    shouldRefreshRouteState &&
+    (routesToRevalidate.size > 0 || shouldRevalidate)
+  ) {
     await refreshRouteState(router);
     shouldRevalidate = false;
   }

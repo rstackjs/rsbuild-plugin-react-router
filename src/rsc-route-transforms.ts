@@ -36,6 +36,22 @@ import {
 } from './rsc-route-exports.js';
 import type { Route } from './types.js';
 
+// Canonical client HMR navigate snippet for generated route chunks: read the
+// live data router, strip the configured basename from the current URL, and
+// perform a scroll-preserving `replace` navigation so a hot update re-renders
+// the route tree in place. The RSC client entry's runtime `rsc:update` handler
+// (`src/templates/entry.rsc.client.tsx`) is the hand-written mirror of this
+// shape; keep the two in lockstep.
+const RSC_HMR_NAVIGATE_SNIPPET = `const router = globalThis.__reactRouterDataRouter;
+                if (router?.navigate) {
+                  const basename = router.basename || "/";
+                  let pathname = location.pathname;
+                  if (basename !== "/" && pathname.startsWith(basename)) {
+                    pathname = pathname.slice(basename.length) || "/";
+                  }
+                  router.navigate(pathname + location.search + location.hash, { replace: true, preventScrollReset: true });
+                }`;
+
 const ENSURE_CLIENT_ROUTE_MODULE_CHUNK_FOR_HMR = `
 import * as ___EnsureClientRouteModuleForHMR_REACT___ from "react";
 export function EnsureClientRouteModuleForHMR___() { return ___EnsureClientRouteModuleForHMR_REACT___.createElement(___EnsureClientRouteModuleForHMR_REACT___.Fragment, null) }
@@ -714,29 +730,24 @@ const createClientRouteModule = async (
       collectRouteClientDependencyExports(program, plan)
     );
   }
+  // Which of the source module's exports this chunk keeps. Every non-`shared`
+  // chunk strips all server exports plus every client export the predicate
+  // rejects; `shared` is the one exception that removes a fixed export list.
+  const keepsClientExport =
+    clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK
+      ? isClientRouteExport
+      : clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK
+        ? (exportName: string) => ROUTE_CLIENT_DATA_EXPORTS_SET.has(exportName)
+        : (exportName: string) => exportName === clientRouteChunk;
   const exportsToRemove =
     clientRouteChunk === 'shared'
       ? [...SERVER_ROUTE_EXPORTS, ...CLIENT_ROUTE_EXPORTS]
-      : clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK
-        ? [
-            ...SERVER_ROUTE_EXPORTS,
-            ...plan.exportNames.filter(
-              exportName => !isClientRouteExport(exportName)
-            ),
-          ]
-        : clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK
-          ? [
-              ...SERVER_ROUTE_EXPORTS,
-              ...plan.exportNames.filter(
-                exportName => !ROUTE_CLIENT_DATA_EXPORTS_SET.has(exportName)
-              ),
-            ]
-          : [
-              ...SERVER_ROUTE_EXPORTS,
-              ...plan.exportNames.filter(
-                exportName => exportName !== clientRouteChunk
-              ),
-            ];
+      : [
+          ...SERVER_ROUTE_EXPORTS,
+          ...plan.exportNames.filter(
+            exportName => !keepsClientExport(exportName)
+          ),
+        ];
   const removed = removeExports(ast, exportsToRemove);
   if (removed) {
     removeUnusedImports(ast);
@@ -749,6 +760,13 @@ const createClientRouteModule = async (
     // rspack `RscServerPlugin` CSS wrapper never converts these data exports
     // into components (which would break RSC serialization of the data
     // functions). Imports with specifiers (e.g. a used `?url` import) survive.
+    //
+    // TODO(upstream): this is a workaround for rspack's `RscServerPlugin`
+    // wrapping every CSS-bearing client module export in a CSS-injecting
+    // component wrapper, including non-component (data) exports. If upstream
+    // gains a way to opt data-only chunks out of that wrapping, drop this
+    // strip and the dedicated `=data` chunk. File/track the limitation at
+    // https://github.com/web-infra-dev/rspack before removing this.
     removeSideEffectStyleImports(program);
   }
   rewriteRscClientRouteImports(ast, sourceFileName, clientRouteChunk, options);
@@ -784,15 +802,31 @@ const createClientRouteModule = async (
     }
   }
 
-  const rscUpdateAction = `const router = globalThis.__reactRouterDataRouter;
-              if (router?.navigate) {
-                const basename = router.basename || "/";
-                let pathname = location.pathname;
-                if (basename !== "/" && pathname.startsWith(basename)) {
-                  pathname = pathname.slice(basename.length) || "/";
-                }
-                router.navigate(pathname + location.search + location.hash, { replace: true, preventScrollReset: true });
-              }`;
+  // A single route edit emits several client chunks (shared + route + data +
+  // one per split export), and each chunk's `accept` callback fires
+  // independently. Letting every callback navigate meant one route change
+  // triggered several redundant navigations. Coalesce them through a
+  // globalThis-guarded requestAnimationFrame: the first accept in a frame
+  // schedules the navigate and the rest short-circuit.
+  const rscHmrAcceptCallback = `() => {
+              const __rrHmr = globalThis;
+              if (__rrHmr.__rrRscHmrNavigateScheduled) { return; }
+              __rrHmr.__rrRscHmrNavigateScheduled = true;
+              requestAnimationFrame(() => {
+                __rrHmr.__rrRscHmrNavigateScheduled = false;
+                ${RSC_HMR_NAVIGATE_SNIPPET}
+              });
+            }`;
+
+  const hmrFooter = !options.isDev
+    ? ''
+    : clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK
+      ? // Data exports (handle/links/meta/shouldRevalidate) never render a
+        // component, so this chunk self-accepts with no navigate: that keeps a
+        // data-only edit from bubbling to a full reload without adding a
+        // redundant route navigation.
+        `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(); }\n`
+      : `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(${rscHmrAcceptCallback}); }\n`;
 
   return {
     code:
@@ -800,9 +834,7 @@ const createClientRouteModule = async (
       (clientRouteChunk === 'shared'
         ? `\n${ENSURE_CLIENT_ROUTE_MODULE_CHUNK_FOR_HMR}`
         : '') +
-      (options.isDev
-        ? `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(() => { requestAnimationFrame(() => { ${rscUpdateAction} }); }); }\n`
-        : ''),
+      hmrFooter,
     map: null,
   };
 };

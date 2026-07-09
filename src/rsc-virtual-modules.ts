@@ -85,27 +85,12 @@ export const createReactRouterRscVirtualModules = ({
     ),
     'virtual/react-router/unstable_rsc/inject-hmr-runtime': !isBuild
       ? `if (import.meta.webpackHot) {
+  // Self-accept so RSC route/client hot updates settle at this boundary instead
+  // of bubbling to a full page reload. The single "rsc:update" navigate handler
+  // lives in the RSC client entry (entry.rsc.client.tsx); a duplicate handler
+  // registered here previously raced a second navigation per event (the first
+  // aborted), so only the self-accept remains.
   import.meta.webpackHot.accept();
-  import.meta.webpackHot.on("rsc:update", payload => {
-    requestAnimationFrame(() => {
-      if (payload?.reload) {
-        location.reload();
-        return;
-      }
-      const router = globalThis.__reactRouterDataRouter;
-      if (router?.navigate) {
-        const basename = router.basename || "/";
-        let pathname = location.pathname;
-        if (basename !== "/" && pathname.startsWith(basename)) {
-          pathname = pathname.slice(basename.length) || "/";
-        }
-        router.navigate(pathname + location.search + location.hash, {
-          replace: true,
-          preventScrollReset: true
-        });
-      }
-    });
-  });
 }`
       : '',
     'virtual/react-router/unstable_rsc/basename': defaultExport(basename),
