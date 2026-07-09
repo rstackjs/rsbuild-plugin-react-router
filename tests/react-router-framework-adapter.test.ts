@@ -120,6 +120,10 @@ describe('React Router framework fixture adapter', () => {
         expect(config).toContain(
           `import { ${routerPlugin} } from "rsbuild-plugin-react-router";`
         );
+        expect(config).toContain(
+          'import { pluginMdx } from "@rsbuild/plugin-mdx";'
+        );
+        expect(config).toContain('pluginMdx()');
         expect(config).toContain(`${routerPlugin}()`);
         expect(config).toContain('port: 4173');
         expect(config).toContain('strictPort: true');

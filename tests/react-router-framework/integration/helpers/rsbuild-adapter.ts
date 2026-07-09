@@ -84,7 +84,7 @@ export async function finalizeFixtureProject({
     // data-mode rsc-preview template handled above.
     await writeFile(
       rsbuildConfigPath,
-      await rsbuildConfig.basic({ port, templateName }),
+      await rsbuildConfig.basic({ port, templateName, mdx: true }),
       "utf8",
     );
   }
