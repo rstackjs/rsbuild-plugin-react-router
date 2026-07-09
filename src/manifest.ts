@@ -494,7 +494,6 @@ const createRouteManifestItem = ({
 
 function generateReactRouterManifestForDevEffect(
   routes: Record<string, Route>,
-  _options: PluginOptions,
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix: string,
@@ -631,7 +630,6 @@ export async function generateReactRouterManifestForDev(
   return runPluginEffect(
     generateReactRouterManifestForDevEffect(
       routes,
-      options,
       clientStats,
       context,
       assetPrefix,
