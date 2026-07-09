@@ -83,12 +83,19 @@ hot?.on('rsc:update', payload => {
     const router = (
       window as typeof window & { __reactRouterDataRouter?: DataRouter }
     ).__reactRouterDataRouter;
-    void router?.navigate(
-      window.location.pathname + window.location.search + window.location.hash,
-      {
-        replace: true,
-        preventScrollReset: true,
+    if (router?.navigate) {
+      const basename = router.basename || '/';
+      let pathname = window.location.pathname;
+      if (basename !== '/' && pathname.startsWith(basename)) {
+        pathname = pathname.slice(basename.length) || '/';
       }
-    );
+      void router.navigate(
+        pathname + window.location.search + window.location.hash,
+        {
+          replace: true,
+          preventScrollReset: true,
+        }
+      );
+    }
   });
 });

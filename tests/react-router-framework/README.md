@@ -127,7 +127,11 @@ here exists so a corpus sync doesn't blindly revert them.
   the rsbuild/rspack RSC flavor has no `import.meta.viteRsc`, so the `withCss`
   helper and the `'use server-entry'` fixtures in that file encode the rsbuild
   behavior. If a sync reintroduces `import.meta.viteRsc.loadCss()`, restore the
-  `entryCssFiles` / `'use server-entry'` form.
+  `entryCssFiles` / `'use server-entry'` form. Relatedly, that same oracle
+  re-exports route data exports (`links`/`meta`/`handle`/`shouldRevalidate`)
+  from a dedicated CSS-free `?client-route-module=data` chunk instead of the
+  `route` chunk, so the native rspack `RscServerPlugin` never wraps those data
+  functions in a CSS-injecting component wrapper.
 
 ## Renames
 

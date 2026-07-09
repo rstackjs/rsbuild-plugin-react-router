@@ -2,6 +2,7 @@ import { dirname } from 'pathe';
 
 import { generate, parse } from './yuku.js';
 import {
+  CLIENT_EXPORTS,
   CLIENT_NON_COMPONENT_EXPORTS,
   SERVER_ONLY_ROUTE_EXPORTS,
 } from './constants.js';
@@ -11,6 +12,7 @@ import {
   getPatternIdentifierNames,
   getProgram,
   type AnyNode,
+  type ProgramNode,
 } from './route-ast.js';
 import {
   collectReferencedNames,
@@ -58,6 +60,46 @@ const SERVER_ROUTE_EXPORTS_SET = new Set<string>(SERVER_ROUTE_EXPORTS);
 const CLIENT_CHUNK_QUERY = 'client-route-module';
 const SERVER_MODULE_QUERY = 'server-route-module';
 const ROUTE_CLIENT_MODULE_CHUNK = 'route';
+const ROUTE_CLIENT_DATA_CHUNK = 'data';
+
+// Route "data" exports (non-component client functions/objects that ship in the
+// serialized route manifest). They are isolated into their own CSS-free client
+// chunk so the native rspack `RscServerPlugin` never wraps them in a
+// CSS-injecting component wrapper (see `createClientRouteModule`).
+const ROUTE_CLIENT_DATA_EXPORTS = [
+  CLIENT_EXPORTS.handle,
+  CLIENT_EXPORTS.links,
+  CLIENT_EXPORTS.meta,
+  CLIENT_EXPORTS.shouldRevalidate,
+] as const;
+const ROUTE_CLIENT_DATA_EXPORTS_SET = new Set<string>(
+  ROUTE_CLIENT_DATA_EXPORTS
+);
+
+// Bare, specifier-less side-effect style imports (`import "./x.css"`). Matches
+// plain CSS, vanilla-extract `.css.ts`/`.css.js`, and preprocessor extensions,
+// with or without a trailing query.
+const STYLE_SIDE_EFFECT_IMPORT_SOURCE =
+  /\.(css|scss|sass|less|styl|stylus)(\.(ts|js))?(\?|$)/;
+
+const removeSideEffectStyleImports = (program: ProgramNode): void => {
+  program.body = program.body.filter((statement: AnyNode) => {
+    if (statement.type !== 'ImportDeclaration') {
+      return true;
+    }
+    // Only drop specifier-less side-effect imports. Imports WITH specifiers
+    // (e.g. a `?url` asset import used by `links()`) must survive, as must
+    // non-style side-effect imports.
+    if ((statement.specifiers ?? []).length > 0) {
+      return true;
+    }
+    const source = statement.source;
+    if (typeof source?.value !== 'string') {
+      return true;
+    }
+    return !STYLE_SIDE_EFFECT_IMPORT_SOURCE.test(source.value);
+  });
+};
 
 type RscRouteTransformOptions = {
   code: string;
@@ -440,6 +482,13 @@ const createRscRouteExportPlan = async (
           chunkName
         );
       }
+      if (ROUTE_CLIENT_DATA_EXPORTS_SET.has(exportName)) {
+        return createClientRouteModuleId(
+          options.resourcePath,
+          options.resourceQuery,
+          ROUTE_CLIENT_DATA_CHUNK
+        );
+      }
       if (isClientRouteExport(exportName)) {
         return createClientRouteModuleId(
           options.resourcePath,
@@ -596,15 +645,32 @@ const createClientRouteModule = async (
               exportName => !isClientRouteExport(exportName)
             ),
           ]
-        : [
-            ...SERVER_ROUTE_EXPORTS,
-            ...plan.exportNames.filter(
-              exportName => exportName !== clientRouteChunk
-            ),
-          ];
+        : clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK
+          ? [
+              ...SERVER_ROUTE_EXPORTS,
+              ...plan.exportNames.filter(
+                exportName => !ROUTE_CLIENT_DATA_EXPORTS_SET.has(exportName)
+              ),
+            ]
+          : [
+              ...SERVER_ROUTE_EXPORTS,
+              ...plan.exportNames.filter(
+                exportName => exportName !== clientRouteChunk
+              ),
+            ];
   const removed = removeExports(ast, exportsToRemove);
   if (removed) {
     removeUnusedImports(ast);
+  }
+  if (clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK) {
+    // The data chunk re-exports only route data functions (handle/links/meta/
+    // shouldRevalidate). Component chunks still import the route's styles, so
+    // CSS delivery is unchanged; stripping the bare side-effect style imports
+    // here keeps this chunk's client-manifest `cssFiles` empty so the native
+    // rspack `RscServerPlugin` CSS wrapper never converts these data exports
+    // into components (which would break RSC serialization of the data
+    // functions). Imports with specifiers (e.g. a used `?url` import) survive.
+    removeSideEffectStyleImports(program);
   }
   rewriteRscClientRouteImports(ast, sourceFileName, clientRouteChunk, options);
   const generated = generate(ast, {
@@ -626,11 +692,15 @@ const createClientRouteModule = async (
     clientModuleCode += `}\n`;
   }
 
-  const rscUpdateAction =
-    clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK &&
-    plan.exportNameSet.has('default')
-      ? 'location.reload();'
-      : 'globalThis.__reactRouterDataRouter?.navigate?.(location.pathname + location.search + location.hash, { replace: true, preventScrollReset: true });';
+  const rscUpdateAction = `const router = globalThis.__reactRouterDataRouter;
+              if (router?.navigate) {
+                const basename = router.basename || "/";
+                let pathname = location.pathname;
+                if (basename !== "/" && pathname.startsWith(basename)) {
+                  pathname = pathname.slice(basename.length) || "/";
+                }
+                router.navigate(pathname + location.search + location.hash, { replace: true, preventScrollReset: true });
+              }`;
 
   return {
     code:

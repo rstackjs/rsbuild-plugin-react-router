@@ -173,7 +173,7 @@ describe('RSC route transforms', () => {
     );
   });
 
-  it('reloads default RSC client route modules when they update', async () => {
+  it('refreshes default RSC client route modules when they update', async () => {
     const result = await transform({
       code: 'export default function Route() { return null; }',
       resourcePath: '/app/routes/client.tsx',
@@ -183,7 +183,10 @@ describe('RSC route transforms', () => {
     });
 
     expect(result.code).toContain('import.meta.webpackHot.accept(() =>');
-    expect(result.code).toContain('location.reload()');
+    expect(result.code).toContain('const basename = router.basename || "/"');
+    expect(result.code).toContain(
+      'router.navigate(pathname + location.search + location.hash'
+    );
   });
 
   it('groups RSC client route exports in one route client module', async () => {

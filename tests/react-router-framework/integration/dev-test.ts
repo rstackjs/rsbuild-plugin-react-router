@@ -191,41 +191,37 @@ test.describe("rsbuild dev", () => {
             return <div data-mdx-route>{content}</div>
           }
         `,
-        ...(!templateName.includes("rsc")
-          ? {
-              ".env": `
-                ENV_VAR_FROM_DOTENV_FILE=Content from .env file
-              `,
-              "app/routes/dotenv.tsx": tsx`
-                import { useState, useEffect } from "react";
-                import { useLoaderData } from "react-router";
+        ".env": `
+          ENV_VAR_FROM_DOTENV_FILE=Content from .env file
+        `,
+        "app/routes/dotenv.tsx": tsx`
+          import { useState, useEffect } from "react";
+          import { useLoaderData } from "react-router";
 
-                export const loader = () => {
-                  return {
-                    loaderContent: process.env.ENV_VAR_FROM_DOTENV_FILE,
-                  }
-                }
-
-                export default function DotenvRoute() {
-                  const { loaderContent } = useLoaderData();
-
-                  const [clientContent, setClientContent] = useState('');
-                  useEffect(() => {
-                    try {
-                      setClientContent("process.env.ENV_VAR_FROM_DOTENV_FILE shouldn't be available on the client, found: " + process.env.ENV_VAR_FROM_DOTENV_FILE);
-                    } catch (err) {
-                      setClientContent("process.env.ENV_VAR_FROM_DOTENV_FILE not available on the client, which is a good thing");
-                    }
-                  }, []);
-
-                  return <>
-                    <div data-dotenv-route-loader-content>{loaderContent}</div>
-                    <div data-dotenv-route-client-content>{clientContent}</div>
-                  </>
-                }
-              `,
+          export const loader = () => {
+            return {
+              loaderContent: process.env.ENV_VAR_FROM_DOTENV_FILE,
             }
-          : {}),
+          }
+
+          export default function DotenvRoute() {
+            const { loaderContent } = useLoaderData();
+
+            const [clientContent, setClientContent] = useState('');
+            useEffect(() => {
+              try {
+                setClientContent("process.env.ENV_VAR_FROM_DOTENV_FILE shouldn't be available on the client, found: " + process.env.ENV_VAR_FROM_DOTENV_FILE);
+              } catch (err) {
+                setClientContent("process.env.ENV_VAR_FROM_DOTENV_FILE not available on the client, which is a good thing");
+              }
+            }, []);
+
+            return <>
+              <div data-dotenv-route-loader-content>{loaderContent}</div>
+              <div data-dotenv-route-client-content>{clientContent}</div>
+            </>
+          }
+        `,
         "app/routes/error-stacktrace.tsx": tsx`
           import { Link, useLocation, type LoaderFunction, type MetaFunction } from "react-router";
 
@@ -407,17 +403,6 @@ test.describe("rsbuild dev", () => {
       });
 
       test("loads .env file", async ({ dev, page }) => {
-        // The `.env` file and `app/routes/dotenv.tsx` fixture above are gated to
-        // non-rsc templates, and the RSC rsbuild dev server does not load `.env`
-        // into the RSC server environment's `process.env` (the build + Express
-        // path does — dotenv-test.ts covers rsc-framework and passes). Enabling
-        // this needs the RSC dev server to run rsbuild env loading for the node
-        // environment (src/rsc-dev-server.ts) plus the RSC dotenv fixture above.
-        test.fixme(
-          templateName.includes("rsc"),
-          "RSC Framework Mode: rsbuild dev server doesn't load .env into the RSC server env",
-        );
-
         const { port } = await dev(files, templateName);
 
         await page.goto(`http://localhost:${port}/dotenv`, {

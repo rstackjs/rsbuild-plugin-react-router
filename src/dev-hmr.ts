@@ -241,7 +241,6 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     return {
       nextManifest: undefined,
       shouldRefreshRouteState: false,
-      shouldRevalidateRouteState: false,
     };
   }
 
@@ -270,7 +269,6 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   }
 
   const shouldRefreshRouteState = true;
-  const shouldRevalidateRouteState = routesToRevalidate.size > 0;
   if (
     typeof router.createRoutesForHMR === 'function' &&
     typeof router._internalSetRoutes === 'function'
@@ -286,12 +284,16 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     patchCurrentRouteMatches(router, routes);
   }
 
-  return { nextManifest, shouldRefreshRouteState, shouldRevalidateRouteState };
+  return { nextManifest, shouldRefreshRouteState };
 }
 
 async function revalidateRouter(router) {
   try {
     window.__reactRouterHdrActive = true;
+    if (typeof router.revalidate === 'function') {
+      await router.revalidate();
+      return;
+    }
     if (typeof router.navigate === 'function') {
       await router.navigate(getCurrentRouterPath(router), {
         replace: true,
@@ -305,15 +307,16 @@ async function revalidateRouter(router) {
   }
 }
 
-async function refreshRouteState(router, shouldRevalidate) {
-  if (typeof router.navigate !== 'function') {
+async function refreshRouteState(router) {
+  if (typeof router.revalidate !== 'function') {
     return;
   }
-  await router.navigate(getCurrentRouterPath(router), {
-    replace: true,
-    preventScrollReset: true,
-    ...(shouldRevalidate ? {} : { defaultShouldRevalidate: false }),
-  });
+  try {
+    window.__reactRouterHdrActive = true;
+    await router.revalidate();
+  } finally {
+    window.__reactRouterHdrActive = false;
+  }
 }
 
 function performReactRefresh() {
@@ -339,18 +342,13 @@ async function flush() {
   const {
     nextManifest,
     shouldRefreshRouteState,
-    shouldRevalidateRouteState,
   } = applyPendingRouteUpdates(router, routeModules, manifest, context);
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
   }
   if (shouldRefreshRouteState) {
-    const revalidateWithRouteState =
-      shouldRevalidate && shouldRevalidateRouteState;
-    await refreshRouteState(router, revalidateWithRouteState);
-    if (revalidateWithRouteState) {
-      shouldRevalidate = false;
-    }
+    await refreshRouteState(router);
+    shouldRevalidate = false;
   }
   if (shouldRevalidate) {
     await revalidateRouter(router);

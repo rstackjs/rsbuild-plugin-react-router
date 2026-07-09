@@ -164,4 +164,56 @@ describe('createReactRouterRscDevServerSetup', () => {
       );
     }
   });
+
+  it('renders a 500 document whose <main> carries the thrown error', async () => {
+    const middlewares: ConnectMiddleware[] = [];
+    const server = {
+      middlewares: {
+        use: (middleware: ConnectMiddleware) => {
+          middlewares.push(middleware);
+        },
+      },
+      environments: {
+        node: {
+          loadBundle: async () => ({
+            default: {
+              fetch: async () => {
+                throw new Error('crash-loader');
+              },
+            },
+          }),
+        },
+      },
+    };
+    const setup = createReactRouterRscDevServerSetup({
+      entryName: 'index',
+      pluginName: 'test-plugin',
+    });
+    const postSetup = (setup as (context: unknown) => unknown)({ server });
+    (postSetup as () => void)();
+    const middleware = middlewares[0];
+
+    const httpServer = createServer((req, res) => {
+      middleware(req, res, () => {
+        res.statusCode = 404;
+        res.end('static-404');
+      });
+    });
+    await new Promise<void>(resolve =>
+      httpServer.listen(0, '127.0.0.1', resolve)
+    );
+    const { port } = httpServer.address() as AddressInfo;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/error-route`);
+      expect(response.status).toBe(500);
+      const body = await response.text();
+      expect(body).toContain('<main>');
+      expect(body).toContain('Error: crash-loader');
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        httpServer.close(err => (err ? reject(err) : resolve()))
+      );
+    }
+  });
 });

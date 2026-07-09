@@ -150,6 +150,13 @@ function withSharedChunkHmr(lines: string[]) {
   ];
 }
 
+// Intentional divergence from upstream: the rsbuild/rspack RSC flavor isolates
+// route data exports (`links`/`meta`/`handle`/`shouldRevalidate`) into a
+// dedicated CSS-free `?client-route-module=data` chunk instead of grouping them
+// into the `route` chunk. This keeps that chunk's client-manifest `cssFiles`
+// empty so the native rspack `RscServerPlugin` never wraps the data functions
+// in a CSS-injecting component wrapper. If a sync reintroduces `=route` targets
+// for `links`/`meta`, restore the `=data` form.
 describe("route entry", () => {
   describe("client environment", () => {
     const transform = plugin.transform.bind({
@@ -165,8 +172,8 @@ describe("route entry", () => {
           'import * as React from "react";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
           'export { default } from "/test.js?client-route-module=route";',
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
@@ -183,8 +190,8 @@ describe("route entry", () => {
           '"use client";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";\n',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";\n',
         ].join("\n"),
       );
     });
@@ -198,8 +205,8 @@ describe("route entry", () => {
           'import * as React from "react";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=HydrateFallback").then(mod => ({ default: mod.HydrateFallback })));\n',
@@ -217,8 +224,8 @@ describe("route entry", () => {
           'export { test } from "/test.js?client-route-module=shared";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=route").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=route").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
           'export { default } from "/test.js?client-route-module=route";',
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
@@ -256,8 +263,8 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
           'export { default } from "/test.js?client-route-module=route";',
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
@@ -279,8 +286,8 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
           ...withCss("ServerComponent"),
           ...withCss("ServerLayout"),
           ...withCss("ServerErrorBoundary"),
@@ -301,8 +308,8 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
           ...withCss("ServerComponent"),
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',
@@ -322,8 +329,8 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=route";',
           'export { clientAction } from "/test.js?client-route-module=route";',
-          'export { links } from "/test.js?client-route-module=route";',
-          'export { meta } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
           'export { default } from "/test.js?client-route-module=route";',
           'export { Layout } from "/test.js?client-route-module=route";',
           'export { ErrorBoundary } from "/test.js?client-route-module=route";',

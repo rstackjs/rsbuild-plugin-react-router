@@ -92,10 +92,18 @@ export const createReactRouterRscVirtualModules = ({
         location.reload();
         return;
       }
-      globalThis.__reactRouterDataRouter?.navigate?.(
-        location.pathname + location.search + location.hash,
-        { replace: true, preventScrollReset: true }
-      );
+      const router = globalThis.__reactRouterDataRouter;
+      if (router?.navigate) {
+        const basename = router.basename || "/";
+        let pathname = location.pathname;
+        if (basename !== "/" && pathname.startsWith(basename)) {
+          pathname = pathname.slice(basename.length) || "/";
+        }
+        router.navigate(pathname + location.search + location.hash, {
+          replace: true,
+          preventScrollReset: true
+        });
+      }
     });
   });
 }`

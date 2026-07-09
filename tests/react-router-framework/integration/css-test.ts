@@ -24,27 +24,10 @@ const NEW_PADDING = "30px";
 
 const fixtures = [
   ...bundlerTemplates,
-  // RSC Framework mode is intentionally excluded, blocked by an upstream Rspack
-  // `RscServerPlugin` bug (NOT a vanilla-extract-in-node compilation issue — the
-  // plugin does run in the node build and compiles `.css.ts` correctly). Proven
-  // root cause: this matrix's `css-with-links-export` route has both a `links`
-  // export (a non-component data function) AND vanilla-extract `.css.ts` imports.
-  // vanilla-extract runs in the react-server compilation and emits its CSS there,
-  // so the route's client module gets a non-empty `cssFiles` entry in the RSC
-  // client manifest. Rspack's builtin `RscServerPlugin` then wraps EVERY export
-  // of that "use client" module in a CSS-injecting component wrapper:
-  //   const links = resources.length
-  //     ? (props) => createElement(Fragment, null, resources, createElement(Ref, props))
-  //     : Ref;
-  // For component exports (`default`) this is correct, but for the `links` data
-  // function it replaces the client reference with a raw function, so React
-  // Router's serialized route manifest carries `links: function` and the RSC
-  // render throws "Functions cannot be passed directly to Client Components"
-  // (HTTP 500). Non-vanilla CSS (bundled/css-modules/postcss) is emptied in the
-  // react-server layer, so `cssFiles` stays empty, `resources.length` is 0, and
-  // `links` remains a proper client reference — which is why plain CSS works in
-  // RSC framework mode (see rsc/rsc-css-test.ts). The fix belongs upstream in
-  // Rspack's `RscServerPlugin` (only wrap component exports, not data exports).
+  // RSC Framework mode is intentionally excluded. Route data exports are now
+  // isolated from the native rspack `RscServerPlugin` CSS wrapper, but this broad
+  // matrix still fails first-paint CSS assertions in no-JS mode. Keep the focused
+  // RSC CSS coverage in `rsc/rsc-css-test.ts` until first-paint CSS parity lands.
   // {
   //   templateName: "rsc-framework",
   //   templateDisplayName: "RSC Framework",
@@ -60,8 +43,8 @@ type RouteBasePath =
   | "rsc-server-first-route";
 const getRouteBasePaths = (templateName: TemplateName) => {
   return [
-    "css-with-links-export",
     "css-with-floated-link",
+    "css-with-links-export",
     ...(templateName.includes("rsc")
       ? (["rsc-server-first-route"] as const)
       : []),
