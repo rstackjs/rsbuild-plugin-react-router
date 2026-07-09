@@ -30,6 +30,7 @@ type ProcessFilterOptions = {
   includeStale?: boolean;
   isOwnedPid?: (pid: number) => boolean;
   isProcessCwdUnder?: (pid: number, parentPath: string) => boolean;
+  ownedPids?: Iterable<number>;
   runId?: string;
 };
 
@@ -187,17 +188,21 @@ export const filterFrameworkTestProcesses = (
     includeStale = false,
     isOwnedPid = defaultIsOwnedPid,
     isProcessCwdUnder = defaultProcessCwdIsUnder,
+    ownedPids,
     runId = process.env[TEST_RUN_ID_ENV],
   }: ProcessFilterOptions = {},
-): ProcessInfo[] =>
-  processes.filter(
+): ProcessInfo[] => {
+  const ownedPidSet = ownedPids ? new Set(ownedPids) : undefined;
+  return processes.filter(
     ({ args, pid }) =>
+      ownedPidSet?.has(pid) ||
       isOwnedPid(pid) ||
       (runId !== undefined && args.includes(runId)) ||
       (includeStale &&
         isFrameworkTestProcess(args) &&
         isProcessCwdUnder(pid, frameworkTmpPath)),
   );
+};
 
 export const countFrameworkTestResources = (
   processes: ProcessInfo[],
@@ -229,8 +234,10 @@ const defaultIsOwnedPid = (pid: number): boolean => {
   return runId !== undefined && processEnvIncludes(pid, TEST_RUN_ID_ENV, runId);
 };
 
-export const getActiveResourceCounts = (): ResourceCounts => {
-  return countFrameworkTestResources(listProcesses());
+export const getActiveResourceCounts = (
+  options: ProcessFilterOptions = {},
+): ResourceCounts => {
+  return countFrameworkTestResources(listProcesses(), options);
 };
 
 export const assertResourceGuardrail = ({

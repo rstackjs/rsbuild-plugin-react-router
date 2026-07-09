@@ -6,6 +6,13 @@ type ModuleFederationPluginLike = {
   options?: { experiments?: { asyncStartup?: boolean } };
 };
 
+// The federated server bundle must not execute its entry before the federation
+// runtime is initialized, so asyncStartup is required whenever the plugin runs
+// alongside Module Federation. The MF plugin instance is already constructed
+// by the time we see the rspack config, so the only way in is mutating its
+// options object — `_options` is the field current @module-federation plugins
+// actually read at apply-time, with public `options` as a fallback. If both
+// fields disappear in a future MF release this silently no-ops; revisit then.
 const ensureFederationAsyncStartup = (
   rspackConfig: Rspack.Configuration | undefined
 ): void => {

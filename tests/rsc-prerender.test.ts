@@ -1,11 +1,16 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import { createLogger } from '@rsbuild/core';
 import { describe, expect, it } from '@rstest/core';
 import {
   SPA_FALLBACK_REQUEST_PATH,
   extractRscFlightData,
   getRscHtmlFilePath,
   getRscPayloadFilePath,
-  getRscPrerenderRequestPaths,
+  getRscPrerenderRequests,
   normalizeRscPrerenderBasename,
+  runReactRouterRscPrerenderBuild,
 } from '../src/rsc-prerender';
 
 const flightScript = (chunk: string) =>
@@ -26,51 +31,66 @@ describe('normalizeRscPrerenderBasename', () => {
 describe('getRscPrerenderRequestPaths', () => {
   it('returns the prerender paths for ssr builds', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/', '/about'],
         ssr: true,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/', '/about']);
   });
 
   it('adds the SPA fallback document when ssr is disabled', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/'],
         ssr: false,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/', SPA_FALLBACK_REQUEST_PATH]);
   });
 
   it('prerenders only the SPA fallback for ssr:false without prerender paths', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: [],
         ssr: false,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual([SPA_FALLBACK_REQUEST_PATH]);
   });
 
   it('joins paths with the basename', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/', '/products/1'],
         ssr: true,
         basename: '/base',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/base/', '/base/products/1']);
+  });
+
+  it('keeps basename request paths separate from artifact paths', () => {
+    expect(
+      getRscPrerenderRequests({
+        prerenderPaths: [],
+        ssr: false,
+        basename: '/base',
+      })
+    ).toEqual([
+      {
+        requestPath: '/base/__spa-fallback.html',
+        artifactPath: SPA_FALLBACK_REQUEST_PATH,
+      },
+    ]);
   });
 
   it('deduplicates paths', () => {
     expect(
-      getRscPrerenderRequestPaths({
+      getRscPrerenderRequests({
         prerenderPaths: ['/', '/'],
         ssr: true,
         basename: '/',
-      })
+      }).map(r => r.requestPath)
     ).toEqual(['/']);
   });
 });
@@ -133,5 +153,38 @@ describe('getRscPayloadFilePath', () => {
     expect(getRscPayloadFilePath(SPA_FALLBACK_REQUEST_PATH)).toBe(
       '__spa-fallback.rsc'
     );
+  });
+});
+
+describe('runReactRouterRscPrerenderBuild', () => {
+  it('reports a failed RSC response without duplicating the path', async () => {
+    const buildDirectory = await mkdtemp(
+      resolve(tmpdir(), 'rsbuild-rsc-prerender-')
+    );
+
+    try {
+      const serverDirectory = resolve(buildDirectory, 'server');
+      await mkdir(serverDirectory);
+      await writeFile(
+        resolve(serverDirectory, 'index.js'),
+        'export default { fetch: async () => new Response(null, { status: 500 }) };'
+      );
+
+      await expect(
+        runReactRouterRscPrerenderBuild({
+          api: { logger: createLogger({ level: 'silent' }) },
+          hasWebEnvironment: true,
+          buildDirectory,
+          ssr: true,
+          prerenderConfig: true,
+          prerenderPaths: ['/about'],
+          basename: '/',
+        })
+      ).rejects.toThrowError(
+        /^Prerender: Received a 500 status code from the RSC server while prerendering the `\/about` path\.$/
+      );
+    } finally {
+      await rm(buildDirectory, { recursive: true, force: true });
+    }
   });
 });

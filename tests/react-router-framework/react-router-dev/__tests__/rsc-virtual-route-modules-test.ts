@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import ts from "typescript";
+import { describe, expect, it } from "@rstest/core";
 
 import { transformRscRouteModule } from "../../../../src/rsc-route-transforms";
 import type { RouteChunkConfig } from "../../../../src/route-chunks";
@@ -149,6 +150,13 @@ function withSharedChunkHmr(lines: string[]) {
   ];
 }
 
+// Intentional divergence from upstream: the rsbuild/rspack RSC flavor isolates
+// route data exports (`links`/`meta`/`handle`/`shouldRevalidate`) into a
+// dedicated CSS-free `?client-route-module=data` chunk instead of grouping them
+// into the `route` chunk. This keeps that chunk's client-manifest `cssFiles`
+// empty so the native rspack `RscServerPlugin` never wraps the data functions
+// in a CSS-injecting component wrapper. If a sync reintroduces `=route` targets
+// for `links`/`meta`, restore the `=data` form.
 describe("route entry", () => {
   describe("client environment", () => {
     const transform = plugin.transform.bind({
@@ -164,11 +172,11 @@ describe("route entry", () => {
           'import * as React from "react";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
+          'export { default } from "/test.js?client-route-module=route";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=HydrateFallback").then(mod => ({ default: mod.HydrateFallback })));\n',
         ].join("\n"),
       );
@@ -182,8 +190,8 @@ describe("route entry", () => {
           '"use client";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";\n',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";\n',
         ].join("\n"),
       );
     });
@@ -197,10 +205,10 @@ describe("route entry", () => {
           'import * as React from "react";',
           'export const clientLoader = async (...args) => import("/test.js?client-route-module=clientLoader").then(mod => mod.clientLoader(...args));',
           'export const clientAction = async (...args) => import("/test.js?client-route-module=clientAction").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=HydrateFallback").then(mod => ({ default: mod.HydrateFallback })));\n',
         ].join("\n"),
       );
@@ -214,25 +222,31 @@ describe("route entry", () => {
           '"use client";',
           'import * as React from "react";',
           'export { test } from "/test.js?client-route-module=shared";',
-          'export const clientLoader = async (...args) => import("/test.js?client-route-module=shared").then(mod => mod.clientLoader(...args));',
-          'export const clientAction = async (...args) => import("/test.js?client-route-module=shared").then(mod => mod.clientAction(...args));',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
-          'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=shared").then(mod => ({ default: mod.HydrateFallback })));\n',
+          'export const clientLoader = async (...args) => import("/test.js?client-route-module=route").then(mod => mod.clientLoader(...args));',
+          'export const clientAction = async (...args) => import("/test.js?client-route-module=route").then(mod => mod.clientAction(...args));',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
+          'export { default } from "/test.js?client-route-module=route";',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
+          'export const HydrateFallback = React.lazy(() => import("/test.js?client-route-module=route").then(mod => ({ default: mod.HydrateFallback })));\n',
         ].join("\n"),
       );
     });
   });
 
   describe("server environment", () => {
+    // Intentional divergence from the upstream Vite oracle: the rsbuild
+    // flavor streams `entryCssFiles` links (via the `'use server-entry'`
+    // mechanism) instead of upstream's `import.meta.viteRsc.loadCss()`.
     function withCss(name: string) {
       return [
         `import { ${name} as ${name}WithoutClientChunk } from "/test.js?server-route-module=";`,
         `export function ${name}(props) {`,
         `  return React.createElement(React.Fragment, null,`,
+        `    ...(${name}WithoutClientChunk.entryCssFiles ?? []).map(href =>`,
+        `      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),`,
+        `    React.createElement(EnsureClientRouteModuleForHMR___, null),`,
         `    React.createElement(${name}WithoutClientChunk, props),`,
         `  );`,
         `}`,
@@ -242,18 +256,36 @@ describe("route entry", () => {
     it("transforms full client modules", async () => {
       const transformed = await transform(fullClientModule, "/test.js");
       assert.ok(transformed);
+      // Intentional divergence from the upstream Vite oracle: a client route
+      // that imports side-effect CSS (`import "./side-effect.css"`) has its
+      // bundled (non-vanilla) CSS orphaned in the initial browser entry chunk,
+      // so the client reference's `cssFiles` never captures it. The rsbuild
+      // flavor promotes the server module to a `'use server-entry'` CSS carrier
+      // (see `createServerRouteModule`) and wraps the `default` component here
+      // so the carrier's `entryCssFiles` stream as stylesheet links at first
+      // paint (mirrors the server-component `withCss` path). Without a
+      // side-effect style import, `default` is re-exported unchanged.
       expect(transformed.code).toBe(
         [
+          'import * as React from "react";',
+          'import { RscRouteStyleEntry___ } from "/test.js?server-route-module=";',
           'export { loader } from "/test.js?server-route-module=";',
           'export { action } from "/test.js?server-route-module=";',
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
+          'import RscClientRouteDefault___ from "/test.js?client-route-module=route";',
+          'export default function RscClientRouteWithStyles___(props) {',
+          '  return React.createElement(React.Fragment, null,',
+          '    ...(RscRouteStyleEntry___.entryCssFiles ?? []).map(href =>',
+          '      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),',
+          '    React.createElement(RscClientRouteDefault___, props),',
+          '  );',
+          '}',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export { HydrateFallback } from "/test.js?client-route-module=HydrateFallback";\n',
         ].join("\n"),
       );
@@ -272,20 +304,12 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          ...withCss("ServerComponent").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerComponent").slice(3),
-          ...withCss("ServerLayout").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerLayout").slice(3),
-          ...withCss("ServerErrorBoundary").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerErrorBoundary").slice(3),
-          ...withCss("ServerHydrateFallback").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerHydrateFallback").slice(3),
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
+          ...withCss("ServerComponent"),
+          ...withCss("ServerLayout"),
+          ...withCss("ServerErrorBoundary"),
+          ...withCss("ServerHydrateFallback"),
         ].join("\n") + "\n",
       );
     });
@@ -302,13 +326,11 @@ describe("route entry", () => {
           'export { headers } from "/test.js?server-route-module=";',
           'export { clientLoader } from "/test.js?client-route-module=clientLoader";',
           'export { clientAction } from "/test.js?client-route-module=clientAction";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          ...withCss("ServerComponent").slice(0, 3),
-          "    React.createElement(EnsureClientRouteModuleForHMR___, null),",
-          ...withCss("ServerComponent").slice(3),
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
+          ...withCss("ServerComponent"),
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
           'export { HydrateFallback } from "/test.js?client-route-module=HydrateFallback";',
         ].join("\n") + "\n",
       );
@@ -317,20 +339,32 @@ describe("route entry", () => {
     it("transforms unsplittable modules", async () => {
       const transformed = await transform(unsplittableModule, "/test.js");
       assert.ok(transformed);
+      // Same client-route CSS carrier divergence as "transforms full client
+      // modules": the side-effect CSS import makes `default` render through the
+      // `RscRouteStyleEntry___` `entryCssFiles` wrapper.
       expect(transformed.code).toBe(
         [
+          'import * as React from "react";',
+          'import { RscRouteStyleEntry___ } from "/test.js?server-route-module=";',
           'export { test } from "/test.js?server-route-module=";',
           'export { loader } from "/test.js?server-route-module=";',
           'export { action } from "/test.js?server-route-module=";',
           'export { headers } from "/test.js?server-route-module=";',
-          'export { clientLoader } from "/test.js?client-route-module=shared";',
-          'export { clientAction } from "/test.js?client-route-module=shared";',
-          'export { links } from "/test.js?client-route-module=shared";',
-          'export { meta } from "/test.js?client-route-module=shared";',
-          'export { default } from "/test.js?client-route-module=shared";',
-          'export { Layout } from "/test.js?client-route-module=shared";',
-          'export { ErrorBoundary } from "/test.js?client-route-module=shared";',
-          'export { HydrateFallback } from "/test.js?client-route-module=shared";\n',
+          'export { clientLoader } from "/test.js?client-route-module=route";',
+          'export { clientAction } from "/test.js?client-route-module=route";',
+          'export { links } from "/test.js?client-route-module=data";',
+          'export { meta } from "/test.js?client-route-module=data";',
+          'import RscClientRouteDefault___ from "/test.js?client-route-module=route";',
+          'export default function RscClientRouteWithStyles___(props) {',
+          '  return React.createElement(React.Fragment, null,',
+          '    ...(RscRouteStyleEntry___.entryCssFiles ?? []).map(href =>',
+          '      React.createElement("link", { key: href, rel: "stylesheet", href: href, precedence: "default" })),',
+          '    React.createElement(RscClientRouteDefault___, props),',
+          '  );',
+          '}',
+          'export { Layout } from "/test.js?client-route-module=route";',
+          'export { ErrorBoundary } from "/test.js?client-route-module=route";',
+          'export { HydrateFallback } from "/test.js?client-route-module=route";\n',
         ].join("\n"),
       );
     });
@@ -344,14 +378,24 @@ describe("server-route-module", () => {
       "/test.js?server-route-module=",
     );
     assert.ok(transformed);
+    // Intentional divergence from the upstream Vite oracle: a client route's
+    // pruned server module retains its side-effect CSS imports (specifier-less
+    // style imports survive `removeUnusedImports`). The rsbuild flavor promotes
+    // it to a `'use server-entry'` module with a null-rendering
+    // `RscRouteStyleEntry___` carrier so the RSC runtime attaches this graph's
+    // CSS as the carrier's `entryCssFiles`, which `createServerRouteEntry`
+    // streams as first-paint stylesheet links. A server module WITHOUT any
+    // side-effect style import keeps its plain (directive-free) form.
     expect(transformed.code).toBe(
       [
+        "'use server-entry';",
         'import "./side-effect.css";',
         'import { server } from "./server";',
         'import { shared } from "./shared";',
         "export function loader() {\n  console.log(server, shared);\n}",
         "export function action() {\n  console.log(server, shared);\n}",
         "export function headers() {\n  console.log(server, shared);\n}",
+        "export function RscRouteStyleEntry___() { return null; }\n",
       ].join("\n"),
     );
   });
@@ -364,6 +408,9 @@ describe("server-route-module", () => {
     assert.ok(transformed);
     expect(transformed.code).toBe(
       [
+        // rsbuild flavor: server-component modules carry `'use server-entry'`
+        // so the rspack RSC runtime records `entryCssFiles` for them.
+        "'use server-entry';",
         'import "./side-effect.css";',
         'import { server } from "./server";',
         'import { shared } from "./shared";',
@@ -386,6 +433,7 @@ describe("server-route-module", () => {
     assert.ok(transformed);
     expect(transformed.code).toBe(
       [
+        "'use server-entry';",
         'import "./side-effect.css";',
         'import { server } from "./server";',
         'import { shared } from "./shared";',
@@ -409,13 +457,6 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
-        "export default function Route() {\n  console.log(client, shared);\n}",
-        "export function Layout() {\n  console.log(client, shared);\n}",
-        "export function ErrorBoundary() {\n  console.log(client, shared);\n}",
       ]).join("\n"),
     );
   });
@@ -430,10 +471,6 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
       ]).join("\n"),
     );
   });
@@ -448,12 +485,6 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
-        "export function Layout() {\n  console.log(client, shared);\n}",
-        "export function ErrorBoundary() {\n  console.log(client, shared);\n}",
       ]).join("\n"),
     );
   });
@@ -468,17 +499,7 @@ describe("client-route-module=shared", () => {
       withSharedChunkHmr([
         '"use client";',
         'import "./side-effect.css";',
-        'import { client } from "./client";',
-        'import { shared } from "./shared";',
         'export const test = "test";',
-        "export function clientLoader() {\n  console.log(client, shared, test);\n}",
-        "export function clientAction() {\n  console.log(client, shared, test);\n}",
-        "export function links() {\n  console.log(client, shared);\n}",
-        "export function meta() {\n  console.log(client, shared);\n}",
-        "export default function Route() {\n  console.log(client, shared);\n}",
-        "export function Layout() {\n  console.log(client, shared);\n}",
-        "export function ErrorBoundary() {\n  console.log(client, shared);\n}",
-        "export function HydrateFallback() {\n  console.log(client, shared, test);\n}",
       ]).join("\n"),
     );
   });

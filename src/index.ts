@@ -3,15 +3,17 @@ import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
-import { createJiti } from 'jiti';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
-import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
+import {
+  DEFAULT_JS_DIST_PATH,
+  JS_EXTENSIONS,
+  PLUGIN_NAME,
+} from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 import {
   findEntryFile,
-  normalizeAssetPrefix,
   resolveAppPackagePath,
   resolveEffectiveAssetPrefix,
 } from './plugin-utils.js';
@@ -36,7 +38,10 @@ import {
 } from './manifest.js';
 import type { RouteModuleAnalysis } from './export-utils.js';
 import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
-import { registerBuildOutputTransforms } from './build-output-transforms.js';
+import {
+  registerBuildOutputTransforms,
+  registerSsrAssetRelocation,
+} from './build-output-transforms.js';
 import { type RouteChunkCache } from './route-chunks.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
@@ -55,7 +60,11 @@ import {
 } from './dev-hmr.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
-import { importConfigWithWatchPaths } from './config-imports.js';
+import {
+  createConfigImporter,
+  type ConfigImporter,
+  importConfigWithWatchPaths,
+} from './config-imports.js';
 import {
   createReactRouterRouteTopology,
   createReactRouterRouteWatchFiles,
@@ -186,6 +195,7 @@ export const pluginReactRouter = (
 
     const {
       resolved: resolvedConfig,
+      userAndPresetConfig,
       presets: configPresets,
       hasConfiguredServerModuleFormat,
     } = await resolveReactRouterConfig(reactRouterUserConfig);
@@ -200,8 +210,10 @@ export const pluginReactRouter = (
       ssr,
       prerender: prerenderConfig,
       serverBuildFile,
+      serverBundles,
       serverModuleFormat,
       splitRouteModules,
+      subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
 
@@ -261,11 +273,16 @@ export const pluginReactRouter = (
       throw new Error(`Route config file not found at "${missingRoutesPath}".`);
     }
 
-    const jiti = createJiti(process.cwd(), {
+    const routeConfigDefine =
+      typeof api.getRsbuildConfig === 'function'
+        ? api.getRsbuildConfig().source?.define
+        : undefined;
+    const jiti = createConfigImporter({
+      define: routeConfigDefine,
       moduleCache: false,
     });
     const importRouteConfig = async (
-      importer: Pick<typeof jiti, 'import'>
+      importer: ConfigImporter
     ): Promise<RouteConfigEntry[]> => {
       const routeConfigFile = relative(resolve(appDirectory), routesPath);
       let routeConfigValue: RouteConfigEntry[];
@@ -301,7 +318,9 @@ export const pluginReactRouter = (
     };
     const loadRouteConfig = () => importRouteConfig(jiti);
     const { value: routeConfig, watchPaths: routeConfigWatchPaths } =
-      await importConfigWithWatchPaths(routesPath, importRouteConfig);
+      await importConfigWithWatchPaths(routesPath, importRouteConfig, {
+        define: routeConfigDefine,
+      });
 
     const {
       devServerBuildEntryName,
@@ -324,7 +343,7 @@ export const pluginReactRouter = (
       });
       assertReactRouterRscConfigSupport({
         pluginName: PLUGIN_NAME,
-        userConfig: reactRouterUserConfig,
+        userConfig: resolvedConfig,
       });
       await setupReactRouterRscPlugin({
         api,
@@ -354,14 +373,22 @@ export const pluginReactRouter = (
     };
 
     const resolvedConfigWithRoutes: ResolvedReactRouterConfig = {
-      ...resolvedConfig,
       appDirectory: resolve(appDirectory),
+      basename,
       buildDirectory: resolve(buildDirectory),
-      routeDiscovery,
+      buildEnd,
+      future,
       prerender: prerenderConfig,
       routes,
-      unstable_routeConfig: routeConfig,
+      routeDiscovery,
+      serverBuildFile,
+      serverBundles,
+      serverModuleFormat,
+      ssr,
+      splitRouteModules,
+      subResourceIntegrity,
       allowedActionOrigins: allowedActionOrigins ?? false,
+      unstable_routeConfig: routeConfig,
     };
 
     const { buildEnd: _buildEnd, ...resolvedConfigForPreset } =
@@ -372,6 +399,10 @@ export const pluginReactRouter = (
           resolvedConfigForPreset as ReactRouterPresetResolvedConfig,
       });
     }
+    const buildEndReactRouterConfig: ResolvedReactRouterConfig = {
+      ...resolvedConfigWithRoutes,
+      future: userAndPresetConfig.future ?? {},
+    } as ResolvedReactRouterConfig;
 
     const isBuild = api.context.action === 'build';
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
@@ -467,7 +498,6 @@ export const pluginReactRouter = (
           assetsBuildDirectory,
           defaultEntryName: devServerBuildEntryName,
           entryServerPath: finalEntryServerPath,
-          federation: options.federation,
           finalEntryClientPath,
           future,
           hasServerApp,
@@ -491,6 +521,48 @@ export const pluginReactRouter = (
         }));
 
     const { manifestChunkNames } = modePlan;
+
+    let sendRscDevUpdate: (() => void) | undefined;
+    let scheduledRscDevUpdate: ReturnType<typeof setTimeout> | undefined;
+    let hasPendingRscNodeUpdate = false;
+    if (isRscMode && !isBuild) {
+      api.onBeforeStartDevServer(({ server }) => {
+        sendRscDevUpdate = () =>
+          server.sockWrite('custom', {
+            event: 'rsc:update',
+          });
+      });
+      api.onCloseDevServer(() => {
+        if (scheduledRscDevUpdate) {
+          clearTimeout(scheduledRscDevUpdate);
+          scheduledRscDevUpdate = undefined;
+        }
+        hasPendingRscNodeUpdate = false;
+        sendRscDevUpdate = undefined;
+      });
+      api.onAfterEnvironmentCompile(({ environment, stats }) => {
+        if (
+          (environment.name !== 'node' && environment.name !== 'web') ||
+          stats?.hasErrors()
+        ) {
+          return;
+        }
+        if (environment.name === 'node') {
+          hasPendingRscNodeUpdate = true;
+        }
+        if (!hasPendingRscNodeUpdate) {
+          return;
+        }
+        if (scheduledRscDevUpdate) {
+          clearTimeout(scheduledRscDevUpdate);
+        }
+        scheduledRscDevUpdate = setTimeout(() => {
+          scheduledRscDevUpdate = undefined;
+          hasPendingRscNodeUpdate = false;
+          sendRscDevUpdate?.();
+        }, 1000);
+      });
+    }
 
     const devBackgroundResources = registerReactRouterDevBackgroundResources({
       api,
@@ -614,7 +686,7 @@ export const pluginReactRouter = (
               routeChunkOptions: modePlan.routeChunkOptions,
               routeModuleAnalysis,
               buildManifest: modePlan.artifacts.buildManifest,
-              resolvedConfigWithRoutes,
+              buildEndReactRouterConfig,
               buildEnd,
             })
           )
@@ -640,15 +712,33 @@ export const pluginReactRouter = (
     }
 
     // Public requests stay bare while Rspack resolves seeded virtual files.
-    const createVirtualModulePlugin = (publicPath: string) => {
+    const createVirtualModulePlugin = (
+      publicPath: string,
+      jsDistPath: string
+    ) => {
       return new rspack.experiments.VirtualModulesPlugin(
-        mapVirtualModules(modePlan.createVirtualModules(publicPath))
+        mapVirtualModules(modePlan.createVirtualModules(publicPath, jsDistPath))
       );
     };
 
     api.modifyRsbuildConfig(async (config, { mergeRsbuildConfig }) => {
+      // The RSC bootstrap script URL must reflect the user's web js distPath;
+      // the entry filename itself is deterministic because the plugin forces
+      // web `output.filename.js` to '[name].js' below.
+      const webDistPath = config.environments?.web?.output?.distPath;
+      const rootDistPath = config.output?.distPath;
+      const jsDistPath =
+        (typeof webDistPath === 'object' ? webDistPath.js : undefined) ??
+        (typeof rootDistPath === 'object' ? rootDistPath.js : undefined) ??
+        DEFAULT_JS_DIST_PATH;
+      const assetPrefix = resolveEffectiveAssetPrefix({
+        dev: config.dev,
+        output: config.output,
+        isBuild,
+      });
       const vmodPlugin = createVirtualModulePlugin(
-        normalizeAssetPrefix(config.output?.assetPrefix)
+        assetPrefix,
+        jsDistPath
       );
       const useAsyncNodeChunkLoading =
         options.federation && resolvedServerOutput === 'commonjs';
@@ -666,7 +756,9 @@ export const pluginReactRouter = (
         : (config.dev?.lazyCompilation ?? pluginOptions.lazyCompilation);
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
-        entryClientPath: finalEntryClientPath,
+        entryClientPath: isRscMode
+          ? finalEntryRscClientPath
+          : finalEntryClientPath,
         prewarmReactRouterModules: Boolean(
           pluginOptions.unstableLazyCompilationPrewarm
         ),
@@ -681,22 +773,6 @@ export const pluginReactRouter = (
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
       const resolveConfig = modePlan.createResolveConfig(api.context.rootPath);
-      type SourceMapConfig =
-        | NonNullable<NonNullable<typeof config.output>['sourceMap']>
-        | undefined;
-      const hasConfiguredNodeJsSourceMap = (
-        sourceMap: SourceMapConfig
-      ): boolean =>
-        sourceMap === false ||
-        sourceMap === true ||
-        (typeof sourceMap === 'object' &&
-          sourceMap !== null &&
-          sourceMap.js !== undefined);
-      const hasConfiguredNodeSourceMap =
-        hasConfiguredNodeJsSourceMap(config.output?.sourceMap) ||
-        hasConfiguredNodeJsSourceMap(
-          config.environments?.node?.output?.sourceMap
-        );
 
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
@@ -724,7 +800,9 @@ export const pluginReactRouter = (
             resolve: resolveConfig,
             plugins: [
               vmodPlugin,
-              createQuerylessRouteImportPlugin(routeByFilePath),
+              createQuerylessRouteImportPlugin(routeByFilePath, {
+                rsc: isRscMode,
+              }),
             ],
           },
         },
@@ -763,15 +841,16 @@ export const pluginReactRouter = (
                     },
                   ],
                 },
-                ...(options.federation
-                  ? {
-                      output: {
-                        chunkLoading: 'import',
-                      },
-                    }
-                  : {}),
                 externalsType: modePlan.webExternalsType,
-                output: modePlan.webOutput,
+                output: {
+                  ...modePlan.webOutput,
+                  publicPath: assetPrefix,
+                  ...(options.federation
+                    ? {
+                        chunkLoading: 'import',
+                      }
+                    : {}),
+                },
                 optimization: modePlan.webOptimization,
               },
             },
@@ -784,13 +863,6 @@ export const pluginReactRouter = (
               entry: modePlan.nodeEntries,
             },
             output: {
-              ...(!isBuild && !hasConfiguredNodeSourceMap
-                ? {
-                    sourceMap: {
-                      js: 'inline-source-map',
-                    },
-                  }
-                : {}),
               distPath: {
                 root: resolve(buildDirectory, 'server'),
               },
@@ -826,6 +898,9 @@ export const pluginReactRouter = (
                 output: {
                   chunkFormat: resolvedServerOutput,
                   chunkLoading: nodeChunkLoading,
+                  devtoolModuleFilenameTemplate: '[absolute-resource-path]',
+                  devtoolFallbackModuleFilenameTemplate:
+                    '[absolute-resource-path]?[hash]',
                   workerChunkLoading: nodeChunkLoading,
                   wasmLoading: 'fetch',
                   module: resolvedServerOutput === 'module',
@@ -853,6 +928,12 @@ export const pluginReactRouter = (
         routeChunkCache,
         routeChunkConfig: modePlan.routeChunkConfig,
       });
+
+      // RSC mode has no `registerBuildOutputTransforms` pass, so relocate the
+      // node-emitted `?url`/`.css?url` static assets into the client build here.
+      // Without this the href baked into `links()` (resolved in the node env)
+      // 404s in the browser because the file only exists under `build/server`.
+      registerSsrAssetRelocation({ api, outputClientPath, performanceProfiler });
     } else {
       registerModifyBrowserManifestAssets(
         api,

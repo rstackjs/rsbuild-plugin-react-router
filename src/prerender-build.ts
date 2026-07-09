@@ -75,7 +75,7 @@ type RunReactRouterPrerenderBuildOptions = {
   routeChunkOptions: RouteChunkManifestOptions | undefined;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
   buildManifest: Awaited<ReturnType<typeof getBuildManifest>>;
-  resolvedConfigWithRoutes: ResolvedReactRouterConfig;
+  buildEndReactRouterConfig: ResolvedReactRouterConfig;
   buildEnd: Config['buildEnd'];
 };
 
@@ -132,6 +132,23 @@ const createDataRequestPath = (
     : `${prerenderPath.replace(/\/$/, '')}.data`;
 };
 
+const createDataOutputPath = (
+  prerenderPath: string,
+  trailingSlashAwareDataRequests: boolean
+): string =>
+  createDataRequestPath(prerenderPath, trailingSlashAwareDataRequests);
+
+const createDataHandlerRequestPath = (
+  prerenderPath: string,
+  trailingSlashAwareDataRequests: boolean
+): string => {
+  if (trailingSlashAwareDataRequests && prerenderPath === '/') {
+    return '/_root.data';
+  }
+
+  return createDataRequestPath(prerenderPath, trailingSlashAwareDataRequests);
+};
+
 export const createBuildRequestEffect = <T>(
   input: string | URL,
   init: RequestInit | undefined,
@@ -179,11 +196,19 @@ const prerenderData = async ({
   api: PrerenderBuildApi;
   requestInit?: RequestInit;
 }): Promise<string> => {
-  const dataRequestPath = createDataRequestPath(
+  const dataRequestPath = createDataHandlerRequestPath(
+    prerenderPath,
+    trailingSlashAwareDataRequests
+  );
+  const dataOutputPath = createDataOutputPath(
     prerenderPath,
     trailingSlashAwareDataRequests
   );
   const normalizedPath = `${basename}${dataRequestPath}`.replace(/\/\/+/g, '/');
+  const outputNormalizedPath = `${basename}${dataOutputPath}`.replace(
+    /\/\/+/g,
+    '/'
+  );
   const url = new URL(`http://localhost${normalizedPath}`);
   if (onlyRoutes?.length) {
     url.searchParams.set('_routes', onlyRoutes.join(','));
@@ -201,7 +226,10 @@ const prerenderData = async ({
       );
     }
 
-    const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
+    const outputPath = resolve(
+      clientBuildDir,
+      ...outputNormalizedPath.split('/')
+    );
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, data);
     api.logger.info(
@@ -430,10 +458,10 @@ const validatePrerenderPathMatches = (
   }
 };
 
-export const createBoundedPrerenderTasksEffect = (
-  prerenderPaths: string[],
+export const createBoundedPrerenderTasksEffect = <T>(
+  prerenderPaths: T[],
   concurrency: number,
-  renderPath: (path: string) => Effect.Effect<void, Error, never>
+  renderPath: (path: T) => Effect.Effect<void, Error, never>
 ): Effect.Effect<void, Error, never> =>
   Effect.forEach(prerenderPaths, renderPath, { concurrency, discard: true });
 
@@ -527,16 +555,23 @@ const createPrerenderPathEffect = ({
         clientBuildDir,
         basename,
         api,
-        requestInit: data
-          ? {
-              headers: {
-                'X-React-Router-Prerender-Data': encodeURI(data),
-              },
-            }
-          : undefined,
+        requestInit: data ? createPrerenderDataRequestInit(data) : undefined,
       })
     );
   });
+
+const createPrerenderDataRequestInit = (
+  data: string
+): RequestInit | undefined => {
+  const encodedData = encodeURI(data);
+  return encodedData.length < 8 * 1024
+    ? {
+        headers: {
+          'X-React-Router-Prerender-Data': encodedData,
+        },
+      }
+    : undefined;
+};
 
 const runPrerenderPaths = async ({
   build,
@@ -591,7 +626,7 @@ export const runReactRouterPrerenderBuild = async (
     routeChunkOptions,
     routeModuleAnalysis,
     buildManifest,
-    resolvedConfigWithRoutes,
+    buildEndReactRouterConfig,
     buildEnd,
     basename,
   } = options;
@@ -684,7 +719,7 @@ export const runReactRouterPrerenderBuild = async (
   if (buildEnd) {
     await buildEnd({
       buildManifest,
-      reactRouterConfig: resolvedConfigWithRoutes,
+      reactRouterConfig: buildEndReactRouterConfig,
       rsbuildConfig: api.getNormalizedConfig(),
     });
   }

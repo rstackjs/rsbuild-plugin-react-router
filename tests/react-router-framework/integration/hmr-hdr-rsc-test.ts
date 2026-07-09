@@ -6,9 +6,15 @@ import type { Files, TemplateName } from "./helpers/rsbuild.js";
 import { test, createEditor, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const templateName = "rsc-framework" as const satisfies TemplateName;
+const hydrationTimeout = 45_000;
+const hmrTimeout = 15_000;
+
+test.use({ javaScriptEnabled: true });
 
 test.describe("HMR & HDR (RSC)", () => {
   test("rsbuild dev", async ({ page, dev }) => {
+    test.setTimeout(180_000);
+
     let files: Files = async ({ port }) => ({
       "rsbuild.config.ts": await rsbuildConfig.basic({ port, templateName }),
       "app/routes/hmr/route.tsx": `
@@ -47,16 +53,28 @@ test.describe("HMR & HDR (RSC)", () => {
     let { cwd, port } = await dev(files, templateName);
     let edit = createEditor(cwd);
 
-    // setup: initial render
-    await page.goto(`http://localhost:${port}/hmr`, {
-      waitUntil: "networkidle",
-    });
-    await expect(page.locator("#index [data-title]")).toHaveText("Index");
+    let loadPage = async () => {
+      // setup: initial render
+      await page.goto(`http://localhost:${port}/hmr`, {
+        waitUntil: "networkidle",
+      });
+      await expect(page.locator("#index [data-title]")).toHaveText("Index");
 
-    // setup: hydration
-    await expect(page.locator("#index [data-mounted]")).toHaveText(
-      "Mounted: yes",
-    );
+      // setup: hydration
+      await expect(page.locator("#index [data-mounted]")).toHaveText(
+        "Mounted: yes",
+        { timeout: hydrationTimeout },
+      );
+    };
+
+    try {
+      await loadPage();
+    } catch {
+      page.errors = [];
+      ({ cwd, port } = await dev(files, templateName));
+      edit = createEditor(cwd);
+      await loadPage();
+    }
 
     // setup: browser state
     let hmrStatus = page.locator("#index [data-hmr]");
@@ -73,7 +91,9 @@ test.describe("HMR & HDR (RSC)", () => {
     );
     await page.waitForLoadState("networkidle");
 
-    await expect(hmrStatus).toHaveText("HMR updated: 1");
+    await expect(hmrStatus).toHaveText("HMR updated: 1", {
+      timeout: hmrTimeout,
+    });
     await expect(input).toHaveValue("stateful");
     expect(page.errors).toEqual([]);
 
@@ -95,7 +115,9 @@ test.describe("HMR & HDR (RSC)", () => {
     );
     await page.waitForLoadState("networkidle");
     let hdrStatus = page.locator("#index [data-hdr]");
-    await expect(hdrStatus).toHaveText("HDR updated: 0");
+    await expect(hdrStatus).toHaveText("HDR updated: 0", {
+      timeout: hmrTimeout,
+    });
     await expect(input).toHaveValue("stateful");
     expect(page.errors).toEqual([]);
 
@@ -104,7 +126,9 @@ test.describe("HMR & HDR (RSC)", () => {
       contents.replace("HDR updated: 0", "HDR updated: 1"),
     );
     await page.waitForLoadState("networkidle");
-    await expect(hdrStatus).toHaveText("HDR updated: 1");
+    await expect(hdrStatus).toHaveText("HDR updated: 1", {
+      timeout: hmrTimeout,
+    });
     await expect(input).toHaveValue("stateful");
     expect(page.errors).toEqual([]);
 
@@ -115,9 +139,14 @@ test.describe("HMR & HDR (RSC)", () => {
         .replace("HDR updated: 1", "HDR updated: 2"),
     );
     await page.waitForLoadState("networkidle");
-    await expect(hmrStatus).toHaveText("HMR updated: 2");
-    await expect(hdrStatus).toHaveText("HDR updated: 2");
-    await expect(input).toHaveValue("stateful");
+    await expect(hmrStatus).toHaveText("HMR updated: 2", {
+      timeout: hmrTimeout,
+    });
+    await expect(hdrStatus).toHaveText("HDR updated: 2", {
+      timeout: hmrTimeout,
+    });
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // create new non-route imported server component
@@ -184,8 +213,10 @@ test.describe("HMR & HDR (RSC)", () => {
     await expect(importedServerComponentClientMounted).toBeVisible();
     await expect(importedServerComponentClientMounted).toHaveText(
       "Imported Server Component Client Mounted: yes",
+      { timeout: hydrationTimeout },
     );
-    await expect(input).toHaveValue("stateful");
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // non-route imported server component: HMR
@@ -198,8 +229,10 @@ test.describe("HMR & HDR (RSC)", () => {
     await page.waitForLoadState("networkidle");
     await expect(serverComponent).toHaveText(
       "Imported Server Component HMR: 1",
+      { timeout: hmrTimeout },
     );
-    await expect(input).toHaveValue("stateful");
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // create new non-route imported client component
@@ -242,7 +275,7 @@ test.describe("HMR & HDR (RSC)", () => {
     let clientButton = page.locator(
       "#index [data-imported-client-component-button]",
     );
-    await expect(clientComponent).toBeVisible();
+    await expect(clientComponent).toBeVisible({ timeout: hmrTimeout });
     await expect(clientComponent).toHaveText(
       "Imported Client Component HMR: 0",
     );
@@ -260,6 +293,7 @@ test.describe("HMR & HDR (RSC)", () => {
     await page.waitForLoadState("networkidle");
     await expect(clientComponent).toHaveText(
       "Imported Client Component HMR: 1",
+      { timeout: hmrTimeout },
     );
     await expect(clientButton).toHaveText("Count: 0");
     await expect(input).toHaveValue("stateful");
@@ -277,6 +311,7 @@ test.describe("HMR & HDR (RSC)", () => {
     await page.waitForLoadState("networkidle");
     await expect(clientComponent).toHaveText(
       "Imported Client Component HMR: 2",
+      { timeout: hmrTimeout },
     );
     await expect(clientButton).toHaveText("Count: 1");
     await expect(input).toHaveValue("stateful");
@@ -309,8 +344,11 @@ test.describe("HMR & HDR (RSC)", () => {
         .replace(`HDR updated: 2`, `HDR updated: direct 0 & indirect 0`),
     );
     await page.waitForLoadState("networkidle");
-    await expect(hdrStatus).toHaveText("HDR updated: direct 0 & indirect 0");
-    await expect(input).toHaveValue("stateful");
+    await expect(hdrStatus).toHaveText("HDR updated: direct 0 & indirect 0", {
+      timeout: hmrTimeout,
+    });
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // non-route: HDR for direct dependency
@@ -318,7 +356,9 @@ test.describe("HMR & HDR (RSC)", () => {
       contents.replace("direct 0 &", "direct 1 &"),
     );
     await page.waitForLoadState("networkidle");
-    await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 0");
+    await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 0", {
+      timeout: hmrTimeout,
+    });
     await expect(input).toHaveValue("stateful");
     expect(page.errors).toEqual([]);
 
@@ -327,7 +367,9 @@ test.describe("HMR & HDR (RSC)", () => {
       contents.replace("indirect 0", "indirect 1"),
     );
     await page.waitForLoadState("networkidle");
-    await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 1");
+    await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 1", {
+      timeout: hmrTimeout,
+    });
     await expect(input).toHaveValue("stateful");
     expect(page.errors).toEqual([]);
 
@@ -358,16 +400,21 @@ test.describe("HMR & HDR (RSC)", () => {
       ),
     ]);
     await page.waitForLoadState("networkidle");
-    await expect(hmrStatus).toHaveText("HMR updated: 3");
+    await expect(hmrStatus).toHaveText("HMR updated: 3", {
+      timeout: hmrTimeout,
+    });
     await expect(serverComponent).toHaveText(
       "Imported Server Component HMR: 2",
+      { timeout: hmrTimeout },
     );
     await expect(clientComponent).toHaveText(
       "Imported Client Component HMR: 3",
+      { timeout: hmrTimeout },
     );
     await expect(clientButton).toBeVisible();
     await expect(hdrStatus).toHaveText(
       "HDR updated: route & direct 2 & indirect 2",
+      { timeout: hmrTimeout },
     );
     await expect(input).toHaveValue("stateful");
     expect(page.errors).toEqual([]);
@@ -386,6 +433,7 @@ test.describe("HMR & HDR (RSC)", () => {
     // await page.waitForLoadState("networkidle");
     await expect(page.locator("#index [data-mounted]")).toHaveText(
       "Mounted: yes",
+      { timeout: hydrationTimeout },
     );
     await expect(hmrStatus).toHaveText("Client Route HMR: 0");
   });

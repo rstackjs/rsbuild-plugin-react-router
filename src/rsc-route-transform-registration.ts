@@ -4,16 +4,8 @@ import type { RsbuildPlugin } from '@rsbuild/core';
 import { resolve } from 'pathe';
 import type { RouteChunkCache, RouteChunkConfig } from './route-chunks.js';
 import type { Route } from './types.js';
+import type { ReactRouterPerformanceProfiler } from './performance.js';
 import { transformRscRouteModule } from './rsc-route-transforms.js';
-
-type RscRouteTransformProfiler = {
-  record<T>(
-    environmentName: string | undefined,
-    label: string,
-    resource: string,
-    task: () => Promise<T>
-  ): Promise<T>;
-};
 
 const mdxRoutePattern = /\.mdx?$/i;
 const RSC_ROUTE_TRANSFORM_LOADER = 'react-router-rsc-route-transform';
@@ -53,7 +45,7 @@ export const registerReactRouterRscRouteTransforms = ({
 }: {
   api: Parameters<RsbuildPlugin['setup']>[0];
   isBuild: boolean;
-  performanceProfiler: RscRouteTransformProfiler;
+  performanceProfiler: Pick<ReactRouterPerformanceProfiler, 'record'>;
   routeByFilePath: Map<string, Route>;
   routeChunkCache: RouteChunkCache;
   routeChunkConfig: RouteChunkConfig;
@@ -89,7 +81,7 @@ export const registerReactRouterRscRouteTransforms = ({
   api.transform(
     {
       test: path =>
-        routeByFilePath.has(resolve(path)) && !mdxRoutePattern.test(path),
+        !mdxRoutePattern.test(path) && routeByFilePath.has(resolve(path)),
       order: 'pre',
     },
     transformRoute

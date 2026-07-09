@@ -21,6 +21,8 @@ const templateNames = [
   "rsc-framework",
 ] as const satisfies TemplateName[];
 
+const devHmrTimeout = 60_000;
+
 const sharedFiles = {
   "app/routes/_index.tsx": js`
     import { useState, useEffect } from "react";
@@ -178,9 +180,11 @@ test.describe("base + React Router basename", () => {
   for (const templateName of templateNames) {
     test.describe(`template: ${templateName}`, () => {
       test.describe("rsbuild dev", () => {
+        test.describe.configure({ timeout: 180_000 });
+
         let port: number;
         let cwd: string;
-        let stop: () => unknown;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -206,7 +210,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(async () => await stop?.());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when the base and basename are the same", async ({
           page,
@@ -263,6 +270,7 @@ test.describe("base + React Router basename", () => {
         test("works with child routes using client loaders", async ({
           page,
         }) => {
+          test.setTimeout(180_000);
           let basename = "/mybase/";
           await setup({
             base: basename,
@@ -323,26 +331,35 @@ test.describe("base + React Router basename", () => {
             waitUntil: "domcontentloaded",
           });
 
-          await expect(page.locator("#parent")).toBeDefined();
-          await expect(page.locator("#loading")).toContainText("Loading...");
+          await expect(page.locator("#parent")).toBeVisible({
+            timeout: devHmrTimeout,
+          });
+          await expect(page.locator("#loading")).toContainText("Loading...", {
+            timeout: devHmrTimeout,
+          });
           await expect(page.locator("[data-mounted]")).toHaveText(
             "Mounted: yes",
+            { timeout: devHmrTimeout },
           );
 
           expect(hydrationErrors).toEqual([]);
 
-          await page.waitForSelector("#child");
-          await expect(page.locator("#child")).toHaveText("CHILD");
+          await expect(page.locator("#child")).toHaveText("CHILD", {
+            timeout: devHmrTimeout,
+          });
           await expect(page.locator("[data-mounted]")).toHaveText(
             "Mounted: yes",
+            { timeout: devHmrTimeout },
           );
         });
       });
 
       test.describe("express dev", async () => {
+        test.describe.configure({ timeout: 180_000 });
+
         let port: number;
         let cwd: string;
-        let stop: () => void;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -367,7 +384,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(() => stop());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when base and basename are the same", async ({ page }) => {
           await setup({ base: "/mybase/", basename: "/mybase/" });
@@ -401,7 +421,7 @@ test.describe("base + React Router basename", () => {
       test.describe("build", () => {
         let port: number;
         let cwd: string;
-        let stop: () => unknown;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -426,7 +446,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(() => stop());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when base and basename are the same", async ({ page }) => {
           await setup({ base: "/mybase/", basename: "/mybase/" });
@@ -471,7 +494,7 @@ test.describe("base + React Router basename", () => {
       test.describe("express build", async () => {
         let port: number;
         let cwd: string;
-        let stop: () => void;
+        let stop: (() => unknown) | undefined;
 
         async function setup({
           base,
@@ -507,7 +530,10 @@ test.describe("base + React Router basename", () => {
           }
         }
 
-        test.afterAll(() => stop?.());
+        test.afterEach(async () => {
+          await stop?.();
+          stop = undefined;
+        });
 
         test("works when base and basename are the same", async ({ page }) => {
           await setup({ base: "/mybase/", basename: "/mybase/" });
@@ -661,18 +687,44 @@ async function workflowDev({
   expect(pageErrors).toEqual([]);
 
   // route: HMR
+  const hotUpdate = page.waitForResponse(
+    (response) =>
+      response.url().includes(".hot-update.") && response.status() < 400,
+    { timeout: devHmrTimeout },
+  );
   await edit("app/routes/_index.tsx", (contents) =>
     contents.replace("HMR updated: 0", "HMR updated: 1"),
   );
-  await page.waitForLoadState("networkidle");
-  await expect(hmrStatus).toHaveText("HMR updated: 1");
-  await expect(input).toHaveValue("stateful");
+  await hotUpdate;
+  try {
+    await expect(hmrStatus).toHaveText("HMR updated: 1", {
+      timeout: devHmrTimeout,
+    });
+  } catch (error) {
+    console.log("basename hmr debug url", page.url());
+    console.log(
+      "basename hmr debug requests",
+      requests.slice(-30).map((request) => request.url()),
+    );
+    throw error;
+  }
+  await expect(input).toHaveValue("stateful", { timeout: devHmrTimeout });
   expect(pageErrors).toEqual([]);
 
   // client side navigation
-  await page.getByRole("link", { name: "other" }).click();
+  await page.evaluate(() => {
+    let link = document.querySelector<HTMLAnchorElement>(
+      '#index a[href$="/other"]',
+    );
+    if (!link) {
+      throw new Error("Missing other route link");
+    }
+    link.click();
+  });
   await page.waitForURL(`http://localhost:${port}${basename}other`);
-  await page.getByText("other-loader").click();
+  await expect(page.getByText("other-loader")).toBeVisible({
+    timeout: devHmrTimeout,
+  });
   expect(pageErrors).toEqual([]);
 
   // verify client asset requests are all under base

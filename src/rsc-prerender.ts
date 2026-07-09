@@ -41,6 +41,11 @@ type RscRequestHandler = (request: Request) => Promise<Response>;
 
 type RscPrerenderBuildApi = Pick<RsbuildPluginAPI, 'logger'>;
 
+type RscPrerenderRequest = {
+  requestPath: string;
+  artifactPath: string;
+};
+
 type RunReactRouterRscPrerenderBuildOptions = {
   api: RscPrerenderBuildApi;
   hasWebEnvironment: boolean;
@@ -60,7 +65,7 @@ export const normalizeRscPrerenderBasename: (basename: string) => string =
  * The request paths to prerender: the resolved prerender paths joined with
  * the basename, plus the SPA fallback document when `ssr: false`.
  */
-export const getRscPrerenderRequestPaths = ({
+export const getRscPrerenderRequests = ({
   prerenderPaths,
   ssr,
   basename,
@@ -68,16 +73,16 @@ export const getRscPrerenderRequestPaths = ({
   prerenderPaths: string[];
   ssr: boolean;
   basename: string;
-}): string[] => {
+}): RscPrerenderRequest[] => {
   const paths = new Set(prerenderPaths);
   if (!ssr) {
     paths.add(SPA_FALLBACK_REQUEST_PATH);
   }
   const normalizedBasename = normalizeRscPrerenderBasename(basename);
-  return Array.from(paths).map(
-    path =>
-      `${normalizedBasename}${path.startsWith('/') ? path.slice(1) : path}`
-  );
+  return Array.from(paths).map(path => ({
+    artifactPath: path,
+    requestPath: `${normalizedBasename}${path.startsWith('/') ? path.slice(1) : path}`,
+  }));
 };
 
 /**
@@ -196,17 +201,19 @@ const assertPrerenderableResponse = (
   }
   throw new Error(
     `Prerender: Received a ${response.status} status code from ` +
-      `the RSC server while prerendering the \`${pathname}\` path.\n${pathname}`
+      `the RSC server while prerendering the \`${pathname}\` path.`
   );
 };
 
 const prerenderRscUrl = async ({
   api,
+  artifactPath,
   clientBuildDir,
   handler,
   url,
 }: {
   api: RscPrerenderBuildApi;
+  artifactPath?: string;
   clientBuildDir: string;
   handler: RscRequestHandler;
   url: URL;
@@ -214,6 +221,7 @@ const prerenderRscUrl = async ({
   withBuildRequest(url, undefined, async request => {
     const response = await handler(request);
     const pathname = url.pathname;
+    const outputPathname = artifactPath ?? pathname;
     assertPrerenderableResponse(pathname, response);
 
     if (redirectStatusCodes.has(response.status)) {
@@ -221,7 +229,7 @@ const prerenderRscUrl = async ({
       await writePrerenderedFile({
         api,
         clientBuildDir,
-        filePath: getRscHtmlFilePath(pathname),
+        filePath: getRscHtmlFilePath(outputPathname),
         contents: createRedirectHtml({
           pathname,
           location,
@@ -240,7 +248,7 @@ const prerenderRscUrl = async ({
       await writePrerenderedFile({
         api,
         clientBuildDir,
-        filePath: getRscHtmlFilePath(pathname),
+        filePath: getRscHtmlFilePath(outputPathname),
         contents: html,
       });
       const flightData = extractRscFlightData(html);
@@ -248,7 +256,7 @@ const prerenderRscUrl = async ({
         await writePrerenderedFile({
           api,
           clientBuildDir,
-          filePath: getRscPayloadFilePath(pathname),
+          filePath: getRscPayloadFilePath(outputPathname),
           contents: flightData,
         });
       }
@@ -261,13 +269,19 @@ const prerenderRscUrl = async ({
     await writePrerenderedFile({
       api,
       clientBuildDir,
-      filePath: pathname,
+      filePath: outputPathname,
       contents: new Uint8Array(await response.arrayBuffer()),
     });
     if (!pathname.endsWith('.rsc')) {
       const dataUrl = new URL(url);
       dataUrl.pathname += '.rsc';
-      await prerenderRscUrl({ api, clientBuildDir, handler, url: dataUrl });
+      await prerenderRscUrl({
+        api,
+        artifactPath: `${outputPathname}.rsc`,
+        clientBuildDir,
+        handler,
+        url: dataUrl,
+      });
     }
   });
 
@@ -289,12 +303,12 @@ export const runReactRouterRscPrerenderBuild = async (
     return;
   }
 
-  const requestPaths = getRscPrerenderRequestPaths({
+  const prerenderRequests = getRscPrerenderRequests({
     prerenderPaths,
     ssr,
     basename,
   });
-  if (requestPaths.length === 0) {
+  if (prerenderRequests.length === 0) {
     return;
   }
 
@@ -320,19 +334,20 @@ export const runReactRouterRscPrerenderBuild = async (
     const buildModule = await import(pathToFileURL(serverBuildPath).toString());
     const handler = resolveRscRequestHandler(buildModule, serverBuildPath);
 
-    api.logger.info(`Prerender: ${requestPaths.length} path(s)...`);
+    api.logger.info(`Prerender: ${prerenderRequests.length} path(s)...`);
 
     await runPluginEffect(
       createBoundedPrerenderTasksEffect(
-        requestPaths,
+        prerenderRequests,
         getPrerenderConcurrency(prerenderConfig),
-        requestPath =>
+        prerenderRequest =>
           tryPluginPromise(() =>
             prerenderRscUrl({
               api,
+              artifactPath: prerenderRequest.artifactPath,
               clientBuildDir,
               handler,
-              url: new URL(`http://localhost${requestPath}`),
+              url: new URL(`http://localhost${prerenderRequest.requestPath}`),
             })
           )
       )

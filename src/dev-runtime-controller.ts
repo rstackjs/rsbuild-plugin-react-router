@@ -2,6 +2,7 @@ import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
 import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
+import { escapeHtml } from './plugin-utils.js';
 import {
   beginDevCompilerAttempt,
   clearDevCompilerStart,
@@ -67,13 +68,13 @@ type CreateControllerOptions = {
   onNodeRebuildCommitted?: () => void;
 };
 
-const escapeHtml = (value: string): string =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
+
+const isHdrRevisionFile = (file: string): boolean =>
+  file.includes('.react-router/hdr-revision.mjs');
+
+const isCssSourceFile = (file: string): boolean =>
+  /\.css(?:\.[cm]?[jt]s)?$/.test(file);
 
 export const createReactRouterDevRuntimeController = ({
   api,
@@ -166,9 +167,8 @@ export const createReactRouterDevRuntimeController = ({
           if (
             result === 'committed' &&
             changes.node.known &&
-            (!changes.web.known || changes.web.files.size === 0) &&
             Array.from(changes.node.files).some(
-              file => !file.includes('.react-router/hdr-revision.mjs')
+              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
             )
           ) {
             onNodeRebuildCommitted?.();
@@ -546,6 +546,13 @@ export const createReactRouterDevRuntimeController = ({
     },
 
     createBuildLoader(entryName?: string): () => Promise<ServerBuild> {
+      // Pin the loader to the dev-server session active at creation time. Once a
+      // loader is handed to React Router for session N it must keep serving N (or
+      // fail loudly with 'not registered' once N closes) and never silently migrate
+      // to a replacement session — this preserves SSR generation/session coherency.
+      // The live fallback below applies ONLY when no session exists yet at creation
+      // (boundServer === undefined), i.e. a loader built during config setup before
+      // the dev server has started; there is no session to stay coherent with yet.
       const boundServer = sessions.getActiveBinding()?.server;
       return () => {
         const server = boundServer ?? sessions.getActiveBinding()?.server;

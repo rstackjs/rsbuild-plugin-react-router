@@ -1,12 +1,27 @@
 import { createRequestListener } from '@remix-run/node-fetch-server';
 import type { RsbuildConfig } from '@rsbuild/core';
+import { installDevServerSourceMapSupport } from './dev-source-maps.js';
+import { escapeHtml } from './plugin-utils.js';
 
-type RscDevServer = {
-  environments: {
-    node: {
-      loadBundle<T>(entryName: string): Promise<T>;
-    };
-  };
+/**
+ * Turns an error thrown by the RSC server build into a source-mapped 500 HTML
+ * document. `@remix-run/node-fetch-server`'s request listener catches handler
+ * throws internally and, without an `onError`, emits a bare 500 with no body
+ * markup. React Router's classic dev path instead returns an ErrorBoundary
+ * document whose `<main>` carries the stack, and the integration test asserts
+ * on that `<main>`. Reading `error.stack` here triggers the installed
+ * `prepareStackTrace`, remapping generated `.js` frames back to the original
+ * `.tsx` source.
+ */
+const renderDevServerError = (error: unknown): Response => {
+  const stack =
+    error instanceof Error ? (error.stack ?? String(error)) : String(error);
+  return new Response(
+    `<!doctype html><html><body><main><pre>${escapeHtml(
+      stack
+    )}</pre></main></body></html>`,
+    { status: 500, headers: { 'content-type': 'text/html' } }
+  );
 };
 
 type RscServerBuild = {
@@ -53,19 +68,35 @@ export function createReactRouterRscDevServerSetup({
   entryName,
   pluginName,
 }: RscDevServerSetupOptions): RscDevServerSetup {
-  return ({ server }) => {
-    const devServer = server as unknown as RscDevServer;
-    const listener = createRequestListener(async request => {
-      const build =
-        await devServer.environments.node.loadBundle<RscServerBuild>(entryName);
-      const handler = build.default?.fetch;
-      if (typeof handler !== 'function') {
-        throw new Error(
-          `[${pluginName}] RSC server build must default-export an object with a fetch function.`
-        );
-      }
-      return handler(request);
-    });
+  return context => {
+    // `ServerSetupContext` is a discriminated union on `action`; only the
+    // `'dev'` server exposes the typed `environments` API (`loadBundle`), while
+    // the `'preview'` server (`RsbuildPreviewServer`) does not. Excluding the
+    // preview branch narrows `context` to the dev variant, so `server` is a
+    // fully typed `RsbuildDevServer` — no casts, and `loadBundle` is only ever
+    // reached on the server that actually provides it.
+    if (context.action === 'preview') {
+      return;
+    }
+    const { server } = context;
+    // Remap generated `.js` stack frames back to original `.tsx` sources so a
+    // loader/render error surfaced below carries source-mapped locations, the
+    // same support the classic dev path installs.
+    installDevServerSourceMapSupport();
+    const listener = createRequestListener(
+      async request => {
+        const build =
+          await server.environments.node.loadBundle<RscServerBuild>(entryName);
+        const handler = build.default?.fetch;
+        if (typeof handler !== 'function') {
+          throw new Error(
+            `[${pluginName}] RSC server build must default-export an object with a fetch function.`
+          );
+        }
+        return handler(request);
+      },
+      { onError: renderDevServerError }
+    );
 
     // Register the RSC middleware in the callback returned from
     // `server.setup`. Rsbuild runs middlewares registered synchronously in

@@ -63,6 +63,15 @@ if (document.readyState === 'loading') {
   hydrate();
 }
 
+// The single `rsc:update` navigate handler for RSC dev HMR. This is the
+// hand-written mirror of the generated route-chunk snippet
+// (`RSC_HMR_NAVIGATE_SNIPPET` in `src/rsc-route-transforms.ts`); keep the two in
+// lockstep. The `inject-hmr-runtime` virtual module only self-accepts and no
+// longer registers a second, racing handler here.
+//
+// The dev server emits `rsc:update` with no payload; there is no `reload` flag
+// (full reloads travel through the HMR runtime's own `full-reload` message), so
+// this handler always navigates.
 const hot = (
   import.meta as unknown as {
     webpackHot?: {
@@ -73,8 +82,26 @@ const hot = (
 
 hot?.on('rsc:update', () => {
   requestAnimationFrame(() => {
-    (
+    const router = (
       window as typeof window & { __reactRouterDataRouter?: DataRouter }
-    ).__reactRouterDataRouter?.revalidate();
+    ).__reactRouterDataRouter;
+    if (router?.navigate) {
+      const basename = router.basename || '/';
+      let pathname = window.location.pathname;
+      if (basename !== '/' && pathname.startsWith(basename)) {
+        pathname = pathname.slice(basename.length) || '/';
+        // A trailing-slash basename (e.g. "/mybase/") consumes the leading
+        // slash, yielding a relative path that react-router resolves against
+        // the current location and doubles. Force it back to absolute.
+        if (pathname[0] !== '/') pathname = '/' + pathname;
+      }
+      void router.navigate(
+        pathname + window.location.search + window.location.hash,
+        {
+          replace: true,
+          preventScrollReset: true,
+        }
+      );
+    }
   });
 });

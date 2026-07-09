@@ -93,26 +93,56 @@ Do not add a local ignore list for Rsbuild gaps. Upstream `test.skip` and
 `test.fixme` calls should remain intact, but otherwise unsupported cases should
 fail visibly.
 
-## Bundler artifact excision
+## Vite artifact excision
 
-The corpus carries no inert upstream bundler artifacts: checked-in fixture
-template config files from the upstream bundler setup are deleted, and
-upstream bundler dependencies are stripped from corpus `package.json` files.
+The corpus carries no inert Vite artifacts: the checked-in fixture/template
+`vite.config.*` files are deleted, and `vite`, `@vitejs/*`, and Vite-plugin
+dependencies (`vite-tsconfig-paths`, `@vanilla-extract/vite-plugin`,
+`@cloudflare/vite-plugin`) are stripped from corpus `package.json` files.
 Tests author `rsbuild.config.ts` fixtures directly: the `rsbuildConfig` helper
-factory in `integration/helpers/rsbuild.ts` emits rsbuild config text, and
-inline fixture configs are written as rsbuild configs with comments marking
-dropped bundler-only options. The upstream major-version template pair is
-collapsed into a single `rsbuild-template`. Server-only macro fixtures were
-removed until an Rsbuild equivalent exists.
+factory in `integration/helpers/rsbuild.ts` (formerly `viteConfig` in
+`helpers/vite.ts`) emits rsbuild config text (see its doc comment for the
+Vite -> rsbuild option mappings), and inline fixture configs are written as
+rsbuild configs with comments marking dropped Vite-only options. The adapter
+rejects `vite.config.*` fixture files and requires tests to author
+`rsbuild.config.ts` explicitly so test-specific options are preserved. The
+upstream `vite-7-template` / `vite-8-template` pair is collapsed into a single
+template, renamed to `rsbuild-template` (the Vite major split is meaningless
+for rsbuild).
+
+## Intentional divergences from upstream
+
+Some corpus files deliberately diverge from the upstream oracle to match how
+`rsbuild-plugin-react-router` actually behaves. These are **not** stale drift —
+do not "restore" them from upstream during a sync. Each is marked with an
+inline `Intentional divergence from upstream` comment at the site; the list
+here exists so a corpus sync doesn't blindly revert them.
+
+- **RSC route-module CSS mechanism** — in
+  `react-router-dev/__tests__/rsc-virtual-route-modules-test.ts`, the expected
+  transform output streams stylesheet links from a route module's
+  `entryCssFiles` array (populated by the rspack RSC runtime for modules marked
+  with the `'use server-entry'` directive) instead of upstream's
+  `import.meta.viteRsc.loadCss()` call. The upstream oracle is Vite-specific;
+  the rsbuild/rspack RSC flavor has no `import.meta.viteRsc`, so the `withCss`
+  helper and the `'use server-entry'` fixtures in that file encode the rsbuild
+  behavior. If a sync reintroduces `import.meta.viteRsc.loadCss()`, restore the
+  `entryCssFiles` / `'use server-entry'` form. Relatedly, that same oracle
+  re-exports route data exports (`links`/`meta`/`handle`/`shouldRevalidate`)
+  from a dedicated CSS-free `?client-route-module=data` chunk instead of the
+  `route` chunk, so the native rspack `RscServerPlugin` never wraps those data
+  functions in a CSS-injecting component wrapper.
 
 ## Renames
 
 Because this corpus is repo-owned rather than a verbatim upstream mirror, the
-upstream bundler-oriented filenames, directory names, helper exports, and
+upstream Vite-oriented filenames, directory names, helper exports, and
 describe/test titles that are misleading under rsbuild have been renamed to
 rsbuild-flavored names via `git mv` (history preserved). The complete
-upstream-path -> corpus-path map lives in `UPSTREAM.json` under `renames`.
-Notable moves:
+upstream-path -> corpus-path map lives in `UPSTREAM.json` under `renames`,
+alongside a `renamesNote` documenting the helper-export renames (e.g.
+`viteConfig` -> `rsbuildConfig`, `viteMajorTemplates` -> `bundlerTemplates`)
+and the title renames. Notable moves:
 
 - `integration/vite-*-test.ts` -> `integration/*-test.ts` (drop the `vite-`
   prefix)
@@ -122,8 +152,8 @@ Notable moves:
 - `integration/helpers/rsc-vite-framework` -> `integration/helpers/rsc-framework`
 
 Vite-only skipped suites are intentionally not carried in this Rsbuild corpus.
-The RSC preview/framework fixtures use `react-server-dom-rspack` runtime
-packages.
+The RSC preview/framework fixtures use `react-server-dom-rspack` and
+`rsbuild-plugin-rsc`.
 
 ## Commands
 

@@ -15,6 +15,7 @@ import type { Page } from "@playwright/test";
 import { test as base, expect } from "@playwright/test";
 import type { Config } from "@react-router/dev/config";
 import {
+  assertNoViteConfigFiles,
   finalizeFixtureProject,
   prepareFixtureProjectDependencies,
   reactRouterServeBin,
@@ -22,8 +23,13 @@ import {
 } from "./rsbuild-adapter.js";
 import {
   assertResourceGuardrail,
+  getActiveResourceCounts,
   withFrameworkTestRunEnv,
 } from "./test-resource-guard.js";
+import type { TemplateName } from "./templates.js";
+
+export { rsbuildConfig } from "./rsbuild-config.js";
+export type { TemplateName } from "./templates.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const root = path.resolve(__dirname, "../..");
@@ -47,156 +53,6 @@ export const reactRouterConfig = (
 
     export default ${JSON.stringify(config, null, 2)} satisfies Config;
   `;
-};
-
-type RsbuildConfigServerArgs = {
-  port: number;
-};
-
-type RsbuildConfigBuildArgs = {
-  assetsInlineLimit?: number;
-  assetsDir?: string;
-  cssCodeSplit?: boolean;
-};
-
-type RsbuildConfigBaseArgs = {
-  templateName?: TemplateName;
-  base?: string;
-  mdx?: boolean;
-  vanillaExtract?: boolean;
-};
-
-type RsbuildConfigArgs = (
-  | RsbuildConfigServerArgs
-  | { [K in keyof RsbuildConfigServerArgs]?: never }
-) &
-  RsbuildConfigBuildArgs &
-  RsbuildConfigBaseArgs;
-
-const configSection = (name: string, entries: string[]) =>
-  entries.length > 0
-    ? [`${name}: {`, ...entries.map((entry) => `  ${entry}`), `},`]
-    : [];
-
-const CSS_CODE_SPLIT_NOTE =
-  '// Vite "build.cssCodeSplit: false" is not mapped: rsbuild always extracts CSS and these fixtures only assert that styles are applied.';
-
-/**
- * Emits rsbuild.config.ts contents for test fixtures.
- *
- * Vite -> rsbuild option mappings used by the corpus:
- * - `base` -> `output.assetPrefix` + `dev.assetPrefix`. We intentionally do
- *   not use rsbuild `server.base` (React Router's `basename` handles route
- *   prefixing and the plugin's dev SSR middleware serves all paths).
- * - `server.port` + `strictPort` -> `server.port` + `server.strictPort`
- * - `build.assetsInlineLimit` -> `output.dataUriLimit`
- * - `build.assetsDir` -> `output.distPath.assets`
- * - vanilla-extract Vite plugin -> `@vanilla-extract/webpack-plugin` via
- *   `tools.rspack`
- * - MDX rollup plugin -> `@rsbuild/plugin-mdx`
- *
- * Intentionally unmapped Vite options:
- * - `server.hmr.port`: rsbuild serves the HMR websocket on the dev server port
- * - `server.fs.allow`: Vite-only static file serving restriction
- * - `build.cssCodeSplit`: see CSS_CODE_SPLIT_NOTE
- * - `vite-tsconfig-paths`: rsbuild resolves tsconfig `paths` natively
- */
-export const rsbuildConfig = {
-  // Emits the `server` section of an rsbuild config object literal so tests
-  // can compose their own rsbuild.config.ts strings.
-  server: async ({ port }: RsbuildConfigServerArgs) => {
-    return dedent`
-      server: {
-        port: ${port},
-        strictPort: true,
-      },
-    `;
-  },
-  // Emits the `output` section of an rsbuild config object literal.
-  build: ({
-    assetsInlineLimit,
-    assetsDir,
-    cssCodeSplit,
-  }: RsbuildConfigBuildArgs = {}) => {
-    return [
-      ...configSection("output", [
-        ...(assetsInlineLimit !== undefined
-          ? [`dataUriLimit: ${assetsInlineLimit}, // Vite: build.assetsInlineLimit`]
-          : []),
-        ...(assetsDir !== undefined
-          ? [
-              `distPath: { assets: ${JSON.stringify(assetsDir)} }, // Vite: build.assetsDir`,
-            ]
-          : []),
-      ]),
-      ...(cssCodeSplit === false ? [CSS_CODE_SPLIT_NOTE] : []),
-    ].join("\n");
-  },
-  // Emits a complete rsbuild.config.ts.
-  basic: async (args: RsbuildConfigArgs = {}) => {
-    const isRsc = args.templateName?.includes("rsc") ?? false;
-    const routerPlugin = isRsc ? "pluginReactRouterRSC" : "pluginReactRouter";
-
-    const imports = [
-      `import { defineConfig } from "@rsbuild/core";`,
-      ...(args.mdx ? [`import { pluginMdx } from "@rsbuild/plugin-mdx";`] : []),
-      `import { pluginReact } from "@rsbuild/plugin-react";`,
-      `import { ${routerPlugin} } from "rsbuild-plugin-react-router";`,
-      ...(args.vanillaExtract
-        ? [
-            `import { VanillaExtractPlugin } from "@vanilla-extract/webpack-plugin";`,
-          ]
-        : []),
-    ];
-
-    const config = [
-      ...configSection("server", [
-        ...(args.port !== undefined
-          ? [`port: ${args.port},`, `strictPort: true,`]
-          : []),
-      ]),
-      ...configSection("dev", [
-        ...(args.base !== undefined
-          ? [`assetPrefix: ${JSON.stringify(args.base)}, // Vite: base (dev)`]
-          : []),
-      ]),
-      ...configSection("output", [
-        ...(args.base !== undefined
-          ? [`assetPrefix: ${JSON.stringify(args.base)}, // Vite: base`]
-          : []),
-        ...(args.assetsInlineLimit !== undefined
-          ? [`dataUriLimit: ${args.assetsInlineLimit}, // Vite: build.assetsInlineLimit`]
-          : []),
-        ...(args.assetsDir !== undefined
-          ? [
-              `distPath: { assets: ${JSON.stringify(args.assetsDir)} }, // Vite: build.assetsDir`,
-            ]
-          : []),
-      ]),
-      ...(args.vanillaExtract
-        ? [
-            `// vanilla-extract: debug identifiers + sideEffects disabled for .css.ts imports.`,
-            `tools: {`,
-            `  rspack: {`,
-            `    plugins: [new VanillaExtractPlugin({ identifiers: "debug" })],`,
-            `    optimization: { sideEffects: false },`,
-            `  },`,
-            `},`,
-          ]
-        : []),
-      ...(args.cssCodeSplit === false ? [CSS_CODE_SPLIT_NOTE] : []),
-      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${routerPlugin}()],`,
-    ];
-
-    return [
-      ...imports,
-      "",
-      "export default defineConfig({",
-      ...config.map((line) => `  ${line}`),
-      "});",
-      "",
-    ].join("\n");
-  },
 };
 
 export const EXPRESS_SERVER = (args: {
@@ -282,14 +138,7 @@ export const EXPRESS_SERVER = (args: {
 
 type FrameworkModeBundlerTemplateName = "rsbuild-template";
 
-type FrameworkModeRscTemplateName = "rsc-framework";
-
 export type RscBundlerTemplateName = "rsc-preview";
-
-export type TemplateName =
-  | FrameworkModeBundlerTemplateName
-  | FrameworkModeRscTemplateName
-  | RscBundlerTemplateName;
 
 // Collapsed from the upstream Vite 7/Vite 8 template pair: the Vite major
 // version split is meaningless for rsbuild, so suites parameterized over
@@ -326,11 +175,13 @@ export async function createProject(
 
   // user-defined files
   await Promise.all(
-    Object.entries(files).map(async ([filename, contents]) => {
-      let filepath = path.join(projectDir, filename);
-      await mkdir(path.dirname(filepath), { recursive: true });
-      await writeFile(filepath, stripIndent(contents));
-    }),
+    Object.entries(assertNoViteConfigFiles(files)).map(
+      async ([filename, contents]) => {
+        let filepath = path.join(projectDir, filename);
+        await mkdir(path.dirname(filepath), { recursive: true });
+        await writeFile(filepath, stripIndent(contents));
+      },
+    ),
   );
 
   await finalizeFixtureProject({ projectDir, templateName });
@@ -436,7 +287,13 @@ export const createDev =
       nodeArgs[0] === rsbuildBin && nodeArgs[1] === "dev"
         ? [...nodeArgs, "--port", String(port)]
         : nodeArgs;
-    let proc = node(args, { cwd, env });
+    let proc = node(args, {
+      cwd,
+      env: {
+        NODE_ENV: "development",
+        ...env,
+      },
+    });
     await waitForServer(proc, { port, basename });
     return () => stopProcess(proc);
   };
@@ -457,8 +314,13 @@ export const rsbuildPreview = async ({
   // fall back to a static file server with an SPA fallback to `index.html`,
   // mirroring upstream's `ssr: false` preview handling.
   let serverBundlePath = path.join(cwd, "build/server/static/js/app.js");
+  let rscServerBundlePath = path.join(cwd, "build/server/index.js");
   let clientIndexPath = path.join(cwd, "build/client/index.html");
-  if (!existsSync(serverBundlePath) && existsSync(clientIndexPath)) {
+  if (
+    !existsSync(serverBundlePath) &&
+    !existsSync(rscServerBundlePath) &&
+    existsSync(clientIndexPath)
+  ) {
     return spaStaticPreview({ cwd, port });
   }
   return reactRouterServe({ cwd, port });
@@ -616,14 +478,16 @@ export const test = base.extend<Fixtures>({
   },
   // eslint-disable-next-line no-empty-pattern
   dev: async ({}, use) => {
-    let stop: (() => unknown) | undefined;
+    let stops: Array<() => unknown> = [];
     await use(async (files, template) => {
       let port = await getPort();
       let cwd = await createProject(await files({ port }), template);
-      stop = await dev({ cwd, port });
+      stops.push(await dev({ cwd, port }));
       return { port, cwd };
     });
-    await stop?.();
+    for (let stop of stops.reverse()) {
+      await stop();
+    }
   },
   // eslint-disable-next-line no-empty-pattern
   customDev: async ({}, use) => {
@@ -689,6 +553,11 @@ function node(
     stdio: "pipe",
     detached: platform() !== "win32",
   });
+  assertResourceGuardrail({
+    counts: getActiveResourceCounts({
+      ownedPids: proc.pid === undefined ? undefined : [proc.pid],
+    }),
+  });
   return proc;
 }
 
@@ -739,7 +608,7 @@ async function waitForServer(
         args.basename ?? "/"
       }`,
     ],
-    timeout: platform() === "win32" ? 20000 : 10000,
+    timeout: 20000,
   }).catch(async (err) => {
     let stdout = devStdout();
     let stderr = devStderr();

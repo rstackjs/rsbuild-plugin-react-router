@@ -12,13 +12,15 @@ import {
 } from "execa";
 import * as Path from "pathe";
 
-import type { TemplateName } from "./rsbuild.js";
+import type { TemplateName } from "./templates.js";
 import {
+  assertNoViteConfigFiles,
   finalizeFixtureProject,
   prepareFixtureProjectDependencies,
 } from "./rsbuild-adapter.js";
 import {
   assertResourceGuardrail,
+  getActiveResourceCounts,
   killProcessGroup,
   withFrameworkTestRunEnv,
 } from "./test-resource-guard.js";
@@ -38,7 +40,8 @@ const templatePath = (templateName: string) =>
 type Edits = Record<string, string | ((contents: string) => string)>;
 
 async function applyEdits(cwd: string, edits: Edits) {
-  const promises = Object.entries(edits).map(async ([file, transform]) => {
+  const normalizedEdits = assertNoViteConfigFiles(edits);
+  const promises = Object.entries(normalizedEdits).map(async ([file, transform]) => {
     const filepath = Path.join(cwd, file);
     await fs.writeFile(
       filepath,
@@ -123,6 +126,13 @@ export const test = base.extend<{
       if (p instanceof ChildProcess) {
         processes.push(p);
       }
+      assertResourceGuardrail({
+        counts: getActiveResourceCounts({
+          ownedPids: processes
+            .map(process => process.pid)
+            .filter((pid): pid is number => pid !== undefined),
+        }),
+      });
 
       p.then((result) => {
         if (!(result instanceof Error)) return result;

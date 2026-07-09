@@ -235,6 +235,77 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
+  it('treats serialized browser manifest values as literal replacement text', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-modify-manifest-'));
+    const appDir = join(root, 'app');
+    const routeFile = join(appDir, 'routes/dollar.tsx');
+    const specialRouteIds = [
+      'routes/dollar$',
+      'routes/match$&',
+      'routes/literal$$',
+    ] as const;
+    mkdirSync(join(appDir, 'routes'), { recursive: true });
+    writeFileSync(
+      join(appDir, 'root.tsx'),
+      `export default function Root() { return null; }`
+    );
+    writeFileSync(
+      routeFile,
+      `export default function Dollar() { return null; }`
+    );
+    const harness = createProcessAssetsHarness();
+    const suffix = ';window.afterPlaceholder=true;';
+    const assets = {
+      [BROWSER_MANIFEST_PATH]: createAsset(
+        `window.__reactRouterManifest="PLACEHOLDER"${suffix}`
+      ),
+    };
+    const compilation = createCompilation(
+      [
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+        ['root', { files: new Set(['static/js/root.js']) }],
+        ...specialRouteIds.map((routeId, index) => [
+          routeId,
+          { files: new Set([`static/js/special-${index}.js`]) },
+        ]),
+      ],
+      assets
+    );
+
+    try {
+      registerModifyBrowserManifestAssets(
+        harness.api as never,
+        {
+          root: rootRoute,
+          ...Object.fromEntries(
+            specialRouteIds.map((routeId, index) => [
+              routeId,
+              {
+                id: routeId,
+                parentId: 'root',
+                file: 'routes/dollar.tsx',
+                path: `special-${index}`,
+              },
+            ])
+          ),
+        },
+        {},
+        appDir
+      );
+
+      await harness.run({ assets, compilation });
+
+      const source = assets[BROWSER_MANIFEST_PATH].source();
+      for (const routeId of specialRouteIds) {
+        expect(source).toContain(`'${routeId}'`);
+      }
+      expect(source).not.toContain('PLACEHOLDER');
+      expect(source.match(/window\.afterPlaceholder=true/g)).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('reports the exact compilation that produced the manifest', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();

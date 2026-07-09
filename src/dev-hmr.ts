@@ -126,21 +126,15 @@ const pendingRouteUpdates = new Map();
 let flushTimeout;
 let pendingRevalidation = false;
 
-function setNeedsHdrNavigation() {
-  window.__reactRouterNeedsHdrNavigation = true;
-}
-
-function consumeNeedsHdrNavigation() {
-  const needsNavigation = window.__reactRouterNeedsHdrNavigation === true;
-  window.__reactRouterNeedsHdrNavigation = false;
-  return needsNavigation;
-}
-
 function getCurrentRouterPath(router) {
   const basename = router.basename || '/';
   let pathname = window.location.pathname;
   if (basename !== '/' && pathname.startsWith(basename)) {
     pathname = pathname.slice(basename.length) || '/';
+    // A trailing-slash basename (e.g. "/mybase/") consumes the leading slash,
+    // leaving a relative path that react-router resolves against the current
+    // location and doubles. Force it back to absolute.
+    if (pathname[0] !== '/') pathname = '/' + pathname;
   }
   return pathname + window.location.search + window.location.hash;
 }
@@ -198,31 +192,81 @@ function applyRouteModuleUpdate(routeId, update, routeEntry, routeModules) {
   const imported = update.getRouteModuleExports();
   registerReactRouterRouteExports(routeId, imported);
   const current = routeModules[routeId];
+  const preserveIdentity = key =>
+    imported[key] ? (current && current[key]) || imported[key] : imported[key];
   routeModules[routeId] = {
     ...imported,
-    default: imported.default
-      ? (current && current.default) || imported.default
-      : imported.default,
-    ErrorBoundary: imported.ErrorBoundary
-      ? (current && current.ErrorBoundary) || imported.ErrorBoundary
-      : imported.ErrorBoundary,
-    HydrateFallback: imported.HydrateFallback
-      ? (current && current.HydrateFallback) || imported.HydrateFallback
-      : imported.HydrateFallback,
+    default: preserveIdentity('default'),
+    ErrorBoundary: preserveIdentity('ErrorBoundary'),
+    HydrateFallback: preserveIdentity('HydrateFallback'),
   };
+}
+
+function getRouteById(routes, routeId) {
+  for (const route of routes) {
+    if (route.id === routeId) {
+      return route;
+    }
+    if (route.children) {
+      const child = getRouteById(route.children, routeId);
+      if (child) {
+        return child;
+      }
+    }
+  }
+}
+
+// Deliberate coupling to React Router's private dev API: patching the live
+// match objects is the only way to swap route implementations without a
+// navigation. The typeof guard below degrades to a no-op if RR removes it.
+function patchCurrentRouteMatches(router, routes) {
+  if (
+    !router.state ||
+    !Array.isArray(router.state.matches) ||
+    typeof router._internalSetStateDoNotUseOrYouWillBreakYourApp !== 'function'
+  ) {
+    return;
+  }
+
+  let changed = false;
+  const matches = router.state.matches.map(match => {
+    const route = getRouteById(routes, match.route.id);
+    if (!route || route === match.route) {
+      return match;
+    }
+    changed = true;
+    return { ...match, route };
+  });
+
+  if (changed) {
+    router._internalSetStateDoNotUseOrYouWillBreakYourApp({ matches });
+  }
 }
 
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
-    return { nextManifest: undefined, shouldRefreshRouteState: false };
+    return {
+      nextManifest: undefined,
+      shouldRefreshRouteState: false,
+      routesToRevalidate: new Set(),
+    };
   }
 
-  const nextManifest = JSON.parse(JSON.stringify(manifest));
+  // Targeted clone: shallow-copy the manifest and its routes map, then deep-copy
+  // only the route entries we actually mutate below. Untouched entries stay as
+  // shared references (nothing dirty-checks route objects by identity; RR rebuilds
+  // strictly from the explicit routesToRevalidate set), and deep-copying the
+  // touched entries keeps the live manifest unmutated until the final
+  // Object.assign in flush(), matching the previous clone-everything behavior.
+  const nextManifest = { ...manifest, routes: { ...manifest.routes } };
   const routesToRevalidate = new Set();
+  let shouldRefreshRouteState = false;
   for (const { routeId, update } of takePendingRouteUpdates()) {
-    const routeEntry = nextManifest.routes[routeId];
-    if (!routeEntry) continue;
+    const existingEntry = nextManifest.routes[routeId];
+    if (!existingEntry) continue;
 
+    const routeEntry = JSON.parse(JSON.stringify(existingEntry));
+    nextManifest.routes[routeId] = routeEntry;
     applyRouteModuleUpdate(routeId, update, routeEntry, routeModules);
     if (
       routeEntry.hasLoader ||
@@ -231,12 +275,18 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     ) {
       routesToRevalidate.add(routeId);
     }
+    if (
+      existingEntry.hasLoader ||
+      existingEntry.hasClientLoader ||
+      existingEntry.hasClientMiddleware ||
+      routeEntry.hasLoader ||
+      routeEntry.hasClientLoader ||
+      routeEntry.hasClientMiddleware
+    ) {
+      shouldRefreshRouteState = true;
+    }
   }
 
-  const shouldRefreshRouteState = routesToRevalidate.size === 0;
-  if (routesToRevalidate.size > 0) {
-    setNeedsHdrNavigation();
-  }
   if (
     typeof router.createRoutesForHMR === 'function' &&
     typeof router._internalSetRoutes === 'function'
@@ -249,21 +299,24 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
       context.isSpaMode
     );
     router._internalSetRoutes(routes);
+    patchCurrentRouteMatches(router, routes);
   }
 
-  return { nextManifest, shouldRefreshRouteState };
+  return { nextManifest, shouldRefreshRouteState, routesToRevalidate };
 }
 
 async function revalidateRouter(router) {
   try {
     window.__reactRouterHdrActive = true;
-    if (consumeNeedsHdrNavigation() && typeof router.navigate === 'function') {
+    if (typeof router.revalidate === 'function') {
+      await router.revalidate();
+      return;
+    }
+    if (typeof router.navigate === 'function') {
       await router.navigate(getCurrentRouterPath(router), {
         replace: true,
         preventScrollReset: true,
       });
-    } else {
-      await router.revalidate();
     }
   } finally {
     window.__reactRouterHdrActive = false;
@@ -271,14 +324,15 @@ async function revalidateRouter(router) {
 }
 
 async function refreshRouteState(router) {
-  if (typeof router.navigate !== 'function') {
+  if (typeof router.revalidate !== 'function') {
     return;
   }
-  await router.navigate(getCurrentRouterPath(router), {
-    replace: true,
-    preventScrollReset: true,
-    defaultShouldRevalidate: false,
-  });
+  try {
+    window.__reactRouterHdrActive = true;
+    await router.revalidate();
+  } finally {
+    window.__reactRouterHdrActive = false;
+  }
 }
 
 function performReactRefresh() {
@@ -299,21 +353,27 @@ async function flush() {
     return;
   }
 
-  const shouldRevalidate = pendingRevalidation;
+  let shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  const { nextManifest, shouldRefreshRouteState } = applyPendingRouteUpdates(
-    router,
-    routeModules,
-    manifest,
-    context
-  );
+  const { nextManifest, shouldRefreshRouteState, routesToRevalidate } =
+    applyPendingRouteUpdates(router, routeModules, manifest, context);
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
   }
+  // Only run the full route-state revalidate (refetch every loader) when an
+  // updated route is actually loader-bearing (routesToRevalidate) or an HDR
+  // revalidation is already pending. A component-only edit -- including one that
+  // removes a route's loader -- skips the refetch so a visual change does not
+  // re-run all loaders.
+  if (
+    shouldRefreshRouteState &&
+    (routesToRevalidate.size > 0 || shouldRevalidate)
+  ) {
+    await refreshRouteState(router);
+    shouldRevalidate = false;
+  }
   if (shouldRevalidate) {
     await revalidateRouter(router);
-  } else if (shouldRefreshRouteState) {
-    await refreshRouteState(router);
   }
   performReactRefresh();
 }

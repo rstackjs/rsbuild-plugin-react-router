@@ -7,6 +7,7 @@ import {
   assertReactRouterRscSupport,
   createReactRouterRscResolveAliases,
   createReactRouterRscVirtualModules,
+  setupReactRouterRscPlugin,
 } from '../src/rsc-support';
 
 describe('RSC support helpers', () => {
@@ -33,6 +34,7 @@ describe('RSC support helpers', () => {
       basename: '/',
       buildDirectory: '/repo/build',
       isBuild: false,
+      jsDistPath: 'custom/js',
       outputClientPath: '/repo/build/client',
       publicPath: '/assets',
       routeDiscovery: { mode: 'initial' },
@@ -49,13 +51,51 @@ describe('RSC support helpers', () => {
     expect(modules['virtual/react-router/server-build']).toBeUndefined();
     expect(
       modules['virtual/react-router/unstable_rsc/bootstrap-scripts']
-    ).toContain('/assets/static/js/index.js');
+    ).toContain('/assets/custom/js/index.js');
+    // The RSC HMR runtime only self-accepts; the single `rsc:update` navigate
+    // handler now lives in the RSC client entry, not this virtual module.
     expect(
       modules['virtual/react-router/unstable_rsc/inject-hmr-runtime']
-    ).toContain('rsc:update');
+    ).toContain('import.meta.webpackHot.accept()');
     expect(
       modules['virtual/react-router/unstable_rsc/allowed-action-origins']
     ).toBe('export default ["https://app.example.com"];');
+    expect(
+      modules['virtual/react-router/unstable_rsc/server-manifest']
+    ).toContain('__webpack_require__.rscM?.serverManifest');
+  });
+
+  it('defaults RSC route discovery for SSR and SPA mode', () => {
+    const createModules = (
+      ssr: boolean,
+      routeDiscovery?: Parameters<
+        typeof createReactRouterRscVirtualModules
+      >[0]['routeDiscovery']
+    ) =>
+      createReactRouterRscVirtualModules({
+        allowedActionOrigins: undefined,
+        appDirectory: '/repo/app',
+        basename: '/',
+        buildDirectory: '/repo/build',
+        isBuild: true,
+        jsDistPath: 'static/js',
+        outputClientPath: '/repo/build/client',
+        publicPath: '/',
+        routeDiscovery,
+        routes: {},
+        ssr,
+      });
+
+    expect(
+      createModules(true)[
+        'virtual/react-router/unstable_rsc/route-discovery'
+      ]
+    ).toBe('export default {"mode":"lazy"};');
+    expect(
+      createModules(false, { mode: 'lazy' })[
+        'virtual/react-router/unstable_rsc/route-discovery'
+      ]
+    ).toBe('export default {"mode":"initial"};');
   });
 
   it('rejects config options RSC framework mode does not support', () => {
@@ -78,6 +118,32 @@ describe('RSC support helpers', () => {
         userConfig: { ssr: true, basename: '/app' },
       })
     ).not.toThrow();
+  });
+
+  it('rejects the legacy SRI future alias after config normalization', () => {
+    expect(() =>
+      assertReactRouterRscConfigSupport({
+        pluginName: 'test-plugin',
+        userConfig: {
+          future: { unstable_subResourceIntegrity: true },
+          subResourceIntegrity: true,
+        },
+      })
+    ).toThrow(/subResourceIntegrity/);
+  });
+
+  it('rejects separately registered rsbuild-plugin-rsc instances', async () => {
+    await expect(
+      setupReactRouterRscPlugin({
+        api: {
+          isPluginExists: () => true,
+        } as any,
+        entryRscPath: '/repo/app/entry.rsc.tsx',
+        entrySsrPath: '/repo/app/entry.rsc.ssr.tsx',
+        pluginName: 'test-plugin',
+        rsc: {},
+      })
+    ).rejects.toThrow(/already registered/);
   });
 
   it('rejects React Router versions before the RSC export surface', () => {

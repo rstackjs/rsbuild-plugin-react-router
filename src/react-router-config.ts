@@ -8,6 +8,7 @@ import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 import { getPackageVersion, parseVersionMajorMinor } from './plugin-utils.js';
+import type { PrerenderConfigObject, PrerenderPathsConfig } from './types.js';
 
 export type BuildEndHook = {
   bivarianceHack(args: {
@@ -43,14 +44,7 @@ type FutureConfig = {
   v8_viteEnvironmentApi: boolean;
 };
 
-type PrerenderConfig =
-  | ReactRouterConfig['prerender']
-  | ({
-      paths?: ReactRouterConfig['prerender'];
-      concurrency?: number;
-      unstable_concurrency?: number;
-    } & Record<string, unknown>)
-  | undefined;
+type PrerenderConfig = PrerenderPathsConfig | PrerenderConfigObject | undefined;
 
 type RouteManifestEntry = {
   id: string;
@@ -65,6 +59,7 @@ type RouteManifest = Record<string, RouteManifestEntry>;
 
 type ResolveReactRouterConfigResult = {
   resolved: ResolvedReactRouterConfig;
+  userAndPresetConfig: Config;
   presets: NonNullable<Config['presets']>;
   hasConfiguredServerModuleFormat: boolean;
 };
@@ -286,6 +281,7 @@ export const resolveReactRouterConfigEffect = (
 
     return {
       resolved,
+      userAndPresetConfig: userAndPresetConfigs,
       presets: reactRouterUserConfig.presets ?? [],
       hasConfiguredServerModuleFormat:
         userAndPresetConfigs.serverModuleFormat !== undefined,

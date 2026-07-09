@@ -11,9 +11,6 @@ type RouteNode = Route & {
   children?: RouteNode[];
 };
 
-const sortRoutes = (routes: RouteNode[]): RouteNode[] =>
-  [...routes].sort((a, b) => a.id.localeCompare(b.id));
-
 const createRouteTree = (routes: Record<string, Route>): RouteNode[] => {
   const nodes = new Map<string, RouteNode>();
   for (const route of Object.values(routes)) {
@@ -32,16 +29,16 @@ const createRouteTree = (routes: Record<string, Route>): RouteNode[] => {
     roots.push(route);
   }
 
-  const sortChildren = (route: RouteNode): RouteNode => {
+  const normalizeChildren = (route: RouteNode): RouteNode => {
     if (route.children?.length) {
-      route.children = sortRoutes(route.children).map(sortChildren);
+      route.children = route.children.map(normalizeChildren);
     } else {
       delete route.children;
     }
     return route;
   };
 
-  return sortRoutes(roots).map(sortChildren);
+  return roots.map(normalizeChildren);
 };
 
 const appendRoute = (

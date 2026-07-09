@@ -34,7 +34,7 @@ describe('queryless route imports', () => {
     ).toBe('/app/routes/target.tsx?client-route-module=shared');
   });
 
-  it('leaves node route module imports alone outside RSC client modules', () => {
+  it('leaves classic node route imports alone', () => {
     expect(
       resolveQuerylessRouteImportRequest({
         compilerName: 'node',
@@ -44,5 +44,31 @@ describe('queryless route imports', () => {
         routeByFilePath,
       })
     ).toBeUndefined();
+  });
+
+  it('rewrites RSC web route imports to shared client route modules', () => {
+    expect(
+      resolveQuerylessRouteImportRequest({
+        compilerName: 'web',
+        context: '/app/routes',
+        issuer: '/app/routes/source.tsx',
+        rsc: true,
+        request: './target',
+        routeByFilePath,
+      })
+    ).toBe('/app/routes/target.tsx?client-route-module=shared');
+  });
+
+  it('rewrites RSC node route imports to server route modules', () => {
+    expect(
+      resolveQuerylessRouteImportRequest({
+        compilerName: 'node',
+        context: '/app/routes',
+        issuer: '/app/routes/source.tsx?server-route-module=',
+        rsc: true,
+        request: './target',
+        routeByFilePath,
+      })
+    ).toBe('/app/routes/target.tsx?server-route-module=');
   });
 });

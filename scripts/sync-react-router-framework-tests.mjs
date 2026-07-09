@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +30,11 @@ export const PINNED_UPSTREAM = {
   repository: 'https://github.com/remix-run/react-router',
   ref: '4cf6e62d0cdf9d7f6e09b0ea10077d7fb0e1b438',
 };
+const originalPinnedUpstreamRef = PINNED_UPSTREAM.ref;
+
+const rootPackageJson = JSON.parse(
+  await readFile(path.join(repoRoot, 'package.json'), 'utf8')
+);
 
 /**
  * Upstream directories copied into the corpus, as
@@ -49,9 +62,13 @@ export const adapterOwnedPaths = [
   'integration/helpers/fixtures.ts',
   'integration/helpers/global-setup.ts',
   'integration/helpers/global-teardown.ts',
+  'integration/helpers/rsbuild-config.ts',
   'integration/helpers/rsbuild.ts',
   'integration/helpers/test-resource-guard.ts',
   'integration/playwright.config.ts',
+  'integration/rsc/rsc-css-test.ts',
+  'integration/svgr-test.ts',
+  'integration/tailwind-test.ts',
 ];
 
 /**
@@ -64,6 +81,7 @@ export const adaptedCorpusPaths = [
   'integration/absolute-base-test.ts',
   'integration/action-test.ts',
   'integration/basename-test.ts',
+  'integration/bug-report-test.ts',
   'integration/build-test.ts',
   'integration/catch-boundary-data-test.ts',
   'integration/cli-test.ts',
@@ -90,6 +108,7 @@ export const adaptedCorpusPaths = [
   'integration/link-test.ts',
   'integration/loader-context-test.ts',
   'integration/manifests-test.ts',
+  'integration/matches-test.ts',
   'integration/mdx-test.ts',
   'integration/middleware-test.ts',
   'integration/node-env-test.ts',
@@ -115,6 +134,7 @@ export const adaptedCorpusPaths = [
   'integration/sri-test.ts',
   'integration/typegen-test.ts',
   'integration/unused-route-exports-test.ts',
+  'react-router-dev/__tests__/fixtures/basic/tsconfig.json',
   'react-router-dev/__tests__/rsc-virtual-route-modules-test.ts',
 ];
 
@@ -126,9 +146,8 @@ export const adaptedCorpusPaths = [
  * directory names that say "vite" are misleading under rsbuild, so they were
  * renamed to rsbuild-flavored names via `git mv` (history preserved). This map
  * is exported into UPSTREAM.json as `renames` so the provenance of each moved
- * path stays discoverable. A separate repurpose of this sync script is planned;
- * for now the map is descriptive metadata only (the sync flow does not consume
- * it to move files).
+ * path stays discoverable. The sync flow applies this map before restoring the
+ * declared local overlay.
  */
 export const corpusRenames = {
   // Earlier collapse: the upstream Vite 7 / Vite 8 template pair was merged into
@@ -178,7 +197,39 @@ export const corpusRenames = {
     'integration/unused-route-exports-test.ts',
 };
 
+/**
+ * Applies repo-owned corpus path renames to a freshly copied upstream tree.
+ * The Vite 8 template is intentionally discarded: the corpus keeps the Vite 7
+ * template bytes as the single Rsbuild template baseline.
+ *
+ * @param {string} workRoot
+ */
+export const applyCorpusRenames = async workRoot => {
+  const collapsedTemplatePath = 'integration/helpers/vite-8-template';
+  await rm(path.join(workRoot, collapsedTemplatePath), {
+    force: true,
+    recursive: true,
+  });
+
+  for (const [source, target] of Object.entries(corpusRenames)) {
+    if (source === collapsedTemplatePath) {
+      continue;
+    }
+    const sourcePath = path.join(workRoot, source);
+    if (!existsSync(sourcePath)) {
+      continue;
+    }
+    const targetPath = path.join(workRoot, target);
+    await mkdir(path.dirname(targetPath), { recursive: true });
+    await rm(targetPath, { force: true, recursive: true });
+    await rename(sourcePath, targetPath);
+  }
+};
+
 export const removedUpstreamPaths = [
+  'integration/helpers/rsc-vite-framework/vite.config.ts',
+  'integration/helpers/rsc-vite/vite.config.ts',
+  'integration/helpers/vite-7-template/vite.config.ts',
   'integration/helpers/vite-plugin-cloudflare-template',
   'integration/vite-plugin-cloudflare-test.ts',
   'integration/vite-plugin-order-validation-test.ts',
@@ -186,11 +237,7 @@ export const removedUpstreamPaths = [
 ];
 
 const preservedCorpusPaths = [
-  ...new Set([
-    ...adapterOwnedPaths,
-    ...adaptedCorpusPaths,
-    ...Object.values(corpusRenames),
-  ]),
+  ...new Set([...adapterOwnedPaths, ...adaptedCorpusPaths]),
 ];
 
 const defaultSource = '/home/zack/projects/react-router';
@@ -201,12 +248,27 @@ const sourceRoot = path.resolve(
 );
 const normalizeOnly = process.argv.includes('--normalize-only');
 const updatePin = process.argv.includes('--update-pin');
+const isDirectExecution =
+  process.argv[1] && path.resolve(process.argv[1]) === scriptPath;
+
+const toCorpusRelativePath = (root, absolutePath) =>
+  path.relative(root, absolutePath).split(path.sep).join('/');
+
+const isPreservedCorpusPath = relativePath =>
+  preservedCorpusPaths.some(
+    preservedPath =>
+      relativePath === preservedPath ||
+      relativePath.startsWith(`${preservedPath}/`)
+  );
 const targetRoot = path.join(repoRoot, 'tests/react-router-framework');
 const manifestPath = path.join(targetRoot, 'UPSTREAM.json');
 const scratchRoot = path.join(
   repoRoot,
   'node_modules/.cache/react-router-framework-sync'
 );
+const stagedTargetRoot = path.join(scratchRoot, 'target');
+const preservedRoot = path.join(scratchRoot, 'preserved');
+const backupRoot = path.join(scratchRoot, 'previous');
 
 const packageVersionByName = {
   '@react-router/dev': '^8.0.1',
@@ -223,6 +285,18 @@ const packageVersionByName = {
   'react-dom': '^19.2.4',
   'react-router': '^8.0.1',
   'react-server-dom-rspack': '0.0.2',
+  'rsbuild-plugin-react-router': `^${rootPackageJson.version}`,
+  // rsbuild-plugin-rsc version pin. This map is the SOURCE OF TRUTH for the
+  // fixture package.jsons: a sync run normalizes every corpus package.json to
+  // these versions. The plugin is pre-1.0, so every 0.x minor is a breaking
+  // change — bump ALL of these together:
+  //   1. package.json          -> dependencies["rsbuild-plugin-rsc"]
+  //   2. package.json          -> peerDependencies["rsbuild-plugin-rsc"]
+  //   3. this file (packageVersionByName below)
+  //   4. tests/react-router-framework/integration/helpers/rsbuild-adapter.ts
+  //        (synthesized fixture devDependency)
+  //   5. tests/react-router-framework/integration/helpers/rsc-framework/package.json
+  //   6. tests/react-router-framework/integration/helpers/rsc-preview/package.json
   'rsbuild-plugin-rsc': '^0.1.1',
   typescript: '^5.9.3',
 };
@@ -263,19 +337,7 @@ const enforcePinnedRef = async () => {
     );
   }
 
-  const scriptSource = await readFile(scriptPath, 'utf8');
-  const updatedSource = scriptSource.replace(
-    `ref: '${PINNED_UPSTREAM.ref}'`,
-    `ref: '${headSha}'`
-  );
-  if (updatedSource === scriptSource) {
-    throw new Error(
-      `--update-pin could not rewrite the pinned ref in ${scriptPath}.`
-    );
-  }
-  await writeFile(scriptPath, updatedSource, 'utf8');
   PINNED_UPSTREAM.ref = headSha;
-  console.log(`Updated pinned upstream ref to ${headSha}`);
   return headSha;
 };
 
@@ -287,47 +349,94 @@ const copyIfExists = async (from, to) => {
   await cp(from, to, { force: true, recursive: true });
 };
 
-const preserveAdapterFiles = async () => {
-  await rm(scratchRoot, { force: true, recursive: true });
+const preserveAdapterFiles = async (workRoot = targetRoot) => {
+  await rm(preservedRoot, { force: true, recursive: true });
   for (const relativePath of preservedCorpusPaths) {
     await copyIfExists(
-      path.join(targetRoot, relativePath),
-      path.join(scratchRoot, relativePath)
+      path.join(workRoot, relativePath),
+      path.join(preservedRoot, relativePath)
     );
   }
 };
 
-const restoreAdapterFiles = async () => {
+const restoreAdapterFiles = async (workRoot = targetRoot) => {
   for (const relativePath of preservedCorpusPaths) {
     await copyIfExists(
-      path.join(scratchRoot, relativePath),
-      path.join(targetRoot, relativePath)
+      path.join(preservedRoot, relativePath),
+      path.join(workRoot, relativePath)
     );
   }
-  await rm(scratchRoot, { force: true, recursive: true });
 };
 
-const copyUpstreamTests = async () => {
+const copyUpstreamTests = async (workRoot = targetRoot) => {
   for (const [source, target] of sourceDirs) {
     const sourcePath = path.join(sourceRoot, source);
     if (!existsSync(sourcePath)) {
       throw new Error(`Missing upstream React Router test path: ${sourcePath}`);
     }
-    await rm(path.join(targetRoot, target), { force: true, recursive: true });
-    await cp(sourcePath, path.join(targetRoot, target), {
+    await rm(path.join(workRoot, target), { force: true, recursive: true });
+    await cp(sourcePath, path.join(workRoot, target), {
       force: true,
       recursive: true,
     });
   }
 
-  for (const sourcePath of [
-    ...Object.keys(corpusRenames),
-    ...removedUpstreamPaths,
-  ]) {
-    await rm(path.join(targetRoot, sourcePath), {
+  for (const sourcePath of removedUpstreamPaths) {
+    await rm(path.join(workRoot, sourcePath), {
       force: true,
       recursive: true,
     });
+  }
+};
+
+const replaceCorpusFromStage = async () => {
+  await rm(backupRoot, { force: true, recursive: true });
+  await rename(targetRoot, backupRoot);
+  try {
+    await rename(stagedTargetRoot, targetRoot);
+  } catch (error) {
+    await rename(backupRoot, targetRoot);
+    throw error;
+  }
+  await moveLocalCorpusDirs(backupRoot, targetRoot);
+  await rm(backupRoot, { force: true, recursive: true });
+};
+
+const copyCorpusTree = async (from, to) => {
+  await mkdir(to, { recursive: true });
+  const entries = await readdir(from, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === '.tmp') {
+      continue;
+    }
+    const sourcePath = path.join(from, entry.name);
+    const targetPath = path.join(to, entry.name);
+    if (entry.isDirectory()) {
+      await copyCorpusTree(sourcePath, targetPath);
+    } else {
+      await cp(sourcePath, targetPath, { force: true, recursive: true });
+    }
+  }
+};
+
+const moveLocalCorpusDirs = async (from, to) => {
+  if (!existsSync(from)) {
+    return;
+  }
+  const entries = await readdir(from, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const sourcePath = path.join(from, entry.name);
+    const targetPath = path.join(to, entry.name);
+    if (entry.name === 'node_modules' || entry.name === '.tmp') {
+      await mkdir(path.dirname(targetPath), { recursive: true });
+      await rm(targetPath, { force: true, recursive: true });
+      await rename(sourcePath, targetPath);
+      continue;
+    }
+    await moveLocalCorpusDirs(sourcePath, targetPath);
   }
 };
 
@@ -335,7 +444,13 @@ const findFiles = async (directory, predicate) => {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name === '.tmp') {
+    if (
+      entry.name === 'node_modules' ||
+      entry.name === '.tmp' ||
+      entry.name === '.react-router' ||
+      entry.name === 'test-results' ||
+      entry.name === 'playwright-report'
+    ) {
       continue;
     }
     const absolutePath = path.join(directory, entry.name);
@@ -359,7 +474,7 @@ const normalizePackageJson = async packageJsonPath => {
     }
 
     for (const [name, version] of Object.entries(dependencies)) {
-      if (version !== 'workspace:*' && version !== 'catalog:') {
+      if (!version.startsWith('workspace:') && version !== 'catalog:') {
         continue;
       }
       const replacement = packageVersionByName[name];
@@ -445,7 +560,7 @@ const writeManifest = async ref => {
     await findFiles(targetRoot, name => name !== 'UPSTREAM.json')
   ).length;
   const { untrackedDriftPaths } = getCorpusVerification();
-  const corpusVerified = updatePin ? true : untrackedDriftPaths.length === 0;
+  const corpusVerified = untrackedDriftPaths.length === 0;
 
   const manifest = {
     repository: PINNED_UPSTREAM.repository,
@@ -494,18 +609,29 @@ const writeManifest = async ref => {
   return { corpusVerified, untrackedDriftPaths };
 };
 
-if (!normalizeOnly) {
+if (isDirectExecution && !normalizeOnly) {
   const ref = await enforcePinnedRef();
-  await preserveAdapterFiles();
-  await copyUpstreamTests();
-  await restoreAdapterFiles();
+  await rm(scratchRoot, { force: true, recursive: true });
+  await mkdir(stagedTargetRoot, { recursive: true });
+  await preserveAdapterFiles(targetRoot);
+  await copyUpstreamTests(stagedTargetRoot);
+  await applyCorpusRenames(stagedTargetRoot);
+  await restoreAdapterFiles(stagedTargetRoot);
 
   for (const packageJsonPath of await findFiles(
-    targetRoot,
+    stagedTargetRoot,
     name => name === 'package.json'
   )) {
+    if (
+      isPreservedCorpusPath(
+        toCorpusRelativePath(stagedTargetRoot, packageJsonPath)
+      )
+    ) {
+      continue;
+    }
     await normalizePackageJson(packageJsonPath);
   }
+  await replaceCorpusFromStage();
 
   const { corpusVerified, untrackedDriftPaths } = await writeManifest(ref);
   console.log(
@@ -519,13 +645,40 @@ if (!normalizeOnly) {
         `\nSee the note in tests/react-router-framework/UPSTREAM.json.`
     );
   }
-} else {
+
+  if (updatePin) {
+    const scriptSource = await readFile(scriptPath, 'utf8');
+    const updatedSource = scriptSource.replace(
+      `ref: '${originalPinnedUpstreamRef}'`,
+      `ref: '${ref}'`
+    );
+    if (updatedSource === scriptSource) {
+      throw new Error(
+        `--update-pin could not rewrite the pinned ref in ${scriptPath}.`
+      );
+    }
+    await writeFile(scriptPath, updatedSource, 'utf8');
+    console.log(`Updated pinned upstream ref to ${ref}`);
+  }
+  await rm(scratchRoot, { force: true, recursive: true });
+} else if (isDirectExecution) {
+  await rm(scratchRoot, { force: true, recursive: true });
+  await copyCorpusTree(targetRoot, stagedTargetRoot);
   for (const packageJsonPath of await findFiles(
-    targetRoot,
+    stagedTargetRoot,
     name => name === 'package.json'
   )) {
+    if (
+      isPreservedCorpusPath(
+        toCorpusRelativePath(stagedTargetRoot, packageJsonPath)
+      )
+    ) {
+      continue;
+    }
     await normalizePackageJson(packageJsonPath);
   }
+  await replaceCorpusFromStage();
+  await rm(scratchRoot, { force: true, recursive: true });
   console.log(
     `Normalized React Router framework test package manifests in ${targetRoot}`
   );

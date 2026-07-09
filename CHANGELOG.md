@@ -1,5 +1,15 @@
 # rsbuild-plugin-react-router
 
+## 0.3.1
+
+### Patch Changes
+
+- fde856e: Improve development startup performance with guarded lazy compilation enabled by default, configurable route transform workers, unstable opt-in lazy-compilation prewarming, and leaner dev build orchestration.
+- 18fb279: Migrate the dev middleware hook from `dev.setupMiddlewares` to `server.setup`.
+- 9e95ea0: Serve the React Router SPA shell during `rsbuild dev` when `ssr` is disabled.
+- a512cc2: Preserve React Router manifest assets when Rspack natural chunk or module ids make direct chunk lookup incomplete.
+- 4aff046: Fix route export analysis for valid TypeScript route modules that Yuku cannot parse, and preserve literal browser manifest replacement values containing `$`.
+
 ## 0.3.0
 
 ### Minor Changes

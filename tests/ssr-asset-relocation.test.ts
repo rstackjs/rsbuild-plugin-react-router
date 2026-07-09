@@ -120,6 +120,7 @@ describe('relocateServerAssetsToClient', () => {
 
     const mkdirCalls: string[] = [];
     const writes: Array<{ path: string; data: string }> = [];
+    const renames: Array<{ from: string; to: string }> = [];
 
     const result = await relocateServerAssetsToClient({
       compilation,
@@ -131,6 +132,9 @@ describe('relocateServerAssetsToClient', () => {
       writeFileFn: async (path, data) => {
         writes.push({ path, data: data.toString('utf8') });
       },
+      renameFn: async (from, to) => {
+        renames.push({ from, to });
+      },
     });
 
     expect(result.written).toEqual([
@@ -139,14 +143,22 @@ describe('relocateServerAssetsToClient', () => {
     ]);
     expect(result.skipped).toEqual([]);
 
-    expect(writes).toEqual([
+    expect(writes.map(write => write.data)).toEqual([
+      '.test{color:red}',
+      'test',
+    ]);
+    expect(renames).toEqual([
       {
-        path: join(outputClientPath, 'static/assets/test.454e65.css'),
-        data: '.test{color:red}',
+        from: expect.stringContaining(
+          join(outputClientPath, 'static/assets/test.454e65.css.tmp-')
+        ),
+        to: join(outputClientPath, 'static/assets/test.454e65.css'),
       },
       {
-        path: join(outputClientPath, 'static/assets/test.4fdcca.txt'),
-        data: 'test',
+        from: expect.stringContaining(
+          join(outputClientPath, 'static/assets/test.4fdcca.txt.tmp-')
+        ),
+        to: join(outputClientPath, 'static/assets/test.4fdcca.txt'),
       },
     ]);
 
@@ -174,14 +186,53 @@ describe('relocateServerAssetsToClient', () => {
       outputClientPath: '/build/client',
       existsSyncFn: () => true,
       mkdirFn: async () => undefined,
+      readFileFn: async () => Buffer.from('shared'),
       writeFileFn: async path => {
         writes.push(path);
       },
+      renameFn: async () => undefined,
     });
 
     expect(result.written).toEqual([]);
     expect(result.skipped).toEqual(['static/assets/shared.abc.txt']);
     expect(writes).toEqual([]);
     expect(compilation.deleted).toEqual(['static/assets/shared.abc.txt']);
+  });
+
+  it('overwrites an existing stale asset atomically', async () => {
+    const compilation = createCompilation({
+      'static/assets/shared.css': {
+        info: { sourceFilename: 'app/assets/shared.css' },
+        buffer: Buffer.from('.fresh{color:green}'),
+      },
+    });
+    const writes: Array<{ path: string; data: string }> = [];
+    const renames: Array<{ from: string; to: string }> = [];
+
+    const result = await relocateServerAssetsToClient({
+      compilation,
+      outputClientPath: '/build/client',
+      existsSyncFn: () => true,
+      mkdirFn: async () => undefined,
+      readFileFn: async () => Buffer.from('.stale{color:red}'),
+      writeFileFn: async (path, data) => {
+        writes.push({ path, data: data.toString('utf8') });
+      },
+      renameFn: async (from, to) => {
+        renames.push({ from, to });
+      },
+    });
+
+    expect(result.written).toEqual(['static/assets/shared.css']);
+    expect(result.skipped).toEqual([]);
+    expect(writes).toHaveLength(1);
+    expect(writes[0].data).toBe('.fresh{color:green}');
+    expect(renames).toEqual([
+      {
+        from: writes[0].path,
+        to: '/build/client/static/assets/shared.css',
+      },
+    ]);
+    expect(compilation.deleted).toEqual(['static/assets/shared.css']);
   });
 });

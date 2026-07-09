@@ -198,7 +198,7 @@ const isNonReferenceIdentifier = (node: AnyNode, parent: AnyNode | null) => {
 
 const isUppercaseName = (name: string): boolean => /^[A-Z]/.test(name);
 
-const collectReferencedNames = (node: AnyNode): Set<string> => {
+export const collectReferencedNames = (node: AnyNode): Set<string> => {
   const referenced = new Set<string>();
   walk(node as never, {
     Identifier(node, ctx) {

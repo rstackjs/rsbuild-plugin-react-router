@@ -171,9 +171,10 @@ export function registerModifyBrowserManifestAssets(
     const browserManifestAsset = assets[BROWSER_MANIFEST_ASSET];
     if (browserManifestAsset) {
       const originalSource = browserManifestAsset.source().toString();
+      const serializedManifest = jsesc(manifestForBrowser, { es6: true });
       const newSource = originalSource.replace(
         /["'`]PLACEHOLDER["'`]/,
-        jsesc(manifestForBrowser, { es6: true })
+        () => serializedManifest
       );
       compilation.updateAsset(
         BROWSER_MANIFEST_ASSET,
@@ -208,24 +209,14 @@ export function registerModifyBrowserManifestAssets(
     });
   };
 
-  if (isBuild) {
-    // In production, Rspack renames content-hashed assets during
-    // `realContentHash` (PROCESS_ASSETS_STAGE_OPTIMIZE_HASH = 2500). Reading
-    // asset names before that stage yields pre-rename hashes that never appear
-    // in the output, so CSS/JS URLs in the manifest 404. Defer manifest
-    // generation and emission to the `report` stage
-    // (PROCESS_ASSETS_STAGE_REPORT = 5000), which runs after the rename (and
-    // after SRI integrity hashes are finalized).
-    api.processAssets({ stage: 'report', environments: ['web'] }, context =>
-      buildAndEmitManifest(context, { withSri: finalizeSri })
-    );
-    return;
-  }
-
-  // In dev, CSS extraction can also attach entry CSS after `additions`.
-  // Generate the manifest at `report` so custom entry CSS is visible to
-  // React Router's `<Links />`.
+  // In production, Rspack renames content-hashed assets during
+  // `realContentHash` (PROCESS_ASSETS_STAGE_OPTIMIZE_HASH = 2500). Reading
+  // asset names before that stage yields pre-rename hashes that never appear
+  // in the output, so CSS/JS URLs in the manifest 404. In dev, CSS extraction
+  // can also attach entry CSS after `additions`. Defer manifest generation and
+  // emission to the `report` stage (PROCESS_ASSETS_STAGE_REPORT = 5000), which
+  // runs after the rename, late CSS attachment, and SRI integrity finalization.
   api.processAssets({ stage: 'report', environments: ['web'] }, context =>
-    buildAndEmitManifest(context, { withSri: false })
+    buildAndEmitManifest(context, { withSri: finalizeSri })
   );
 }

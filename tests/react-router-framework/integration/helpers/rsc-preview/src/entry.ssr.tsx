@@ -13,12 +13,15 @@ type PayloadPromise = Promise<RSCPayload> & {
 export default async function handler(
   request: Request,
   serverResponse: Response,
+  options: {
+    bootstrapScripts?: string[];
+  } = {},
 ) {
   return routeRSCServerRequest({
     request,
     serverResponse,
     createFromReadableStream,
-    async renderHTML(getPayload, options) {
+    async renderHTML(getPayload, renderOptions) {
       const payload = getPayload() as PayloadPromise;
       payload.formState ??= payload.then((value) =>
         value.type === "render" ? value.formState : undefined,
@@ -27,7 +30,11 @@ export default async function handler(
       return ReactDomServer.renderToReadableStream(
         <RSCStaticRouter getPayload={getPayload} />,
         {
-          ...options,
+          ...renderOptions,
+          // Inject the client bootstrap scripts (browser entry) so the
+          // server-rendered document hydrates. Threaded from entry.rsc.tsx via
+          // the RSC server entry's `entryJsFiles`.
+          bootstrapScripts: options.bootstrapScripts,
           signal: request.signal,
           formState: (await payload.formState) as never,
         },

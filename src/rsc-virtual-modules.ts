@@ -1,7 +1,7 @@
 import { relative, resolve } from 'pathe';
 import type { Config } from './react-router-config.js';
 import type { Route } from './types.js';
-import { normalizeAssetPrefix } from './plugin-utils.js';
+import { combineURLs, normalizeAssetPrefix } from './plugin-utils.js';
 import { getVirtualModuleFilePath } from './virtual-modules.js';
 import {
   createRscInternalClientModule,
@@ -19,6 +19,7 @@ const RSC_VIRTUAL_ALIAS_IDS = [
   'allowed-action-origins',
   'react-router-serve-config',
   'bootstrap-scripts',
+  'server-manifest',
 ] as const;
 
 type RscVirtualModulesOptions = {
@@ -27,6 +28,8 @@ type RscVirtualModulesOptions = {
   basename: string;
   buildDirectory: string;
   isBuild: boolean;
+  /** Resolved web `output.distPath.js` segment, e.g. `static/js`. */
+  jsDistPath: string;
   outputClientPath: string;
   publicPath: string;
   routeDiscovery: Config['routeDiscovery'];
@@ -59,6 +62,7 @@ export const createReactRouterRscVirtualModules = ({
   basename,
   buildDirectory,
   isBuild,
+  jsDistPath,
   outputClientPath,
   publicPath,
   routeDiscovery,
@@ -81,12 +85,12 @@ export const createReactRouterRscVirtualModules = ({
     ),
     'virtual/react-router/unstable_rsc/inject-hmr-runtime': !isBuild
       ? `if (import.meta.webpackHot) {
+  // Self-accept so RSC route/client hot updates settle at this boundary instead
+  // of bubbling to a full page reload. The single "rsc:update" navigate handler
+  // lives in the RSC client entry (entry.rsc.client.tsx); a duplicate handler
+  // registered here previously raced a second navigation per event (the first
+  // aborted), so only the self-accept remains.
   import.meta.webpackHot.accept();
-  import.meta.webpackHot.on("rsc:update", () => {
-    requestAnimationFrame(() => {
-      globalThis.__reactRouterDataRouter?.revalidate?.();
-    });
-  });
 }`
       : '',
     'virtual/react-router/unstable_rsc/basename': defaultExport(basename),
@@ -98,8 +102,12 @@ export const createReactRouterRscVirtualModules = ({
         publicPath,
       }),
     'virtual/react-router/unstable_rsc/bootstrap-scripts': defaultExport([
-      `${bootstrapPublicPath}static/js/index.js`,
+      combineURLs(bootstrapPublicPath, `${jsDistPath}/index.js`),
     ]),
+    'virtual/react-router/unstable_rsc/server-manifest': `export default function getServerManifest() {
+  return __webpack_require__.rscM?.serverManifest;
+}
+`,
     'virtual/react-router/rsc-internal-client': createRscInternalClientModule(),
   };
 };

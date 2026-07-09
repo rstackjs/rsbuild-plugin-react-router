@@ -40,7 +40,10 @@ type CommonModePlan = {
   manifestChunkNames: Set<string>;
   webEntries: Record<string, string | RsbuildEntryDescription>;
   nodeEntries: Record<string, string | RsbuildEntryDescription>;
-  createVirtualModules(publicPath: string): Record<string, string>;
+  createVirtualModules(
+    publicPath: string,
+    jsDistPath: string
+  ): Record<string, string>;
   createResolveConfig(rootPath: string): Rspack.Configuration['resolve'];
   server: RsbuildConfig['server'] | undefined;
   webExternalsType: 'module' | undefined;
@@ -92,7 +95,6 @@ type CreateClassicModePlanOptions = ModePlanContext & {
   devHmr?: DevHmrPlanOptions;
   defaultEntryName: string;
   entryServerPath: string;
-  federation?: boolean;
   finalEntryClientPath: string;
   future: Config['future'];
   hasServerApp: boolean;
@@ -185,13 +187,14 @@ const createRscModePlan = async ({
         layer: RSC_LAYERS.rsc,
       },
     },
-    createVirtualModules: (publicPath: string) =>
+    createVirtualModules: (publicPath: string, jsDistPath: string) =>
       createReactRouterRscVirtualModules({
         allowedActionOrigins: allowedActionOriginsForBuild,
         appDirectory,
         basename,
         buildDirectory,
         isBuild,
+        jsDistPath,
         outputClientPath,
         publicPath,
         routeDiscovery,
@@ -202,15 +205,14 @@ const createRscModePlan = async ({
       modules: [resolve(rootPath, 'node_modules'), 'node_modules'],
       alias: createReactRouterRscResolveAliases(rootPath),
     }),
-    server:
-      !customServer && ssr
-        ? {
-            setup: createReactRouterRscDevServerSetup({
-              entryName: rscServerEntryName,
-              pluginName,
-            }),
-          }
-        : undefined,
+    server: !customServer
+      ? {
+          setup: createReactRouterRscDevServerSetup({
+            entryName: rscServerEntryName,
+            pluginName,
+          }),
+        }
+      : undefined,
     webExternalsType: undefined,
     webOutput: {
       chunkFormat: 'array-push',
@@ -240,7 +242,6 @@ const createClassicModePlan = async ({
   defaultEntryName,
   devHmr,
   entryServerPath,
-  federation,
   finalEntryClientPath,
   future,
   hasServerApp,
@@ -321,7 +322,7 @@ const createClassicModePlan = async ({
       defaultEntryName,
       serverBundleEntries: artifacts.serverBundleEntries,
     }),
-    createVirtualModules: (publicPath: string) =>
+    createVirtualModules: (publicPath: string, _jsDistPath: string) =>
       createClassicVirtualModules({
         allowedActionOrigins: allowedActionOriginsForBuild,
         appDirectory,
@@ -329,7 +330,6 @@ const createClassicModePlan = async ({
         basename,
         devHmrRuntimeModule: devHmr?.runtimeModule,
         entryServerPath,
-        federation,
         future,
         prerenderPaths: artifacts.prerenderPaths,
         publicPath,

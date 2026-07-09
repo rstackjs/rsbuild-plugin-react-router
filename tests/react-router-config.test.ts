@@ -203,6 +203,27 @@ describe('resolveReactRouterConfig', () => {
     expect(result.resolved.subResourceIntegrity).toBe(true);
   });
 
+  it('types prerender object config with required paths', () => {
+    const validObjectConfig = {
+      prerender: { paths: ['/'], concurrency: 2 },
+    } satisfies Config;
+    const validFunctionConfig = {
+      prerender: () => ['/'],
+    } satisfies Config;
+
+    expect(validObjectConfig.prerender.concurrency).toBe(2);
+    expect(typeof validFunctionConfig.prerender).toBe('function');
+  });
+
+  it('rejects prerender object config without paths at type-check time', () => {
+    const invalidConfig = {
+      // @ts-expect-error prerender object config must include paths
+      prerender: { concurrency: 2 },
+    } satisfies Config;
+
+    expect(invalidConfig.prerender.concurrency).toBe(2);
+  });
+
   it('defaults trailing slash-aware data requests for React Router 8 and newer', () => {
     expect(getDefaultTrailingSlashAwareDataRequests('7.13.0')).toBe(false);
     expect(getDefaultTrailingSlashAwareDataRequests('8.0.1')).toBe(true);

@@ -6,7 +6,7 @@ import {
 } from "node:fs";
 import path from "pathe";
 
-import type { TemplateName } from "./rsbuild.js";
+import type { TemplateName } from "./templates.js";
 
 const repoRoot = process.cwd();
 const helpersRoot = path.join(

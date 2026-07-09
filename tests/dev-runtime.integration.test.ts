@@ -420,7 +420,7 @@ const expectInitialCompilationFailure = async (
   await expect(
     withTimeout(harness.loadBuild(), 20_000, 'the initial compilation failure')
   ).rejects.toThrow('development compilation failed');
-  expect(harness.hasConsoleError('Unexpected token')).toBe(true);
+  expect(harness.hasConsoleError('Expression expected')).toBe(true);
   expect(harness.compileAttempts).toBeGreaterThan(0);
   expect(harness.completedCompiles).toBeGreaterThan(0);
 };

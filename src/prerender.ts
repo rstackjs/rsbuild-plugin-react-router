@@ -1,23 +1,11 @@
 import type { Config } from './react-router-config.js';
+import type { PrerenderConfigObject, PrerenderPathsConfig } from './types.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { matchRoutes } from 'react-router';
 
 type ReactRouterPrerenderConfig = Config['prerender'];
 type MatchRouteObject =
   Parameters<typeof matchRoutes>[0] extends Array<infer R> ? R : never;
-
-type PrerenderPathsConfig =
-  | boolean
-  | string[]
-  | ((args: {
-      getStaticPaths: () => string[];
-    }) => boolean | string[] | Promise<boolean | string[]>);
-
-type PrerenderConfigObject = {
-  paths?: PrerenderPathsConfig;
-  concurrency?: number;
-  unstable_concurrency?: number;
-} & Record<string, unknown>;
 
 type PrerenderConfig = ReactRouterPrerenderConfig | PrerenderConfigObject;
 type PrerenderConcurrencyConfig =
@@ -260,7 +248,7 @@ export const resolvePrerenderPaths = async (
           '⚠️ Paths with dynamic/splat params cannot be prerendered when ' +
             'using `prerender: true`. You may want to use the `prerender()` ' +
             'API to prerender the following paths:',
-          ...paramRoutes.map(path => `  - ${path}`),
+          ...paramRoutes.map(path => `  - ${path.replace(/^\/(?=[:*])/, '')}`),
         ].join('\n')
       );
     }

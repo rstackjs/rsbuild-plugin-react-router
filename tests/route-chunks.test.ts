@@ -71,6 +71,26 @@ const codeWithActionAndDefault = `
   export default function Route() { return null; }
 `;
 
+const codeWithHydratedClientLoaderGlobals = `
+  export const customExport = (() => {
+    globalThis.custom_export_count = (globalThis.custom_export_count || 0) + 1;
+    return () => true;
+  })();
+
+  export const clientLoader = (() => {
+    globalThis.client_loader_count = (globalThis.client_loader_count || 0) + 1;
+    return async () => globalThis.client_loader_count;
+  })();
+  clientLoader.hydrate = true;
+
+  const Route = (() => {
+    globalThis.component_count = (globalThis.component_count || 0) + 1;
+    return () => null;
+  })();
+
+  export default Route;
+`;
+
 const detect = (code: string, id = routeId) =>
   detectRouteChunksIfEnabled(new Map(), config, id, code);
 
@@ -149,25 +169,7 @@ describe('route chunks', () => {
     });
 
     it('does not treat undeclared globals as shared export dependencies', async () => {
-      const code = `
-        export const customExport = (() => {
-          globalThis.custom_export_count = (globalThis.custom_export_count || 0) + 1;
-          return () => true;
-        })();
-
-        export const clientLoader = (() => {
-          globalThis.client_loader_count = (globalThis.client_loader_count || 0) + 1;
-          return async () => globalThis.client_loader_count;
-        })();
-        clientLoader.hydrate = true;
-
-        const Route = (() => {
-          globalThis.component_count = (globalThis.component_count || 0) + 1;
-          return () => null;
-        })();
-
-        export default Route;
-      `;
+      const code = codeWithHydratedClientLoaderGlobals;
 
       const result = await detect(code);
 
@@ -413,7 +415,7 @@ describe('route chunks', () => {
   });
 
   describe('generate route chunk code', () => {
-    it('omits chunkable client exports from the main chunk while retaining default and server exports', async () => {
+    it('omits chunkable client and server-only exports from the main chunk', async () => {
       const code = `
         import { json } from 'react-router';
         export async function action() { return json({}); }
@@ -429,7 +431,7 @@ describe('route chunks', () => {
         code
       );
 
-      await expectExports(chunk, ['default', 'action'], ['clientAction']);
+      await expectExports(chunk, ['default'], ['action', 'clientAction']);
     });
 
     it('returns main chunk code without analysis when no route chunk exports exist', async () => {
@@ -488,25 +490,7 @@ describe('route chunks', () => {
     });
 
     it('keeps hydrated client loaders out of individual route chunks', async () => {
-      const code = `
-        export const customExport = (() => {
-          globalThis.custom_export_count = (globalThis.custom_export_count || 0) + 1;
-          return () => true;
-        })();
-
-        export const clientLoader = (() => {
-          globalThis.client_loader_count = (globalThis.client_loader_count || 0) + 1;
-          return async () => globalThis.client_loader_count;
-        })();
-        clientLoader.hydrate = true;
-
-        const Route = (() => {
-          globalThis.component_count = (globalThis.component_count || 0) + 1;
-          return () => null;
-        })();
-
-        export default Route;
-      `;
+      const code = codeWithHydratedClientLoaderGlobals;
 
       const chunk = await getRouteChunkIfEnabled(
         new Map(),

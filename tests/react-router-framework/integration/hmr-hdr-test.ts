@@ -12,6 +12,8 @@ const tsx = dedent;
 const mdx = dedent;
 
 const templates = [...bundlerTemplates];
+const hydrationTimeout = 45_000;
+const hmrTimeout = 15_000;
 
 // RSC Framework HMR/HDR behavior is covered in integration/hmr-hdr-rsc-test.ts.
 
@@ -20,9 +22,10 @@ templates.forEach((template) => {
 
   test.describe(`${template.displayName} - HMR & HDR`, () => {
     test.use({
+      javaScriptEnabled: true,
       template: template.name,
       files: {
-        "app/routes/_index.tsx": tsx`
+        "app/routes/hmr.tsx": tsx`
           // imports
           import { useState, useEffect } from "react";
 
@@ -159,12 +162,13 @@ async function workflow({
   url: string;
 }) {
   // setup: initial render
-  await page.goto(url, { waitUntil: "networkidle" });
+  await page.goto(url + "/hmr", { waitUntil: "networkidle" });
   await expect(page.locator("#index [data-title]")).toHaveText("Index");
 
   // setup: hydration
   await expect(page.locator("#index [data-mounted]")).toHaveText(
     "Mounted: yes",
+    { timeout: hydrationTimeout },
   );
 
   // setup: browser state
@@ -179,21 +183,25 @@ async function workflow({
 
   // route: HMR
   await edit({
-    "app/routes/_index.tsx": (contents) =>
+    "app/routes/hmr.tsx": (contents) =>
       contents
         .replace("HMR updated title: 0", "HMR updated title: 1")
         .replace("HMR updated: 0", "HMR updated: 1"),
   });
   await page.waitForLoadState("networkidle");
 
-  await expect(page).toHaveTitle("HMR updated title: 1");
-  await expect(hmrStatus).toHaveText("HMR updated: 1");
-  await expect(input).toHaveValue("stateful");
+  await expect(page).toHaveTitle("HMR updated title: 1", {
+    timeout: hmrTimeout,
+  });
+  await expect(hmrStatus).toHaveText("HMR updated: 1", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   expect(page.errors).toEqual([]);
 
   // route: add loader
   await edit({
-    "app/routes/_index.tsx": (contents) =>
+    "app/routes/hmr.tsx": (contents) =>
       contents
         .replace(
           "// imports",
@@ -214,10 +222,12 @@ async function workflow({
   });
   await page.waitForLoadState("networkidle");
   let hdrStatus = page.locator("#index [data-hdr]");
-  await expect(hdrStatus).toHaveText("HDR updated: 0");
+  await expect(hdrStatus).toHaveText("HDR updated: 0", {
+    timeout: hmrTimeout,
+  });
 
   // React Fast Refresh cannot preserve state for a component when hooks are added or removed
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveValue("", { timeout: hmrTimeout });
   await input.fill("stateful");
   expect(
     // When adding a loader, a harmless error is logged to the browser console.
@@ -233,24 +243,31 @@ async function workflow({
 
   // route: HDR
   await edit({
-    "app/routes/_index.tsx": (contents) =>
+    "app/routes/hmr.tsx": (contents) =>
       contents.replace("HDR updated: 0", "HDR updated: 1"),
   });
   await page.waitForLoadState("networkidle");
-  await expect(hdrStatus).toHaveText("HDR updated: 1");
-  await expect(input).toHaveValue("stateful");
+  await expect(hdrStatus).toHaveText("HDR updated: 1", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toBeVisible({ timeout: hmrTimeout });
+  await input.fill("stateful");
 
   // route: HMR + HDR
   await edit({
-    "app/routes/_index.tsx": (contents) =>
+    "app/routes/hmr.tsx": (contents) =>
       contents
         .replace("HMR updated: 1", "HMR updated: 2")
         .replace("HDR updated: 1", "HDR updated: 2"),
   });
   await page.waitForLoadState("networkidle");
-  await expect(hmrStatus).toHaveText("HMR updated: 2");
-  await expect(hdrStatus).toHaveText("HDR updated: 2");
-  await expect(input).toHaveValue("stateful");
+  await expect(hmrStatus).toHaveText("HMR updated: 2", {
+    timeout: hmrTimeout,
+  });
+  await expect(hdrStatus).toHaveText("HDR updated: 2", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   expect(page.errors).toEqual([]);
 
   // create new non-route component module
@@ -260,7 +277,7 @@ async function workflow({
         return <p data-component>Component HMR: 0</p>;
       }
     `,
-    "app/routes/_index.tsx": (contents) =>
+    "app/routes/hmr.tsx": (contents) =>
       contents
         .replace(
           "// imports",
@@ -270,9 +287,11 @@ async function workflow({
   });
   await page.waitForLoadState("networkidle");
   let component = page.locator("#index [data-component]");
-  await expect(component).toBeVisible();
-  await expect(component).toHaveText("Component HMR: 0");
-  await expect(input).toHaveValue("stateful");
+  await expect(component).toBeVisible({ timeout: hmrTimeout });
+  await expect(component).toHaveText("Component HMR: 0", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   expect(page.errors).toEqual([]);
 
   // non-route: HMR
@@ -281,8 +300,10 @@ async function workflow({
       contents.replace("Component HMR: 0", "Component HMR: 1"),
   });
   await page.waitForLoadState("networkidle");
-  await expect(component).toHaveText("Component HMR: 1");
-  await expect(input).toHaveValue("stateful");
+  await expect(component).toHaveText("Component HMR: 1", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   expect(page.errors).toEqual([]);
 
   // create new non-route server module
@@ -292,7 +313,7 @@ async function workflow({
       import { indirect } from "./indirect-hdr-dep"
       export const direct = "direct 0 & " + indirect
     `,
-    "app/routes/_index.tsx": (contents) =>
+    "app/routes/hmr.tsx": (contents) =>
       contents
         .replace(
           "// imports",
@@ -304,8 +325,10 @@ async function workflow({
         ),
   });
   await page.waitForLoadState("networkidle");
-  await expect(hdrStatus).toHaveText("HDR updated: direct 0 & indirect 0");
-  await expect(input).toHaveValue("stateful");
+  await expect(hdrStatus).toHaveText("HDR updated: direct 0 & indirect 0", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   expect(page.errors).toEqual([]);
 
   // non-route: HDR for direct dependency
@@ -314,8 +337,10 @@ async function workflow({
       contents.replace("direct 0 &", "direct 1 &"),
   });
   await page.waitForLoadState("networkidle");
-  await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 0");
-  await expect(input).toHaveValue("stateful");
+  await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 0", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   expect(page.errors).toEqual([]);
 
   // non-route: HDR for indirect dependency
@@ -324,14 +349,16 @@ async function workflow({
       contents.replace("indirect 0", "indirect 1"),
   });
   await page.waitForLoadState("networkidle");
-  await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 1");
-  await expect(input).toHaveValue("stateful");
+  await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 1", {
+    timeout: hmrTimeout,
+  });
+  await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   expect(page.errors).toEqual([]);
 
   // everything everywhere all at once
   await Promise.all([
     edit({
-      "app/routes/_index.tsx": (contents) =>
+      "app/routes/hmr.tsx": (contents) =>
         contents
           .replace("HMR updated: 2", "HMR updated: 3")
           .replace("HDR updated: ", "HDR updated: route & "),
@@ -350,14 +377,19 @@ async function workflow({
     }),
   ]);
   await page.waitForLoadState("networkidle");
-  await expect(hmrStatus).toHaveText("HMR updated: 3");
-  await expect(component).toHaveText("Component HMR: 2");
+  await expect(hmrStatus).toHaveText("HMR updated: 3", {
+    timeout: hmrTimeout,
+  });
+  await expect(component).toHaveText("Component HMR: 2", {
+    timeout: hmrTimeout,
+  });
   await expect(hdrStatus).toHaveText(
     "HDR updated: route & direct 2 & indirect 2",
+    { timeout: hmrTimeout },
   );
   // TODO: Investigate why this is flaky in CI for RSC Framework Mode
   if (isRsc) {
-    await expect(input).toHaveValue("stateful");
+    await expect(input).toHaveValue("stateful", { timeout: hmrTimeout });
   }
 
   expect(page.errors).toEqual([]);

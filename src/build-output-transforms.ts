@@ -13,7 +13,10 @@ import {
 import type { RouteTransformExecutor } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
 import { createBundlerRouteExportResolver } from './route-export-resolution.js';
-import type { RouteChunkConfig } from './route-chunks.js';
+import {
+  getRouteChunkNameFromModuleId,
+  type RouteChunkConfig,
+} from './route-chunks.js';
 import type { PluginOptions, Route } from './types.js';
 import { isSourceMapEnabled } from './warnings/warn-on-client-source-maps.js';
 import {
@@ -24,6 +27,50 @@ import {
   relocateServerAssetsToClient,
   type RelocatableAssetCompilation,
 } from './ssr-asset-relocation.js';
+
+/**
+ * Register the node-compilation hook that relocates server-only static assets
+ * (`?url` imports, `.css?url` files, and other `asset/resource` outputs
+ * referenced only by loaders or `.server` modules) into the client build. The
+ * loader/`links()` export returns the asset URL to the client, which fetches it
+ * from `build/client` at runtime, so the file must exist there even though only
+ * the node compilation referenced it. The assets are also stripped from the
+ * server build to avoid shipping duplicate static files, mirroring upstream
+ * React Router's Vite plugin. This runs for every node compilation, so it also
+ * covers `serverBundles` (multiple node outputs) and dev mode (where
+ * `writeToDisk` is enabled).
+ *
+ * Registered by both the classic build-output transforms and the RSC branch so
+ * `.css?url`/`?url` assets referenced from `links()` resolve in RSC framework
+ * mode too.
+ */
+export const registerSsrAssetRelocation = ({
+  api,
+  outputClientPath,
+  performanceProfiler,
+}: {
+  api: RsbuildPluginAPI;
+  outputClientPath: string;
+  performanceProfiler: ReactRouterPerformanceProfiler;
+}): void => {
+  const relocatedDestinations = new Map<string, string>();
+  api.processAssets(
+    { stage: 'report', targets: ['node'] },
+    async ({ compilation }) => {
+      await performanceProfiler.record(
+        'node',
+        'assets:relocate-ssr-only',
+        'ssr-only-assets',
+        () =>
+          relocateServerAssetsToClient({
+            compilation: compilation as unknown as RelocatableAssetCompilation,
+            outputClientPath,
+            relocatedDestinations,
+          })
+      );
+    }
+  );
+};
 
 type RegisterBuildOutputTransformsOptions = {
   api: RsbuildPluginAPI;
@@ -135,32 +182,7 @@ export const registerBuildOutputTransforms = ({
     }
   );
 
-  // Relocate server-only static assets (`?url` imports, `.css?url` files, and
-  // other `asset/resource` outputs referenced only by loaders or `.server`
-  // modules) into the client build. The loader returns the asset URL to the
-  // client, which fetches it from `build/client` at runtime, so the file must
-  // exist there even though only the node compilation referenced it. The
-  // assets are also stripped from the server build to avoid shipping duplicate
-  // static files, mirroring upstream React Router framework plugin. This runs for
-  // every node compilation, so it also covers `serverBundles` (multiple node
-  // outputs) and dev mode (where `writeToDisk` is enabled).
-  const relocatedDestinations = new Set<string>();
-  api.processAssets(
-    { stage: 'report', targets: ['node'] },
-    async ({ compilation }) => {
-      await performanceProfiler.record(
-        'node',
-        'assets:relocate-ssr-only',
-        'ssr-only-assets',
-        () =>
-          relocateServerAssetsToClient({
-            compilation: compilation as unknown as RelocatableAssetCompilation,
-            outputClientPath,
-            relocatedDestinations,
-          })
-      );
-    }
-  );
+  registerSsrAssetRelocation({ api, outputClientPath, performanceProfiler });
 
   api.transform(
     {
@@ -243,15 +265,43 @@ export const registerBuildOutputTransforms = ({
         args.environment?.name,
         'route:chunk',
         args.resource,
-        async () =>
-          routeTransformExecutor.run({
+        async () => {
+          const routeChunkArtifact = await routeTransformExecutor.run({
             kind: 'routeChunk',
             code: args.code,
             resource: args.resource,
             resourcePath: args.resourcePath,
             isBuild,
             routeChunkConfig,
-          })
+          });
+
+          // Invariant with the transformRouteModule registration below: in
+          // split-chunk production builds, web route modules are transformed
+          // HERE (on the main chunk) and the shared registration is scoped to
+          // ['node']. If either gate changes, web modules get transformed
+          // twice or not at all.
+          if (
+            !isBuild ||
+            getRouteChunkNameFromModuleId(args.resource) !== 'main'
+          ) {
+            return routeChunkArtifact;
+          }
+
+          return routeTransformExecutor.run({
+            kind: 'routeModule',
+            code: routeChunkArtifact.code,
+            resource: args.resource,
+            resourcePath: args.resourcePath,
+            environmentName: 'web',
+            sourceMaps: isSourceMapEnabled(
+              args.environment.config.output.sourceMap
+            ),
+            ssr,
+            isBuild,
+            isSpaMode,
+            rootRoutePath,
+          });
+        }
       );
     }
   );
@@ -340,6 +390,10 @@ export const registerBuildOutputTransforms = ({
       resourceQuery: {
         not: /__react-router-build-client-route|react-router-route|route-chunk=/,
       },
+      // Invariant with the route-chunk= handler above: when split-chunk
+      // production builds transform web modules on the main chunk, this
+      // registration must stay scoped to ['node'] so web modules are not
+      // transformed twice.
       environments: isBuild && splitRouteModules ? ['node'] : undefined,
       order: 'post',
     },
