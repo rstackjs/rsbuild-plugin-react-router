@@ -621,7 +621,7 @@ function generateReactRouterManifestForDevEffect(
 
 export async function generateReactRouterManifestForDev(
   routes: Record<string, Route>,
-  options: PluginOptions,
+  _options: PluginOptions,
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix = '/',
