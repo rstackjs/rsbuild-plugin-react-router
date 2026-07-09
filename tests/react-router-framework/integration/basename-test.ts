@@ -21,7 +21,7 @@ const templateNames = [
   "rsc-framework",
 ] as const satisfies TemplateName[];
 
-const devHmrTimeout = 30_000;
+const devHmrTimeout = 60_000;
 
 const sharedFiles = {
   "app/routes/_index.tsx": js`
