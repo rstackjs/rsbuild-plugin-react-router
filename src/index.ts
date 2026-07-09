@@ -38,7 +38,10 @@ import {
 } from './manifest.js';
 import type { RouteModuleAnalysis } from './export-utils.js';
 import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
-import { registerBuildOutputTransforms } from './build-output-transforms.js';
+import {
+  registerBuildOutputTransforms,
+  registerSsrAssetRelocation,
+} from './build-output-transforms.js';
 import { type RouteChunkCache } from './route-chunks.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
@@ -925,6 +928,12 @@ export const pluginReactRouter = (
         routeChunkCache,
         routeChunkConfig: modePlan.routeChunkConfig,
       });
+
+      // RSC mode has no `registerBuildOutputTransforms` pass, so relocate the
+      // node-emitted `?url`/`.css?url` static assets into the client build here.
+      // Without this the href baked into `links()` (resolved in the node env)
+      // 404s in the browser because the file only exists under `build/server`.
+      registerSsrAssetRelocation({ api, outputClientPath, performanceProfiler });
     } else {
       registerModifyBrowserManifestAssets(
         api,

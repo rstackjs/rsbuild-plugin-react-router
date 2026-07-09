@@ -28,6 +28,50 @@ import {
   type RelocatableAssetCompilation,
 } from './ssr-asset-relocation.js';
 
+/**
+ * Register the node-compilation hook that relocates server-only static assets
+ * (`?url` imports, `.css?url` files, and other `asset/resource` outputs
+ * referenced only by loaders or `.server` modules) into the client build. The
+ * loader/`links()` export returns the asset URL to the client, which fetches it
+ * from `build/client` at runtime, so the file must exist there even though only
+ * the node compilation referenced it. The assets are also stripped from the
+ * server build to avoid shipping duplicate static files, mirroring upstream
+ * React Router's Vite plugin. This runs for every node compilation, so it also
+ * covers `serverBundles` (multiple node outputs) and dev mode (where
+ * `writeToDisk` is enabled).
+ *
+ * Registered by both the classic build-output transforms and the RSC branch so
+ * `.css?url`/`?url` assets referenced from `links()` resolve in RSC framework
+ * mode too.
+ */
+export const registerSsrAssetRelocation = ({
+  api,
+  outputClientPath,
+  performanceProfiler,
+}: {
+  api: RsbuildPluginAPI;
+  outputClientPath: string;
+  performanceProfiler: ReactRouterPerformanceProfiler;
+}): void => {
+  const relocatedDestinations = new Map<string, string>();
+  api.processAssets(
+    { stage: 'report', targets: ['node'] },
+    async ({ compilation }) => {
+      await performanceProfiler.record(
+        'node',
+        'assets:relocate-ssr-only',
+        'ssr-only-assets',
+        () =>
+          relocateServerAssetsToClient({
+            compilation: compilation as unknown as RelocatableAssetCompilation,
+            outputClientPath,
+            relocatedDestinations,
+          })
+      );
+    }
+  );
+};
+
 type RegisterBuildOutputTransformsOptions = {
   api: RsbuildPluginAPI;
   resolvedServerOutput: 'module' | 'commonjs';
@@ -138,32 +182,7 @@ export const registerBuildOutputTransforms = ({
     }
   );
 
-  // Relocate server-only static assets (`?url` imports, `.css?url` files, and
-  // other `asset/resource` outputs referenced only by loaders or `.server`
-  // modules) into the client build. The loader returns the asset URL to the
-  // client, which fetches it from `build/client` at runtime, so the file must
-  // exist there even though only the node compilation referenced it. The
-  // assets are also stripped from the server build to avoid shipping duplicate
-  // static files, mirroring upstream React Router's Vite plugin. This runs for
-  // every node compilation, so it also covers `serverBundles` (multiple node
-  // outputs) and dev mode (where `writeToDisk` is enabled).
-  const relocatedDestinations = new Map<string, string>();
-  api.processAssets(
-    { stage: 'report', targets: ['node'] },
-    async ({ compilation }) => {
-      await performanceProfiler.record(
-        'node',
-        'assets:relocate-ssr-only',
-        'ssr-only-assets',
-        () =>
-          relocateServerAssetsToClient({
-            compilation: compilation as unknown as RelocatableAssetCompilation,
-            outputClientPath,
-            relocatedDestinations,
-          })
-      );
-    }
-  );
+  registerSsrAssetRelocation({ api, outputClientPath, performanceProfiler });
 
   api.transform(
     {
