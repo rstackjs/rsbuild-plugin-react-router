@@ -14,7 +14,6 @@ import {
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 import {
   findEntryFile,
-  normalizeAssetPrefix,
   resolveAppPackagePath,
   resolveEffectiveAssetPrefix,
 } from './plugin-utils.js';
@@ -729,8 +728,13 @@ export const pluginReactRouter = (
         (typeof webDistPath === 'object' ? webDistPath.js : undefined) ??
         (typeof rootDistPath === 'object' ? rootDistPath.js : undefined) ??
         DEFAULT_JS_DIST_PATH;
+      const assetPrefix = resolveEffectiveAssetPrefix({
+        dev: config.dev,
+        output: config.output,
+        isBuild,
+      });
       const vmodPlugin = createVirtualModulePlugin(
-        normalizeAssetPrefix(config.output?.assetPrefix),
+        assetPrefix,
         jsDistPath
       );
       const useAsyncNodeChunkLoading =
@@ -837,7 +841,7 @@ export const pluginReactRouter = (
                 externalsType: modePlan.webExternalsType,
                 output: {
                   ...modePlan.webOutput,
-                  publicPath: normalizeAssetPrefix(config.output?.assetPrefix),
+                  publicPath: assetPrefix,
                   ...(options.federation
                     ? {
                         chunkLoading: 'import',

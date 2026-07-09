@@ -803,7 +803,7 @@ async function waitForServer(
         args.basename ?? "/"
       }`,
     ],
-    timeout: platform() === "win32" ? 20000 : 10000,
+    timeout: 20000,
   }).catch(async (err) => {
     let stdout = devStdout();
     let stderr = devStderr();

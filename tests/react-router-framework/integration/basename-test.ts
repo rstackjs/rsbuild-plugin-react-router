@@ -328,10 +328,15 @@ test.describe("base + React Router basename", () => {
             waitUntil: "domcontentloaded",
           });
 
-          await expect(page.locator("#parent")).toBeDefined();
-          await expect(page.locator("#loading")).toContainText("Loading...");
+          await expect(page.locator("#parent")).toBeVisible({
+            timeout: devHmrTimeout,
+          });
+          await expect(page.locator("#loading")).toContainText("Loading...", {
+            timeout: devHmrTimeout,
+          });
           await expect(page.locator("[data-mounted]")).toHaveText(
             "Mounted: yes",
+            { timeout: devHmrTimeout },
           );
 
           expect(hydrationErrors).toEqual([]);
