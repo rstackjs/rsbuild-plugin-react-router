@@ -1,8 +1,4 @@
-import type { Config } from '@react-router/dev/config';
-
-type SyntheticReactRouterConfig = Config & {
-  splitRouteModules?: boolean | 'enforce';
-};
+import type { ReactRouterRsbuildConfig } from 'rsbuild-plugin-react-router';
 
 export default {
   appDirectory: 'app',
@@ -15,4 +11,4 @@ export default {
   serverModuleFormat: 'esm',
   splitRouteModules: true,
   ssr: true,
-} satisfies SyntheticReactRouterConfig;
+} satisfies ReactRouterRsbuildConfig;

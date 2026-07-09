@@ -308,12 +308,12 @@ const createReactRouterConfig = variant => {
   const splitRouteModules = variant.includes('split');
 
   return [
-    `import type { Config } from '@react-router/dev/config';`,
+    `import type { ReactRouterRsbuildConfig } from 'rsbuild-plugin-react-router';`,
     '',
     'export default {',
     `  ssr: ${ssr ? 'true' : 'false'},`,
     `  splitRouteModules: ${splitRouteModules ? 'true' : 'false'},`,
-    '} satisfies Config;',
+    '} satisfies ReactRouterRsbuildConfig;',
     '',
   ].join('\n');
 };
