@@ -67,6 +67,10 @@ type RsbuildConfigBaseArgs = {
   defineNodeEnv?: boolean;
   envPrefixes?: string[];
   mdx?: boolean;
+  svgr?: boolean;
+  tailwind?: boolean;
+  sass?: boolean;
+  less?: boolean;
   vanillaExtract?: boolean;
 };
 
@@ -98,6 +102,10 @@ const CSS_CODE_SPLIT_NOTE =
  * - vanilla-extract Vite plugin -> `@vanilla-extract/webpack-plugin` via
  *   `tools.rspack`
  * - MDX rollup plugin -> `@rsbuild/plugin-mdx`
+ * - vite-plugin-svgr -> `@rsbuild/plugin-svgr` (`.svg?react` / `.svg?url`)
+ * - Tailwind PostCSS plugin -> `@rsbuild/plugin-tailwindcss` (Tailwind v4)
+ * - Sass Vite plugin -> `@rsbuild/plugin-sass`
+ * - Less Vite plugin -> `@rsbuild/plugin-less`
  *
  * Intentionally unmapped Vite options:
  * - `server.hmr.port`: rsbuild serves the HMR websocket on the dev server port
@@ -144,6 +152,18 @@ export const rsbuildConfig = {
     const imports = [
       `import { defineConfig${args.envPrefixes ? ", loadEnv" : ""} } from "@rsbuild/core";`,
       ...(args.mdx ? [`import { pluginMdx } from "@rsbuild/plugin-mdx";`] : []),
+      ...(args.svgr
+        ? [`import { pluginSvgr } from "@rsbuild/plugin-svgr";`]
+        : []),
+      ...(args.tailwind
+        ? [`import { pluginTailwindcss } from "@rsbuild/plugin-tailwindcss";`]
+        : []),
+      ...(args.sass
+        ? [`import { pluginSass } from "@rsbuild/plugin-sass";`]
+        : []),
+      ...(args.less
+        ? [`import { pluginLess } from "@rsbuild/plugin-less";`]
+        : []),
       `import { pluginReact } from "@rsbuild/plugin-react";`,
       `import { ${routerPlugin} } from "rsbuild-plugin-react-router";`,
       ...(args.vanillaExtract
@@ -210,7 +230,7 @@ export const rsbuildConfig = {
           ]
         : []),
       ...(args.cssCodeSplit === false ? [CSS_CODE_SPLIT_NOTE] : []),
-      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${routerPlugin}()],`,
+      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${args.svgr ? "pluginSvgr(), " : ""}${args.tailwind ? "pluginTailwindcss(), " : ""}${args.sass ? "pluginSass(), " : ""}${args.less ? "pluginLess(), " : ""}${routerPlugin}()],`,
     ];
 
     return [

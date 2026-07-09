@@ -143,6 +143,24 @@ const files = ({ templateName }: { templateName: TemplateName }) => ({
             padding: ${PADDING};
           }
         `,
+        [`app/routes/${routeBasePath}/styles.scss`]: css`
+          // Sass variable exercises @rsbuild/plugin-sass compilation.
+          $scss-padding: ${PADDING};
+
+          .${routeBasePath}-scss {
+            background: lavender;
+            padding: $scss-padding;
+          }
+        `,
+        [`app/routes/${routeBasePath}/styles.less`]: css`
+          // Less variable exercises @rsbuild/plugin-less compilation.
+          @less-padding: ${PADDING};
+
+          .${routeBasePath}-less {
+            background: mistyrose;
+            padding: @less-padding;
+          }
+        `,
         [`app/routes/${routeBasePath}/styles-vanilla-global.css.ts`]: js`
           import { createVar, globalStyle } from "@vanilla-extract/css";
 
@@ -163,6 +181,8 @@ const files = ({ templateName }: { templateName: TemplateName }) => ({
           import "./styles-bundled.css";
           import postcssLinkedStyles from "./styles-postcss-linked.css?url";
           import cssModulesStyles from "./styles.module.css";
+          import "./styles.scss";
+          import "./styles.less";
           import "./styles-vanilla-global.css";
           import * as stylesVanillaLocal from "./styles-vanilla-local.css";
 
@@ -188,7 +208,11 @@ const files = ({ templateName }: { templateName: TemplateName }) => ({
                       <div id="css-bundled" className="${routeBasePath}-bundled">
                         <div id="css-vanilla-global" className="${routeBasePath}-vanilla-global">
                           <div id="css-vanilla-local" className={stylesVanillaLocal.index}>
-                            <h2>CSS test</h2>
+                            <div id="css-scss" className="${routeBasePath}-scss">
+                              <div id="css-less" className="${routeBasePath}-less">
+                                <h2>CSS test</h2>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -223,6 +247,8 @@ test.describe("CSS", () => {
                 port,
                 templateName,
                 vanillaExtract: true,
+                sass: true,
+                less: true,
               }),
               ...files({ templateName }),
             },
@@ -266,6 +292,8 @@ test.describe("CSS", () => {
                 base,
                 templateName,
                 vanillaExtract: true,
+                sass: true,
+                less: true,
               }),
               ...files({ templateName }),
             },
@@ -305,6 +333,8 @@ test.describe("CSS", () => {
                 port,
                 templateName,
                 vanillaExtract: true,
+                sass: true,
+                less: true,
               }),
               "server.mjs": EXPRESS_SERVER({ port, templateName }),
               ...files({ templateName }),
@@ -345,6 +375,8 @@ test.describe("CSS", () => {
                 port,
                 templateName,
                 vanillaExtract: true,
+                sass: true,
+                less: true,
               }),
               ...files({ templateName }),
             },
@@ -410,6 +442,8 @@ test.describe("CSS", () => {
                 templateName,
                 cssCodeSplit: false,
                 vanillaExtract: true,
+                sass: true,
+                less: true,
               }),
               ...files({ templateName }),
             },
@@ -474,6 +508,8 @@ async function pageLoadWorkflow({
         "#css-bundled",
         "#css-postcss-linked",
         "#css-modules",
+        "#css-scss",
+        "#css-less",
         "#css-vanilla-global",
         "#css-vanilla-local",
       ].map(

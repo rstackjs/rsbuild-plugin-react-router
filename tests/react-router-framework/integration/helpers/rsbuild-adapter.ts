@@ -203,14 +203,19 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       "@react-router/fs-routes": reactRouterVersion,
       "@react-router/remix-routes-option-adapter": reactRouterVersion,
       "@rsbuild/core": "2.1.0",
+      "@rsbuild/plugin-less": "1.6.4",
       "@rsbuild/plugin-mdx": "^1.1.3",
       "@rsbuild/plugin-react": "2.1.0",
+      "@rsbuild/plugin-sass": "1.5.3",
+      "@rsbuild/plugin-svgr": "2.0.4",
+      "@rsbuild/plugin-tailwindcss": "2.0.3",
       "@types/node": "^25.0.10",
       "@types/react": "^19.2.10",
       "@types/react-dom": "^19.2.3",
       "@vanilla-extract/webpack-plugin": "^2.3.27",
       rsbuild: "npm:@rsbuild/core@2.1.0",
       "rsbuild-plugin-react-router": `file:${repoRoot}`,
+      tailwindcss: "4.3.2",
       // rsbuild-plugin-rsc version pin. It is pre-1.0, so EVERY 0.x minor is a
       // breaking change — bump all of these locations together:
       //   1. package.json          -> dependencies["rsbuild-plugin-rsc"]
