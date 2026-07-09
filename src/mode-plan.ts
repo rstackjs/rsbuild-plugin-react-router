@@ -195,6 +195,7 @@ const createRscModePlan = async ({
         publicPath,
         routeDiscovery,
         routes,
+        ssr,
       }),
     createResolveConfig: (rootPath: string) => ({
       modules: [resolve(rootPath, 'node_modules'), 'node_modules'],

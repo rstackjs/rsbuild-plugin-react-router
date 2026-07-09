@@ -31,6 +31,7 @@ type RscVirtualModulesOptions = {
   publicPath: string;
   routeDiscovery: Config['routeDiscovery'];
   routes: Record<string, Route>;
+  ssr: boolean;
 };
 
 export const createReactRouterRscResolveAliases = (
@@ -62,6 +63,7 @@ export const createReactRouterRscVirtualModules = ({
   publicPath,
   routeDiscovery,
   routes,
+  ssr,
 }: RscVirtualModulesOptions): Record<string, string> => {
   const rscAssetsBuildDirectory = relative(
     resolve(buildDirectory, 'server'),
@@ -74,8 +76,9 @@ export const createReactRouterRscVirtualModules = ({
       appDirectory,
       routes,
     }),
-    'virtual/react-router/unstable_rsc/route-discovery':
-      defaultExport(routeDiscovery),
+    'virtual/react-router/unstable_rsc/route-discovery': defaultExport(
+      ssr === false ? { mode: 'initial' } : (routeDiscovery ?? { mode: 'lazy' })
+    ),
     'virtual/react-router/unstable_rsc/inject-hmr-runtime': !isBuild
       ? `if (import.meta.webpackHot) {
   import.meta.webpackHot.accept();

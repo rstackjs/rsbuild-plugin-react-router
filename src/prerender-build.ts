@@ -132,6 +132,19 @@ const createDataRequestPath = (
     : `${prerenderPath.replace(/\/$/, '')}.data`;
 };
 
+const createDataOutputPath = (
+  prerenderPath: string,
+  trailingSlashAwareDataRequests: boolean
+): string => {
+  if (trailingSlashAwareDataRequests) {
+    return prerenderPath.endsWith('/')
+      ? `${prerenderPath}_.data`
+      : `${prerenderPath}.data`;
+  }
+
+  return createDataRequestPath(prerenderPath, trailingSlashAwareDataRequests);
+};
+
 const createDataHandlerRequestPath = (
   prerenderPath: string,
   trailingSlashAwareDataRequests: boolean
@@ -194,7 +207,7 @@ const prerenderData = async ({
     prerenderPath,
     trailingSlashAwareDataRequests
   );
-  const dataOutputPath = createDataRequestPath(
+  const dataOutputPath = createDataOutputPath(
     prerenderPath,
     trailingSlashAwareDataRequests
   );

@@ -44,6 +44,7 @@ describe('RSC support helpers', () => {
           path: '',
         },
       },
+      ssr: true,
     });
 
     expect(modules['virtual/react-router/server-build']).toBeUndefined();
@@ -56,6 +57,38 @@ describe('RSC support helpers', () => {
     expect(
       modules['virtual/react-router/unstable_rsc/allowed-action-origins']
     ).toBe('export default ["https://app.example.com"];');
+  });
+
+  it('defaults RSC route discovery for SSR and SPA mode', () => {
+    const createModules = (
+      ssr: boolean,
+      routeDiscovery?: Parameters<
+        typeof createReactRouterRscVirtualModules
+      >[0]['routeDiscovery']
+    ) =>
+      createReactRouterRscVirtualModules({
+        allowedActionOrigins: undefined,
+        appDirectory: '/repo/app',
+        basename: '/',
+        buildDirectory: '/repo/build',
+        isBuild: true,
+        outputClientPath: '/repo/build/client',
+        publicPath: '/',
+        routeDiscovery,
+        routes: {},
+        ssr,
+      });
+
+    expect(
+      createModules(true)[
+        'virtual/react-router/unstable_rsc/route-discovery'
+      ]
+    ).toBe('export default {"mode":"lazy"};');
+    expect(
+      createModules(false, { mode: 'lazy' })[
+        'virtual/react-router/unstable_rsc/route-discovery'
+      ]
+    ).toBe('export default {"mode":"initial"};');
   });
 
   it('rejects config options RSC framework mode does not support', () => {
