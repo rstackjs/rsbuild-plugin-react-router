@@ -2,9 +2,9 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import url from "node:url";
 import path from "pathe";
-import stripIndent from "strip-indent";
 
-import type { TemplateName } from "./rsbuild.js";
+import { rsbuildConfig } from "./rsbuild-config.js";
+import type { TemplateName } from "./templates.js";
 export { prepareFixtureProjectDependencies } from "./fixture-workspace-dependencies.js";
 
 // Templates that author their OWN rsbuild.config.ts in the template directory
@@ -13,7 +13,7 @@ export { prepareFixtureProjectDependencies } from "./fixture-workspace-dependenc
 // wrong bundler mode. `rsc-preview` is the data-mode RSC bundler template — it
 // ships an rsbuild.config.ts wired for `rsbuild-plugin-rsc` directly, NOT the
 // framework-mode `pluginReactRouterRSC`. Keep this in sync with the
-// TemplateName union in ./rsbuild.ts.
+// TemplateName union in ./templates.ts.
 const TEMPLATES_SHIPPING_OWN_CONFIG: ReadonlySet<TemplateName> = new Set<TemplateName>([
   "rsc-preview",
 ]);
@@ -25,42 +25,6 @@ const reactRouterVersion = "^8.0.1";
 export const rsbuildBin = "node_modules/@rsbuild/core/bin/rsbuild.js";
 export const reactRouterServeBin =
   "node_modules/@react-router/serve/dist/cli.js";
-
-type RsbuildConfigOptions = {
-  port?: number;
-  base?: string;
-};
-
-export const rsbuildConfig = ({ port, base }: RsbuildConfigOptions = {}) =>
-  stripIndent(`
-    import { defineConfig } from "@rsbuild/core";
-    import { pluginMdx } from "@rsbuild/plugin-mdx";
-    import { pluginReact } from "@rsbuild/plugin-react";
-    import { pluginReactRouter } from "rsbuild-plugin-react-router";
-
-    export default defineConfig({
-      ${port ? `server: { port: ${port}, host: "localhost" },` : ""}
-      ${base ? `output: { assetPrefix: ${JSON.stringify(base)} },` : ""}
-      plugins: [pluginReact(), pluginMdx(), pluginReactRouter()],
-    });
-  `);
-
-export const rsbuildRscConfig = ({
-  port,
-  base,
-}: RsbuildConfigOptions = {}) =>
-  stripIndent(`
-    import { defineConfig } from "@rsbuild/core";
-    import { pluginMdx } from "@rsbuild/plugin-mdx";
-    import { pluginReact } from "@rsbuild/plugin-react";
-    import { pluginReactRouterRSC } from "rsbuild-plugin-react-router";
-
-    export default defineConfig({
-      ${port ? `server: { port: ${port}, host: "localhost" },` : ""}
-      ${base ? `output: { assetPrefix: ${JSON.stringify(base)} },` : ""}
-      plugins: [pluginReact(), pluginMdx(), pluginReactRouterRSC()],
-    });
-  `);
 
 export const assertNoViteConfigFiles = <T>(
   files: Record<string, T> = {}
@@ -120,9 +84,7 @@ export async function finalizeFixtureProject({
     // data-mode rsc-preview template handled above.
     await writeFile(
       rsbuildConfigPath,
-      templateName === "rsc-framework"
-        ? rsbuildRscConfig({ port })
-        : rsbuildConfig({ port }),
+      await rsbuildConfig.basic({ port, templateName }),
       "utf8",
     );
   }

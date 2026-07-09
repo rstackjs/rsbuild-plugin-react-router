@@ -9,6 +9,7 @@ const templates = [
 ] as const;
 
 export type Template = (typeof templates)[number];
+export type TemplateName = Template["name"];
 
 export function getTemplates(names?: Array<Template["name"]>) {
   if (names === undefined) return templates;

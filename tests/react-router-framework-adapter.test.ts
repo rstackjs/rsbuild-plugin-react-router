@@ -7,6 +7,7 @@ import {
   assertNoViteConfigFiles,
   finalizeFixtureProject,
 } from './react-router-framework/integration/helpers/rsbuild-adapter';
+import { rsbuildConfig } from './react-router-framework/integration/helpers/rsbuild-config';
 
 describe('React Router framework fixture adapter', () => {
   beforeEach(() => {
@@ -92,6 +93,96 @@ describe('React Router framework fixture adapter', () => {
       expect(tsconfig.compilerOptions.paths).toEqual({
         '~/*': ['./app/*'],
       });
+    } finally {
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ['rsbuild-template', 'pluginReactRouter'],
+    ['rsc-framework', 'pluginReactRouterRSC'],
+  ] as const)(
+    'creates the %s config with %s',
+    async (templateName, routerPlugin) => {
+      const projectDir = await mkdtemp(join(tmpdir(), 'rr-rsbuild-adapter-'));
+
+      try {
+        await finalizeFixtureProject({
+          projectDir,
+          port: 4173,
+          templateName,
+        });
+
+        const config = await readFile(
+          join(projectDir, 'rsbuild.config.ts'),
+          'utf8'
+        );
+        expect(config).toContain(
+          `import { ${routerPlugin} } from "rsbuild-plugin-react-router";`
+        );
+        expect(config).toContain(`${routerPlugin}()`);
+        expect(config).toContain('port: 4173');
+        expect(config).toContain('strictPort: true');
+      } finally {
+        await rm(projectDir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('retains every supplied Rsbuild config option', async () => {
+    const config = await rsbuildConfig.basic({
+      port: 4173,
+      templateName: 'rsbuild-template',
+      base: '/base/',
+      assetsInlineLimit: 512,
+      assetsDir: 'static',
+      cssCodeSplit: false,
+      defineNodeEnv: true,
+      envPrefixes: ['PUBLIC_'],
+      mdx: true,
+      svgr: true,
+      tailwind: true,
+      sass: true,
+      less: true,
+      vanillaExtract: true,
+    });
+
+    expect(config).toContain('port: 4173');
+    expect(config).toContain('assetPrefix: "/base/"');
+    expect(config).toContain('dataUriLimit: 512');
+    expect(config).toContain('distPath: { assets: "static" }');
+    expect(config).toContain('build.cssCodeSplit: false');
+    expect(config).toContain('"process.env.NODE_ENV"');
+    expect(config).toContain('loadEnv({ prefixes: ["PUBLIC_"] })');
+    expect(config).toContain('pluginMdx()');
+    expect(config).toContain('pluginSvgr()');
+    expect(config).toContain('pluginTailwindcss()');
+    expect(config).toContain('pluginSass()');
+    expect(config).toContain('pluginLess()');
+    expect(config).toContain('new VanillaExtractPlugin');
+  });
+
+  it('preserves the shipped rsc-preview config', async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), 'rr-rsbuild-adapter-'));
+    const shippedConfig = await readFile(
+      join(
+        process.cwd(),
+        'tests/react-router-framework/integration/helpers/rsc-preview/rsbuild.config.ts'
+      ),
+      'utf8'
+    );
+
+    try {
+      const configPath = join(projectDir, 'rsbuild.config.ts');
+      await writeFile(configPath, shippedConfig);
+
+      await finalizeFixtureProject({
+        projectDir,
+        port: 4173,
+        templateName: 'rsc-preview',
+      });
+
+      expect(await readFile(configPath, 'utf8')).toBe(shippedConfig);
     } finally {
       await rm(projectDir, { recursive: true, force: true });
     }
