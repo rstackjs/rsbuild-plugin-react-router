@@ -25,7 +25,10 @@ test.describe(async () => {
   test.beforeAll(async () => {
     port = await getPort();
     cwd = await createProject({
-      "rsbuild.config.ts": await rsbuildConfig.basic({ port: port }),
+      "rsbuild.config.ts": await rsbuildConfig.basic({
+        port,
+        defineNodeEnv: true,
+      }),
       ...files,
     });
   });
@@ -55,7 +58,7 @@ test.describe(async () => {
   test.describe(() => {
     let buildPort: number;
     test.beforeAll(async () => {
-      build({ cwd });
+      build({ cwd, env: { NODE_ENV: "production" } });
       buildPort = await getPort();
       stop = await reactRouterServe({ cwd, port: buildPort });
     });
