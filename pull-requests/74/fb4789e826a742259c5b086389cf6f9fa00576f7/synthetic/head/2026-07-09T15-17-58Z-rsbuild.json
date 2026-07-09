@@ -1,0 +1,863 @@
+{
+  "generatedAt": "2026-07-09T15:17:58.765Z",
+  "node": "v22.23.1",
+  "platform": "linux-x64",
+  "runs": 2,
+  "profile": "all",
+  "results": [
+    {
+      "mode": "rsbuild",
+      "profile": "cold",
+      "run": 1,
+      "durationSeconds": 124.56676323,
+      "reactRouterPerformance": [
+        {
+          "environment": "web",
+          "compilerLifecycleMs": 61238.6,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/browser-manifest.js"
+                }
+              ]
+            },
+            "route:chunk": {
+              "count": 2840,
+              "totalMs": 29862,
+              "wallMs": 9341.2,
+              "maxMs": 384.3,
+              "slowest": [
+                {
+                  "durationMs": 384.3,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0104.tsx?route-chunk=HydrateFallback"
+                },
+                {
+                  "durationMs": 203.9,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0272.tsx?route-chunk=clientAction"
+                },
+                {
+                  "durationMs": 195.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0139.tsx?route-chunk=clientLoader"
+                },
+                {
+                  "durationMs": 195,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0203.tsx?route-chunk=clientAction"
+                },
+                {
+                  "durationMs": 192.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0046.tsx?route-chunk=clientLoader"
+                }
+              ]
+            },
+            "route:client-entry": {
+              "count": 357,
+              "totalMs": 3503.7,
+              "wallMs": 1382.3,
+              "maxMs": 191.8,
+              "slowest": [
+                {
+                  "durationMs": 191.8,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0177.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 179.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0285.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 177,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0069.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 176.7,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0317.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 161.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0292.tsx?__react-router-build-client-route"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 2,
+              "totalMs": 7,
+              "wallMs": 7,
+              "maxMs": 3.9,
+              "slowest": [
+                {
+                  "durationMs": 3.9,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/root.tsx?react-router-route"
+                },
+                {
+                  "durationMs": 3.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/routes/home.tsx?react-router-route"
+                }
+              ]
+            },
+            "manifest:stage": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "virtual/react-router/browser-manifest"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "environment": "node",
+          "compilerLifecycleMs": 123186.4,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 19.8,
+              "wallMs": 19.8,
+              "maxMs": 19.8,
+              "slowest": [
+                {
+                  "durationMs": 19.8,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/server-manifest.js"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 357,
+              "totalMs": 3649.7,
+              "wallMs": 1129.4,
+              "maxMs": 104.1,
+              "slowest": [
+                {
+                  "durationMs": 104.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0042.tsx"
+                },
+                {
+                  "durationMs": 103.8,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0056.tsx"
+                },
+                {
+                  "durationMs": 103.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0065.tsx"
+                },
+                {
+                  "durationMs": 94.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0066.tsx"
+                },
+                {
+                  "durationMs": 92,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0000.tsx"
+                }
+              ]
+            },
+            "assets:relocate-ssr-only": {
+              "count": 1,
+              "totalMs": 36.9,
+              "wallMs": 36.9,
+              "maxMs": 36.9,
+              "slowest": [
+                {
+                  "durationMs": 36.9,
+                  "resource": "ssr-only-assets"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "rsbuild",
+      "profile": "cold",
+      "run": 2,
+      "durationSeconds": 125.19319973,
+      "reactRouterPerformance": [
+        {
+          "environment": "web",
+          "compilerLifecycleMs": 61565.1,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/browser-manifest.js"
+                }
+              ]
+            },
+            "route:chunk": {
+              "count": 2840,
+              "totalMs": 28343.2,
+              "wallMs": 9270.7,
+              "maxMs": 409.4,
+              "slowest": [
+                {
+                  "durationMs": 409.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0324.tsx?route-chunk=clientAction"
+                },
+                {
+                  "durationMs": 374.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0026.tsx?route-chunk=clientLoader"
+                },
+                {
+                  "durationMs": 289.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0005.tsx?route-chunk=clientAction"
+                },
+                {
+                  "durationMs": 267,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0339.tsx?route-chunk=HydrateFallback"
+                },
+                {
+                  "durationMs": 267,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0223.tsx?route-chunk=HydrateFallback"
+                }
+              ]
+            },
+            "route:client-entry": {
+              "count": 357,
+              "totalMs": 3323.2,
+              "wallMs": 1572.9,
+              "maxMs": 357.2,
+              "slowest": [
+                {
+                  "durationMs": 357.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0223.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 239.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0001.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 226.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0077.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 204.9,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0324.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 135.9,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0060.tsx?__react-router-build-client-route"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 2,
+              "totalMs": 8,
+              "wallMs": 8,
+              "maxMs": 4.8,
+              "slowest": [
+                {
+                  "durationMs": 4.8,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/root.tsx?react-router-route"
+                },
+                {
+                  "durationMs": 3.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/routes/home.tsx?react-router-route"
+                }
+              ]
+            },
+            "manifest:stage": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "virtual/react-router/browser-manifest"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "environment": "node",
+          "compilerLifecycleMs": 124167.6,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 19.5,
+              "wallMs": 19.5,
+              "maxMs": 19.5,
+              "slowest": [
+                {
+                  "durationMs": 19.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/server-manifest.js"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 357,
+              "totalMs": 3737.5,
+              "wallMs": 1021.5,
+              "maxMs": 63.6,
+              "slowest": [
+                {
+                  "durationMs": 63.6,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0184.tsx"
+                },
+                {
+                  "durationMs": 63.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0029.tsx"
+                },
+                {
+                  "durationMs": 56.3,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0246.tsx"
+                },
+                {
+                  "durationMs": 56.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0189.tsx"
+                },
+                {
+                  "durationMs": 56.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0208.tsx"
+                }
+              ]
+            },
+            "assets:relocate-ssr-only": {
+              "count": 1,
+              "totalMs": 52.4,
+              "wallMs": 52.4,
+              "maxMs": 52.4,
+              "slowest": [
+                {
+                  "durationMs": 52.4,
+                  "resource": "ssr-only-assets"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "rsbuild",
+      "profile": "warm",
+      "run": 1,
+      "durationSeconds": 91.185982142,
+      "reactRouterPerformance": [
+        {
+          "environment": "web",
+          "compilerLifecycleMs": 42562.3,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/browser-manifest.js"
+                }
+              ]
+            },
+            "route:client-entry": {
+              "count": 357,
+              "totalMs": 13808.2,
+              "wallMs": 1461.1,
+              "maxMs": 340.1,
+              "slowest": [
+                {
+                  "durationMs": 340.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0016.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 338,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0304.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 331.3,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0105.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 330.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0213.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 327.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0107.tsx?__react-router-build-client-route"
+                }
+              ]
+            },
+            "route:chunk": {
+              "count": 2840,
+              "totalMs": 65003,
+              "wallMs": 8040.1,
+              "maxMs": 339.5,
+              "slowest": [
+                {
+                  "durationMs": 339.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0138.tsx?route-chunk=HydrateFallback"
+                },
+                {
+                  "durationMs": 339.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0058.tsx?route-chunk=clientLoader"
+                },
+                {
+                  "durationMs": 339.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0151.tsx?route-chunk=clientLoader"
+                },
+                {
+                  "durationMs": 337.8,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0184.tsx?route-chunk=HydrateFallback"
+                },
+                {
+                  "durationMs": 337.8,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0060.tsx?route-chunk=clientLoader"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 2,
+              "totalMs": 20.1,
+              "wallMs": 20.1,
+              "maxMs": 10.5,
+              "slowest": [
+                {
+                  "durationMs": 10.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/routes/home.tsx?react-router-route"
+                },
+                {
+                  "durationMs": 9.6,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/root.tsx?react-router-route"
+                }
+              ]
+            },
+            "manifest:stage": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "virtual/react-router/browser-manifest"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "environment": "node",
+          "compilerLifecycleMs": 90319.8,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 18.1,
+              "wallMs": 18.1,
+              "maxMs": 18.1,
+              "slowest": [
+                {
+                  "durationMs": 18.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/server-manifest.js"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 357,
+              "totalMs": 3285.5,
+              "wallMs": 798.8,
+              "maxMs": 74.5,
+              "slowest": [
+                {
+                  "durationMs": 74.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0017.tsx"
+                },
+                {
+                  "durationMs": 74.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0161.tsx"
+                },
+                {
+                  "durationMs": 74.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0323.tsx"
+                },
+                {
+                  "durationMs": 70.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0044.tsx"
+                },
+                {
+                  "durationMs": 33.7,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0071.tsx"
+                }
+              ]
+            },
+            "assets:relocate-ssr-only": {
+              "count": 1,
+              "totalMs": 24,
+              "wallMs": 24,
+              "maxMs": 24,
+              "slowest": [
+                {
+                  "durationMs": 24,
+                  "resource": "ssr-only-assets"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "rsbuild",
+      "profile": "warm",
+      "run": 2,
+      "durationSeconds": 97.38373669099994,
+      "reactRouterPerformance": [
+        {
+          "environment": "web",
+          "compilerLifecycleMs": 44936.7,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/browser-manifest.js"
+                }
+              ]
+            },
+            "route:chunk": {
+              "count": 2840,
+              "totalMs": 65685.8,
+              "wallMs": 8163.7,
+              "maxMs": 426.1,
+              "slowest": [
+                {
+                  "durationMs": 426.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0199.tsx?route-chunk=HydrateFallback"
+                },
+                {
+                  "durationMs": 423.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0043.tsx?route-chunk=clientLoader"
+                },
+                {
+                  "durationMs": 418.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0292.tsx?route-chunk=HydrateFallback"
+                },
+                {
+                  "durationMs": 418.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0344.tsx?route-chunk=clientAction"
+                },
+                {
+                  "durationMs": 417.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0288.tsx?route-chunk=clientLoader"
+                }
+              ]
+            },
+            "route:client-entry": {
+              "count": 357,
+              "totalMs": 18490.8,
+              "wallMs": 1407.7,
+              "maxMs": 433.6,
+              "slowest": [
+                {
+                  "durationMs": 433.6,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0346.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 421.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0130.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 418.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0149.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 414.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0268.tsx?__react-router-build-client-route"
+                },
+                {
+                  "durationMs": 402.4,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0136.tsx?__react-router-build-client-route"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 2,
+              "totalMs": 21.6,
+              "wallMs": 21.6,
+              "maxMs": 19.1,
+              "slowest": [
+                {
+                  "durationMs": 19.1,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/root.tsx?react-router-route"
+                },
+                {
+                  "durationMs": 2.6,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/routes/home.tsx?react-router-route"
+                }
+              ]
+            },
+            "manifest:stage": {
+              "count": 1,
+              "totalMs": 0.1,
+              "wallMs": 0.1,
+              "maxMs": 0.1,
+              "slowest": [
+                {
+                  "durationMs": 0.1,
+                  "resource": "virtual/react-router/browser-manifest"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "environment": "node",
+          "compilerLifecycleMs": 96509.3,
+          "operations": {
+            "manifest:transform": {
+              "count": 1,
+              "totalMs": 18.5,
+              "wallMs": 18.5,
+              "maxMs": 18.5,
+              "slowest": [
+                {
+                  "durationMs": 18.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/node_modules/virtual/react-router/server-manifest.js"
+                }
+              ]
+            },
+            "route:module": {
+              "count": 357,
+              "totalMs": 3870,
+              "wallMs": 779.8,
+              "maxMs": 77.8,
+              "slowest": [
+                {
+                  "durationMs": 77.8,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0123.tsx"
+                },
+                {
+                  "durationMs": 77.5,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0047.tsx"
+                },
+                {
+                  "durationMs": 75.7,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0229.tsx"
+                },
+                {
+                  "durationMs": 75.2,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0018.tsx"
+                },
+                {
+                  "durationMs": 34,
+                  "resource": "/home/runner/work/rsbuild-plugin-react-router/rsbuild-plugin-react-router/head/benchmarks/synthetic-web-bundler-benchmark/app/generated/routes/route-0071.tsx"
+                }
+              ]
+            },
+            "assets:relocate-ssr-only": {
+              "count": 1,
+              "totalMs": 27.4,
+              "wallMs": 27.4,
+              "maxMs": 27.4,
+              "slowest": [
+                {
+                  "durationMs": 27.4,
+                  "resource": "ssr-only-assets"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "rsbuild",
+      "profile": "dev",
+      "run": 1,
+      "durationSeconds": 108.25997043500003,
+      "readyMs": 95130.751039,
+      "routeTotalMs": 3092.321259999997,
+      "updateMs": 3489.672433999949,
+      "routeRequests": [
+        {
+          "path": "/",
+          "status": 200,
+          "ok": true,
+          "ms": 2775.9680379999336,
+          "bytes": 3886
+        },
+        {
+          "path": "/feature/0000",
+          "status": 200,
+          "ok": true,
+          "ms": 106.01968400005717,
+          "bytes": 22895
+        },
+        {
+          "path": "/feature/0010",
+          "status": 200,
+          "ok": true,
+          "ms": 104.14990000007674,
+          "bytes": 22967
+        },
+        {
+          "path": "/feature/0100",
+          "status": 200,
+          "ok": true,
+          "ms": 105.9226529999869,
+          "bytes": 22910
+        }
+      ],
+      "updateRouteRequests": [
+        {
+          "path": "/feature/0000",
+          "status": 200,
+          "ok": true,
+          "ms": 4717.073805000051,
+          "bytes": 22895
+        }
+      ]
+    },
+    {
+      "mode": "rsbuild",
+      "profile": "dev",
+      "run": 2,
+      "durationSeconds": 110.527667869,
+      "readyMs": 97630.65953399998,
+      "routeTotalMs": 3068.0129190000007,
+      "updateMs": 3521.5760670000454,
+      "routeRequests": [
+        {
+          "path": "/",
+          "status": 200,
+          "ok": true,
+          "ms": 2758.7462870000163,
+          "bytes": 3886
+        },
+        {
+          "path": "/feature/0000",
+          "status": 200,
+          "ok": true,
+          "ms": 105.7842889999738,
+          "bytes": 22895
+        },
+        {
+          "path": "/feature/0010",
+          "status": 200,
+          "ok": true,
+          "ms": 95.71209199994337,
+          "bytes": 22967
+        },
+        {
+          "path": "/feature/0100",
+          "status": 200,
+          "ok": true,
+          "ms": 107.69671299995389,
+          "bytes": 22910
+        }
+      ],
+      "updateRouteRequests": [
+        {
+          "path": "/feature/0000",
+          "status": 200,
+          "ok": true,
+          "ms": 4486.871396000031,
+          "bytes": 22896
+        }
+      ]
+    }
+  ],
+  "summaries": [
+    {
+      "mode": "rsbuild",
+      "profile": "cold",
+      "samples": [
+        124.56676323,
+        125.19319973
+      ],
+      "median": 124.87998148,
+      "mean": 124.87998148,
+      "readyMs": {
+        "samples": [],
+        "median": null,
+        "mean": null
+      },
+      "routeTotalMs": {
+        "samples": [],
+        "median": null,
+        "mean": null
+      },
+      "updateMs": {
+        "samples": [],
+        "median": null,
+        "mean": null
+      }
+    },
+    {
+      "mode": "rsbuild",
+      "profile": "dev",
+      "samples": [
+        108.25997043500003,
+        110.527667869
+      ],
+      "median": 109.39381915200002,
+      "mean": 109.39381915200002,
+      "readyMs": {
+        "samples": [
+          95130.751039,
+          97630.65953399998
+        ],
+        "median": 96380.70528649999,
+        "mean": 96380.70528649999
+      },
+      "routeTotalMs": {
+        "samples": [
+          3092.321259999997,
+          3068.0129190000007
+        ],
+        "median": 3080.167089499999,
+        "mean": 3080.167089499999
+      },
+      "updateMs": {
+        "samples": [
+          3489.672433999949,
+          3521.5760670000454
+        ],
+        "median": 3505.6242504999973,
+        "mean": 3505.6242504999973
+      }
+    },
+    {
+      "mode": "rsbuild",
+      "profile": "warm",
+      "samples": [
+        91.185982142,
+        97.38373669099994
+      ],
+      "median": 94.28485941649997,
+      "mean": 94.28485941649997,
+      "readyMs": {
+        "samples": [],
+        "median": null,
+        "mean": null
+      },
+      "routeTotalMs": {
+        "samples": [],
+        "median": null,
+        "mean": null
+      },
+      "updateMs": {
+        "samples": [],
+        "median": null,
+        "mean": null
+      }
+    }
+  ]
+}
