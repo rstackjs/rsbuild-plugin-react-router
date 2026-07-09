@@ -111,8 +111,10 @@ export default {
 ```
 
 Use `ReactRouterRsbuildConfig` for Rsbuild projects so plugin-supported
-configuration such as `splitRouteModules` stays typed without reaching into
-`@react-router/dev` internals.
+configuration such as `splitRouteModules` stays typed. The underlying route
+and config types come from `@react-router/dev`, which framework-mode apps
+already install for `routes.ts` helpers and typegen; it is declared as an
+optional peer dependency.
 
 Commonly used options:
 
