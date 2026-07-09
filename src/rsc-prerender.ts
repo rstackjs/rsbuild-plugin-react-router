@@ -201,7 +201,7 @@ const assertPrerenderableResponse = (
   }
   throw new Error(
     `Prerender: Received a ${response.status} status code from ` +
-      `the RSC server while prerendering the \`${pathname}\` path.\n${pathname}`
+      `the RSC server while prerendering the \`${pathname}\` path.`
   );
 };
 
