@@ -685,11 +685,24 @@ const createClientRouteModule = async (
       plan.exportNameSet.has('Layout') ||
       plan.exportNameSet.has('ServerLayout');
     clientModuleCode += `\nimport { createElement as __rr_createElement } from "react";\n`;
-    clientModuleCode += `export function ErrorBoundary() {\n`;
-    clientModuleCode += `  return __rr_createElement(${JSON.stringify(
-      hasRootLayout ? 'main' : 'div'
-    )}, null, "Unexpected Server Error");\n`;
-    clientModuleCode += `}\n`;
+    if (options.isDev) {
+      // Mirror React Router's own dev default root boundary: surface the real
+      // error with its stack (already source-mapped by the dev server's
+      // prepareStackTrace hook) instead of swallowing it behind a static
+      // message. The <main><pre> shape matches RemixRootDefaultErrorBoundary,
+      // which the dev error-stacktrace integration test asserts on.
+      clientModuleCode += `import { useRouteError as __rr_useRouteError } from "react-router";\n`;
+      clientModuleCode += `export function ErrorBoundary() {\n`;
+      clientModuleCode += `  const error = __rr_useRouteError();\n`;
+      clientModuleCode += `  return __rr_createElement("main", null, __rr_createElement("pre", null, String((error && error.stack) || error)));\n`;
+      clientModuleCode += `}\n`;
+    } else {
+      clientModuleCode += `export function ErrorBoundary() {\n`;
+      clientModuleCode += `  return __rr_createElement(${JSON.stringify(
+        hasRootLayout ? 'main' : 'div'
+      )}, null, "Unexpected Server Error");\n`;
+      clientModuleCode += `}\n`;
+    }
   }
 
   const rscUpdateAction = `const router = globalThis.__reactRouterDataRouter;

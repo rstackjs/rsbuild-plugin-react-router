@@ -425,16 +425,16 @@ test.describe("rsbuild dev", () => {
         dev,
         page,
       }) => {
-        // The RSC dev server now streams a source-mapped error document on
-        // handler throws (src/rsc-dev-server.ts renderDevServerError), but this
-        // test still can't pass in RSC Framework Mode: the crash condition
-        // never fires because `useLocation().search` is empty during the RSC
-        // server render pass (verified against compiled output where
-        // `import.meta.env.SSR` is correctly `true`). Needs the request URL's
-        // search threaded into the RSC render location.
+        // Matches upstream's own fixme for RSC mode (vite-dev-test.ts
+        // "Investigate this for RSC Framework Mode"). The server DOES render a
+        // source-mapped error boundary (dev default root boundary surfaces the
+        // real stack), but the crash is gated on import.meta.env.SSR, so client
+        // hydration re-renders without throwing and React recovers — wiping the
+        // <main> this test asserts on from the live DOM. Same behavior as
+        // upstream RSC framework mode.
         test.fixme(
           templateName.includes("rsc"),
-          "RSC Framework Mode: useLocation().search is empty during the RSC server render",
+          "RSC hydration recovers from SSR-only render errors (upstream fixme parity)",
         );
 
         const { port } = await dev(files, templateName);
