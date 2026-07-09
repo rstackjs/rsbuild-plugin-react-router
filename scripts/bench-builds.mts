@@ -552,7 +552,7 @@ const runBenchmarkIteration = (benchmarkContext, index) =>
       `${commandResult.stdout}\n${commandResult.stderr}`
     );
     const bundleSize =
-      args.mode === 'build' && commandResult.status === 0
+      args.mode === 'build' && measured && commandResult.status === 0
         ? yield* tryPromise(() =>
             collectBuildOutputStats(path.join(fixtureRoot, 'build'))
           )

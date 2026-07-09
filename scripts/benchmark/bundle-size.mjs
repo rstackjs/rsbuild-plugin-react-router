@@ -1,6 +1,9 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { promisify } from 'node:util';
+import { gzip as gzipCallback } from 'node:zlib';
+
+const gzip = promisify(gzipCallback);
 
 export const bundleSizeMetricKeys = [
   'fileCount',
@@ -18,27 +21,6 @@ export const bundleSizeMetricKeys = [
   'sourceMapGzipBytes',
 ];
 
-export const bundleSizeComparisonMetrics = [
-  { label: 'Client JS gzip median', key: 'clientJsGzipBytes' },
-  { label: 'Total output gzip median', key: 'totalGzipBytes' },
-];
-
-export const bundleSizeCiColumns = [
-  {
-    heading: 'Head client JS gzip',
-    headField: 'headClientJsGzipBytes',
-  },
-  {
-    heading: 'Client JS gzip delta',
-    headField: 'clientJsGzipDeltaPercent',
-    format: 'percent',
-  },
-  {
-    heading: 'Head total gzip',
-    headField: 'headTotalGzipBytes',
-  },
-];
-
 export const createEmptyBuildOutputStats = () =>
   Object.fromEntries(bundleSizeMetricKeys.map(key => [key, 0]));
 
@@ -54,8 +36,6 @@ export const formatBytes = value => {
 
 export const getBundleSizeMedian = (benchmark, key) =>
   benchmark?.summary?.bundleSize?.[key]?.median ?? null;
-
-export const bundleSizeMetricPath = key => `summary.bundleSize.${key}.median`;
 
 export const summarizeBundleSizeRuns = (runs, summarizeMetric) =>
   Object.fromEntries(
@@ -119,15 +99,13 @@ export const collectBuildOutputStats = async buildRoot => {
           return;
         }
 
-        const [fileStat, buffer] = await Promise.all([
-          stat(filePath),
-          readFile(filePath),
-        ]);
+        const buffer = await readFile(filePath);
+        const gzipped = await gzip(buffer);
         addFileStats(
           stats,
           path.relative(buildRoot, filePath),
-          fileStat.size,
-          gzipSync(buffer).byteLength
+          buffer.byteLength,
+          gzipped.byteLength
         );
       })
     );

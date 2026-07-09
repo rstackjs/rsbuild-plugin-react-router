@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { readJson } from './benchmark/ci-report-model.mjs';
-import {
-  bundleSizeComparisonMetrics,
-  bundleSizeMetricPath,
-  formatBytes,
-} from './benchmark/bundle-size.mjs';
+import { formatBytes } from './benchmark/bundle-size.mjs';
 
 const parseInput = () => {
   const { values } = parseArgs({
@@ -76,6 +72,7 @@ const formatMs = value =>
   value == null ? '-' : `${(value / 1000).toFixed(2)}s`;
 const formatKb = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
+
 const main = async () => {
   const values = parseInput();
   const [before, after] = await Promise.all([
@@ -117,12 +114,18 @@ const main = async () => {
       after: metric(afterBenchmark, 'summary.maxRssKb.p95'),
       format: formatKb,
     },
-    ...bundleSizeComparisonMetrics.map(({ label, key }) => ({
-      label,
-      before: metric(beforeBenchmark, bundleSizeMetricPath(key)),
-      after: metric(afterBenchmark, bundleSizeMetricPath(key)),
+    {
+      label: 'Client JS gzip median',
+      before: metric(beforeBenchmark, 'summary.bundleSize.clientJsGzipBytes.median'),
+      after: metric(afterBenchmark, 'summary.bundleSize.clientJsGzipBytes.median'),
       format: formatBytes,
-    })),
+    },
+    {
+      label: 'Total output gzip median',
+      before: metric(beforeBenchmark, 'summary.bundleSize.totalGzipBytes.median'),
+      after: metric(afterBenchmark, 'summary.bundleSize.totalGzipBytes.median'),
+      format: formatBytes,
+    },
   ];
 
   for (const operation of operations) {

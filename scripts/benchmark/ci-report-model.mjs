@@ -191,10 +191,6 @@ const compareBenchmarks = (baseResult, headResult) => {
       ),
       baseTotalGzipBytes,
       headTotalGzipBytes,
-      totalGzipDeltaPercent: percentDelta(
-        baseTotalGzipBytes,
-        headTotalGzipBytes
-      ),
       baseRunCount: baseBenchmark?.runs?.length ?? null,
       headRunCount: headBenchmark?.runs?.length ?? null,
       headWallMeanMs: headBenchmark?.summary?.wallMs?.mean ?? null,

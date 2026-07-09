@@ -165,6 +165,7 @@ const formatMs = value =>
 const formatReportMs = value => (value == null ? '-' : `${value.toFixed(1)}ms`);
 const formatRss = value =>
   value == null ? '-' : `${Math.round(value / 1024)} MB`;
+
 const formatParallelRouteTransform = parallelRouteTransform => {
   if (parallelRouteTransform === undefined) {
     return 'adaptive';
