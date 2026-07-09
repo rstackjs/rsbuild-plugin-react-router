@@ -686,7 +686,15 @@ async function workflowDev({
   expect(pageErrors).toEqual([]);
 
   // client side navigation
-  await page.getByRole("link", { name: "other" }).click();
+  await page.evaluate(() => {
+    let link = document.querySelector<HTMLAnchorElement>(
+      '#index a[href$="/other"]',
+    );
+    if (!link) {
+      throw new Error("Missing other route link");
+    }
+    link.click();
+  });
   await page.waitForURL(`http://localhost:${port}${basename}other`);
   await page.getByText("other-loader").click();
   expect(pageErrors).toEqual([]);
