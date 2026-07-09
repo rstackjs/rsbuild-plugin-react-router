@@ -11,12 +11,6 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from '@rstest/core';
 
-// Spawning `node` directly on .mts scripts needs the runtime to strip types
-// by default (Node >= 22.18 / 23.6); otherwise the spawn fails with
-// ERR_UNKNOWN_FILE_EXTENSION. The spawns use `process.execPath`, so this
-// process's feature flag matches the spawned binary.
-const skipOnOldNode = !process.features?.typescript;
-
 describe('benchmark fixture generator', () => {
   it('creates a deterministic synthetic React Router app', async () => {
     const { generateSyntheticFixture } = await import(
@@ -366,62 +360,76 @@ describe('benchmark fixture generator', () => {
     }
   });
 
-  it.skipIf(skipOnOldNode)(
-    'accepts equals-form CLI options before benchmark selection (skipped on Node < 22: spawns node on .mts without native type-stripping)',
-    () => {
-      const result = spawnSync(
-        process.execPath,
-        [
-          'scripts/bench-builds.mts',
-          '--profile=smoke',
-          '--iterations=1',
-          '--large-iterations=1',
-          '--warmup=0',
-          '--filter=missing',
-          '--rspack-profile=ALL',
-          '--rspack-trace-output=rspack.log',
-          '--skip-root-build',
-        ],
-        {
-          cwd: process.cwd(),
-          encoding: 'utf8',
-        }
-      );
+  it('requires native TypeScript support for benchmark CLIs', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--no-experimental-strip-types',
+        'scripts/benchmark/run.mjs',
+        'scripts/bench-builds.mts',
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      }
+    );
 
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('No benchmarks matched filter "missing".');
-      expect(result.stderr).not.toContain('Unknown benchmark argument');
-    }
-  );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'Benchmark scripts require Node 22.18+ or 23.6+ with native TypeScript support.'
+    );
+  });
 
-  it.skipIf(skipOnOldNode)(
-    'accepts the large benchmark profile in the CLI (skipped on Node < 22: spawns node on .mts without native type-stripping)',
-    () => {
-      const result = spawnSync(
-        process.execPath,
-        [
-          'scripts/bench-builds.mts',
-          '--profile=large',
-          '--iterations=1',
-          '--warmup=0',
-          '--filter=missing',
-          '--skip-root-build',
-        ],
-        {
-          cwd: process.cwd(),
-          encoding: 'utf8',
-        }
-      );
+  it('accepts equals-form CLI options before benchmark selection', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        'scripts/benchmark/run.mjs',
+        'scripts/bench-builds.mts',
+        '--profile=smoke',
+        '--iterations=1',
+        '--large-iterations=1',
+        '--warmup=0',
+        '--filter=missing',
+        '--rspack-profile=ALL',
+        '--rspack-trace-output=rspack.log',
+        '--skip-root-build',
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      }
+    );
 
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('No benchmarks matched filter "missing".');
-      expect(result.stderr).not.toContain('Unknown profile "large"');
-    }
-  );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('No benchmarks matched filter "missing".');
+    expect(result.stderr).not.toContain('Unknown benchmark argument');
+  });
 
-  it.skipIf(skipOnOldNode)(
-    'renders the embedded synthetic app benchmark row in CI reports (skipped on Node < 22: spawns node on .mts without native type-stripping)',
-    () => {
+  it('accepts the large benchmark profile in the CLI', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        'scripts/benchmark/run.mjs',
+        'scripts/bench-builds.mts',
+        '--profile=large',
+        '--iterations=1',
+        '--warmup=0',
+        '--filter=missing',
+        '--skip-root-build',
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('No benchmarks matched filter "missing".');
+    expect(result.stderr).not.toContain('Unknown profile "large"');
+  });
+
+  it('renders the embedded synthetic app benchmark row in CI reports', () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
 
     try {
@@ -692,6 +700,7 @@ describe('benchmark fixture generator', () => {
       const result = spawnSync(
         process.execPath,
         [
+          'scripts/benchmark/run.mjs',
           'scripts/report-benchmark-ci.mts',
           '--base',
           join(root, 'base.json'),
@@ -774,8 +783,7 @@ describe('benchmark fixture generator', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-    }
-  );
+  });
 });
 function writeJson(file: string, value: unknown) {
   writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
