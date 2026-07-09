@@ -57,3 +57,17 @@ Exact verification:
 - `pnpm typecheck` exited 0, including root `tsc --noEmit`, `tsconfig.tests.json`, and all four React Router framework workspace typechecks.
 - `pnpm exec prettier --check tests/react-router-framework-adapter.test.ts tests/react-router-framework/integration/helpers/rsbuild-adapter.ts tests/react-router-framework/integration/helpers/fixture-workspace-dependencies.ts .superpowers/sdd/task-4-report.md` exited 0.
 - `git diff --check` exited 0.
+
+## Cycle-cleanup follow-up
+
+Fix:
+
+- Changed `fixtures.ts` to import `TemplateName` directly from `templates.ts`, removing its type-only dependency on the `rsbuild.ts` facade.
+
+Exact verification:
+
+- `tracedecay tool grep --project "$PWD" --pattern 'import type \\{ TemplateName \\} from "\\./rsbuild\\.js"' --path-glob 'tests/react-router-framework/integration/helpers/*.ts' --case-sensitive true` returned no matches across 13 helper files.
+- `pnpm exec rstest run tests/react-router-framework-adapter.test.ts` exited 0 (1 file passed, 13 tests passed).
+- `pnpm typecheck` exited 0, including root `tsc --noEmit`, `tsconfig.tests.json`, and all four React Router framework workspace typechecks.
+- `pnpm exec prettier --check tests/react-router-framework/integration/helpers/fixtures.ts .superpowers/sdd/task-4-report.md` exited 0.
+- `git diff --check` exited 0.

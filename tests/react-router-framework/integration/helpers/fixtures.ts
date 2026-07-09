@@ -12,7 +12,7 @@ import {
 } from "execa";
 import * as Path from "pathe";
 
-import type { TemplateName } from "./rsbuild.js";
+import type { TemplateName } from "./templates.js";
 import {
   assertNoViteConfigFiles,
   finalizeFixtureProject,
