@@ -213,12 +213,20 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     return { nextManifest: undefined, shouldRefreshRouteState: false };
   }
 
-  const nextManifest = JSON.parse(JSON.stringify(manifest));
+  // Targeted clone: shallow-copy the manifest and its routes map, then deep-copy
+  // only the route entries we actually mutate below. Untouched entries stay as
+  // shared references (nothing dirty-checks route objects by identity; RR rebuilds
+  // strictly from the explicit routesToRevalidate set), and deep-copying the
+  // touched entries keeps the live manifest unmutated until the final
+  // Object.assign in flush(), matching the previous clone-everything behavior.
+  const nextManifest = { ...manifest, routes: { ...manifest.routes } };
   const routesToRevalidate = new Set();
   for (const { routeId, update } of takePendingRouteUpdates()) {
-    const routeEntry = nextManifest.routes[routeId];
-    if (!routeEntry) continue;
+    const existingEntry = nextManifest.routes[routeId];
+    if (!existingEntry) continue;
 
+    const routeEntry = JSON.parse(JSON.stringify(existingEntry));
+    nextManifest.routes[routeId] = routeEntry;
     applyRouteModuleUpdate(routeId, update, routeEntry, routeModules);
     if (
       routeEntry.hasLoader ||

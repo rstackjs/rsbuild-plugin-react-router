@@ -51,6 +51,31 @@ describe('config import helpers', () => {
     );
   });
 
+  it('replaces the longest matching member path when a prefix and a deeper path are both defined', () => {
+    expect(
+      applyConfigDefines('if (import.meta.env.SSR) run();', {
+        'import.meta.env': '{"MODE":"test"}',
+        'import.meta.env.SSR': 'true',
+      })
+    ).toBe('if (true) run();');
+  });
+
+  it('replaces only the prefix when the deeper path is not defined', () => {
+    expect(
+      applyConfigDefines('if (import.meta.env.SSR) run();', {
+        'import.meta.env': '{"MODE":"test"}',
+      })
+    ).toBe('if ({"MODE":"test"}.SSR) run();');
+  });
+
+  it('replaces the outermost match for computed member access the same as dot access', () => {
+    expect(
+      applyConfigDefines("if (import.meta.env['SSR']) run();", {
+        'import.meta.env.SSR': 'true',
+      })
+    ).toBe('if (true) run();');
+  });
+
   it('collects local modules loaded while importing config', () => {
     const configPath = '/project/react-router.config.ts';
     const helperPath = '/project/config/server-bundles.ts';

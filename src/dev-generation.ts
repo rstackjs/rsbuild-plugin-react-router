@@ -21,14 +21,10 @@ import {
 } from './dev-runtime-artifacts.js';
 import { normalizeEffectError, runPluginEffect } from './effect-runtime.js';
 
-export { snapshotDevChangedFiles } from './dev-runtime-artifacts.js';
 export type {
-  DevChangedFiles,
   DevGraphChanges,
   DevGraphIdentity,
-  ReactRouterDevBuildPlan,
   ReactRouterDevManifest,
-  ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
 
 type CommittedGeneration = {
@@ -228,9 +224,7 @@ const hasSameRouteMetadata = (
   }
   // Without a client-side HMR runtime these flags can only reach the browser
   // through a full reload.
-  return HMR_PATCHABLE_ROUTE_FLAGS.every(
-    flag => previous[flag] === next[flag]
-  );
+  return HMR_PATCHABLE_ROUTE_FLAGS.every(flag => previous[flag] === next[flag]);
 };
 
 const hasRouteManifestMetadataChanges = (
