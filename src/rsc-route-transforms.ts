@@ -99,39 +99,31 @@ const ROUTE_CLIENT_DATA_EXPORTS_SET = new Set<string>(
 const STYLE_SIDE_EFFECT_IMPORT_SOURCE =
   /\.(css|scss|sass|less|styl|stylus)(\.(ts|js))?(\?|$)/;
 
+const isSideEffectStyleImport = (statement: AnyNode): boolean => {
+  if (
+    statement.type !== 'ImportDeclaration' ||
+    (statement.specifiers ?? []).length > 0
+  ) {
+    return false;
+  }
+  const source = statement.source;
+  return (
+    typeof source?.value === 'string' &&
+    STYLE_SIDE_EFFECT_IMPORT_SOURCE.test(source.value)
+  );
+};
+
 const removeSideEffectStyleImports = (program: ProgramNode): void => {
-  program.body = program.body.filter((statement: AnyNode) => {
-    if (statement.type !== 'ImportDeclaration') {
-      return true;
-    }
-    // Only drop specifier-less side-effect imports. Imports WITH specifiers
-    // (e.g. a `?url` asset import used by `links()`) must survive, as must
-    // non-style side-effect imports.
-    if ((statement.specifiers ?? []).length > 0) {
-      return true;
-    }
-    const source = statement.source;
-    if (typeof source?.value !== 'string') {
-      return true;
-    }
-    return !STYLE_SIDE_EFFECT_IMPORT_SOURCE.test(source.value);
-  });
+  // Only drop specifier-less side-effect imports. Imports WITH specifiers
+  // (e.g. a `?url` asset import used by `links()`) must survive, as must
+  // non-style side-effect imports.
+  program.body = program.body.filter(
+    (statement: AnyNode) => !isSideEffectStyleImport(statement),
+  );
 };
 
 const programHasSideEffectStyleImports = (program: ProgramNode): boolean =>
-  (program.body ?? []).some((statement: AnyNode) => {
-    if (statement.type !== 'ImportDeclaration') {
-      return false;
-    }
-    if ((statement.specifiers ?? []).length > 0) {
-      return false;
-    }
-    const source = statement.source;
-    return (
-      typeof source?.value === 'string' &&
-      STYLE_SIDE_EFFECT_IMPORT_SOURCE.test(source.value)
-    );
-  });
+  (program.body ?? []).some(isSideEffectStyleImport);
 
 // A vanilla-extract style imported for its VALUE exports — the generated scoped
 // class names, e.g. `import * as s from "./x.css"` consumed as `s.index`, or
