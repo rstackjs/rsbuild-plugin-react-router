@@ -360,11 +360,10 @@ async function flush() {
     await refreshRouteState(router);
     shouldRevalidate = false;
   } else if (nextManifest) {
-    await refreshRouteState(router);
-    Object.assign(manifest, nextManifest);
     if (hmrRoutes) {
       patchCurrentRouteMatches(router, hmrRoutes);
     }
+    Object.assign(manifest, nextManifest);
     // The node compiler also emits an HDR revision for this route edit. If it
     // did not arrive in this flush, consume that redundant revalidation later.
     pendingComponentRouteRevalidation = !shouldRevalidate;
