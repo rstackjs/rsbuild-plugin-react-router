@@ -407,6 +407,52 @@ describe('benchmark fixture generator', () => {
     expect(result.stderr).not.toContain('Unknown profile "large"');
   });
 
+  it('merges benchmark result shards for CI reporting', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-merge-'));
+
+    try {
+      writeJson(join(root, 'small.json'), {
+        profile: 'ci-small',
+        failed: false,
+        benchmarks: [{ id: 'synthetic-48-ssr-esm' }],
+      });
+      writeJson(join(root, 'large.json'), {
+        profile: 'ci-large',
+        failed: true,
+        benchmarks: [{ id: 'large-355-ssr-esm' }],
+      });
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          'scripts/benchmark/ci-merge-results.mjs',
+          '--out',
+          join(root, 'out/baseline.json'),
+          join(root, 'small.json'),
+          join(root, 'large.json'),
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, result.stderr || result.stdout).toBe(0);
+      expect(
+        JSON.parse(readFileSync(join(root, 'out/baseline.json'), 'utf8'))
+      ).toMatchObject({
+        profile: 'ci-small+ci-large',
+        failed: true,
+        benchmarks: [
+          { id: 'synthetic-48-ssr-esm' },
+          { id: 'large-355-ssr-esm' },
+        ],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('renders the embedded synthetic app benchmark row in CI reports', () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-report-'));
 
