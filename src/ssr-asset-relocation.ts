@@ -15,10 +15,10 @@ import { dirname, join } from 'pathe';
  *
  * Rspack emits these assets into the server output (`build/server/static/...`)
  * and never into the client output. This module mirrors upstream React
- * Router framework plugin, which internally enables `ssrEmitAssets` and then, in
+ * Router's Vite plugin, which internally enables `ssrEmitAssets` and then, in
  * the SSR `writeBundle` hook, moves server-emitted static assets into the
  * client assets directory and strips them from the server build
- * (`react-router-dev/rsbuild/plugin.ts`). Here the equivalent runs inside the
+ * (`react-router-dev/vite/plugin.ts`). Here the equivalent runs inside the
  * node compilation's `processAssets` hook: static assets are written into the
  * client output at the same public path and deleted from the server
  * compilation so the server build never ships duplicate static files.

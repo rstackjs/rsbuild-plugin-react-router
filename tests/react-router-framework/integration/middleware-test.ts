@@ -37,7 +37,6 @@ test.describe("Middleware", () => {
       fixture = await createFixture({
         spaMode: true,
         files: {
-          // ...existing code...
           "react-router.config.ts": reactRouterConfig({
             ssr: false,
             splitRouteModules: false,
@@ -47,7 +46,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
@@ -380,7 +378,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
@@ -479,7 +476,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
@@ -787,7 +783,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
@@ -909,7 +904,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
@@ -1074,7 +1068,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
@@ -1170,7 +1163,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               output: { minify: false }, // Rsbuild: output.minify
               plugins: [pluginReact(), pluginReactRouter()],
@@ -2002,7 +1994,6 @@ test.describe("Middleware", () => {
             import { pluginReact } from "@rsbuild/plugin-react";
             import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-            // Rsbuild manifest is not needed by rsbuild-plugin-react-router.
             export default defineConfig({
               plugins: [pluginReact(), pluginReactRouter()],
             });

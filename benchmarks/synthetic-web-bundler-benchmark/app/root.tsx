@@ -7,7 +7,7 @@ export const meta: MetaFunction = () => [
   { title: 'Synthetic Web Bundler Benchmark' },
   {
     name: 'description',
-    content: 'A deterministic, non-product Rsbuild and Rsbuild benchmark.',
+    content: 'A deterministic, non-product Vite and Rsbuild benchmark.',
   },
 ];
 

@@ -21,7 +21,7 @@ export default (
     model={{ name: 'gpt-5.2-codex', reasoningEffort: 'high' }}
     workingDir=".."
     target={{ language: 'ts' }}
-    description="Port missing behaviors into the Rsbuild React Router plugin."
+    description="Adapt missing upstream React Router framework behaviors to the Rsbuild plugin."
   >
     <Asset id="port_main" kind="code" path="src/index.ts" />
 
@@ -32,9 +32,9 @@ export default (
     >
       <Prompt>
         <System>
-          You are implementing features in a TypeScript Rsbuild plugin. Prefer
-          existing React Router framework behavior when reasonable, but adapt to
-          Rsbuild/Rspack APIs correctly.
+          You are implementing features in a TypeScript Rsbuild plugin. Treat
+          the upstream React Router Vite sources as framework behavior
+          references, then adapt them to Rsbuild/Rspack APIs correctly.
         </System>
         <Skill name="rsbuild-docs">{`Use https://rsbuild.rs/llms.txt as the entry point. It lists relative links like /guide/.../index.md and /config/.../source-map.md. Resolve those against https://rsbuild.rs to navigate to the relevant sections.`}</Skill>
         <Context>
@@ -57,6 +57,26 @@ export default (
             as: 'Dev Server Middleware (src/dev-server.ts)',
             mode: 'code',
           })}
+          {ctx.file('./task/upstream/react-router-dev/vite/plugin.ts', {
+            as: 'Upstream React Router Plugin',
+            mode: 'code',
+          })}
+          {ctx.file('./task/upstream/react-router-dev/vite/remove-exports.ts', {
+            as: 'Upstream remove-exports.ts',
+            mode: 'code',
+          })}
+          {ctx.file('./task/upstream/react-router-dev/vite/ssr-externals.ts', {
+            as: 'Upstream ssr-externals.ts',
+            mode: 'code',
+          })}
+          {ctx.file(
+            './task/upstream/react-router-dev/vite/plugins/validate-plugin-order.ts',
+            { as: 'Upstream validate-plugin-order.ts', mode: 'code' }
+          )}
+          {ctx.file(
+            './task/upstream/react-router-dev/vite/plugins/warn-on-client-source-maps.ts',
+            { as: 'Upstream warn-on-client-source-maps.ts', mode: 'code' }
+          )}
         </Context>
         <Instructions>
           Use only standard JSX syntax. Prompt interpolation must use JSX

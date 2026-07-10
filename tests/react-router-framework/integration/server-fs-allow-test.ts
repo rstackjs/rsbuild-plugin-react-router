@@ -16,8 +16,8 @@ let files = {
   `,
 };
 
-// Skipped: Rsbuild's server.fs.allow is a Rsbuild-migrated static file serving
-// restriction with no rsbuild equivalent; without it this test asserts
+// Skipped: Vite's server.fs.allow is a Vite-only static file serving
+// restriction with no Rsbuild equivalent; without it this test asserts
 // nothing beyond basic rendering covered elsewhere.
 test.describe.skip(async () => {
   let port: number;

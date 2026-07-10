@@ -149,7 +149,7 @@ If none are found, it falls back to defaults.
 
 ### Framework Mode
 
-React Router "Framework Mode" is implemented as a Rsbuild plugin, but this Rsbuild
+React Router "Framework Mode" is implemented as a Vite plugin, but this Rsbuild
 plugin aims to provide equivalent **framework-mode behaviors** (typegen, Route
 Module API types, route module splitting, SPA/SSR/prerender strategies) on top
 of Rsbuild/Rspack.
@@ -672,7 +672,7 @@ and embedded synthetic app timings in the same benchmark comment.
 
 ## React Router Framework Mode
 
-React Router "Framework Mode" wraps Data Mode using a Rsbuild plugin. This Rsbuild
+React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild
 plugin aims to match the important framework behaviors on Rsbuild:
 
 - Typegen + Route Module API types (`./+types/*`)
