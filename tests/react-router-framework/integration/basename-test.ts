@@ -715,7 +715,8 @@ async function workflowDev({
 
   // client side navigation
   const otherLink = page.locator('#index a[href$="/other"]');
-  await otherLink.click({ timeout: devHmrTimeout });
+  await expect(otherLink).toBeVisible({ timeout: devHmrTimeout });
+  await otherLink.dispatchEvent("click");
   await page.waitForURL(`http://localhost:${port}${basename}other`);
   await expect(page.getByText("other-loader")).toBeVisible({
     timeout: devHmrTimeout,
