@@ -56,11 +56,6 @@ type CreateControllerOptions = {
   isBuild: boolean;
   buildPlan: ReactRouterDevBuildPlan;
   /**
-   * The browser HMR runtime patches route manifest metadata (loader/action
-   * flags) in place, so metadata-only changes no longer need a full reload.
-   */
-  clientPatchesRouteMetadata?: boolean;
-  /**
    * Invoked after a development attempt commits a re-evaluated node build for
    * changed server files. Used to signal hot data revalidation to the client.
    */
@@ -85,7 +80,6 @@ export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
   buildPlan,
-  clientPatchesRouteMetadata,
   onNodeRebuildCommitted,
 }: CreateControllerOptions): ReactRouterDevRuntimeController => {
   if (isBuild) {
@@ -284,7 +278,6 @@ export const createReactRouterDevRuntimeController = ({
       const runtime = createReactRouterDevRuntime({
         server,
         buildPlan,
-        clientPatchesRouteMetadata,
         onEvaluationError(error) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;

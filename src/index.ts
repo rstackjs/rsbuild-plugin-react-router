@@ -596,14 +596,12 @@ export const pluginReactRouter = (
             ),
         })
       : undefined;
-    devHdrSignal?.ensure();
-    const devHmrEnabled = devHmrRefreshRuntimePath !== undefined;
+    let devHmrEnabled = false;
 
     const devRuntime = createReactRouterDevRuntimeController({
       api,
       isBuild,
       buildPlan: serverBuildPlan,
-      clientPatchesRouteMetadata: devHmrEnabled,
       onNodeRebuildCommitted: () => devHdrSignal?.bump(),
     });
 
@@ -728,7 +726,7 @@ export const pluginReactRouter = (
           ...bundleVirtualModules,
           ...bundleManifestModules,
           'virtual/react-router/with-props': generateWithProps(),
-          ...(devHmrEnabled && devHmrRefreshRuntimePath
+          ...(devHmrRefreshRuntimePath
             ? {
                 [DEV_HMR_RUNTIME_MODULE_ID]: generateDevHmrRuntimeModule({
                   reactRefreshRuntimePath: devHmrRefreshRuntimePath,
@@ -941,6 +939,27 @@ export const pluginReactRouter = (
         if (name !== 'web' && name !== 'node') {
           return config;
         }
+        if (name === 'web') {
+          const swcOptions =
+            typeof config.tools?.swc === 'object' &&
+            config.tools.swc !== null &&
+            !Array.isArray(config.tools.swc)
+              ? (config.tools.swc as {
+                  jsc?: {
+                    transform?: { react?: { refresh?: boolean } };
+                  };
+                })
+              : undefined;
+          devHmrEnabled =
+            !isBuild &&
+            devHmrRefreshRuntimePath !== undefined &&
+            config.mode === 'development' &&
+            config.dev?.hmr !== false &&
+            swcOptions?.jsc?.transform?.react?.refresh === true;
+          if (devHmrEnabled) {
+            devHdrSignal?.ensure();
+          }
+        }
 
         return mergeEnvironmentConfig(config, {
           tools: {
@@ -1021,7 +1040,7 @@ export const pluginReactRouter = (
       ssr,
       isSpaMode,
       rootRoutePath,
-      devHmrEnabled,
+      isDevHmrEnabled: () => devHmrEnabled,
     });
   },
 });
