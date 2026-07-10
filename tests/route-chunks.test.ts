@@ -168,6 +168,42 @@ describe('route chunks', () => {
       expect(result.chunkedExports).toEqual(routeChunkExportNames);
     });
 
+    it('splits a HydrateFallback initialized by an independent IIFE', async () => {
+      const code = `
+        import { jsx as _jsx } from 'react/jsx-runtime';
+        import { Form } from 'react-router';
+        import clientLoaderStyles from './clientLoader.module.css';
+        import clientActionStyles from './clientAction.module.css';
+        import hydrateFallbackStyles from './hydrateFallback.module.css';
+        export const inSplittableMainChunk = () => console.log() || true;
+        export const clientLoader = async () => ({
+          message: eval("typeof inSplittableMainChunk === 'function'"),
+          className: clientLoaderStyles.root,
+        });
+        export const clientAction = () => ({
+          message: eval("typeof inSplittableMainChunk === 'function'"),
+          className: clientActionStyles.root,
+        });
+        export const HydrateFallback = function() {
+          globalThis.hydrateFallbackDownloaded = true;
+          return () => _jsx('div', { className: hydrateFallbackStyles.root });
+        }();
+        export default function Route() {
+          inSplittableMainChunk();
+          return _jsx(Form, {});
+        }
+      `;
+
+      const result = await detect(code);
+
+      expect(result.hasRouteChunkByExportName).toEqual({
+        clientAction: true,
+        clientLoader: true,
+        clientMiddleware: false,
+        HydrateFallback: true,
+      });
+    });
+
     it('does not treat undeclared globals as shared export dependencies', async () => {
       const code = codeWithHydratedClientLoaderGlobals;
 

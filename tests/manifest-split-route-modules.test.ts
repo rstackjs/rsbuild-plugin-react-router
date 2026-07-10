@@ -109,6 +109,43 @@ describe('manifest split route modules', () => {
     }
   );
 
+  it('includes CSS emitted by split route chunks', async () => {
+    const { root, appDir } = createTempApp(`
+      import styles from './clients.module.css';
+      export async function clientLoader() {
+        return styles.root;
+      }
+      export default function Clients() { return null; }
+    `);
+    writeFileSync(join(appDir, 'routes/clients.module.css'), '.root {}');
+    const clientStats = createClientStats();
+    clientStats.assetsByChunkName[
+      getRouteChunkEntryName('routes/clients', 'clientLoader')
+    ]?.push('static/css/routes/clients-client-loader.css');
+
+    try {
+      const manifest = await getReactRouterManifestForDev(
+        routes,
+        {},
+        clientStats,
+        appDir,
+        '/',
+        {
+          splitRouteModules: true,
+          rootRouteFile: 'root.tsx',
+          isBuild: true,
+          cache: new Map(),
+        }
+      );
+
+      expect(manifest.routes['routes/clients'].css).toContain(
+        '/static/css/routes/clients-client-loader.css'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('omits split route module fields in dev mode', async () => {
     const { root, appDir } = createTempApp();
     try {

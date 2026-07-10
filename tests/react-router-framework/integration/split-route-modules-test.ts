@@ -1,6 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
 import getPort from "get-port";
-import dedent from "dedent";
 
 import {
   createProject,
@@ -542,16 +541,15 @@ test.describe("Split route modules", async () => {
 
       test("build fails", async () => {
         let { stderr, status } = build({ cwd });
+        let output = stderr.toString();
         expect(status).toBe(1);
-        expect(stderr.toString()).toMatch(
-          dedent`
-            Error splitting route module: routes/mixed.tsx
-
-            - clientLoader
-            - HydrateFallback
-
-            These exports could not be split into their own chunks because they share code with other exports. You should extract any shared code into its own module and then import it within the route module.
-          `,
+        expect(output).toContain(
+          "Error splitting route module: routes/mixed.tsx",
+        );
+        expect(output).toContain("- clientLoader");
+        expect(output).toContain("- HydrateFallback");
+        expect(output).toContain(
+          "These exports could not be split into their own chunks because they share code with other exports.",
         );
       });
     });

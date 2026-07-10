@@ -450,18 +450,28 @@ const createRouteManifestItem = ({
   jsAssets,
   routeAnalysis,
   getModulePathForChunk,
+  getCssAssetsForChunk,
 }: {
   route: Route;
   assetPrefix: string;
   jsAssets: string[];
   routeAnalysis: RouteManifestAnalysis;
   getModulePathForChunk: (chunkName: string) => string | undefined;
+  getCssAssetsForChunk: (chunkName: string) => string[];
 }): RouteManifestItem => {
   const routeChunkMap = routeAnalysis.hasRouteChunkByExportName;
   const chunkModulePath = (exportName: RouteChunkExportName) =>
     routeChunkMap?.[exportName]
       ? getModulePathForChunk(getRouteChunkEntryName(route.id, exportName))
       : undefined;
+  const cssAssets = [
+    ...routeAnalysis.cssAssets,
+    ...routeChunkExportNames.flatMap(exportName =>
+      routeChunkMap?.[exportName]
+        ? getCssAssetsForChunk(getRouteChunkEntryName(route.id, exportName))
+        : []
+    ),
+  ];
 
   return {
     id: route.id,
@@ -488,7 +498,9 @@ const createRouteManifestItem = ({
     // the entry chunk's own file from its imports list). Otherwise prefetch
     // link computations produce duplicate modulepreload hrefs.
     imports: jsAssets.slice(1).map(asset => combineURLs(assetPrefix, asset)),
-    css: routeAnalysis.cssAssets.map(asset => combineURLs(assetPrefix, asset)),
+    css: Array.from(new Set(cssAssets)).map(asset =>
+      combineURLs(assetPrefix, asset)
+    ),
   };
 };
 
@@ -518,6 +530,8 @@ function generateReactRouterManifestForDevEffect(
       const { js: jsAssets } = getAssetsForChunk(chunkName);
       return jsAssets[0] ? combineURLs(assetPrefix, jsAssets[0]) : undefined;
     };
+    const getCssAssetsForChunk = (chunkName: string): string[] =>
+      getAssetsForChunk(chunkName).css;
 
     const manifestEntries = yield* Effect.forEach(
       Object.entries(routes),
@@ -558,6 +572,7 @@ function generateReactRouterManifestForDevEffect(
               jsAssets,
               routeAnalysis,
               getModulePathForChunk,
+              getCssAssetsForChunk,
             }),
             routeAnalysis.routeModuleExports,
           ] as const;
