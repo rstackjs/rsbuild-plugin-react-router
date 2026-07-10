@@ -41,6 +41,8 @@ describe('generateDevHmrRuntimeModule', () => {
     );
     expect(code).toContain('export function registerReactRouterRouteExports');
     expect(code).toContain('export function scheduleReactRouterRouteUpdate');
+    expect(code).toContain('if (await refreshRouteState(router))');
+    expect(code).toContain('await revalidateRouter(router)');
   });
 });
 

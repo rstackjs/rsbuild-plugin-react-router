@@ -377,7 +377,9 @@ async function revalidateRouter(router) {
 async function refreshRouteState(router) {
   if (typeof router.revalidate === 'function') {
     await withHdrActive(() => router.revalidate());
+    return true;
   }
+  return false;
 }
 
 function performReactRefresh() {
@@ -410,8 +412,9 @@ async function flush() {
     shouldRefreshRouteState &&
     (routesToRevalidate.size > 0 || shouldRevalidate)
   ) {
-    await refreshRouteState(router);
-    shouldRevalidate = false;
+    if (await refreshRouteState(router)) {
+      shouldRevalidate = false;
+    }
   }
   if (shouldRevalidate) {
     await revalidateRouter(router);
