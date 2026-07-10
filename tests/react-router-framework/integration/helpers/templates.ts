@@ -1,6 +1,6 @@
 const templates = [
-  // Framework Mode template. Collapsed from the upstream Rsbuild 7/Rsbuild 8 pair:
-  // the Rsbuild major version split is meaningless for rsbuild.
+  // Framework mode template. Collapsed from the upstream Vite 7/Vite 8 pair:
+  // the Vite major version split does not apply to Rsbuild.
   { name: "rsbuild-template", displayName: "rsbuild" },
 
   // RSC templates

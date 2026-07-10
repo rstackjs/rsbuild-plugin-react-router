@@ -10,7 +10,6 @@ import {
   ctx,
 } from '@unpack/ai';
 
-// Downstream tasks can include the fetched snapshot index in prompt context.
 export const upstreamPlugin = assetRef('upstream_plugin');
 
 export default (

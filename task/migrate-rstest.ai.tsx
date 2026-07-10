@@ -49,17 +49,15 @@ export default (
           {ctx.file('./README.md', { as: 'README', mode: 'quote' })}
         </Context>
         <Instructions>
-          Read `https://rstest.rs/llms.txt` and follow any linked markdown docs
-          needed to understand how to migrate tests. Then evaluate whether the
-          Rstest migration is complete here. Start by confirming: - What test
-          runner is currently used (scripts, config files, imports). - Whether
-          this repo contains any Rust crates/tests. Constraints: - This repo is
-          TypeScript. Rstest is a JS testing framework for the Rspack/Rsbuild
-          ecosystem. If this repo does not run JS tests, you must NOT invent
-          them. If migration work remains, make the code changes directly in the
-          repo (configs, dependencies, scripts, and tests). This is a
-          code-editing task. Make changes in the repository rather than
-          producing reports.
+          Evaluate whether the Rstest migration is complete here. Start by
+          confirming: - What test runner is currently used (scripts, config
+          files, imports). - Whether this repo contains any Rust crates/tests.
+          Constraints: - This repo is TypeScript. Rstest is a JS testing
+          framework for the Rspack/Rsbuild ecosystem. If this repo does not run
+          JS tests, you must NOT invent them. If migration work remains, make
+          the code changes directly in the repo (configs, dependencies, scripts,
+          and tests). This is a code-editing task. Make changes in the
+          repository rather than producing reports.
         </Instructions>
       </Prompt>
     </Agent>
