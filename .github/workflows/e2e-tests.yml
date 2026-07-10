@@ -60,3 +60,5 @@ jobs:
 
       - name: Run E2E tests
         run: pnpm e2e
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: node_modules/.cache/ms-playwright
