@@ -210,7 +210,9 @@ const hasSameRouteMetadata = (
     previous.clientActionModule === next.clientActionModule &&
     previous.clientLoaderModule === next.clientLoaderModule &&
     previous.clientMiddlewareModule === next.clientMiddlewareModule &&
+    previous.hasAction === next.hasAction &&
     previous.hasDefaultExport === next.hasDefaultExport &&
+    previous.hasLoader === next.hasLoader &&
     previous.hydrateFallbackModule === next.hydrateFallbackModule &&
     previous.id === next.id &&
     previous.index === next.index &&

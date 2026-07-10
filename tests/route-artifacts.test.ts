@@ -220,7 +220,7 @@ describe('route artifact helpers', () => {
       expect(result.code).not.toContain(
         'import.meta.webpackHot.accept("./demo.tsx?react-router-route"'
       );
-      expect(result.code).toContain('"hasLoader":true');
+      expect(result.code).not.toContain('"hasLoader"');
     });
   });
 

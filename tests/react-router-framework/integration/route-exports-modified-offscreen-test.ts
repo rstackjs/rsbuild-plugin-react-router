@@ -35,7 +35,9 @@ const files = {
     export default function Route() {
       const loaderData = useLoaderData();
       return (
-        <div data-loader-data>loaderData = {JSON.stringify(loaderData)}</div>
+        <div data-loader-data>
+          loaderData = {JSON.stringify(loaderData ?? null)}
+        </div>
       );
     }
   `,
@@ -76,8 +78,12 @@ test.describe(async () => {
       originalContents = contents;
       return contents.replace(/export const loader.*/, "");
     });
-    // Give the server time to pick the manifest change
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await expect
+      .poll(async () => {
+        let response = await fetch(`http://localhost:${port}/other`);
+        return await response.text();
+      })
+      .toContain("null</div>");
 
     // After browser reload, client should be aware that there's no loader on the other route
     if (browserName === "webkit") {
@@ -87,7 +93,10 @@ test.describe(async () => {
     }
     // In case the earlier wait wasn't enough, let the test try again
     await expect(async () => {
-      await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
+      pageErrors = [];
+      await page.goto(`http://localhost:${port}`, {
+        waitUntil: "domcontentloaded",
+      });
       await expect(page.locator("[data-mounted]")).toHaveText("Mounted: yes");
       await page.getByRole("link", { name: "/other" }).click();
       await expect(page.locator("[data-loader-data]")).toHaveText(
@@ -96,9 +105,16 @@ test.describe(async () => {
     }).toPass();
     expect(pageErrors).toEqual([]);
 
-    // Revert route to original state to check HMR works and to ensure the
-    // original file contents were valid
+    // Revert route to original state to ensure the original file contents were
+    // valid.
     await edit("app/routes/other.tsx", () => originalContents);
+    await expect
+      .poll(async () => {
+        let response = await fetch(`http://localhost:${port}/other`);
+        return await response.text();
+      })
+      .toContain("&quot;hello&quot;</div>");
+    await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-loader-data]")).toHaveText(
       'loaderData = "hello"',
     );
