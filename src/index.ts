@@ -86,6 +86,7 @@ import {
   createDevHdrRevisionSignal,
   generateDevHmrRuntimeModule,
   getDevHdrRevisionFilePath,
+  isSwcReactRefreshEnabled,
   resolveReactRefreshRuntimePath,
   DEV_HMR_RUNTIME_MODULE_ID,
 } from './dev-hmr.js';
@@ -934,31 +935,33 @@ export const pluginReactRouter = (
       });
     });
 
+    // Gate classic dev HMR on the resolved swc-loader options rather than the
+    // raw `tools.swc` value: users can layer function/array forms on top of
+    // `@rsbuild/plugin-react`, and only the reduced chain options reflect the
+    // final Fast Refresh state. `post` order runs after Rsbuild core's swc
+    // plugin (`pre`) has merged them.
+    api.modifyBundlerChain({
+      order: 'post',
+      handler: (chain, { CHAIN_ID, isDev, environment }) => {
+        if (environment.name !== 'web') {
+          return;
+        }
+        devHmrEnabled =
+          !isBuild &&
+          devHmrRefreshRuntimePath !== undefined &&
+          isDev &&
+          environment.config.dev?.hmr !== false &&
+          isSwcReactRefreshEnabled(chain, CHAIN_ID);
+        if (devHmrEnabled) {
+          devHdrSignal?.ensure();
+        }
+      },
+    });
+
     api.modifyEnvironmentConfig(
       async (config, { name, mergeEnvironmentConfig }) => {
         if (name !== 'web' && name !== 'node') {
           return config;
-        }
-        if (name === 'web') {
-          const swcOptions =
-            typeof config.tools?.swc === 'object' &&
-            config.tools.swc !== null &&
-            !Array.isArray(config.tools.swc)
-              ? (config.tools.swc as {
-                  jsc?: {
-                    transform?: { react?: { refresh?: boolean } };
-                  };
-                })
-              : undefined;
-          devHmrEnabled =
-            !isBuild &&
-            devHmrRefreshRuntimePath !== undefined &&
-            config.mode === 'development' &&
-            config.dev?.hmr !== false &&
-            swcOptions?.jsc?.transform?.react?.refresh === true;
-          if (devHmrEnabled) {
-            devHdrSignal?.ensure();
-          }
         }
 
         return mergeEnvironmentConfig(config, {

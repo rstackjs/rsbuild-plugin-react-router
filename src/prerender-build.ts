@@ -132,23 +132,6 @@ const createDataRequestPath = (
     : `${prerenderPath.replace(/\/$/, '')}.data`;
 };
 
-const createDataOutputPath = (
-  prerenderPath: string,
-  trailingSlashAwareDataRequests: boolean
-): string =>
-  createDataRequestPath(prerenderPath, trailingSlashAwareDataRequests);
-
-const createDataHandlerRequestPath = (
-  prerenderPath: string,
-  trailingSlashAwareDataRequests: boolean
-): string => {
-  if (trailingSlashAwareDataRequests && prerenderPath === '/') {
-    return '/_root.data';
-  }
-
-  return createDataRequestPath(prerenderPath, trailingSlashAwareDataRequests);
-};
-
 export const createBuildRequestEffect = <T>(
   input: string | URL,
   init: RequestInit | undefined,
@@ -196,19 +179,21 @@ const prerenderData = async ({
   api: PrerenderBuildApi;
   requestInit?: RequestInit;
 }): Promise<string> => {
-  const dataRequestPath = createDataHandlerRequestPath(
+  const dataOutputPath = createDataRequestPath(
     prerenderPath,
     trailingSlashAwareDataRequests
   );
-  const dataOutputPath = createDataOutputPath(
-    prerenderPath,
-    trailingSlashAwareDataRequests
-  );
+  // The handler always serves the root route's data at /_root.data, even when
+  // trailing-slash-aware naming writes the root output to /_.data.
+  const dataRequestPath =
+    trailingSlashAwareDataRequests && prerenderPath === '/'
+      ? '/_root.data'
+      : dataOutputPath;
   const normalizedPath = `${basename}${dataRequestPath}`.replace(/\/\/+/g, '/');
-  const outputNormalizedPath = `${basename}${dataOutputPath}`.replace(
-    /\/\/+/g,
-    '/'
-  );
+  const outputNormalizedPath =
+    dataOutputPath === dataRequestPath
+      ? normalizedPath
+      : `${basename}${dataOutputPath}`.replace(/\/\/+/g, '/');
   const url = new URL(`http://localhost${normalizedPath}`);
   if (onlyRoutes?.length) {
     url.searchParams.set('_routes', onlyRoutes.join(','));
