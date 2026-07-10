@@ -69,12 +69,6 @@ export function createReactRouterRscDevServerSetup({
   pluginName,
 }: RscDevServerSetupOptions): RscDevServerSetup {
   return context => {
-    // `ServerSetupContext` is a discriminated union on `action`; only the
-    // `'dev'` server exposes the typed `environments` API (`loadBundle`), while
-    // the `'preview'` server (`RsbuildPreviewServer`) does not. Excluding the
-    // preview branch narrows `context` to the dev variant, so `server` is a
-    // fully typed `RsbuildDevServer` — no casts, and `loadBundle` is only ever
-    // reached on the server that actually provides it.
     if (context.action === 'preview') {
       return;
     }

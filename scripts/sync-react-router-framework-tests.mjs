@@ -138,21 +138,9 @@ export const adaptedCorpusPaths = [
   'react-router-dev/__tests__/rsc-virtual-route-modules-test.ts',
 ];
 
-/**
- * Corpus renames applied on top of the upstream layout. Keys are the upstream
- * path (as it appears in a fresh sync of the pinned ref, relative to the corpus
- * root); values are the corpus path they now live at. These are hand-maintained
- * because the corpus is repo-owned and rsbuild-adapted: upstream filenames and
- * directory names that say "vite" are misleading under rsbuild, so they were
- * renamed to rsbuild-flavored names via `git mv` (history preserved). This map
- * is exported into UPSTREAM.json as `renames` so the provenance of each moved
- * path stays discoverable. The sync flow applies this map before restoring the
- * declared local overlay.
- */
+/** Upstream paths renamed before restoring the local overlay. */
 export const corpusRenames = {
-  // Earlier collapse: the upstream Vite 7 / Vite 8 template pair was merged into
-  // a single template (the Vite major split is meaningless for rsbuild), then
-  // that template was renamed to an rsbuild-flavored name below.
+  // Collapse versioned Vite templates before applying the Rsbuild rename.
   'integration/helpers/vite-8-template': 'integration/helpers/vite-7-template',
 
   // Infrastructure renames (files + directories).
@@ -285,17 +273,7 @@ const packageVersionByName = {
   'react-router': '^8.0.1',
   'react-server-dom-rspack': '0.0.2',
   'rsbuild-plugin-react-router': `^${rootPackageJson.version}`,
-  // rsbuild-plugin-rsc version pin. This map is the SOURCE OF TRUTH for the
-  // fixture package.jsons: a sync run normalizes every corpus package.json to
-  // these versions. The plugin is pre-1.0, so every 0.x minor is a breaking
-  // change — bump ALL of these together:
-  //   1. package.json          -> dependencies["rsbuild-plugin-rsc"]
-  //   2. package.json          -> peerDependencies["rsbuild-plugin-rsc"]
-  //   3. this file (packageVersionByName below)
-  //   4. tests/react-router-framework/integration/helpers/rsbuild-adapter.ts
-  //        (synthesized fixture devDependency)
-  //   5. tests/react-router-framework/integration/helpers/rsc-framework/package.json
-  //   6. tests/react-router-framework/integration/helpers/rsc-preview/package.json
+  // Keep this pin aligned with the root and RSC fixture package manifests.
   'rsbuild-plugin-rsc': '^0.1.1',
   typescript: '^5.9.3',
 };
