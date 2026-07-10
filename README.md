@@ -590,14 +590,14 @@ export default {
 ```json
 {
   "dependencies": {
-    "@react-router/node": "^7.1.3",
-    "@react-router/serve": "^7.1.3",
-    "react-router": "^7.1.3"
+    "@react-router/node": "^7.13.0",
+    "@react-router/serve": "^7.13.0",
+    "react-router": "^7.13.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241112.0",
-    "@react-router/cloudflare": "^7.1.3",
-    "@react-router/dev": "^7.1.3",
+    "@react-router/cloudflare": "^7.13.0",
+    "@react-router/dev": "^7.13.0",
     "wrangler": "^3.106.0"
   }
 }
