@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Route, PluginOptions } from './types.js';
 import type { RsbuildPluginAPI, Rspack } from '@rsbuild/core';
 import {
@@ -25,6 +26,7 @@ type StatsWithIntegrity = {
 
 type CompilationAssetWithIntegrity = {
   name: string;
+  source?: { source(): string | Buffer };
   info?: {
     integrity?: unknown;
   };
@@ -82,7 +84,19 @@ const addIntegrity = (
   if (typeof assetName !== 'string' || typeof integrity !== 'string') {
     return;
   }
-  sri[toManifestAssetUrl(assetPrefix, assetName)] = integrity;
+  const url = toManifestAssetUrl(assetPrefix, assetName);
+  sri[url] ??= integrity;
+};
+
+const computeSubresourceIntegrity = (
+  source: CompilationAssetWithIntegrity['source']
+): string | undefined => {
+  if (!source) {
+    return undefined;
+  }
+  return `sha384-${createHash('sha384')
+    .update(source.source())
+    .digest('base64')}`;
 };
 
 export const collectSubresourceIntegrity = (
@@ -100,11 +114,57 @@ export const collectSubresourceIntegrity = (
     const assets =
       compilation.getAssets() as readonly CompilationAssetWithIntegrity[];
     for (const asset of assets) {
-      addIntegrity(sri, assetPrefix, asset.name, asset.info?.integrity);
+      addIntegrity(
+        sri,
+        assetPrefix,
+        asset.name,
+        asset.info?.integrity ??
+          (asset.name.endsWith('.js')
+            ? computeSubresourceIntegrity(asset.source)
+            : undefined)
+      );
     }
   }
 
   return Object.keys(sri).length > 0 ? sri : undefined;
+};
+
+const getManifestSriAssetUrls = (
+  manifest: ReactRouterManifest
+): ReadonlySet<string> => {
+  const urls = new Set<string>([
+    manifest.url,
+    manifest.entry.module,
+    ...manifest.entry.imports,
+  ]);
+  for (const route of Object.values(manifest.routes)) {
+    urls.add(route.module);
+    for (const asset of route.imports) {
+      urls.add(asset);
+    }
+    for (const asset of [
+      route.clientActionModule,
+      route.clientLoaderModule,
+      route.clientMiddlewareModule,
+      route.hydrateFallbackModule,
+    ]) {
+      if (asset) {
+        urls.add(asset);
+      }
+    }
+  }
+  return urls;
+};
+
+const filterSubresourceIntegrity = (
+  sri: Record<string, string>,
+  manifest: ReactRouterManifest
+): Record<string, string> | undefined => {
+  const urls = getManifestSriAssetUrls(manifest);
+  const filtered = Object.fromEntries(
+    Object.entries(sri).filter(([url]) => urls.has(url))
+  );
+  return Object.keys(filtered).length > 0 ? filtered : undefined;
 };
 
 export function registerModifyBrowserManifestAssets(
@@ -159,10 +219,16 @@ export function registerModifyBrowserManifestAssets(
     // With SRI, integrity hashes are only available once the compilation has
     // finalized asset hashes, so collect them at this (report) stage.
     const sri = withSri
-      ? (collectSubresourceIntegrity(
-          undefined,
-          compilation,
-          currentAssetPrefix
+      ? (filterSubresourceIntegrity(
+          collectSubresourceIntegrity(
+            compilation.getStats().toJson({
+              all: false,
+              assets: true,
+            }) as StatsWithIntegrity,
+            compilation,
+            currentAssetPrefix
+          ) ?? {},
+          manifest
         ) ?? true)
       : undefined;
     const manifestForBrowser: ReactRouterManifest =

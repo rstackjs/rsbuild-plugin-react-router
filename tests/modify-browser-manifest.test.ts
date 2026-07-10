@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -96,7 +97,8 @@ const createProcessAssetsHarness = () => {
 const createCompilation = (
   namedChunks: Array<[string, unknown]>,
   assets: Record<string, Asset> = {},
-  entrypoints: Array<[string, unknown]> = []
+  entrypoints: Array<[string, unknown]> = [],
+  statsAssets?: Array<{ name: string; integrity?: string }>
 ) => ({
   namedChunks: new Map(namedChunks),
   entrypoints: new Map(entrypoints),
@@ -117,6 +119,11 @@ const createCompilation = (
       source,
       info: source.info,
     }));
+  },
+  getStats() {
+    return {
+      toJson: () => ({ assets: statsAssets ?? [] }),
+    };
   },
 });
 
@@ -201,6 +208,28 @@ describe('modify browser manifest plugin', () => {
     );
 
     expect(sri).toBeUndefined();
+  });
+
+  it('computes JS integrity from final compilation assets when metadata is missing', () => {
+    const source = 'console.log("entry");';
+    const sri = collectSubresourceIntegrity(undefined, {
+      getAssets: () => [
+        {
+          name: 'static/js/entry.client.js',
+          source: { source: () => source },
+        },
+        {
+          name: 'static/css/entry.client.css',
+          source: { source: () => '.root{}' },
+        },
+      ],
+    });
+
+    expect(sri).toEqual({
+      '/static/js/entry.client.js': `sha384-${createHash('sha384')
+        .update(source)
+        .digest('base64')}`,
+    });
   });
 
   it('registers browser manifest mutation with Rsbuild processAssets', async () => {
@@ -405,14 +434,18 @@ describe('modify browser manifest plugin', () => {
     const optimizedEntrySource = 'console.log("stable sri");';
     const assets = {
       ...createBrowserManifestAssets(),
-      'static/js/entry.client.js': createAsset(
-        optimizedEntrySource,
-        'sha384-stable-entry'
-      ),
+      'static/js/entry.client.js': createAsset(optimizedEntrySource),
     };
     const compilation = createCompilation(
       [['entry.client', { files: new Set(['static/js/entry.client.js']) }]],
-      assets
+      assets,
+      [],
+      [
+        {
+          name: 'static/js/entry.client.js',
+          integrity: 'sha384-stable-entry',
+        },
+      ]
     );
     let reportedSri: Record<string, string> | undefined;
 
