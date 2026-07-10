@@ -712,14 +712,8 @@ async function workflowDev({
   expect(pageErrors).toEqual([]);
 
   // client side navigation
-  await page.evaluate(() => {
-    let link = document.querySelector<HTMLAnchorElement>(
-      '#index a[href$="/other"]',
-    );
-    if (!link) {
-      throw new Error("Missing other route link");
-    }
-    link.click();
+  await page.locator('#index a[href$="/other"]').click({
+    timeout: devHmrTimeout,
   });
   await page.waitForURL(`http://localhost:${port}${basename}other`);
   await expect(page.getByText("other-loader")).toBeVisible({
