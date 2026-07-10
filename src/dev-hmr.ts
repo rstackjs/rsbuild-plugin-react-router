@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'pathe';
 
 export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
+export const DEV_MANIFEST_UPDATE_EVENT = 'react-router:manifest-update';
 
 export type DevHmrPlanOptions = {
   enabled: true;
@@ -336,6 +337,34 @@ function performReactRefresh() {
   }
 }
 
+function applyManifestUpdate(nextRoutes) {
+  const router = window.__reactRouterDataRouter;
+  const routeModules = window.__reactRouterRouteModules;
+  const manifest = window.__reactRouterManifest;
+  const context = window.__reactRouterContext;
+  if (
+    !router ||
+    !routeModules ||
+    !manifest ||
+    !context ||
+    !nextRoutes ||
+    typeof router.createRoutesForHMR !== 'function' ||
+    typeof router._internalSetRoutes !== 'function'
+  ) {
+    return;
+  }
+  const routes = router.createRoutesForHMR(
+    new Set(Object.keys(nextRoutes)),
+    nextRoutes,
+    routeModules,
+    context.ssr,
+    context.isSpaMode
+  );
+  manifest.routes = nextRoutes;
+  router._internalSetRoutes(routes);
+  patchCurrentRouteMatches(router, routes);
+}
+
 async function flush() {
   const router = window.__reactRouterDataRouter;
   const routeModules = window.__reactRouterRouteModules;
@@ -379,6 +408,10 @@ async function flush() {
 }
 
 if (typeof window !== 'undefined' && import.meta.webpackHot) {
+  import.meta.webpackHot.on(
+    ${JSON.stringify(DEV_MANIFEST_UPDATE_EVENT)},
+    applyManifestUpdate
+  );
   import.meta.webpackHot.accept(
     ${JSON.stringify(hdrRevisionFilePath)},
     () => {

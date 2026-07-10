@@ -70,14 +70,10 @@ type CreateReactRouterDevRuntimeOptions = {
   buildPlan: ReactRouterDevBuildPlan;
   onEvaluationError: (error: Error) => void;
   onCssAssetOwnershipChanged?: (change: 'removed' | 'restored') => void;
-  onRouteManifestChanged?: () => void;
+  onRouteManifestChanged?: (
+    manifest: ReactRouterDevManifestSet[string]
+  ) => void;
   onWarning?: (message: string) => void;
-  /**
-   * When the browser HMR runtime patches route metadata flags (hasLoader and
-   * friends) in place, flag-only manifest changes no longer require the
-   * full-reload notification from `onRouteManifestChanged`.
-   */
-  clientPatchesRouteMetadata?: boolean;
 };
 
 const collectManifestCssAssetOwnership = (
@@ -277,7 +273,6 @@ export const createReactRouterDevRuntime = ({
   onCssAssetOwnershipChanged = () => undefined,
   onRouteManifestChanged = () => undefined,
   onWarning = () => undefined,
-  clientPatchesRouteMetadata = false,
 }: CreateReactRouterDevRuntimeOptions): ReactRouterDevRuntime => {
   let nextAttemptId = 1;
   let reloadAfterCssRemoval = false;
@@ -303,9 +298,11 @@ export const createReactRouterDevRuntime = ({
     }
   };
 
-  const notifyRouteManifestChanged = (): void => {
+  const notifyRouteManifestChanged = (
+    manifest: ReactRouterDevManifestSet[string]
+  ): void => {
     try {
-      onRouteManifestChanged();
+      onRouteManifestChanged(manifest);
     } catch (cause) {
       onWarning(
         `[rsbuild-plugin-react-router] Failed to notify the browser after route manifest metadata changed: ${normalizeEffectError(cause).message}`
@@ -532,7 +529,7 @@ export const createReactRouterDevRuntime = ({
         hasRouteManifestMetadataChanges(
           previous.web.manifestsByEntryName,
           manifestsByEntryName,
-          !clientPatchesRouteMetadata
+          true
         );
       const reusePreviousNodeBuild =
         !!previous &&
@@ -606,7 +603,9 @@ export const createReactRouterDevRuntime = ({
           reloadAfterCssRemoval = false;
         }
         if (routeManifestMetadataChanged) {
-          notifyRouteManifestChanged();
+          notifyRouteManifestChanged(
+            web.manifestsByEntryName[buildPlan.defaultEntryName]
+          );
         }
         return 'committed';
       } catch (cause) {

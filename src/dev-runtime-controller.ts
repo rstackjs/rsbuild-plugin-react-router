@@ -20,6 +20,7 @@ import {
   registerReactRouterDevRuntime,
   unregisterReactRouterDevRuntime,
 } from './dev-generation.js';
+import { DEV_MANIFEST_UPDATE_EVENT } from './dev-hmr.js';
 import {
   getEnvironmentStats,
   snapshotDevChangedFiles,
@@ -268,7 +269,6 @@ export const createReactRouterDevRuntimeController = ({
       const runtime = createReactRouterDevRuntime({
         server,
         buildPlan,
-        clientPatchesRouteMetadata,
         onEvaluationError(error) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
@@ -286,11 +286,18 @@ export const createReactRouterDevRuntimeController = ({
           reloadAfterCssAssetOwnershipRemoval = change === 'removed';
           sendCssAssetOwnershipReload();
         },
-        onRouteManifestChanged() {
+        onRouteManifestChanged(manifest) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
           }
-          server.sockWrite('full-reload', { path: '*' });
+          if (clientPatchesRouteMetadata) {
+            server.sockWrite('custom', {
+              event: DEV_MANIFEST_UPDATE_EVENT,
+              data: manifest.routes,
+            });
+          } else {
+            server.sockWrite('full-reload', { path: '*' });
+          }
         },
         onWarning: message => api.logger.warn(message),
       });

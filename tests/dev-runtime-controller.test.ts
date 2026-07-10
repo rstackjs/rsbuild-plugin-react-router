@@ -119,7 +119,10 @@ type TestConfig = {
   server?: { setup?: TestServerSetup | TestServerSetup[] };
 };
 
-const createHarness = (userSetup?: TestServerSetup) => {
+const createHarness = (
+  userSetup?: TestServerSetup,
+  options: { clientPatchesRouteMetadata?: boolean } = {}
+) => {
   let start!: OnBeforeStartDevServerFn;
   let startOrder: 'pre' | 'post' | 'default' = 'default';
   let before!: OnBeforeDevCompileFn;
@@ -209,6 +212,7 @@ const createHarness = (userSetup?: TestServerSetup) => {
       defaultEntryName: 'static/js/app',
       entryNames: ['static/js/app'],
     },
+    clientPatchesRouteMetadata: options.clientPatchesRouteMetadata,
     onNodeRebuildCommitted,
   });
   const createServer = (
@@ -535,8 +539,11 @@ describe('React Router development runtime controller', () => {
     });
   });
 
-  it('hard reloads when route export metadata changes', async () => {
-    const { callbacks, controller, loadBundle, server } = createHarness();
+  it('publishes route metadata changes to the HMR runtime', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness(
+      undefined,
+      { clientPatchesRouteMetadata: true }
+    );
     loadBundle.mockImplementation(() => createBuild('base'));
     const web = createCompiler('web');
     const node = createCompiler('node');
@@ -567,7 +574,12 @@ describe('React Router development runtime controller', () => {
       clientLoaderModule: '/routes/about.clientLoader.js',
     });
 
-    expect(server.sockWrite).toHaveBeenCalledWith('full-reload', { path: '*' });
+    expect(server.sockWrite).toHaveBeenCalledWith('custom', {
+      event: 'react-router:manifest-update',
+      data: expect.objectContaining({
+        'routes/about': expect.objectContaining({ hasClientLoader: true }),
+      }),
+    });
   });
 
   it('publishes a safe node-only compile after the aggregate pre-hook', async () => {
