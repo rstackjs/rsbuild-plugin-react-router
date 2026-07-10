@@ -198,8 +198,9 @@ export const registerReactRouterDevBackgroundResources = ({
     : null;
 
   if (!isBuild) {
-    api.onBeforeStartDevServer(() => {
+    api.onBeforeStartDevServer(async () => {
       routeTopologyWatcherClosed = false;
+      await ensureDevRestartMarker(routeRestartMarkerPath);
     });
 
     api.onAfterStartDevServer(({ port }) => {

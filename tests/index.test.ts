@@ -157,7 +157,7 @@ describe('pluginReactRouter', () => {
         },
         {
           paths: expect.stringMatching(
-            /build\/client\/\.react-router\/route-watch$/
+            /\.react-router\/route-watch$/
           ),
           type: 'reload-server',
         },
@@ -344,7 +344,7 @@ describe('pluginReactRouter', () => {
       expect.arrayContaining([
         {
           paths: expect.stringMatching(
-            /build\/client\/\.react-router\/route-watch$/
+            /\.react-router\/route-watch$/
           ),
           type: 'reload-server',
         },

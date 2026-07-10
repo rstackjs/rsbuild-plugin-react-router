@@ -110,9 +110,9 @@ describe('route watch restart marker', () => {
     }
   });
 
-  it('places the restart marker in the client build output', () => {
-    expect(getRouteRestartMarkerPath('/project/build/client')).toBe(
-      resolve('/project/build/client', '.react-router/route-watch')
+  it('places the restart marker beside the app directory', () => {
+    expect(getRouteRestartMarkerPath('/project/app')).toBe(
+      resolve('/project', '.react-router/route-watch')
     );
   });
 
