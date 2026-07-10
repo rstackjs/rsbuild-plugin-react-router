@@ -261,7 +261,7 @@ jobs:
 
       - name: Test benchmark scripts
         if: steps.synthetic-benchmark.outputs.SKIP == 'false'
-        working-directory: ${{ steps.synthetic-benchmark.outputs.TOOL_ROOT }}
+        working-directory: head/benchmarks/synthetic-web-bundler-benchmark
         run: pnpm test:benchmark
 
       - name: Restore base synthetic benchmark results
