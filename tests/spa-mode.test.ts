@@ -28,6 +28,21 @@ describe('SPA Mode (ssr: false)', () => {
       expect(result).toContain('export const ssr = false');
     });
 
+    it('should only import the root route when ssr is false', () => {
+      const result = generateServerBuild(mockRoutes, {
+        entryServerPath: './app/entry.server.tsx',
+        assetsBuildDirectory: 'build/client',
+        basename: '/',
+        appDirectory: 'app',
+        ssr: false,
+        routeDiscovery: { mode: 'initial' },
+      });
+
+      expect(result).toContain('/app/root.tsx";');
+      expect(result).not.toContain('routes/home.tsx');
+      expect(result).toContain('const route1 = { default: () => null };');
+    });
+
     it('should set isSpaMode to false when ssr is true', () => {
       const result = generateServerBuild(mockRoutes, {
         entryServerPath: './app/entry.server.tsx',

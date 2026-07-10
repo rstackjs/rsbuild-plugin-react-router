@@ -44,6 +44,9 @@ function generateStaticTemplate(
     ${Object.keys(routes)
       .map((key, index) => {
         const route = routes[key];
+        if (!options.ssr && key !== 'root') {
+          return `const route${index} = { default: () => null };`;
+        }
         return `import * as route${index} from ${JSON.stringify(
           resolve(options.appDirectory, route.file)
         )};`;
