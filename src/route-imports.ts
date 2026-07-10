@@ -1,11 +1,7 @@
 import type { Rspack } from '@rsbuild/core';
 import { resolve } from 'pathe';
 
-import {
-  BUILD_CLIENT_ROUTE_QUERY_STRING,
-  JS_EXTENSIONS,
-  PLUGIN_NAME,
-} from './constants.js';
+import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
 import type { Route } from './types.js';
 
 type QuerylessRouteImportPlugin = {
@@ -16,6 +12,7 @@ type QuerylessRouteImportPlugin = {
 const RSC_CLIENT_ROUTE_MODULE_QUERY_PREFIX = '?client-route-module=';
 const RSC_SHARED_CLIENT_ROUTE_MODULE_QUERY = '?client-route-module=shared';
 const RSC_SERVER_ROUTE_MODULE_QUERY = '?server-route-module=';
+const CLASSIC_CLIENT_ROUTE_MODULE_QUERY = '?react-router-route';
 
 const isRscClientRouteModuleIssuer = (issuer: string): boolean =>
   issuer.includes(RSC_CLIENT_ROUTE_MODULE_QUERY_PREFIX);
@@ -68,16 +65,14 @@ export const resolveQuerylessRouteImportRequest = ({
   }
 
   if (!rsc && isWebCompiler) {
-    return `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`;
+    return `${routeFilePath}${CLASSIC_CLIENT_ROUTE_MODULE_QUERY}`;
   }
 
   if (isWebCompiler || isRscClientIssuer) {
     return `${routeFilePath}${RSC_SHARED_CLIENT_ROUTE_MODULE_QUERY}`;
   }
 
-  return `${routeFilePath}${
-    rsc ? RSC_SERVER_ROUTE_MODULE_QUERY : BUILD_CLIENT_ROUTE_QUERY_STRING
-  }`;
+  return `${routeFilePath}${RSC_SERVER_ROUTE_MODULE_QUERY}`;
 };
 
 export const createQuerylessRouteImportPlugin = (

@@ -73,7 +73,7 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { clientLoader, customExport, default, meta } from ${JSON.stringify(routeRequest)};`,
+        code: `export { clientLoader, default, meta } from ${JSON.stringify(routeRequest)};`,
       });
     });
 
@@ -141,7 +141,7 @@ describe('route artifact helpers', () => {
       });
     });
 
-    it('keeps the full route module when no route exports split', async () => {
+    it('excludes custom exports from production route entries', async () => {
       const result = await createRouteClientEntryArtifact({
         code: `
           export const clientLoader = async () => {};
@@ -156,7 +156,7 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { clientLoader, customExport, default } from ${JSON.stringify(
+        code: `export { clientLoader, default } from ${JSON.stringify(
           routeRequest
         )};`,
       });

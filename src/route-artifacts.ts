@@ -146,7 +146,7 @@ const shouldReexportFromRouteEntry = ({
       SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName)
     );
   }
-  return !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName);
+  return CLIENT_ROUTE_EXPORTS_SET.has(exportName);
 };
 
 export const buildRouteClientEntryCode = ({
