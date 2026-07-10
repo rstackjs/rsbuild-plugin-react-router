@@ -7,7 +7,10 @@ import { test, createEditor, rsbuildConfig } from "./helpers/rsbuild.js";
 
 const templateName = "rsc-framework" as const satisfies TemplateName;
 const hydrationTimeout = 45_000;
-const hmrTimeout = 15_000;
+// HMR steps that introduce a NEW module (e.g. adding an imported client
+// component) pay a cold compile before the update applies; CI runners take
+// several times longer than the ~6s local run, so widen the budget there.
+const hmrTimeout = process.env.CI ? 45_000 : 15_000;
 
 test.use({ javaScriptEnabled: true });
 
