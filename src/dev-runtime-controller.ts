@@ -55,6 +55,16 @@ type CreateControllerOptions = {
   api: RsbuildPluginAPI;
   isBuild: boolean;
   buildPlan: ReactRouterDevBuildPlan;
+  /**
+   * The browser HMR runtime patches route manifest metadata (loader/action
+   * flags) in place, so metadata-only changes no longer need a full reload.
+   */
+  clientPatchesRouteMetadata?: boolean;
+  /**
+   * Invoked after a development attempt commits a re-evaluated node build for
+   * changed server files. Used to signal hot data revalidation to the client.
+   */
+  onNodeRebuildCommitted?: () => void;
 };
 
 const escapeHtml = (value: string): string =>
@@ -65,10 +75,18 @@ const escapeHtml = (value: string): string =>
 
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
 
+const isHdrRevisionFile = (file: string): boolean =>
+  file.includes('.react-router/hdr-revision.mjs');
+
+const isCssSourceFile = (file: string): boolean =>
+  /\.css(?:\.[cm]?[jt]s)?$/.test(file);
+
 export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
   buildPlan,
+  clientPatchesRouteMetadata,
+  onNodeRebuildCommitted,
 }: CreateControllerOptions): ReactRouterDevRuntimeController => {
   if (isBuild) {
     return {
@@ -132,6 +150,14 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
+  // Web-only commits reuse the node compiler's stale `modifiedFiles`
+  // snapshot, and every HDR bump itself triggers a web rebuild — so signal
+  // once per node compilation identity or the bump loop self-sustains.
+  const hdrSignaledNodeIdentity = new WeakMap<
+    DevCompilerPair,
+    NonNullable<DevGraphIdentity['node']>
+  >();
+
   const finishRuntimeAttemptEffect = (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
@@ -144,11 +170,24 @@ export const createReactRouterDevRuntimeController = ({
     ).pipe(
       Effect.flatMap(result =>
         tryPluginSync(() => {
-          if (
-            result === 'retry-node' &&
-            sessions.getActiveBinding()?.id === binding.id
-          ) {
+          if (sessions.getActiveBinding()?.id !== binding.id) {
+            return;
+          }
+          if (result === 'retry-node') {
             pair.node.watching?.invalidate();
+            return;
+          }
+          if (
+            result === 'committed' &&
+            changes.node.known &&
+            identity.node !== undefined &&
+            hdrSignaledNodeIdentity.get(pair) !== identity.node &&
+            Array.from(changes.node.files).some(
+              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
+            )
+          ) {
+            hdrSignaledNodeIdentity.set(pair, identity.node);
+            onNodeRebuildCommitted?.();
           }
         })
       ),
@@ -245,6 +284,7 @@ export const createReactRouterDevRuntimeController = ({
       const runtime = createReactRouterDevRuntime({
         server,
         buildPlan,
+        clientPatchesRouteMetadata,
         onEvaluationError(error) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;

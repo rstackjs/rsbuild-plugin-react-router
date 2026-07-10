@@ -82,6 +82,13 @@ import {
   createReactRouterRouteWatchFiles,
   registerReactRouterDevBackgroundResources,
 } from './dev-background-resources.js';
+import {
+  createDevHdrRevisionSignal,
+  generateDevHmrRuntimeModule,
+  getDevHdrRevisionFilePath,
+  resolveReactRefreshRuntimePath,
+  DEV_HMR_RUNTIME_MODULE_ID,
+} from './dev-hmr.js';
 
 export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
 export { loadReactRouterServerBuild } from './dev-generation.js';
@@ -576,10 +583,28 @@ export const pluginReactRouter = (
       defaultEntryName: devServerBuildEntryName,
     });
     const { serverBundleEntries } = serverBuildPlan;
+
+    const devHmrRefreshRuntimePath = isBuild
+      ? undefined
+      : resolveReactRefreshRuntimePath(api.context.rootPath);
+    const devHdrSignal = devHmrRefreshRuntimePath
+      ? createDevHdrRevisionSignal({
+          filePath: getDevHdrRevisionFilePath(api.context.rootPath),
+          onError: error =>
+            api.logger.debug(
+              `[${PLUGIN_NAME}] Failed to signal hot data revalidation: ${error.message}`
+            ),
+        })
+      : undefined;
+    devHdrSignal?.ensure();
+    const devHmrEnabled = devHmrRefreshRuntimePath !== undefined;
+
     const devRuntime = createReactRouterDevRuntimeController({
       api,
       isBuild,
       buildPlan: serverBuildPlan,
+      clientPatchesRouteMetadata: devHmrEnabled,
+      onNodeRebuildCommitted: () => devHdrSignal?.bump(),
     });
 
     let clientStats: ReactRouterManifestStats | undefined;
@@ -703,6 +728,16 @@ export const pluginReactRouter = (
           ...bundleVirtualModules,
           ...bundleManifestModules,
           'virtual/react-router/with-props': generateWithProps(),
+          ...(devHmrEnabled && devHmrRefreshRuntimePath
+            ? {
+                [DEV_HMR_RUNTIME_MODULE_ID]: generateDevHmrRuntimeModule({
+                  reactRefreshRuntimePath: devHmrRefreshRuntimePath,
+                  hdrRevisionFilePath: getDevHdrRevisionFilePath(
+                    api.context.rootPath
+                  ),
+                }),
+              }
+            : {}),
         })
       );
     };
@@ -986,6 +1021,7 @@ export const pluginReactRouter = (
       ssr,
       isSpaMode,
       rootRoutePath,
+      devHmrEnabled,
     });
   },
 });
