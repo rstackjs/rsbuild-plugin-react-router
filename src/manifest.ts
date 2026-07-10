@@ -281,7 +281,8 @@ const DEFAULT_MANIFEST_DIR = DEFAULT_JS_DIST_PATH;
 const CSS_IMPORT_RE = /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/;
 
 const createChunkAssetResolver = (
-  clientStats: ReactRouterManifestStats | undefined
+  clientStats: ReactRouterManifestStats | undefined,
+  includeEntrypointJs: boolean
 ): ((chunkName: string) => ChunkAssets) => {
   const chunkAssetsByName = new Map<string, ChunkAssets>();
 
@@ -311,7 +312,7 @@ const createChunkAssetResolver = (
     for (const asset of clientStats?.entrypointFilesByName?.[chunkName] ?? []) {
       if (asset.endsWith('.css')) {
         cssAssets.add(asset);
-      } else if (asset.endsWith('.js')) {
+      } else if (includeEntrypointJs && asset.endsWith('.js')) {
         jsAssets.add(asset);
       }
     }
@@ -527,7 +528,7 @@ function generateReactRouterManifestForDevEffect(
           }
         : null;
 
-    const getAssetsForChunk = createChunkAssetResolver(clientStats);
+    const getAssetsForChunk = createChunkAssetResolver(clientStats, isBuild);
     const getModulePathForChunk = (chunkName: string): string | undefined => {
       const { js: jsAssets } = getAssetsForChunk(chunkName);
       return jsAssets[0] ? combineURLs(assetPrefix, jsAssets[0]) : undefined;
@@ -622,7 +623,10 @@ function generateReactRouterManifestForDevEffect(
 
     const manifest = {
       version,
-      url: combineURLs(assetPrefix, manifestPath),
+      url: combineURLs(
+        assetPrefix,
+        isBuild ? manifestPath : `${manifestPath}?v=${version}`
+      ),
       hmr: undefined,
       entry: fingerprintedValues.entry,
       sri: undefined,

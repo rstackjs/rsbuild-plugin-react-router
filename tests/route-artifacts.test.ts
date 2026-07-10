@@ -201,6 +201,27 @@ describe('route artifact helpers', () => {
         )};`,
       });
     });
+
+    it('self-accepts dev HMR route entries so metadata is refreshed', async () => {
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export async function loader() { return null; }
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        environmentName: 'web',
+        isBuild: false,
+        routeChunkConfig: disabledRouteChunkConfig,
+        routeId: 'routes/demo',
+        devHmr: true,
+      });
+
+      expect(result.code).toContain('import.meta.webpackHot.accept();');
+      expect(result.code).not.toContain(
+        'import.meta.webpackHot.accept("./demo.tsx?react-router-route"'
+      );
+      expect(result.code).toContain('"hasLoader":true');
+    });
   });
 
   describe('createRouteChunkArtifact', () => {
