@@ -119,10 +119,7 @@ type TestConfig = {
   server?: { setup?: TestServerSetup | TestServerSetup[] };
 };
 
-const createHarness = (
-  userSetup?: TestServerSetup,
-  options: { clientPatchesRouteMetadata?: boolean } = {}
-) => {
+const createHarness = (userSetup?: TestServerSetup) => {
   let start!: OnBeforeStartDevServerFn;
   let startOrder: 'pre' | 'post' | 'default' = 'default';
   let before!: OnBeforeDevCompileFn;
@@ -212,7 +209,6 @@ const createHarness = (
       defaultEntryName: 'static/js/app',
       entryNames: ['static/js/app'],
     },
-    clientPatchesRouteMetadata: options.clientPatchesRouteMetadata,
     onNodeRebuildCommitted,
   });
   const createServer = (
@@ -539,13 +535,9 @@ describe('React Router development runtime controller', () => {
     });
   });
 
-  it('hard reloads when server route export metadata changes', async () => {
-    const { callbacks, controller, loadBundle, server } = createHarness(
-      undefined,
-      { clientPatchesRouteMetadata: true }
-    );
-    let build = createBuild('base');
-    loadBundle.mockImplementation(() => build);
+  it('hard reloads when route export metadata changes', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('base'));
     const web = createCompiler('web');
     const node = createCompiler('node');
     await callbacks.start({ server });
@@ -569,10 +561,11 @@ describe('React Router development runtime controller', () => {
       });
     };
 
-    await finishCompile('web-base', { hasLoader: false });
-    build = createBuild('web-next');
-    build.routes['routes/about'].module.loader = () => null;
-    await finishCompile('web-next', { hasLoader: true });
+    await finishCompile('web-base', { hasClientLoader: false });
+    await finishCompile('web-next', {
+      hasClientLoader: true,
+      clientLoaderModule: '/routes/about.clientLoader.js',
+    });
 
     expect(server.sockWrite).toHaveBeenCalledWith('full-reload', { path: '*' });
   });
