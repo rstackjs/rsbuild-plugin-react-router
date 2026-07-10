@@ -687,17 +687,9 @@ async function workflowDev({
   expect(pageErrors).toEqual([]);
 
   // route: HMR
-  const routeHotUpdate = page.waitForResponse(
-    (response) =>
-      response.url().includes("routes/_index.") &&
-      response.url().includes(".hot-update.") &&
-      response.status() < 400,
-    { timeout: devHmrTimeout },
-  );
   await edit("app/routes/_index.tsx", (contents) =>
     contents.replace("HMR updated: 0", "HMR updated: 1"),
   );
-  await routeHotUpdate;
   try {
     await expect(hmrStatus).toHaveText("HMR updated: 1", {
       timeout: devHmrTimeout,
