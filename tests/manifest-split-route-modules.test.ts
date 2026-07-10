@@ -138,9 +138,9 @@ describe('manifest split route modules', () => {
         }
       );
 
-      expect(manifest.routes['routes/clients'].css).toContain(
-        '/static/css/routes/clients-client-loader.css'
-      );
+      expect(manifest.routes['routes/clients'].css).toEqual([
+        '/static/css/routes/clients-client-loader.css',
+      ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

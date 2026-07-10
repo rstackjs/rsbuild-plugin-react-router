@@ -318,18 +318,17 @@ const getExportDependencies = (
             return;
           }
 
-          let isImportedSymbol = false;
           for (const declaration of symbol.declarations as AnyNode[]) {
             const statement = addCachedTopLevelStatement(
               dependencies,
               declaration
             );
             if (statement.type === 'ImportDeclaration') {
-              isImportedSymbol = true;
               dependencies.importedIdentifierNames.add(symbol.name);
               if (typeof statement.source?.value === 'string') {
                 dependencies.importSources.add(statement.source.value);
               }
+              return;
             }
             const declarator = getCachedVariableDeclaratorForNode(declaration);
             if (
@@ -339,10 +338,6 @@ const getExportDependencies = (
               dependencies.exportedVariableDeclarators.add(declarator);
             }
             scanNode(declarator ?? statement);
-          }
-
-          if (isImportedSymbol) {
-            return;
           }
 
           for (const reference of symbol.references as any[]) {
