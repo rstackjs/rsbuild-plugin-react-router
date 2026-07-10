@@ -100,7 +100,7 @@ export const createReactRouterRouteWatchFiles = ({
     watchFiles.push(
       {
         paths: routeConfigWatchPaths,
-        type: 'reload-server',
+        type: 'reload-page',
       },
       {
         paths: routeRestartMarkerPath,
@@ -198,8 +198,9 @@ export const registerReactRouterDevBackgroundResources = ({
     : null;
 
   if (!isBuild) {
-    api.onBeforeStartDevServer(() => {
+    api.onBeforeStartDevServer(async () => {
       routeTopologyWatcherClosed = false;
+      await ensureDevRestartMarker(routeRestartMarkerPath);
     });
 
     api.onAfterStartDevServer(({ port }) => {

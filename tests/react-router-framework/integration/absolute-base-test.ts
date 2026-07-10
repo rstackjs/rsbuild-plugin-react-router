@@ -4,7 +4,7 @@ import type { Files } from "./helpers/rsbuild.js";
 import { test, rsbuildConfig } from "./helpers/rsbuild.js";
 
 let files: Files = async ({ port }) => ({
-  // Vite absolute-URL `base` -> rsbuild dev/output asset prefixes
+  // Rsbuild absolute-URL `base` -> rsbuild dev/output asset prefixes
   "rsbuild.config.ts": await rsbuildConfig.basic({
     port,
     base: `http://localhost:${port}/`,

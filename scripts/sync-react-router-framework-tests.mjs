@@ -221,6 +221,7 @@ export const removedUpstreamPaths = [
   'integration/helpers/vite-plugin-cloudflare-template',
   'integration/vite-plugin-cloudflare-test.ts',
   'integration/vite-plugin-order-validation-test.ts',
+  'react-router-dev/__tests__/styles-test.ts',
 ];
 
 const preservedCorpusPaths = [

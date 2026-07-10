@@ -389,7 +389,7 @@ const handleSpaMode = async ({
         }
         throw new Error(
           `SPA Mode: Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
+            '`entry.server.tsx` while prerendering your SPA Fallback HTML file.\n' +
             html
         );
       }

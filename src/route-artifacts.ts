@@ -1,5 +1,3 @@
-import { basename } from 'pathe';
-
 import {
   CLIENT_EXPORTS,
   CLIENT_ROUTE_EXPORTS_SET,
@@ -85,25 +83,21 @@ export const buildRouteHmrMetadata = (
  * Development-only HMR glue for a web route client entry.
  *
  * The route client entry is the webpack entry for a route, so it must
- * self-accept hot updates to stop them from bubbling into a full reload. It
- * also accepts updates of the underlying route module and forwards fresh
- * exports plus route metadata (loader/action flags derived from the current
- * export names) to the shared HMR runtime, which applies the React Router
- * route-module update contract and revalidates loader data.
+ * self-accept hot updates to stop them from bubbling into a full reload. The
+ * route entry itself must re-run on updates so route metadata (loader/action
+ * flags derived from current export names) does not get stuck in an old accept
+ * callback while the underlying route module changes.
  */
 const buildRouteClientEntryHmrCode = ({
   routeId,
   target,
-  acceptTarget,
   metadata,
 }: {
   routeId: string;
   target: string;
-  acceptTarget: string;
   metadata: RouteHmrMetadata;
 }): string => {
   const targetJson = JSON.stringify(target);
-  const acceptTargetJson = JSON.stringify(acceptTarget);
   return `
 import * as __reactRouterRouteModule from ${targetJson};
 import {
@@ -121,17 +115,6 @@ __reactRouterRegisterRouteExports(
 );
 
 if (import.meta.webpackHot) {
-  import.meta.webpackHot.accept(${acceptTargetJson}, () => {
-    __reactRouterRegisterRouteExports(
-      __reactRouterRouteId,
-      __reactRouterRouteModule
-    );
-    __reactRouterScheduleRouteUpdate(
-      __reactRouterRouteId,
-      __reactRouterRouteMetadata,
-      __reactRouterGetRouteModule
-    );
-  });
   import.meta.webpackHot.accept();
   import.meta.webpackHot.dispose(data => {
     data.__reactRouterRouteShim = true;
@@ -148,10 +131,6 @@ if (import.meta.webpackHot) {
   }
 }
 `;
-};
-
-const createRouteHmrAcceptTarget = (resourcePath: string): string => {
-  return `./${basename(resourcePath)}?react-router-route`;
 };
 
 const shouldReexportFromRouteEntry = ({
@@ -172,7 +151,7 @@ const shouldReexportFromRouteEntry = ({
       SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName)
     );
   }
-  return !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName);
+  return CLIENT_ROUTE_EXPORTS_SET.has(exportName);
 };
 
 export const buildRouteClientEntryCode = ({
@@ -227,7 +206,6 @@ export const buildRouteClientEntryCode = ({
     buildRouteClientEntryHmrCode({
       routeId,
       target,
-      acceptTarget: createRouteHmrAcceptTarget(resourcePath),
       metadata: buildRouteHmrMetadata(exportNames),
     })
   );

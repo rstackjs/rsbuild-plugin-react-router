@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
 
-import { BUILD_CLIENT_ROUTE_QUERY_STRING } from '../src/constants';
 import { resolveQuerylessRouteImportRequest } from '../src/route-imports';
 import type { Route } from '../src/types';
 
@@ -19,7 +18,7 @@ describe('queryless route imports', () => {
         request: './target',
         routeByFilePath,
       })
-    ).toBe(`/app/routes/target.tsx${BUILD_CLIENT_ROUTE_QUERY_STRING}`);
+    ).toBe('/app/routes/target.tsx?react-router-route');
   });
 
   it('rewrites RSC client route module imports to shared client modules', () => {

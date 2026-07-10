@@ -73,7 +73,7 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { clientLoader, customExport, default, meta } from ${JSON.stringify(routeRequest)};`,
+        code: `export { clientLoader, default, meta } from ${JSON.stringify(routeRequest)};`,
       });
     });
 
@@ -141,7 +141,7 @@ describe('route artifact helpers', () => {
       });
     });
 
-    it('keeps the full route module when no route exports split', async () => {
+    it('excludes custom exports from production route entries', async () => {
       const result = await createRouteClientEntryArtifact({
         code: `
           export const clientLoader = async () => {};
@@ -156,7 +156,7 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { clientLoader, customExport, default } from ${JSON.stringify(
+        code: `export { clientLoader, default } from ${JSON.stringify(
           routeRequest
         )};`,
       });
@@ -200,6 +200,27 @@ describe('route artifact helpers', () => {
           routeRequest
         )};`,
       });
+    });
+
+    it('self-accepts dev HMR route entries so metadata is refreshed', async () => {
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export async function loader() { return null; }
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        environmentName: 'web',
+        isBuild: false,
+        routeChunkConfig: disabledRouteChunkConfig,
+        routeId: 'routes/demo',
+        devHmr: true,
+      });
+
+      expect(result.code).toContain('import.meta.webpackHot.accept();');
+      expect(result.code).not.toContain(
+        'import.meta.webpackHot.accept("./demo.tsx?react-router-route"'
+      );
+      expect(result.code).toContain('"hasLoader":true');
     });
   });
 

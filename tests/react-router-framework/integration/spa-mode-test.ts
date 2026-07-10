@@ -818,7 +818,7 @@ test.describe("SPA Mode", () => {
                 import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
                 export default defineConfig({
-                  output: { manifest: true }, // Vite: build.manifest
+                  output: { manifest: true }, // Rsbuild: output.manifest
                   plugins: [pluginReact(), pluginReactRouter()],
                 });
               `,
@@ -1196,21 +1196,19 @@ test.describe("SPA Mode", () => {
           import { pluginReact } from "@rsbuild/plugin-react";
           import { pluginReactRouter } from "rsbuild-plugin-react-router";
 
-          // Vite "build.manifest" is not needed by rsbuild-plugin-react-router.
           export default defineConfig({
             plugins: [pluginReact(), pluginReactRouter()],
           });
         `,
         "app/routeImportTracker.ts": js`
-          // this is kinda silly, but this way we can track imports
-          // that happen during SSR and during CSR
+          // Track route module evaluation separately during SSR and CSR.
           export async function logImport(url: string) {
-            try {
+            if (import.meta.env.SSR) {
               const fs = await import("node:fs");
               const path = await import("node:path");
               fs.appendFileSync(path.join(process.cwd(), "ssr-route-imports.txt"), url + "\n");
             }
-            catch (e) {
+            else {
               (window.csrRouteImports ??= []).push(url);
             }
           }

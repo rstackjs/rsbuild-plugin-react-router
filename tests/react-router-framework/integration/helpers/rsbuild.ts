@@ -248,7 +248,9 @@ export const reactRouterServe = async ({
     ? ["start.js"]
     : [
         reactRouterServeBin,
-        `build/server/${serverBundle ? serverBundle + "/" : ""}static/js/app.js`,
+        serverBundle
+          ? `build/server/${serverBundle}/index.js`
+          : "build/server/static/js/app.js",
       ];
   assertResourceGuardrail();
   let serveProc = spawn(nodeBin, args, {

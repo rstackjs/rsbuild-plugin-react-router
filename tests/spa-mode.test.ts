@@ -21,11 +21,58 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: false,
+        isSpaMode: true,
         routeDiscovery: { mode: 'initial' },
       });
 
       expect(result).toContain('export const isSpaMode = true');
       expect(result).toContain('export const ssr = false');
+    });
+
+    it('should only import the root route when ssr is false', () => {
+      const result = generateServerBuild(
+        {
+          rootKey: mockRoutes.root,
+          homeKey: mockRoutes['routes/home'],
+        },
+        {
+          entryServerPath: './app/entry.server.tsx',
+          assetsBuildDirectory: 'build/client',
+          basename: '/',
+          appDirectory: 'app',
+          ssr: false,
+          isSpaMode: true,
+          routeDiscovery: { mode: 'initial' },
+        }
+      );
+
+      expect(result).toMatch(/import \* as route0 from ".+\/app\/root\.tsx";/);
+      expect(result).not.toContain('routes/home.tsx');
+      expect(result).toContain('const route1 = { default: () => null };');
+    });
+
+    it('should import non-root routes for ssr false prerender paths', () => {
+      const result = generateServerBuild(
+        {
+          rootKey: mockRoutes.root,
+          homeKey: mockRoutes['routes/home'],
+        },
+        {
+          entryServerPath: './app/entry.server.tsx',
+          assetsBuildDirectory: 'build/client',
+          basename: '/',
+          appDirectory: 'app',
+          ssr: false,
+          isSpaMode: false,
+          prerender: ['/'],
+          routeDiscovery: { mode: 'initial' },
+        }
+      );
+
+      expect(result).toMatch(/import \* as route0 from ".+\/app\/root\.tsx";/);
+      expect(result).toMatch(
+        /import \* as route1 from ".+\/app\/routes\/home\.tsx";/
+      );
     });
 
     it('should set isSpaMode to false when ssr is true', () => {
@@ -35,6 +82,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -55,6 +103,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: false,
+        isSpaMode: true,
         routeDiscovery: { mode: 'initial' },
       });
 
@@ -68,6 +117,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -88,6 +138,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         federation: true,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
@@ -104,6 +155,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         federation: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
@@ -126,6 +178,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/my-app',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -139,6 +192,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -158,6 +212,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         future: { v3_fetcherPersist: true },
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
@@ -172,6 +227,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -191,6 +247,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         allowedActionOrigins: ['https://example.com'],
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });

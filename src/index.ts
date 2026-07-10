@@ -428,7 +428,7 @@ export const pluginReactRouter = (
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
     const watchDirectory = resolve(appDirectory);
-    const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
+    const routeRestartMarkerPath = getRouteRestartMarkerPath(appDirectory);
     const routeWatchFiles = createReactRouterRouteWatchFiles({
       configWatchPaths,
       routeConfigWatchPaths,
@@ -473,6 +473,7 @@ export const pluginReactRouter = (
       basename,
       customServer: pluginOptions.customServer,
       isBuild,
+      isSpaMode,
       prerenderConfig,
       routeConfig,
       routeDiscovery,

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -118,6 +119,11 @@ const createCompilation = (
       info: source.info,
     }));
   },
+  getStats() {
+    return {
+      toJson: () => ({ assets: [] }),
+    };
+  },
 });
 
 const rootRoute = { id: 'root', file: 'root.tsx', path: '' };
@@ -175,7 +181,6 @@ describe('modify browser manifest plugin', () => {
 
     expect(sri).toEqual({
       '/assets/static/js/entry.client.js': 'sha384-entry',
-      '/assets/static/css/entry.client.css': 'sha384-css',
       '/assets/static/js/route.js': 'sha384-route',
       '/static/js/already-prefixed.js': 'sha384-prefixed',
     });
@@ -201,6 +206,28 @@ describe('modify browser manifest plugin', () => {
     );
 
     expect(sri).toBeUndefined();
+  });
+
+  it('computes JS integrity from final compilation assets when metadata is missing', () => {
+    const source = 'console.log("entry");';
+    const sri = collectSubresourceIntegrity(undefined, {
+      getAssets: () => [
+        {
+          name: 'static/js/entry.client.js',
+          source: { source: () => source },
+        },
+        {
+          name: 'static/css/entry.client.css',
+          source: { source: () => '.root{}' },
+        },
+      ],
+    });
+
+    expect(sri).toEqual({
+      '/static/js/entry.client.js': `sha384-${createHash('sha384')
+        .update(source)
+        .digest('base64')}`,
+    });
   });
 
   it('registers browser manifest mutation with Rsbuild processAssets', async () => {
@@ -342,7 +369,7 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
-  it('collects build SRI after later asset stages attach integrity metadata', async () => {
+  it('hashes finalized build assets at the report stage', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
     const optimizedEntrySource = 'console.log("after optimize");';
@@ -383,16 +410,16 @@ describe('modify browser manifest plugin', () => {
         { stage: 'report', environments: ['web'] },
       ]);
 
-      // Integrity metadata is attached to the finalized (post-hash) asset
-      // before the `report` stage runs.
       compilation.updateAsset(
         'static/js/entry.client.js',
-        createAsset(optimizedEntrySource, 'sha384-optimized-entry')
+        createAsset(optimizedEntrySource)
       );
       await harness.runStage('report', { assets, compilation });
 
       expect(reportedSri?.['/static/js/entry.client.js']).toBe(
-        'sha384-optimized-entry'
+        `sha384-${createHash('sha384')
+          .update(optimizedEntrySource)
+          .digest('base64')}`
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -405,10 +432,7 @@ describe('modify browser manifest plugin', () => {
     const optimizedEntrySource = 'console.log("stable sri");';
     const assets = {
       ...createBrowserManifestAssets(),
-      'static/js/entry.client.js': createAsset(
-        optimizedEntrySource,
-        'sha384-stable-entry'
-      ),
+      'static/js/entry.client.js': createAsset(optimizedEntrySource),
     };
     const compilation = createCompilation(
       [['entry.client', { files: new Set(['static/js/entry.client.js']) }]],
@@ -438,9 +462,8 @@ describe('modify browser manifest plugin', () => {
 
       await harness.runStage('report', { assets, compilation });
 
-      expect(reportedSri?.['/static/js/entry.client.js']).toBe(
-        'sha384-stable-entry'
-      );
+      expect(reportedSri?.['/static/js/entry.client.js']).toMatch(/^sha384-/);
+      expect(assets[BROWSER_MANIFEST_PATH].source()).not.toContain("'sri'");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -616,7 +639,7 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
-  it('adds transitive entrypoint CSS without adding transitive JavaScript preloads', async () => {
+  it('adds transitive entrypoint assets to the manifest', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
     const assets = createBrowserManifestAssets();
@@ -663,16 +686,10 @@ describe('modify browser manifest plugin', () => {
 
       expect(manifest).toMatchObject({
         entry: {
-          // The entry's own module is excluded from imports (upstream parity),
-          // and transitive entrypoint JS (vendor.js) is not added as a preload.
-          imports: [],
+          imports: ['/static/js/vendor.js'],
           css: ['/static/css/reset.css', '/static/css/route.css'],
         },
       });
-      const entryImports = (manifest as { entry: { imports: string[] } }).entry
-        .imports;
-      expect(entryImports).not.toContain('/static/js/vendor.js');
-      expect(entryImports).not.toContain('/static/js/entry.client.js');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

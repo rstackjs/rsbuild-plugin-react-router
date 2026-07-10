@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'pathe';
 
 export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
+export const DEV_MANIFEST_UPDATE_EVENT = 'react-router:manifest-update';
 
 export type DevHmrPlanOptions = {
   enabled: true;
@@ -93,7 +94,7 @@ export const createDevHdrRevisionSignal = ({
 /**
  * Browser-side HMR runtime shared by all route client entries in development.
  *
- * This mirrors React Router's Vite HMR contract (see `refresh-utils.mjs` in
+ * This mirrors React Router framework HMR contract (see `refresh-utils.mjs` in
  * `@react-router/dev`): route module updates are applied by patching
  * `window.__reactRouterRouteModules` while preserving the previous component
  * identities (React Fast Refresh swaps their implementations in place),
@@ -125,6 +126,7 @@ const RefreshRuntime =
 const pendingRouteUpdates = new Map();
 let flushTimeout;
 let pendingRevalidation = false;
+let pendingComponentRouteRevalidation = false;
 
 function getCurrentRouterPath(router) {
   const basename = router.basename || '/';
@@ -245,11 +247,7 @@ function patchCurrentRouteMatches(router, routes) {
 
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
-    return {
-      nextManifest: undefined,
-      shouldRefreshRouteState: false,
-      routesToRevalidate: new Set(),
-    };
+    return { nextManifest: undefined, hmrRoutes: undefined };
   }
 
   // Clone only entries mutated before the manifest is committed in flush().
@@ -282,22 +280,22 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     }
   }
 
+  let hmrRoutes;
   if (
     typeof router.createRoutesForHMR === 'function' &&
     typeof router._internalSetRoutes === 'function'
   ) {
-    const routes = router.createRoutesForHMR(
+    hmrRoutes = router.createRoutesForHMR(
       routesToRevalidate,
       nextManifest.routes,
       routeModules,
       context.ssr,
       context.isSpaMode
     );
-    router._internalSetRoutes(routes);
-    patchCurrentRouteMatches(router, routes);
+    router._internalSetRoutes(hmrRoutes);
   }
 
-  return { nextManifest, shouldRefreshRouteState, routesToRevalidate };
+  return { nextManifest, hmrRoutes, shouldRefreshRouteState };
 }
 
 async function revalidateRouter(router) {
@@ -339,6 +337,34 @@ function performReactRefresh() {
   }
 }
 
+function applyManifestUpdate(nextRoutes) {
+  const router = window.__reactRouterDataRouter;
+  const routeModules = window.__reactRouterRouteModules;
+  const manifest = window.__reactRouterManifest;
+  const context = window.__reactRouterContext;
+  if (
+    !router ||
+    !routeModules ||
+    !manifest ||
+    !context ||
+    !nextRoutes ||
+    typeof router.createRoutesForHMR !== 'function' ||
+    typeof router._internalSetRoutes !== 'function'
+  ) {
+    return;
+  }
+  const routes = router.createRoutesForHMR(
+    new Set(Object.keys(nextRoutes)),
+    nextRoutes,
+    routeModules,
+    context.ssr,
+    context.isSpaMode
+  );
+  manifest.routes = nextRoutes;
+  router._internalSetRoutes(routes);
+  patchCurrentRouteMatches(router, routes);
+}
+
 async function flush() {
   const router = window.__reactRouterDataRouter;
   const routeModules = window.__reactRouterRouteModules;
@@ -350,26 +376,42 @@ async function flush() {
 
   let shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  const { nextManifest, shouldRefreshRouteState, routesToRevalidate } =
+  const { nextManifest, hmrRoutes, shouldRefreshRouteState } =
     applyPendingRouteUpdates(router, routeModules, manifest, context);
-  if (nextManifest) {
+  // Loader updates must be visible during revalidation. Component-only routes
+  // stay staged until revalidation completes, matching React Router's HMR flow.
+  if (nextManifest && shouldRefreshRouteState) {
+    pendingComponentRouteRevalidation = false;
+    if (hmrRoutes) {
+      patchCurrentRouteMatches(router, hmrRoutes);
+    }
     Object.assign(manifest, nextManifest);
-  }
-  // Component-only updates do not need a full loader revalidation.
-  if (
-    shouldRefreshRouteState &&
-    (routesToRevalidate.size > 0 || shouldRevalidate)
-  ) {
     await refreshRouteState(router);
     shouldRevalidate = false;
-  }
-  if (shouldRevalidate) {
-    await revalidateRouter(router);
+  } else if (nextManifest) {
+    if (hmrRoutes) {
+      patchCurrentRouteMatches(router, hmrRoutes);
+    }
+    Object.assign(manifest, nextManifest);
+    // The node compiler also emits an HDR revision for this route edit. If it
+    // did not arrive in this flush, consume that redundant revalidation later.
+    pendingComponentRouteRevalidation = !shouldRevalidate;
+    shouldRevalidate = false;
+  } else if (shouldRevalidate) {
+    if (pendingComponentRouteRevalidation) {
+      pendingComponentRouteRevalidation = false;
+    } else {
+      await revalidateRouter(router);
+    }
   }
   performReactRefresh();
 }
 
 if (typeof window !== 'undefined' && import.meta.webpackHot) {
+  import.meta.webpackHot.on(
+    ${JSON.stringify(DEV_MANIFEST_UPDATE_EVENT)},
+    applyManifestUpdate
+  );
   import.meta.webpackHot.accept(
     ${JSON.stringify(hdrRevisionFilePath)},
     () => {

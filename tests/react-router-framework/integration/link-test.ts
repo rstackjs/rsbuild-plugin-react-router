@@ -554,7 +554,7 @@ test.describe("route module link export", () => {
         });
 
         // rsbuild may split route CSS across chunk stylesheets; assert the
-        // route CSS was delivered instead of Vite's exact response count.
+        // route CSS was delivered instead of Rsbuild's exact response count.
         expect(stylesheetResponses.length).toBeGreaterThanOrEqual(1);
         for (let res of stylesheetResponses) {
           expect(res.status()).toBe(200);

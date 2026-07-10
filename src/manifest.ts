@@ -281,7 +281,8 @@ const DEFAULT_MANIFEST_DIR = DEFAULT_JS_DIST_PATH;
 const CSS_IMPORT_RE = /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/;
 
 const createChunkAssetResolver = (
-  clientStats: ReactRouterManifestStats | undefined
+  clientStats: ReactRouterManifestStats | undefined,
+  includeEntrypointJs: boolean
 ): ((chunkName: string) => ChunkAssets) => {
   const chunkAssetsByName = new Map<string, ChunkAssets>();
 
@@ -300,24 +301,26 @@ const createChunkAssetResolver = (
     }
 
     const cssAssets = new Set<string>();
-    const jsAssets: string[] = [];
+    const jsAssets = new Set<string>();
     for (const asset of assets) {
       if (asset.endsWith('.css')) {
         cssAssets.add(asset);
       } else if (asset.endsWith('.js')) {
-        jsAssets.push(asset);
+        jsAssets.add(asset);
       }
     }
     for (const asset of clientStats?.entrypointFilesByName?.[chunkName] ?? []) {
       if (asset.endsWith('.css')) {
         cssAssets.add(asset);
+      } else if (includeEntrypointJs && asset.endsWith('.js')) {
+        jsAssets.add(asset);
       }
     }
-    if (jsAssets.length === 0) {
-      jsAssets.push(`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`);
+    if (jsAssets.size === 0) {
+      jsAssets.add(`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`);
     }
 
-    const result = { js: jsAssets, css: [...cssAssets] };
+    const result = { js: [...jsAssets], css: [...cssAssets] };
     chunkAssetsByName.set(chunkName, result);
     return result;
   };
@@ -450,18 +453,28 @@ const createRouteManifestItem = ({
   jsAssets,
   routeAnalysis,
   getModulePathForChunk,
+  getCssAssetsForChunk,
 }: {
   route: Route;
   assetPrefix: string;
   jsAssets: string[];
   routeAnalysis: RouteManifestAnalysis;
   getModulePathForChunk: (chunkName: string) => string | undefined;
+  getCssAssetsForChunk: (chunkName: string) => string[];
 }): RouteManifestItem => {
   const routeChunkMap = routeAnalysis.hasRouteChunkByExportName;
   const chunkModulePath = (exportName: RouteChunkExportName) =>
     routeChunkMap?.[exportName]
       ? getModulePathForChunk(getRouteChunkEntryName(route.id, exportName))
       : undefined;
+  const cssAssets = [
+    ...routeAnalysis.cssAssets,
+    ...routeChunkExportNames.flatMap(exportName =>
+      routeChunkMap?.[exportName]
+        ? getCssAssetsForChunk(getRouteChunkEntryName(route.id, exportName))
+        : []
+    ),
+  ];
 
   return {
     id: route.id,
@@ -488,7 +501,9 @@ const createRouteManifestItem = ({
     // the entry chunk's own file from its imports list). Otherwise prefetch
     // link computations produce duplicate modulepreload hrefs.
     imports: jsAssets.slice(1).map(asset => combineURLs(assetPrefix, asset)),
-    css: routeAnalysis.cssAssets.map(asset => combineURLs(assetPrefix, asset)),
+    css: Array.from(new Set(cssAssets)).map(asset =>
+      combineURLs(assetPrefix, asset)
+    ),
   };
 };
 
@@ -513,11 +528,13 @@ function generateReactRouterManifestForDevEffect(
           }
         : null;
 
-    const getAssetsForChunk = createChunkAssetResolver(clientStats);
+    const getAssetsForChunk = createChunkAssetResolver(clientStats, isBuild);
     const getModulePathForChunk = (chunkName: string): string | undefined => {
       const { js: jsAssets } = getAssetsForChunk(chunkName);
       return jsAssets[0] ? combineURLs(assetPrefix, jsAssets[0]) : undefined;
     };
+    const getCssAssetsForChunk = (chunkName: string): string[] =>
+      getAssetsForChunk(chunkName).css;
 
     const manifestEntries = yield* Effect.forEach(
       Object.entries(routes),
@@ -558,6 +575,7 @@ function generateReactRouterManifestForDevEffect(
               jsAssets,
               routeAnalysis,
               getModulePathForChunk,
+              getCssAssetsForChunk,
             }),
             routeAnalysis.routeModuleExports,
           ] as const;
@@ -605,7 +623,10 @@ function generateReactRouterManifestForDevEffect(
 
     const manifest = {
       version,
-      url: combineURLs(assetPrefix, manifestPath),
+      url: combineURLs(
+        assetPrefix,
+        isBuild ? manifestPath : `${manifestPath}?v=${version}`
+      ),
       hmr: undefined,
       entry: fingerprintedValues.entry,
       sri: undefined,

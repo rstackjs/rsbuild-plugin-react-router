@@ -368,7 +368,7 @@ describe('prerender helpers', () => {
   });
 
   it('allows a root loader alongside unprerendered ssr:false descendants', () => {
-    // Upstream (vite/plugin.ts validateSsrFalsePrerenderExports) exempts the
+    // Upstream (rsbuild/plugin.ts validateSsrFalsePrerenderExports) exempts the
     // root route from the ancestor-loader check: the root loader always runs to
     // render the app shell and root is part of the prerender set whenever any
     // path is prerendered. A root loader must not be flagged just because a

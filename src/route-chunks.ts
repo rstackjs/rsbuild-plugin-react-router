@@ -328,6 +328,7 @@ const getExportDependencies = (
               if (typeof statement.source?.value === 'string') {
                 dependencies.importSources.add(statement.source.value);
               }
+              return;
             }
             const declarator = getCachedVariableDeclaratorForNode(declaration);
             if (

@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, codex/react-router-8-compat-v2]
 
 jobs:
   build-test:
@@ -53,10 +53,12 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
         env:
-          PLAYWRIGHT_BROWSERS_PATH: node_modules/.cache/ms-playwright
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/node_modules/.cache/ms-playwright
 
       - name: Run React Router ecosystem tests
         run: pnpm test:react-router-framework:failfast
 
       - name: Run E2E tests
         run: pnpm e2e
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/node_modules/.cache/ms-playwright

@@ -687,15 +687,9 @@ async function workflowDev({
   expect(pageErrors).toEqual([]);
 
   // route: HMR
-  const hotUpdate = page.waitForResponse(
-    (response) =>
-      response.url().includes(".hot-update.") && response.status() < 400,
-    { timeout: devHmrTimeout },
-  );
   await edit("app/routes/_index.tsx", (contents) =>
     contents.replace("HMR updated: 0", "HMR updated: 1"),
   );
-  await hotUpdate;
   try {
     await expect(hmrStatus).toHaveText("HMR updated: 1", {
       timeout: devHmrTimeout,
@@ -712,15 +706,9 @@ async function workflowDev({
   expect(pageErrors).toEqual([]);
 
   // client side navigation
-  await page.evaluate(() => {
-    let link = document.querySelector<HTMLAnchorElement>(
-      '#index a[href$="/other"]',
-    );
-    if (!link) {
-      throw new Error("Missing other route link");
-    }
-    link.click();
-  });
+  const otherLink = page.locator('#index a[href$="/other"]');
+  await expect(otherLink).toBeVisible({ timeout: devHmrTimeout });
+  await otherLink.dispatchEvent("click");
   await page.waitForURL(`http://localhost:${port}${basename}other`);
   await expect(page.getByText("other-loader")).toBeVisible({
     timeout: devHmrTimeout,

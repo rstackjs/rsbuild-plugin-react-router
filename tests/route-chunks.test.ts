@@ -168,6 +168,30 @@ describe('route chunks', () => {
       expect(result.chunkedExports).toEqual(routeChunkExportNames);
     });
 
+    it('splits a HydrateFallback initialized by an independent IIFE', async () => {
+      const code = `
+        import { jsx as _jsx } from 'react/jsx-runtime';
+        export const inSplittableMainChunk = () => console.log() || true;
+        export const HydrateFallback = function() {
+          globalThis.hydrateFallbackDownloaded = true;
+          return () => _jsx('div', {});
+        }();
+        export default function Route() {
+          inSplittableMainChunk();
+          return _jsx('div', {});
+        }
+      `;
+
+      const result = await detect(code);
+
+      expect(result.hasRouteChunkByExportName).toEqual({
+        clientAction: false,
+        clientLoader: false,
+        clientMiddleware: false,
+        HydrateFallback: true,
+      });
+    });
+
     it('does not treat undeclared globals as shared export dependencies', async () => {
       const code = codeWithHydratedClientLoaderGlobals;
 
