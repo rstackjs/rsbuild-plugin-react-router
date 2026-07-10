@@ -245,11 +245,7 @@ function patchCurrentRouteMatches(router, routes) {
 
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
-    return {
-      nextManifest: undefined,
-      shouldRefreshRouteState: false,
-      routesToRevalidate: new Set(),
-    };
+    return { nextManifest: undefined, hmrRoutes: undefined };
   }
 
   // Clone only entries mutated before the manifest is committed in flush().
@@ -282,22 +278,22 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     }
   }
 
+  let hmrRoutes;
   if (
     typeof router.createRoutesForHMR === 'function' &&
     typeof router._internalSetRoutes === 'function'
   ) {
-    const routes = router.createRoutesForHMR(
+    hmrRoutes = router.createRoutesForHMR(
       routesToRevalidate,
       nextManifest.routes,
       routeModules,
       context.ssr,
       context.isSpaMode
     );
-    router._internalSetRoutes(routes);
-    patchCurrentRouteMatches(router, routes);
+    router._internalSetRoutes(hmrRoutes);
   }
 
-  return { nextManifest, shouldRefreshRouteState, routesToRevalidate };
+  return { nextManifest, hmrRoutes, shouldRefreshRouteState };
 }
 
 async function revalidateRouter(router) {
@@ -350,20 +346,22 @@ async function flush() {
 
   let shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  const { nextManifest, shouldRefreshRouteState, routesToRevalidate } =
+  const { nextManifest, hmrRoutes, shouldRefreshRouteState } =
     applyPendingRouteUpdates(router, routeModules, manifest, context);
-  if (nextManifest) {
+  // Loader updates must be visible during revalidation. Component-only routes
+  // stay staged until revalidation completes, matching React Router's HMR flow.
+  if (nextManifest && shouldRefreshRouteState) {
+    if (hmrRoutes) {
+      patchCurrentRouteMatches(router, hmrRoutes);
+    }
     Object.assign(manifest, nextManifest);
-  }
-  // Component-only updates do not need a full loader revalidation.
-  if (
-    shouldRefreshRouteState &&
-    (routesToRevalidate.size > 0 || shouldRevalidate)
-  ) {
     await refreshRouteState(router);
     shouldRevalidate = false;
-  }
-  if (shouldRevalidate) {
+  } else if (nextManifest) {
+    await refreshRouteState(router);
+    Object.assign(manifest, nextManifest);
+    shouldRevalidate = false;
+  } else if (shouldRevalidate) {
     await revalidateRouter(router);
   }
   performReactRefresh();
