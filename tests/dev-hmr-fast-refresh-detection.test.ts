@@ -1,13 +1,13 @@
 import { createRsbuild, type RsbuildConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { describe, expect, it } from '@rstest/core';
-import { isSwcReactRefreshEnabled } from '../src/dev-hmr';
+import { isRspackSwcReactRefreshEnabled } from '../src/dev-hmr';
 
 type ToolsSwc = NonNullable<NonNullable<RsbuildConfig['tools']>['swc']>;
 
 // Runs real Rsbuild config resolution so every `tools.swc` form goes through
-// core's reduceConfigs merge, then reads the resolved chain the same way the
-// plugin's `post`-ordered modifyBundlerChain hook does.
+// core's reduceConfigs merge, then reads the resolved Rspack config the same
+// way the plugin's `tools.rspack` hook does.
 const detectRefresh = async ({
   swc,
   plugins = [],
@@ -19,26 +19,21 @@ const detectRefresh = async ({
   const rsbuild = await createRsbuild({
     rsbuildConfig: {
       mode: 'development',
-      ...(swc ? { tools: { swc } } : {}),
+      tools: {
+        ...(swc ? { swc } : {}),
+        rspack: config => {
+          detected = isRspackSwcReactRefreshEnabled(config);
+          return config;
+        },
+      },
       plugins: [
         ...plugins,
-        {
-          name: 'test:refresh-probe',
-          setup(api) {
-            api.modifyBundlerChain({
-              order: 'post',
-              handler: (chain, { CHAIN_ID }) => {
-                detected = isSwcReactRefreshEnabled(chain, CHAIN_ID);
-              },
-            });
-          },
-        },
       ],
     },
   });
   await rsbuild.initConfigs();
   if (detected === undefined) {
-    throw new Error('refresh probe hook did not run');
+    throw new Error('refresh probe did not run');
   }
   return detected;
 };
@@ -47,7 +42,7 @@ const refreshFragment = {
   jsc: { transform: { react: { refresh: true } } },
 };
 
-describe('isSwcReactRefreshEnabled', () => {
+describe('isRspackSwcReactRefreshEnabled', () => {
   it('detects the plain-object tools.swc form', async () => {
     await expect(detectRefresh({ swc: refreshFragment })).resolves.toBe(true);
   });

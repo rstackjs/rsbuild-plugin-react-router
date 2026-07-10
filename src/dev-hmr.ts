@@ -1,33 +1,59 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import type { ChainIdentifier, RspackChain } from '@rsbuild/core';
+import type { Rspack } from '@rsbuild/core';
 import { dirname, join } from 'pathe';
 
 import { HMR_PATCHABLE_ROUTE_FLAGS } from './route-artifacts.js';
 
 export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
 
-/**
- * Reads the resolved `builtin:swc-loader` React Refresh flag from the bundler
- * chain. Rsbuild reduces every `tools.swc` form (object, function, array of
- * fragments) into the concrete options object it sets on the main JS rule, so
- * reading it here reflects the final merged value no matter how Fast Refresh
- * was configured. Call from a `post`-ordered `modifyBundlerChain` hook so the
- * reduction (a `pre`-ordered hook in Rsbuild core) has already run.
- */
-export const isSwcReactRefreshEnabled = (
-  chain: RspackChain,
-  CHAIN_ID: ChainIdentifier
-): boolean => {
-  const swcUse = chain.module.rules
-    .get(CHAIN_ID.RULE.JS)
-    ?.oneOfs.get(CHAIN_ID.ONE_OF.JS_MAIN)
-    ?.uses.get(CHAIN_ID.USE.SWC);
-  const options = swcUse?.get('options') as
-    | { jsc?: { transform?: { react?: { refresh?: boolean } } } }
-    | undefined;
-  return options?.jsc?.transform?.react?.refresh === true;
+type SwcLoaderOptions = {
+  jsc?: { transform?: { react?: { refresh?: boolean } } };
 };
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object';
+
+const isSwcLoader = (loader: unknown): boolean =>
+  typeof loader === 'string' && loader.includes('builtin:swc-loader');
+
+const hasReactRefresh = (options: unknown): boolean =>
+  (options as SwcLoaderOptions | undefined)?.jsc?.transform?.react?.refresh ===
+  true;
+
+const readSwcLoaderRefresh = (value: unknown): boolean => {
+  if (Array.isArray(value)) {
+    return value.some(readSwcLoaderRefresh);
+  }
+  if (!isObject(value)) {
+    return false;
+  }
+  if (isSwcLoader(value.loader)) {
+    return hasReactRefresh(value.options);
+  }
+  return Object.values(value).some(readSwcLoaderRefresh);
+};
+
+const readRuleSwcRefresh = (rule: unknown): boolean => {
+  if (!isObject(rule)) {
+    return false;
+  }
+  if (isSwcLoader(rule.loader)) {
+    return hasReactRefresh(rule.options);
+  }
+  return (
+    readSwcLoaderRefresh(rule.use) ||
+    readRuleSetSwcRefresh(rule.oneOf) ||
+    readRuleSetSwcRefresh(rule.rules)
+  );
+};
+
+const readRuleSetSwcRefresh = (rules: unknown): boolean =>
+  Array.isArray(rules) && rules.some(readRuleSwcRefresh);
+
+export const isRspackSwcReactRefreshEnabled = (
+  rspackConfig: Rspack.Configuration
+): boolean => readRuleSetSwcRefresh(rspackConfig.module?.rules);
 
 /**
  * Resolves the `react-refresh/runtime` module that

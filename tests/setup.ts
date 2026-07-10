@@ -170,7 +170,6 @@ rstest.mock('@scripts/test-helper', () => ({
       // Rsbuild config (modifyRsbuildConfig), not post-normalization environment
       // mutations.
       modifyEnvironmentConfig: rstest.fn(),
-      modifyBundlerChain: rstest.fn(),
       transform: rstest.fn(),
       logger: {
         warn: rstest.fn(),

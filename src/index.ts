@@ -86,7 +86,7 @@ import {
   createDevHdrRevisionSignal,
   generateDevHmrRuntimeModule,
   getDevHdrRevisionFilePath,
-  isSwcReactRefreshEnabled,
+  isRspackSwcReactRefreshEnabled,
   resolveReactRefreshRuntimePath,
   DEV_HMR_RUNTIME_MODULE_ID,
 } from './dev-hmr.js';
@@ -935,29 +935,6 @@ export const pluginReactRouter = (
       });
     });
 
-    // Gate classic dev HMR on the resolved swc-loader options rather than the
-    // raw `tools.swc` value: users can layer function/array forms on top of
-    // `@rsbuild/plugin-react`, and only the reduced chain options reflect the
-    // final Fast Refresh state. `post` order runs after Rsbuild core's swc
-    // plugin (`pre`) has merged them.
-    api.modifyBundlerChain({
-      order: 'post',
-      handler: (chain, { CHAIN_ID, isDev, environment }) => {
-        if (environment.name !== 'web') {
-          return;
-        }
-        devHmrEnabled =
-          !isBuild &&
-          devHmrRefreshRuntimePath !== undefined &&
-          isDev &&
-          environment.config.dev?.hmr !== false &&
-          isSwcReactRefreshEnabled(chain, CHAIN_ID);
-        if (devHmrEnabled) {
-          devHdrSignal?.ensure();
-        }
-      },
-    });
-
     api.modifyEnvironmentConfig(
       async (config, { name, mergeEnvironmentConfig }) => {
         if (name !== 'web' && name !== 'node') {
@@ -969,6 +946,18 @@ export const pluginReactRouter = (
             rspack: rspackConfig => {
               if (pluginOptions.federation) {
                 ensureFederationAsyncStartup(rspackConfig);
+              }
+
+              if (name === 'web') {
+                devHmrEnabled =
+                  !isBuild &&
+                  devHmrRefreshRuntimePath !== undefined &&
+                  config.mode === 'development' &&
+                  config.dev?.hmr !== false &&
+                  isRspackSwcReactRefreshEnabled(rspackConfig);
+                if (devHmrEnabled) {
+                  devHdrSignal?.ensure();
+                }
               }
 
               if (name === 'node') {
