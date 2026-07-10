@@ -130,6 +130,7 @@ const createHarness = (userSetup?: TestServerSetup) => {
   let after!: OnAfterDevCompileFn;
   const closeRecords = new WeakMap<RsbuildDevServer, { count: number }>();
   const warn = rstest.fn();
+  const onNodeRebuildCommitted = rstest.fn();
   let serverSetups = userSetup ? [userSetup] : [];
   const api = {
     logger: { error: rstest.fn(), warn },
@@ -208,6 +209,7 @@ const createHarness = (userSetup?: TestServerSetup) => {
       defaultEntryName: 'static/js/app',
       entryNames: ['static/js/app'],
     },
+    onNodeRebuildCommitted,
   });
   const createServer = (
     loadBundle: (entryName: string) => Promise<unknown> | unknown,
@@ -292,6 +294,7 @@ const createHarness = (userSetup?: TestServerSetup) => {
     getCloseCount: (server: RsbuildDevServer) =>
       closeRecords.get(server)?.count ?? 0,
     loadBundle,
+    onNodeRebuildCommitted,
     server,
     startOrder,
     warn,
@@ -571,6 +574,101 @@ describe('React Router development runtime controller', () => {
       assets: { version: 'web-base' },
     });
     expect(loadBundle).toHaveBeenCalledTimes(2);
+  });
+
+  it('signals a node rebuild for paired web and node route changes', async () => {
+    const {
+      callbacks,
+      controller,
+      loadBundle,
+      onNodeRebuildCommitted,
+      server,
+    } = createHarness();
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const routePath = '/app/routes/route-0001.tsx';
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    build = createBuild('route-next');
+    web.setChanges([routePath]);
+    node.setChanges([routePath]);
+    callbacks.before();
+    const nextWeb = web.compile();
+    controller.captureWeb(nextWeb, createManifestSet('web-next'));
+    web.complete(nextWeb);
+    const nextNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(nextWeb, nextNode) });
+
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'route-next',
+      assets: { version: 'web-next' },
+    });
+    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+
+    // A web-only rebuild (e.g. the HDR revision bump itself) commits with the
+    // node compiler's stale modifiedFiles snapshot; it must not re-signal or
+    // the bump feeds back into an infinite rebuild loop.
+    web.setChanges(['/app/web-only.ts']);
+    callbacks.before();
+    const webOnly = web.compile();
+    controller.captureWeb(webOnly, createManifestSet('web-only'));
+    web.complete(webOnly);
+    await callbacks.after({ stats: createGraphStats(webOnly, nextNode) });
+    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+  });
+
+  it('does not signal a node rebuild for paired CSS source changes', async () => {
+    const {
+      callbacks,
+      controller,
+      loadBundle,
+      onNodeRebuildCommitted,
+      server,
+    } = createHarness();
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const cssSourcePath = '/app/routes/page/styles.css.ts';
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    build = createBuild('css-next');
+    web.setChanges([cssSourcePath]);
+    node.setChanges([cssSourcePath]);
+    callbacks.before();
+    const nextWeb = web.compile();
+    controller.captureWeb(nextWeb, createManifestSet('web-next'));
+    web.complete(nextWeb);
+    const nextNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(nextWeb, nextNode) });
+
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'css-next',
+      assets: { version: 'web-next' },
+    });
+    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
   });
 
   it('keeps last-good output when a one-sided node compile cannot evaluate', async () => {

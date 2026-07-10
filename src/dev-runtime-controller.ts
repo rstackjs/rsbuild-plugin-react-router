@@ -27,6 +27,7 @@ import {
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
+import { DEV_HDR_REVISION_RELATIVE_PATH } from './dev-hmr.js';
 import {
   createDevRuntimeSessionManager,
   type RuntimeBinding,
@@ -55,6 +56,11 @@ type CreateControllerOptions = {
   api: RsbuildPluginAPI;
   isBuild: boolean;
   buildPlan: ReactRouterDevBuildPlan;
+  /**
+   * Invoked after a development attempt commits a re-evaluated node build for
+   * changed server files. Used to signal hot data revalidation to the client.
+   */
+  onNodeRebuildCommitted?: () => void;
 };
 
 const escapeHtml = (value: string): string =>
@@ -65,10 +71,29 @@ const escapeHtml = (value: string): string =>
 
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
 
+const isHdrRevisionFile = (file: string): boolean =>
+  file.includes(DEV_HDR_REVISION_RELATIVE_PATH);
+
+const isCssSourceFile = (file: string): boolean =>
+  /\.css(?:\.[cm]?[jt]s)?$/.test(file);
+
+// A change that should bump the HDR revision: anything except the revision
+// file itself (the bump's own echo) and CSS sources (styling never changes
+// loader data).
+const hasHdrTriggeringChange = (files: Iterable<string>): boolean => {
+  for (const file of files) {
+    if (!isHdrRevisionFile(file) && !isCssSourceFile(file)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
   buildPlan,
+  onNodeRebuildCommitted,
 }: CreateControllerOptions): ReactRouterDevRuntimeController => {
   if (isBuild) {
     return {
@@ -132,6 +157,14 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
+  // Web-only commits reuse the node compiler's stale `modifiedFiles`
+  // snapshot, and every HDR bump itself triggers a web rebuild — so signal
+  // once per node compilation identity or the bump loop self-sustains.
+  const hdrSignaledNodeIdentity = new WeakMap<
+    DevCompilerPair,
+    NonNullable<DevGraphIdentity['node']>
+  >();
+
   const finishRuntimeAttemptEffect = (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
@@ -144,11 +177,22 @@ export const createReactRouterDevRuntimeController = ({
     ).pipe(
       Effect.flatMap(result =>
         tryPluginSync(() => {
-          if (
-            result === 'retry-node' &&
-            sessions.getActiveBinding()?.id === binding.id
-          ) {
+          if (sessions.getActiveBinding()?.id !== binding.id) {
+            return;
+          }
+          if (result === 'retry-node') {
             pair.node.watching?.invalidate();
+            return;
+          }
+          if (
+            result === 'committed' &&
+            changes.node.known &&
+            identity.node !== undefined &&
+            hdrSignaledNodeIdentity.get(pair) !== identity.node &&
+            hasHdrTriggeringChange(changes.node.files)
+          ) {
+            hdrSignaledNodeIdentity.set(pair, identity.node);
+            onNodeRebuildCommitted?.();
           }
         })
       ),
