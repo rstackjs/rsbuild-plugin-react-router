@@ -1,18 +1,7 @@
 import type { RsbuildPluginAPI, Rspack } from '@rsbuild/core';
 
-type ModuleFederationPluginLike = {
-  name?: string;
-  _options?: { experiments?: { asyncStartup?: boolean } };
-  options?: { experiments?: { asyncStartup?: boolean } };
-};
-
-// The federated server bundle must not execute its entry before the federation
-// runtime is initialized, so asyncStartup is required whenever the plugin runs
-// alongside Module Federation. The MF plugin instance is already constructed
-// by the time we see the rspack config, so the only way in is mutating its
-// options object — `_options` is the field current @module-federation plugins
-// actually read at apply-time, with public `options` as a fallback. If both
-// fields disappear in a future MF release this silently no-ops; revisit then.
+// Module Federation reads asyncStartup when applying the plugin, after the
+// plugin instance has already been constructed.
 const ensureFederationAsyncStartup = (
   rspackConfig: Rspack.Configuration | undefined
 ): void => {
@@ -24,22 +13,26 @@ const ensureFederationAsyncStartup = (
     if (!plugin || typeof plugin !== 'object') {
       continue;
     }
-    const pluginName = (plugin as ModuleFederationPluginLike).name;
-    if (pluginName !== 'ModuleFederationPlugin') {
+    if (!('name' in plugin) || plugin.name !== 'ModuleFederationPlugin') {
       continue;
     }
 
     const pluginOptions =
-      (plugin as ModuleFederationPluginLike)._options ??
-      (plugin as ModuleFederationPluginLike).options;
-    if (!pluginOptions) {
+      ('_options' in plugin ? plugin._options : undefined) ??
+      ('options' in plugin ? plugin.options : undefined);
+    if (!pluginOptions || typeof pluginOptions !== 'object') {
       continue;
     }
 
-    pluginOptions.experiments = {
-      ...pluginOptions.experiments,
-      asyncStartup: true,
-    };
+    const experiments =
+      'experiments' in pluginOptions &&
+      pluginOptions.experiments &&
+      typeof pluginOptions.experiments === 'object'
+        ? pluginOptions.experiments
+        : undefined;
+    Object.assign(pluginOptions, {
+      experiments: { ...experiments, asyncStartup: true },
+    });
   }
 };
 

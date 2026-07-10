@@ -252,12 +252,7 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     };
   }
 
-  // Targeted clone: shallow-copy the manifest and its routes map, then deep-copy
-  // only the route entries we actually mutate below. Untouched entries stay as
-  // shared references (nothing dirty-checks route objects by identity; RR rebuilds
-  // strictly from the explicit routesToRevalidate set), and deep-copying the
-  // touched entries keeps the live manifest unmutated until the final
-  // Object.assign in flush(), matching the previous clone-everything behavior.
+  // Clone only entries mutated before the manifest is committed in flush().
   const nextManifest = { ...manifest, routes: { ...manifest.routes } };
   const routesToRevalidate = new Set();
   let shouldRefreshRouteState = false;
@@ -360,11 +355,7 @@ async function flush() {
   if (nextManifest) {
     Object.assign(manifest, nextManifest);
   }
-  // Only run the full route-state revalidate (refetch every loader) when an
-  // updated route is actually loader-bearing (routesToRevalidate) or an HDR
-  // revalidation is already pending. A component-only edit -- including one that
-  // removes a route's loader -- skips the refetch so a visual change does not
-  // re-run all loaders.
+  // Component-only updates do not need a full loader revalidation.
   if (
     shouldRefreshRouteState &&
     (routesToRevalidate.size > 0 || shouldRevalidate)
