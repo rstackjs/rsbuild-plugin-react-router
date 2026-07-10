@@ -39,12 +39,12 @@ function generateStaticTemplate(
 ): string {
   const manifestId =
     options.serverManifestId ?? 'virtual/react-router/server-manifest';
+  const routeEntries = Object.entries(routes);
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
-    ${Object.keys(routes)
-      .map((key, index) => {
-        const route = routes[key];
-        if (!options.ssr && key !== 'root') {
+    ${routeEntries
+      .map(([, route], index) => {
+        if (!options.ssr && route.id !== 'root') {
           return `const route${index} = { default: () => null };`;
         }
         return `import * as route${index} from ${JSON.stringify(
@@ -67,9 +67,8 @@ function generateStaticTemplate(
     export const entry = { module: entryServer };
     export const allowedActionOrigins = ${JSON.stringify(options.allowedActionOrigins)};
     export var routes = {};
-    ${Object.keys(routes)
-      .map((key, index) => {
-        const route = routes[key];
+    ${routeEntries
+      .map(([key, route], index) => {
         return `routes[${JSON.stringify(key)}] = {
           id: ${JSON.stringify(route.id)},
           parentId: ${JSON.stringify(route.parentId)},

@@ -1201,8 +1201,7 @@ test.describe("SPA Mode", () => {
           });
         `,
         "app/routeImportTracker.ts": js`
-          // this is kinda silly, but this way we can track imports
-          // that happen during SSR and during CSR
+          // Track route module evaluation separately during SSR and CSR.
           export async function logImport(url: string) {
             if (import.meta.env.SSR) {
               const fs = await import("node:fs");

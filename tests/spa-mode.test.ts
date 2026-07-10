@@ -29,16 +29,22 @@ describe('SPA Mode (ssr: false)', () => {
     });
 
     it('should only import the root route when ssr is false', () => {
-      const result = generateServerBuild(mockRoutes, {
-        entryServerPath: './app/entry.server.tsx',
-        assetsBuildDirectory: 'build/client',
-        basename: '/',
-        appDirectory: 'app',
-        ssr: false,
-        routeDiscovery: { mode: 'initial' },
-      });
+      const result = generateServerBuild(
+        {
+          rootKey: mockRoutes.root,
+          homeKey: mockRoutes['routes/home'],
+        },
+        {
+          entryServerPath: './app/entry.server.tsx',
+          assetsBuildDirectory: 'build/client',
+          basename: '/',
+          appDirectory: 'app',
+          ssr: false,
+          routeDiscovery: { mode: 'initial' },
+        }
+      );
 
-      expect(result).toContain('/app/root.tsx";');
+      expect(result).toMatch(/import \* as route0 from ".+\/app\/root\.tsx";/);
       expect(result).not.toContain('routes/home.tsx');
       expect(result).toContain('const route1 = { default: () => null };');
     });
