@@ -315,7 +315,7 @@ test.describe("Server bundles", () => {
 
     test("React Router browser manifest", () => {
       let clientAssetFiles = fs.readdirSync(
-        path.join(cwd, "build", "client", "assets"),
+        path.join(cwd, "build", "client", "static", "js"),
       );
       let manifestFiles = clientAssetFiles.filter((filename) =>
         filename.startsWith("manifest-"),
