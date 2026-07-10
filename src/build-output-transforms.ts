@@ -12,6 +12,7 @@ import {
 } from './manifest.js';
 import type { RouteTransformExecutor } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
+import { validateSpaModeRouteExports } from './route-transform-tasks.js';
 import { createBundlerRouteExportResolver } from './route-export-resolution.js';
 import {
   getRouteChunkNameFromModuleId,
@@ -266,6 +267,18 @@ export const registerBuildOutputTransforms = ({
         'route:chunk',
         args.resource,
         async () => {
+          const routeChunkName = getRouteChunkNameFromModuleId(args.resource);
+          if (isBuild && isSpaMode && routeChunkName === 'main') {
+            validateSpaModeRouteExports({
+              exportNames: analyzeRouteModuleCode(
+                args.code,
+                args.resourcePath
+              ).exports,
+              resourcePath: args.resourcePath,
+              rootRoutePath,
+            });
+          }
+
           const routeChunkArtifact = await routeTransformExecutor.run({
             kind: 'routeChunk',
             code: args.code,
@@ -282,7 +295,7 @@ export const registerBuildOutputTransforms = ({
           // twice or not at all.
           if (
             !isBuild ||
-            getRouteChunkNameFromModuleId(args.resource) !== 'main'
+            routeChunkName !== 'main'
           ) {
             return routeChunkArtifact;
           }
