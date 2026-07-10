@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
 import {
+  buildRouteHmrFlags,
   createRouteChunkArtifact,
   createRouteClientEntryArtifact,
 } from '../src/route-artifacts';
@@ -150,6 +151,38 @@ describe('route artifact helpers', () => {
           routeRequest
         )};`,
       });
+    });
+
+    it('uses compact dev HMR route flag metadata', async () => {
+      expect(
+        buildRouteHmrFlags([
+          'action',
+          'clientLoader',
+          'default',
+          'ErrorBoundary',
+          'loader',
+        ])
+      ).toBe((1 << 0) | (1 << 2) | (1 << 4) | (1 << 5));
+
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export async function loader() { return null; }
+          export async function clientLoader() { return null; }
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        routeId: 'routes/demo',
+        environmentName: 'web',
+        isBuild: false,
+        devHmr: true,
+        routeChunkConfig: disabledRouteChunkConfig,
+      });
+
+      expect(result.code).toContain('const __rrf = 36;');
+      expect(result.code).toContain(
+        'scheduleReactRouterRouteUpdate as __rru'
+      );
+      expect(result.code).not.toContain('hasClientLoader');
     });
   });
 

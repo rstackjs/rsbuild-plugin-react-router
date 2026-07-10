@@ -2,13 +2,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'pathe';
 
-export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
+import { HMR_PATCHABLE_ROUTE_FLAGS } from './route-artifacts.js';
 
-export type DevHmrPlanOptions = {
-  enabled: true;
-  runtimeModule: string;
-  onNodeRebuildCommitted: () => void;
-};
+export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
 
 /**
  * Resolves the `react-refresh/runtime` module that
@@ -49,11 +45,12 @@ const hdrRevisionModuleContent = (revision: number): string =>
  * whenever server code changes, which the client answers by revalidating
  * React Router loader data.
  */
+export const DEV_HDR_REVISION_RELATIVE_PATH = '.react-router/hdr-revision.mjs';
+
 export const getDevHdrRevisionFilePath = (rootPath: string): string =>
-  join(rootPath, '.react-router', 'hdr-revision.mjs');
+  join(rootPath, DEV_HDR_REVISION_RELATIVE_PATH);
 
 export type DevHdrRevisionSignal = {
-  filePath: string;
   /** Writes the initial revision module so the first compile can resolve it. */
   ensure: () => void;
   /** Increments the revision, signaling hot data revalidation to the client. */
@@ -81,7 +78,6 @@ export const createDevHdrRevisionSignal = ({
     }
   };
   return {
-    filePath,
     ensure: write,
     bump() {
       revision += 1;
@@ -111,11 +107,7 @@ import * as __refreshRuntimeModule from ${JSON.stringify(reactRefreshRuntimePath
 // Read revision so the import survives sideEffects: false tree-shaking.
 import __hdrRevision from ${JSON.stringify(hdrRevisionFilePath)};
 
-let latestHdrRevision = __hdrRevision;
-
-export function getReactRouterHdrRevision() {
-  return latestHdrRevision;
-}
+void __hdrRevision;
 
 const RefreshRuntime =
   __refreshRuntimeModule && __refreshRuntimeModule.performReactRefresh
@@ -158,10 +150,10 @@ export function registerReactRouterRouteExports(routeId, moduleExports) {
 
 export function scheduleReactRouterRouteUpdate(
   routeId,
-  routeMetadata,
+  routeFlags,
   getRouteModuleExports
 ) {
-  pendingRouteUpdates.set(routeId, { routeMetadata, getRouteModuleExports });
+  pendingRouteUpdates.set(routeId, { routeFlags, getRouteModuleExports });
   scheduleFlush();
 }
 
@@ -187,8 +179,16 @@ function takePendingRouteUpdates() {
   return updates;
 }
 
+function getRouteMetadata(routeFlags) {
+  return {
+${HMR_PATCHABLE_ROUTE_FLAGS.map(
+  (flag, index) => `    ${flag}: Boolean(routeFlags & ${1 << index}),`
+).join('\n')}
+  };
+}
+
 function applyRouteModuleUpdate(routeId, update, routeEntry, routeModules) {
-  Object.assign(routeEntry, update.routeMetadata);
+  Object.assign(routeEntry, getRouteMetadata(update.routeFlags));
   const imported = update.getRouteModuleExports();
   registerReactRouterRouteExports(routeId, imported);
   const current = routeModules[routeId];
@@ -260,7 +260,8 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     const existingEntry = nextManifest.routes[routeId];
     if (!existingEntry) continue;
 
-    const routeEntry = JSON.parse(JSON.stringify(existingEntry));
+    // Shallow clone is enough: only top-level flags are mutated below.
+    const routeEntry = { ...existingEntry };
     nextManifest.routes[routeId] = routeEntry;
     applyRouteModuleUpdate(routeId, update, routeEntry, routeModules);
     if (
@@ -300,33 +301,33 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   return { nextManifest, shouldRefreshRouteState, routesToRevalidate };
 }
 
-async function revalidateRouter(router) {
+async function withHdrActive(fn) {
   try {
     window.__reactRouterHdrActive = true;
-    if (typeof router.revalidate === 'function') {
-      await router.revalidate();
-      return;
-    }
-    if (typeof router.navigate === 'function') {
-      await router.navigate(getCurrentRouterPath(router), {
-        replace: true,
-        preventScrollReset: true,
-      });
-    }
+    await fn();
   } finally {
     window.__reactRouterHdrActive = false;
   }
 }
 
-async function refreshRouteState(router) {
-  if (typeof router.revalidate !== 'function') {
+async function revalidateRouter(router) {
+  if (typeof router.revalidate === 'function') {
+    await withHdrActive(() => router.revalidate());
     return;
   }
-  try {
-    window.__reactRouterHdrActive = true;
-    await router.revalidate();
-  } finally {
-    window.__reactRouterHdrActive = false;
+  if (typeof router.navigate === 'function') {
+    await withHdrActive(() =>
+      router.navigate(getCurrentRouterPath(router), {
+        replace: true,
+        preventScrollReset: true,
+      })
+    );
+  }
+}
+
+async function refreshRouteState(router) {
+  if (typeof router.revalidate === 'function') {
+    await withHdrActive(() => router.revalidate());
   }
 }
 
@@ -372,10 +373,7 @@ async function flush() {
 if (typeof window !== 'undefined' && import.meta.webpackHot) {
   import.meta.webpackHot.accept(
     ${JSON.stringify(hdrRevisionFilePath)},
-    () => {
-      latestHdrRevision = __hdrRevision;
-      scheduleReactRouterRevalidation();
-    }
+    scheduleReactRouterRevalidation
   );
 }
 `;

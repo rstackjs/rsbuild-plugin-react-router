@@ -27,6 +27,7 @@ import {
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
+import { DEV_HDR_REVISION_RELATIVE_PATH } from './dev-hmr.js';
 import {
   createDevRuntimeSessionManager,
   type RuntimeBinding,
@@ -71,10 +72,22 @@ const escapeHtml = (value: string): string =>
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
 
 const isHdrRevisionFile = (file: string): boolean =>
-  file.includes('.react-router/hdr-revision.mjs');
+  file.includes(DEV_HDR_REVISION_RELATIVE_PATH);
 
 const isCssSourceFile = (file: string): boolean =>
   /\.css(?:\.[cm]?[jt]s)?$/.test(file);
+
+// A change that should bump the HDR revision: anything except the revision
+// file itself (the bump's own echo) and CSS sources (styling never changes
+// loader data).
+const hasHdrTriggeringChange = (files: Iterable<string>): boolean => {
+  for (const file of files) {
+    if (!isHdrRevisionFile(file) && !isCssSourceFile(file)) {
+      return true;
+    }
+  }
+  return false;
+};
 
 export const createReactRouterDevRuntimeController = ({
   api,
@@ -176,9 +189,7 @@ export const createReactRouterDevRuntimeController = ({
             changes.node.known &&
             identity.node !== undefined &&
             hdrSignaledNodeIdentity.get(pair) !== identity.node &&
-            Array.from(changes.node.files).some(
-              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
-            )
+            hasHdrTriggeringChange(changes.node.files)
           ) {
             hdrSignaledNodeIdentity.set(pair, identity.node);
             onNodeRebuildCommitted?.();

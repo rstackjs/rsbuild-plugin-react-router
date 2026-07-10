@@ -50,8 +50,9 @@ type RouteChunkArtifact = {
   map: null;
 };
 
-// Shared with the dev manifest differ: exactly the route flags the client HMR
-// runtime can patch in place without a full reload.
+// Exactly the route-manifest flags the client HMR runtime can patch in place
+// without a full reload. Array order defines the bit layout shared by the
+// encoder below and the decoder emitted in `generateDevHmrRuntimeModule`.
 export const HMR_PATCHABLE_ROUTE_FLAGS = [
   'hasAction',
   'hasClientAction',
@@ -61,23 +62,25 @@ export const HMR_PATCHABLE_ROUTE_FLAGS = [
   'hasLoader',
 ] as const;
 
-type RouteHmrMetadata = Record<
+const HMR_FLAG_EXPORT_NAME: Record<
   (typeof HMR_PATCHABLE_ROUTE_FLAGS)[number],
-  boolean
->;
+  string
+> = {
+  hasAction: SERVER_EXPORTS.action,
+  hasClientAction: CLIENT_EXPORTS.clientAction,
+  hasClientLoader: CLIENT_EXPORTS.clientLoader,
+  hasClientMiddleware: CLIENT_EXPORTS.clientMiddleware,
+  hasErrorBoundary: CLIENT_EXPORTS.ErrorBoundary,
+  hasLoader: SERVER_EXPORTS.loader,
+};
 
-export const buildRouteHmrMetadata = (
-  exportNames: readonly string[]
-): RouteHmrMetadata => {
+export const buildRouteHmrFlags = (exportNames: readonly string[]): number => {
   const exports = new Set(exportNames);
-  return {
-    hasAction: exports.has(SERVER_EXPORTS.action),
-    hasClientAction: exports.has(CLIENT_EXPORTS.clientAction),
-    hasClientLoader: exports.has(CLIENT_EXPORTS.clientLoader),
-    hasClientMiddleware: exports.has(CLIENT_EXPORTS.clientMiddleware),
-    hasErrorBoundary: exports.has(CLIENT_EXPORTS.ErrorBoundary),
-    hasLoader: exports.has(SERVER_EXPORTS.loader),
-  };
+  let flags = 0;
+  HMR_PATCHABLE_ROUTE_FLAGS.forEach((flag, index) => {
+    if (exports.has(HMR_FLAG_EXPORT_NAME[flag])) flags |= 1 << index;
+  });
+  return flags;
 };
 
 /**
@@ -94,61 +97,46 @@ const buildRouteClientEntryHmrCode = ({
   routeId,
   target,
   acceptTarget,
-  metadata,
+  flags,
 }: {
   routeId: string;
   target: string;
   acceptTarget: string;
-  metadata: RouteHmrMetadata;
+  flags: number;
 }): string => {
   const targetJson = JSON.stringify(target);
   const acceptTargetJson = JSON.stringify(acceptTarget);
   return `
-import * as __reactRouterRouteModule from ${targetJson};
+import * as __rrm from ${targetJson};
 import {
-  registerReactRouterRouteExports as __reactRouterRegisterRouteExports,
-  scheduleReactRouterRouteUpdate as __reactRouterScheduleRouteUpdate,
+  registerReactRouterRouteExports as __rrr,
+  scheduleReactRouterRouteUpdate as __rru,
 } from "virtual/react-router/hmr-runtime";
 
-const __reactRouterRouteId = ${JSON.stringify(routeId)};
-const __reactRouterRouteMetadata = ${JSON.stringify(metadata)};
-const __reactRouterGetRouteModule = () => __reactRouterRouteModule;
+const __rrid = ${JSON.stringify(routeId)};
+const __rrf = ${flags};
+const __rrg = () => __rrm;
+const __rru0 = () => {
+  __rrr(__rrid, __rrm);
+  __rru(__rrid, __rrf, __rrg);
+};
 
-__reactRouterRegisterRouteExports(
-  __reactRouterRouteId,
-  __reactRouterRouteModule
-);
+__rrr(__rrid, __rrm);
 
 if (import.meta.webpackHot) {
-  import.meta.webpackHot.accept(${acceptTargetJson}, () => {
-    __reactRouterRegisterRouteExports(
-      __reactRouterRouteId,
-      __reactRouterRouteModule
-    );
-    __reactRouterScheduleRouteUpdate(
-      __reactRouterRouteId,
-      __reactRouterRouteMetadata,
-      __reactRouterGetRouteModule
-    );
-  });
-  import.meta.webpackHot.accept();
-  import.meta.webpackHot.dispose(data => {
-    data.__reactRouterRouteShim = true;
-  });
-  if (
-    import.meta.webpackHot.data &&
-    import.meta.webpackHot.data.__reactRouterRouteShim
-  ) {
-    __reactRouterScheduleRouteUpdate(
-      __reactRouterRouteId,
-      __reactRouterRouteMetadata,
-      __reactRouterGetRouteModule
-    );
-  }
+  const __rrh = import.meta.webpackHot;
+  __rrh.accept(${acceptTargetJson}, __rru0);
+  __rrh.accept();
+  __rrh.dispose(data => { data.__rr = true; });
+  if (__rrh.data && __rrh.data.__rr) __rru0();
 }
 `;
 };
 
+// The accept target is spelled relative (`./name?react-router-route`) while
+// the import above uses the absolute resource path; both resolve to the same
+// module because the client entry replaces the route file in place, so its
+// resolution context is the route's own directory.
 const createRouteHmrAcceptTarget = (resourcePath: string): string => {
   return `./${basename(resourcePath)}?react-router-route`;
 };
@@ -192,7 +180,7 @@ export const buildRouteClientEntryCode = ({
       routeId,
       target,
       acceptTarget: createRouteHmrAcceptTarget(resourcePath),
-      metadata: buildRouteHmrMetadata(exportNames),
+      flags: buildRouteHmrFlags(exportNames),
     })
   );
 };
