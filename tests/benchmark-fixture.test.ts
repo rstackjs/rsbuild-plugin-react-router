@@ -391,6 +391,18 @@ describe('benchmark fixture generator', () => {
     }
   });
 
+  it('rejects a missing build output root', async () => {
+    const { collectBuildOutputStats } = await import(
+      '../scripts/benchmark/bundle-size.mjs'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-missing-'));
+    rmSync(root, { recursive: true });
+
+    await expect(collectBuildOutputStats(root)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
   it('accepts equals-form CLI options before benchmark selection', () => {
     const result = spawnSync(
       process.execPath,

@@ -78,15 +78,7 @@ export const collectBuildOutputStats = async buildRoot => {
   const stats = createEmptyBuildOutputStats();
 
   const visit = async directory => {
-    let entries;
-    try {
-      entries = await readdir(directory, { withFileTypes: true });
-    } catch (error) {
-      if (error?.code === 'ENOENT') {
-        return;
-      }
-      throw error;
-    }
+    const entries = await readdir(directory, { withFileTypes: true });
 
     await Promise.all(
       entries.map(async entry => {
