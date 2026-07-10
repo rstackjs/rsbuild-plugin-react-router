@@ -145,6 +145,14 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
+  // Web-only commits reuse the node compiler's stale `modifiedFiles`
+  // snapshot, and every HDR bump itself triggers a web rebuild — so signal
+  // once per node compilation identity or the bump loop self-sustains.
+  const hdrSignaledNodeIdentity = new WeakMap<
+    DevCompilerPair,
+    NonNullable<DevGraphIdentity['node']>
+  >();
+
   const finishRuntimeAttemptEffect = (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
@@ -167,10 +175,13 @@ export const createReactRouterDevRuntimeController = ({
           if (
             result === 'committed' &&
             changes.node.known &&
+            identity.node !== undefined &&
+            hdrSignaledNodeIdentity.get(pair) !== identity.node &&
             Array.from(changes.node.files).some(
               file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
             )
           ) {
+            hdrSignaledNodeIdentity.set(pair, identity.node);
             onNodeRebuildCommitted?.();
           }
         })

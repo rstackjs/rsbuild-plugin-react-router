@@ -647,6 +647,17 @@ describe('React Router development runtime controller', () => {
       assets: { version: 'web-next' },
     });
     expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+
+    // A web-only rebuild (e.g. the HDR revision bump itself) commits with the
+    // node compiler's stale modifiedFiles snapshot; it must not re-signal or
+    // the bump feeds back into an infinite rebuild loop.
+    web.setChanges(['/app/web-only.ts']);
+    callbacks.before();
+    const webOnly = web.compile();
+    controller.captureWeb(webOnly, createManifestSet('web-only'));
+    web.complete(webOnly);
+    await callbacks.after({ stats: createGraphStats(webOnly, nextNode) });
+    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
   });
 
   it('does not signal a node rebuild for paired CSS source changes', async () => {
