@@ -315,7 +315,9 @@ jobs:
 
       - name: Ensure skipped synthetic artifact path exists
         if: steps.synthetic-benchmark.outputs.SKIP == 'true'
-        run: mkdir -p benchmark-output/synthetic
+        run: |
+          mkdir -p benchmark-output/synthetic
+          touch benchmark-output/synthetic/SKIPPED
 
       - name: Upload synthetic benchmark shard
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -345,6 +347,15 @@ jobs:
         with:
           node-version-file: head/.nvmrc
           package-manager-cache: false
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          package_json_file: head/package.json
+
+      - name: Install head runtime dependencies
+        working-directory: head
+        run: pnpm install --filter rsbuild-plugin-react-router --prod --frozen-lockfile
 
       - name: Download small benchmark shard
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
