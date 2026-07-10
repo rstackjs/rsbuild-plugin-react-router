@@ -40,11 +40,13 @@ function generateStaticTemplate(
   const manifestId =
     options.serverManifestId ?? 'virtual/react-router/server-manifest';
   const routeEntries = Object.entries(routes);
+  const shouldStubNonRootRoutes =
+    !options.ssr && (options.prerender?.length ?? 0) === 0;
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
     ${routeEntries
       .map(([, route], index) => {
-        if (!options.ssr && route.id !== 'root') {
+        if (shouldStubNonRootRoutes && route.id !== 'root') {
           return `const route${index} = { default: () => null };`;
         }
         return `import * as route${index} from ${JSON.stringify(

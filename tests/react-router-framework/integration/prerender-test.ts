@@ -1127,8 +1127,8 @@ test.describe(`Prerendering`, () => {
 
       let clientDir = path.join(fixture.projectDir, "build", "client");
       expect(listAllFiles(clientDir).sort()).toEqual([
-        "_.data",
         "__spa-fallback.html",
+        "_root.data",
         "favicon.ico",
         "index.html",
       ]);

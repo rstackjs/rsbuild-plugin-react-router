@@ -49,6 +49,29 @@ describe('SPA Mode (ssr: false)', () => {
       expect(result).toContain('const route1 = { default: () => null };');
     });
 
+    it('should import non-root routes for ssr false prerender paths', () => {
+      const result = generateServerBuild(
+        {
+          rootKey: mockRoutes.root,
+          homeKey: mockRoutes['routes/home'],
+        },
+        {
+          entryServerPath: './app/entry.server.tsx',
+          assetsBuildDirectory: 'build/client',
+          basename: '/',
+          appDirectory: 'app',
+          ssr: false,
+          prerender: ['/'],
+          routeDiscovery: { mode: 'initial' },
+        }
+      );
+
+      expect(result).toMatch(/import \* as route0 from ".+\/app\/root\.tsx";/);
+      expect(result).toMatch(
+        /import \* as route1 from ".+\/app\/routes\/home\.tsx";/
+      );
+    });
+
     it('should set isSpaMode to false when ssr is true', () => {
       const result = generateServerBuild(mockRoutes, {
         entryServerPath: './app/entry.server.tsx',
