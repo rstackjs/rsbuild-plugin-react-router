@@ -270,10 +270,8 @@ export const registerBuildOutputTransforms = ({
           const routeChunkName = getRouteChunkNameFromModuleId(args.resource);
           if (isBuild && isSpaMode && routeChunkName === 'main') {
             validateSpaModeRouteExports({
-              exportNames: analyzeRouteModuleCode(
-                args.code,
-                args.resourcePath
-              ).exports,
+              exportNames: analyzeRouteModuleCode(args.code, args.resourcePath)
+                .exports,
               resourcePath: args.resourcePath,
               rootRoutePath,
             });
@@ -293,10 +291,7 @@ export const registerBuildOutputTransforms = ({
           // HERE (on the main chunk) and the shared registration is scoped to
           // ['node']. If either gate changes, web modules get transformed
           // twice or not at all.
-          if (
-            !isBuild ||
-            routeChunkName !== 'main'
-          ) {
+          if (!isBuild || routeChunkName !== 'main') {
             return routeChunkArtifact;
           }
 
