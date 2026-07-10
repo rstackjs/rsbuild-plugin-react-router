@@ -325,7 +325,15 @@ test.describe("Error Sanitization", () => {
       process.env.NODE_ENV = "development";
     });
     test.afterEach(() => {
-      process.env.NODE_ENV = ogEnv;
+      // Assigning `undefined` would coerce to the string "undefined" and
+      // poison NODE_ENV for every later fixture build in this serial worker
+      // (the built web bundle then keeps a literal `process.env.NODE_ENV`
+      // and throws `process is not defined` in the browser).
+      if (ogEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = ogEnv;
+      }
     });
 
     test("renders document without errors", async () => {
