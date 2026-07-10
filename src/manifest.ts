@@ -300,24 +300,26 @@ const createChunkAssetResolver = (
     }
 
     const cssAssets = new Set<string>();
-    const jsAssets: string[] = [];
+    const jsAssets = new Set<string>();
     for (const asset of assets) {
       if (asset.endsWith('.css')) {
         cssAssets.add(asset);
       } else if (asset.endsWith('.js')) {
-        jsAssets.push(asset);
+        jsAssets.add(asset);
       }
     }
     for (const asset of clientStats?.entrypointFilesByName?.[chunkName] ?? []) {
       if (asset.endsWith('.css')) {
         cssAssets.add(asset);
+      } else if (asset.endsWith('.js')) {
+        jsAssets.add(asset);
       }
     }
-    if (jsAssets.length === 0) {
-      jsAssets.push(`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`);
+    if (jsAssets.size === 0) {
+      jsAssets.add(`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`);
     }
 
-    const result = { js: jsAssets, css: [...cssAssets] };
+    const result = { js: [...jsAssets], css: [...cssAssets] };
     chunkAssetsByName.set(chunkName, result);
     return result;
   };

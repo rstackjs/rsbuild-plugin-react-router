@@ -97,8 +97,7 @@ const createProcessAssetsHarness = () => {
 const createCompilation = (
   namedChunks: Array<[string, unknown]>,
   assets: Record<string, Asset> = {},
-  entrypoints: Array<[string, unknown]> = [],
-  statsAssets?: Array<{ name: string; integrity?: string }>
+  entrypoints: Array<[string, unknown]> = []
 ) => ({
   namedChunks: new Map(namedChunks),
   entrypoints: new Map(entrypoints),
@@ -122,7 +121,7 @@ const createCompilation = (
   },
   getStats() {
     return {
-      toJson: () => ({ assets: statsAssets ?? [] }),
+      toJson: () => ({ assets: [] }),
     };
   },
 });
@@ -182,7 +181,6 @@ describe('modify browser manifest plugin', () => {
 
     expect(sri).toEqual({
       '/assets/static/js/entry.client.js': 'sha384-entry',
-      '/assets/static/css/entry.client.css': 'sha384-css',
       '/assets/static/js/route.js': 'sha384-route',
       '/static/js/already-prefixed.js': 'sha384-prefixed',
     });
@@ -371,7 +369,7 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
-  it('collects build SRI after later asset stages attach integrity metadata', async () => {
+  it('hashes finalized build assets at the report stage', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
     const optimizedEntrySource = 'console.log("after optimize");';
@@ -412,16 +410,16 @@ describe('modify browser manifest plugin', () => {
         { stage: 'report', environments: ['web'] },
       ]);
 
-      // Integrity metadata is attached to the finalized (post-hash) asset
-      // before the `report` stage runs.
       compilation.updateAsset(
         'static/js/entry.client.js',
-        createAsset(optimizedEntrySource, 'sha384-optimized-entry')
+        createAsset(optimizedEntrySource)
       );
       await harness.runStage('report', { assets, compilation });
 
       expect(reportedSri?.['/static/js/entry.client.js']).toBe(
-        'sha384-optimized-entry'
+        `sha384-${createHash('sha384')
+          .update(optimizedEntrySource)
+          .digest('base64')}`
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -438,14 +436,7 @@ describe('modify browser manifest plugin', () => {
     };
     const compilation = createCompilation(
       [['entry.client', { files: new Set(['static/js/entry.client.js']) }]],
-      assets,
-      [],
-      [
-        {
-          name: 'static/js/entry.client.js',
-          integrity: 'sha384-stable-entry',
-        },
-      ]
+      assets
     );
     let reportedSri: Record<string, string> | undefined;
 
@@ -471,9 +462,8 @@ describe('modify browser manifest plugin', () => {
 
       await harness.runStage('report', { assets, compilation });
 
-      expect(reportedSri?.['/static/js/entry.client.js']).toBe(
-        'sha384-stable-entry'
-      );
+      expect(reportedSri?.['/static/js/entry.client.js']).toMatch(/^sha384-/);
+      expect(assets[BROWSER_MANIFEST_PATH].source()).not.toContain("'sri'");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -649,7 +639,7 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
-  it('adds transitive entrypoint CSS without adding transitive JavaScript preloads', async () => {
+  it('adds transitive entrypoint assets to the manifest', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
     const assets = createBrowserManifestAssets();
@@ -696,16 +686,10 @@ describe('modify browser manifest plugin', () => {
 
       expect(manifest).toMatchObject({
         entry: {
-          // The entry's own module is excluded from imports (upstream parity),
-          // and transitive entrypoint JS (vendor.js) is not added as a preload.
-          imports: [],
+          imports: ['/static/js/vendor.js'],
           css: ['/static/css/reset.css', '/static/css/route.css'],
         },
       });
-      const entryImports = (manifest as { entry: { imports: string[] } }).entry
-        .imports;
-      expect(entryImports).not.toContain('/static/js/vendor.js');
-      expect(entryImports).not.toContain('/static/js/entry.client.js');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

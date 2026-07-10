@@ -81,11 +81,14 @@ const addIntegrity = (
   assetName: unknown,
   integrity: unknown
 ) => {
-  if (typeof assetName !== 'string' || typeof integrity !== 'string') {
+  if (
+    typeof assetName !== 'string' ||
+    !assetName.endsWith('.js') ||
+    typeof integrity !== 'string'
+  ) {
     return;
   }
-  const url = toManifestAssetUrl(assetPrefix, assetName);
-  sri[url] ??= integrity;
+  sri[toManifestAssetUrl(assetPrefix, assetName)] = integrity;
 };
 
 const computeSubresourceIntegrity = (
@@ -114,57 +117,19 @@ export const collectSubresourceIntegrity = (
     const assets =
       compilation.getAssets() as readonly CompilationAssetWithIntegrity[];
     for (const asset of assets) {
+      if (!asset.name.endsWith('.js')) {
+        continue;
+      }
       addIntegrity(
         sri,
         assetPrefix,
         asset.name,
-        asset.info?.integrity ??
-          (asset.name.endsWith('.js')
-            ? computeSubresourceIntegrity(asset.source)
-            : undefined)
+        computeSubresourceIntegrity(asset.source) ?? asset.info?.integrity
       );
     }
   }
 
   return Object.keys(sri).length > 0 ? sri : undefined;
-};
-
-const getManifestSriAssetUrls = (
-  manifest: ReactRouterManifest
-): ReadonlySet<string> => {
-  const urls = new Set<string>([
-    manifest.url,
-    manifest.entry.module,
-    ...manifest.entry.imports,
-  ]);
-  for (const route of Object.values(manifest.routes)) {
-    urls.add(route.module);
-    for (const asset of route.imports) {
-      urls.add(asset);
-    }
-    for (const asset of [
-      route.clientActionModule,
-      route.clientLoaderModule,
-      route.clientMiddlewareModule,
-      route.hydrateFallbackModule,
-    ]) {
-      if (asset) {
-        urls.add(asset);
-      }
-    }
-  }
-  return urls;
-};
-
-const filterSubresourceIntegrity = (
-  sri: Record<string, string>,
-  manifest: ReactRouterManifest
-): Record<string, string> | undefined => {
-  const urls = getManifestSriAssetUrls(manifest);
-  const filtered = Object.fromEntries(
-    Object.entries(sri).filter(([url]) => urls.has(url))
-  );
-  return Object.keys(filtered).length > 0 ? filtered : undefined;
 };
 
 export function registerModifyBrowserManifestAssets(
@@ -215,29 +180,13 @@ export function registerModifyBrowserManifestAssets(
           routeModuleAnalysis: options?.routeModuleAnalysis,
         })
       );
-
-    // With SRI, integrity hashes are only available once the compilation has
-    // finalized asset hashes, so collect them at this (report) stage.
-    const sri = withSri
-      ? (filterSubresourceIntegrity(
-          collectSubresourceIntegrity(
-            compilation.getStats().toJson({
-              all: false,
-              assets: true,
-            }) as StatsWithIntegrity,
-            compilation,
-            currentAssetPrefix
-          ) ?? {},
-          manifest
-        ) ?? true)
-      : undefined;
-    const manifestForBrowser: ReactRouterManifest =
-      sri !== undefined ? { ...manifest, sri } : manifest;
+    const browserManifest = { ...manifest };
+    delete browserManifest.sri;
 
     const browserManifestAsset = assets[BROWSER_MANIFEST_ASSET];
     if (browserManifestAsset) {
       const originalSource = browserManifestAsset.source().toString();
-      const serializedManifest = jsesc(manifestForBrowser, { es6: true });
+      const serializedManifest = jsesc(browserManifest, { es6: true });
       const newSource = originalSource.replace(
         /["'`]PLACEHOLDER["'`]/,
         () => serializedManifest
@@ -258,7 +207,7 @@ export function registerModifyBrowserManifestAssets(
         entryModulePath: entryJsAssets[0],
       });
       const manifestSource = `window.__reactRouterManifest=${jsesc(
-        manifestForBrowser,
+        browserManifest,
         { es6: true }
       )};`;
       const source = new sources.RawSource(manifestSource);
@@ -269,7 +218,22 @@ export function registerModifyBrowserManifestAssets(
       }
     }
 
-    options?.onManifest?.(manifestForBrowser, sri, moduleExportsByRouteId, {
+    // Rspack's SRI stats are finalized by a later report-stage hook. Hash the
+    // finalized JavaScript sources here as a fallback, matching React Router's
+    // Vite integration. Browser manifests intentionally omit `sri`; hydration
+    // receives it from the server-rendered import map.
+    const sri = withSri
+      ? (collectSubresourceIntegrity(
+          compilation.getStats().toJson({
+            all: false,
+            assets: true,
+          }) as StatsWithIntegrity,
+          compilation,
+          currentAssetPrefix
+        ) ?? true)
+      : undefined;
+
+    options?.onManifest?.(manifest, sri, moduleExportsByRouteId, {
       compilation,
       manifestStats: stats,
     });
