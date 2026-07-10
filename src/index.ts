@@ -774,6 +774,26 @@ export const pluginReactRouter = (
           config.performance.printFileSize === true);
       const resolveConfig = modePlan.createResolveConfig(api.context.rootPath);
 
+      // Browser code (React itself) reads `process.env.NODE_ENV`. Rsbuild only
+      // emits the define for its recognized modes; an unrecognized NODE_ENV
+      // (e.g. the string "undefined" leaking from a misconfigured shell)
+      // resolves mode 'none' and leaves the bare reference in the web bundle,
+      // which throws `process is not defined` at runtime. Always define it for
+      // the web environment — mirroring the Vite plugin — unless the user
+      // supplies their own define.
+      const userDefinesNodeEnv =
+        config.source?.define?.['process.env.NODE_ENV'] !== undefined ||
+        config.environments?.web?.source?.define?.['process.env.NODE_ENV'] !==
+          undefined;
+      const webNodeEnv =
+        process.env.NODE_ENV === 'production' ||
+        process.env.NODE_ENV === 'development' ||
+        process.env.NODE_ENV === 'test'
+          ? process.env.NODE_ENV
+          : isBuild
+            ? 'production'
+            : 'development';
+
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
           ? {
@@ -819,6 +839,13 @@ export const pluginReactRouter = (
               : {}),
             source: {
               entry: modePlan.webEntries,
+              ...(userDefinesNodeEnv
+                ? {}
+                : {
+                    define: {
+                      'process.env.NODE_ENV': JSON.stringify(webNodeEnv),
+                    },
+                  }),
             },
             output: {
               filename: {
