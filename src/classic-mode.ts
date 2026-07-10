@@ -45,6 +45,7 @@ type CreateClassicVirtualModulesOptions = {
   devHmrRuntimeModule?: string;
   entryServerPath: string;
   future: Config['future'];
+  isSpaMode: boolean;
   prerenderPaths: string[];
   publicPath: string;
   routeDiscovery: Config['routeDiscovery'];
@@ -193,6 +194,7 @@ export const createClassicVirtualModules = ({
   devHmrRuntimeModule,
   entryServerPath,
   future,
+  isSpaMode,
   prerenderPaths,
   publicPath,
   routeDiscovery,
@@ -206,6 +208,7 @@ export const createClassicVirtualModules = ({
     basename,
     appDirectory,
     ssr,
+    isSpaMode,
     future,
     allowedActionOrigins,
     prerender: prerenderPaths,

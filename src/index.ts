@@ -473,6 +473,7 @@ export const pluginReactRouter = (
       basename,
       customServer: pluginOptions.customServer,
       isBuild,
+      isSpaMode,
       prerenderConfig,
       routeConfig,
       routeDiscovery,

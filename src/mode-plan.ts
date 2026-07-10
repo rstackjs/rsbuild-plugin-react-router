@@ -82,6 +82,7 @@ type ModePlanContext = {
   customServer: boolean;
   splitRouteModules: Config['splitRouteModules'];
   isBuild: boolean;
+  isSpaMode: boolean;
   prerenderConfig: Config['prerender'];
   routeConfig: RouteConfigEntry[];
   routeDiscovery: Config['routeDiscovery'];
@@ -246,6 +247,7 @@ const createClassicModePlan = async ({
   future,
   hasServerApp,
   isBuild,
+  isSpaMode,
   parallelRouteTransform,
   prerenderConfig,
   reactRouterConfig,
@@ -331,6 +333,7 @@ const createClassicModePlan = async ({
         devHmrRuntimeModule: devHmr?.runtimeModule,
         entryServerPath,
         future,
+        isSpaMode,
         prerenderPaths: artifacts.prerenderPaths,
         publicPath,
         routeDiscovery,

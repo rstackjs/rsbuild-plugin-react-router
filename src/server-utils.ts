@@ -17,6 +17,7 @@ interface ServerBuildOptions {
   basename: string;
   appDirectory: string;
   ssr: boolean;
+  isSpaMode?: boolean;
   future?: unknown;
   allowedActionOrigins?: string[];
   prerender?: string[];
@@ -40,13 +41,12 @@ function generateStaticTemplate(
   const manifestId =
     options.serverManifestId ?? 'virtual/react-router/server-manifest';
   const routeEntries = Object.entries(routes);
-  const shouldStubNonRootRoutes =
-    !options.ssr && (options.prerender?.length ?? 0) === 0;
+  const isSpaMode = options.isSpaMode ?? !options.ssr;
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
     ${routeEntries
       .map(([, route], index) => {
-        if (shouldStubNonRootRoutes && route.id !== 'root') {
+        if (isSpaMode && route.id !== 'root') {
           return `const route${index} = { default: () => null };`;
         }
         return `import * as route${index} from ${JSON.stringify(
@@ -61,7 +61,7 @@ function generateStaticTemplate(
     )};
     export const basename = ${JSON.stringify(options.basename)};
     export const future = ${JSON.stringify(options.future ?? {})};
-    export const isSpaMode = ${!options.ssr};
+    export const isSpaMode = ${isSpaMode};
     export const ssr = ${options.ssr};
     export const routeDiscovery = ${JSON.stringify(options.routeDiscovery)};
     export const prerender = ${JSON.stringify(options.prerender ?? [])};

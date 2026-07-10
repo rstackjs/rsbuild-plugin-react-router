@@ -21,6 +21,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: false,
+        isSpaMode: true,
         routeDiscovery: { mode: 'initial' },
       });
 
@@ -40,6 +41,7 @@ describe('SPA Mode (ssr: false)', () => {
           basename: '/',
           appDirectory: 'app',
           ssr: false,
+          isSpaMode: true,
           routeDiscovery: { mode: 'initial' },
         }
       );
@@ -61,6 +63,7 @@ describe('SPA Mode (ssr: false)', () => {
           basename: '/',
           appDirectory: 'app',
           ssr: false,
+          isSpaMode: false,
           prerender: ['/'],
           routeDiscovery: { mode: 'initial' },
         }
@@ -79,6 +82,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -99,6 +103,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: false,
+        isSpaMode: true,
         routeDiscovery: { mode: 'initial' },
       });
 
@@ -112,6 +117,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -132,6 +138,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         federation: true,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
@@ -148,6 +155,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         federation: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
@@ -170,6 +178,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/my-app',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -183,6 +192,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -202,6 +212,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         future: { v3_fetcherPersist: true },
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
@@ -216,6 +227,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
 
@@ -235,6 +247,7 @@ describe('SPA Mode (ssr: false)', () => {
         basename: '/',
         appDirectory: 'app',
         ssr: true,
+        isSpaMode: false,
         allowedActionOrigins: ['https://example.com'],
         routeDiscovery: { mode: 'lazy', manifestPath: '/__manifest' },
       });
