@@ -360,6 +360,9 @@ async function flush() {
   } else if (nextManifest) {
     await refreshRouteState(router);
     Object.assign(manifest, nextManifest);
+    if (hmrRoutes) {
+      patchCurrentRouteMatches(router, hmrRoutes);
+    }
     shouldRevalidate = false;
   } else if (shouldRevalidate) {
     await revalidateRouter(router);
