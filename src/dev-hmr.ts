@@ -125,7 +125,7 @@ const RefreshRuntime =
 const pendingRouteUpdates = new Map();
 let flushTimeout;
 let pendingRevalidation = false;
-let pendingComponentRouteNavigation = false;
+let pendingComponentRouteRevalidation = false;
 
 function getCurrentRouterPath(router) {
   const basename = router.basename || '/';
@@ -327,18 +327,6 @@ async function refreshRouteState(router) {
   }
 }
 
-async function navigateCurrentRoute(router) {
-  if (typeof router.navigate !== 'function') {
-    await revalidateRouter(router);
-    return;
-  }
-  await router.navigate(getCurrentRouterPath(router), {
-    replace: true,
-    preventScrollReset: true,
-    defaultShouldRevalidate: false,
-  });
-}
-
 function performReactRefresh() {
   if (
     RefreshRuntime &&
@@ -364,7 +352,7 @@ async function flush() {
   // Loader updates must be visible during revalidation. Component-only routes
   // stay staged until revalidation completes, matching React Router's HMR flow.
   if (nextManifest && shouldRefreshRouteState) {
-    pendingComponentRouteNavigation = false;
+    pendingComponentRouteRevalidation = false;
     if (hmrRoutes) {
       patchCurrentRouteMatches(router, hmrRoutes);
     }
@@ -378,13 +366,12 @@ async function flush() {
       patchCurrentRouteMatches(router, hmrRoutes);
     }
     // The node compiler also emits an HDR revision for this route edit. If it
-    // arrives later, publish it without refetching loader data.
-    pendingComponentRouteNavigation = !shouldRevalidate;
+    // did not arrive in this flush, consume that redundant revalidation later.
+    pendingComponentRouteRevalidation = !shouldRevalidate;
     shouldRevalidate = false;
   } else if (shouldRevalidate) {
-    if (pendingComponentRouteNavigation) {
-      pendingComponentRouteNavigation = false;
-      await navigateCurrentRoute(router);
+    if (pendingComponentRouteRevalidation) {
+      pendingComponentRouteRevalidation = false;
     } else {
       await revalidateRouter(router);
     }
