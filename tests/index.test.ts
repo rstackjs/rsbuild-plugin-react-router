@@ -153,7 +153,7 @@ describe('pluginReactRouter', () => {
         },
         {
           paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
-          type: 'reload-server',
+          type: 'reload-page',
         },
         {
           paths: expect.stringMatching(

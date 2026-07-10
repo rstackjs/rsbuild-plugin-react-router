@@ -100,7 +100,7 @@ export const createReactRouterRouteWatchFiles = ({
     watchFiles.push(
       {
         paths: routeConfigWatchPaths,
-        type: 'reload-server',
+        type: 'reload-page',
       },
       {
         paths: routeRestartMarkerPath,
