@@ -13,6 +13,17 @@ const formatDurationSeconds = value =>
 const formatMilliseconds = value =>
   typeof value === 'number' ? `${value.toFixed(1)}ms` : '-';
 const formatCount = value => (typeof value === 'number' ? String(value) : '-');
+const formatNoiseBand = value =>
+  typeof value === 'number' ? `±${value.toFixed(1)}%` : '-';
+const formatUnsignedPercent = value =>
+  typeof value === 'number' ? `${value.toFixed(1)}%` : '-';
+const formatSignal = value =>
+  ({
+    regression: '🔴 regression',
+    improvement: '🟢 improvement',
+    inconclusive: '⚪ inconclusive',
+    'insufficient-data': '⚠️ insufficient data',
+  })[value] ?? '⚠️ insufficient data';
 
 const productionBenchmarkTableHeader = [
   '| Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |',
@@ -26,6 +37,59 @@ const devBenchmarkTableHeader = [
 
 const benchmarkRunCount = benchmark =>
   benchmark.headRunCount ?? benchmark.baseRunCount;
+
+const appendSignalSummary = (lines, report) => {
+  const benchmarkRows = [
+    ...report.buildBenchmarks.map(benchmark => ({
+      label: `${benchmark.id} (build)`,
+      runs: benchmarkRunCount(benchmark),
+      base: benchmark.baseWallMs,
+      head: benchmark.headWallMs,
+      delta: benchmark.wallDeltaPercent,
+      stability: benchmark.stability,
+      format: formatSeconds,
+    })),
+    ...report.benchmarks.map(benchmark => ({
+      label: `${benchmark.id} (dev)`,
+      runs: benchmarkRunCount(benchmark),
+      base: benchmark.baseWallMs,
+      head: benchmark.headWallMs,
+      delta: benchmark.wallDeltaPercent,
+      stability: benchmark.stability,
+      format: formatSeconds,
+    })),
+    ...report.syntheticBenchmarks.map(benchmark => ({
+      label: `complex app (${benchmark.profile})`,
+      runs: benchmark.runs,
+      base: benchmark.baseMedianSeconds,
+      head: benchmark.headMedianSeconds,
+      delta: benchmark.deltaPercent,
+      stability: benchmark.stability,
+      format: formatDurationSeconds,
+    })),
+  ];
+
+  if (benchmarkRows.length === 0) {
+    return;
+  }
+
+  lines.push(
+    '### Reading benchmark confidence',
+    '',
+    'Raw deltas are always shown. The signal label only indicates whether the observed median delta is larger than a robust run-to-run noise band; it does not erase or replace the measurement.',
+    '',
+    "The noise band is the larger of 2% or two combined robust standard deviations estimated from each side's relative median absolute deviation (rMAD). Fewer than three finite samples is reported as insufficient data. An inconclusive result should be rerun or investigated from the uploaded raw samples before drawing a performance conclusion.",
+    '',
+    '| Benchmark | Runs | Base total | Head total | Delta | Base rMAD | Head rMAD | Noise band | Signal |',
+    '|---|---:|---:|---:|---:|---:|---:|---:|---|'
+  );
+  for (const row of benchmarkRows) {
+    lines.push(
+      `| \`${row.label}\` | ${formatCount(row.runs)} | ${row.format(row.base)} | ${row.format(row.head)} | ${formatPercent(row.delta)} | ${formatUnsignedPercent(row.stability.baseRelativeMadPercent)} | ${formatUnsignedPercent(row.stability.headRelativeMadPercent)} | ${formatNoiseBand(row.stability.noiseBandPercent)} | ${formatSignal(row.stability.classification)} |`
+    );
+  }
+  lines.push('');
+};
 
 const renderBuildBenchmarkRow = benchmark =>
   `| \`${benchmark.id}\` | ${formatCount(benchmarkRunCount(benchmark))} | ${formatSeconds(benchmark.baseWallMs)} | ${formatSeconds(benchmark.headWallMs)} | ${formatPercent(benchmark.wallDeltaPercent)} | ${formatSeconds(benchmark.headWallMeanMs)} | ${formatSeconds(benchmark.headWallP95Ms)} | ${formatSpeedup(benchmark.wallSpeedup)} | ${formatRss(benchmark.headRssKb)} |`;
@@ -159,6 +223,7 @@ export const renderBenchmarkComment = report => {
     '',
   ];
 
+  appendSignalSummary(lines, report);
   appendDevRollup(lines, report);
   appendProductionBenchmarks(
     lines,

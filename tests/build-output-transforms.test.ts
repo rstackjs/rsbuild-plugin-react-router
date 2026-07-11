@@ -135,6 +135,35 @@ describe('build output transforms', () => {
     expect(options.routeTransformRunner).toHaveBeenCalledTimes(2);
   });
 
+  it('reads dev HMR enablement when route transforms run', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness, true);
+    let devHmrEnabled = false;
+
+    registerBuildOutputTransforms({
+      ...options,
+      isBuild: false,
+      isDevHmrEnabled: () => devHmrEnabled,
+    });
+
+    const routeModuleTransform = harness.transforms.find(
+      transform => transform.descriptor.order === 'post'
+    );
+
+    await routeModuleTransform!.handler(createTransformArgs(options.routePath));
+    devHmrEnabled = true;
+    await routeModuleTransform!.handler(createTransformArgs(options.routePath));
+
+    expect(options.routeTransformRunner).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ devHmr: false })
+    );
+    expect(options.routeTransformRunner).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ devHmr: true })
+    );
+  });
+
   it('does not match split-export transforms for internal route requests', () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);

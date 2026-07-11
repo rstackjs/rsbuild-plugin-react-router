@@ -40,6 +40,7 @@ type RegisterBuildOutputTransformsOptions = {
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
+  isDevHmrEnabled?: () => boolean;
 };
 
 export const registerBuildOutputTransforms = ({
@@ -63,6 +64,7 @@ export const registerBuildOutputTransforms = ({
   ssr,
   isSpaMode,
   rootRoutePath,
+  isDevHmrEnabled = () => false,
 }: RegisterBuildOutputTransformsOptions): void => {
   const transformRouteModule = async (args: Parameters<TransformHandler>[0]) =>
     performanceProfiler.record(
@@ -83,6 +85,7 @@ export const registerBuildOutputTransforms = ({
           isBuild,
           isSpaMode,
           rootRoutePath,
+          devHmr: isDevHmrEnabled(),
         })
     );
 
@@ -160,6 +163,8 @@ export const registerBuildOutputTransforms = ({
             environmentName: args.environment?.name,
             isBuild,
             routeChunkConfig,
+            routeId: routeByFilePath.get(args.resourcePath)?.id,
+            devHmr: isDevHmrEnabled(),
           })
       )
   );

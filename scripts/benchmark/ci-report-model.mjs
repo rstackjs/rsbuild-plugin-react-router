@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { classifyBenchmarkSignal } from './statistics.mjs';
 
 export const readJson = async file => JSON.parse(await readFile(file, 'utf8'));
 
@@ -144,6 +145,10 @@ const compareBenchmarks = (baseResult, headResult) => {
     const headRouteTotalMs = medianRouteTotal(headBenchmark);
     const baseUpdateMs = medianUpdate(baseBenchmark);
     const headUpdateMs = medianUpdate(headBenchmark);
+    const stability = classifyBenchmarkSignal(
+      (baseBenchmark?.runs ?? []).map(run => run.wallMs),
+      (headBenchmark?.runs ?? []).map(run => run.wallMs)
+    );
 
     return {
       id,
@@ -170,6 +175,7 @@ const compareBenchmarks = (baseResult, headResult) => {
       headRunCount: headBenchmark?.runs?.length ?? null,
       headWallMeanMs: headBenchmark?.summary?.wallMs?.mean ?? null,
       headWallP95Ms: headBenchmark?.summary?.wallMs?.p95 ?? null,
+      stability,
       devRouteSummaries: compareRouteSummaries(
         baseBenchmark?.devRouteSummary,
         headBenchmark?.devRouteSummary
@@ -216,6 +222,10 @@ const compareSyntheticBenchmarks = (basePayloads, headPayloads) => {
     const headRouteTotalMs = headSummary?.routeTotalMs?.median ?? null;
     const baseUpdateMs = baseSummary?.updateMs?.median ?? null;
     const headUpdateMs = headSummary?.updateMs?.median ?? null;
+    const stability = classifyBenchmarkSignal(
+      baseSummary?.samples ?? [],
+      headSummary?.samples ?? []
+    );
 
     return {
       profile,
@@ -237,6 +247,7 @@ const compareSyntheticBenchmarks = (basePayloads, headPayloads) => {
       runs: headSummary?.runs ?? baseSummary?.runs ?? null,
       node: headSummary?.node ?? baseSummary?.node ?? null,
       platform: headSummary?.platform ?? baseSummary?.platform ?? null,
+      stability,
     };
   });
 };
