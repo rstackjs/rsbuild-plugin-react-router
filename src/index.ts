@@ -770,6 +770,11 @@ export const pluginReactRouter = (
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
         entryClientPath: finalEntryClientPath,
+        eagerRouteFiles:
+          pluginOptions.unstableLazyCompilationRouteEntries?.eagerRouteFiles,
+        lazyRouteEntries: Boolean(
+          pluginOptions.unstableLazyCompilationRouteEntries
+        ),
         prewarmReactRouterModules: Boolean(
           pluginOptions.unstableLazyCompilationPrewarm
         ),

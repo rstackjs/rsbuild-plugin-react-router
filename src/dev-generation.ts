@@ -72,7 +72,9 @@ type CreateReactRouterDevRuntimeOptions = {
   server: RsbuildDevServer;
   buildPlan: ReactRouterDevBuildPlan;
   onEvaluationError: (error: Error) => void;
-  onCssAssetOwnershipChanged?: (change: 'removed' | 'restored') => void;
+  onCssAssetOwnershipChanged?: (
+    change: 'added' | 'removed' | 'restored'
+  ) => void;
   onRouteManifestChanged?: () => void;
   onWarning?: (message: string) => void;
 };
@@ -274,7 +276,7 @@ export const createReactRouterDevRuntime = ({
   >();
 
   const notifyCssAssetOwnershipChanged = (
-    change: 'removed' | 'restored'
+    change: 'added' | 'removed' | 'restored'
   ): void => {
     try {
       onCssAssetOwnershipChanged(change);
@@ -502,6 +504,12 @@ export const createReactRouterDevRuntime = ({
           previous.web.manifestsByEntryName,
           manifestsByEntryName
         );
+      // Lazy compilation activation can change chunk ownership without any
+      // source file changing. Reloading for that transient manifest delta
+      // throws away the UI action that activated the module.
+      // Unknown provenance is strict: only an explicitly marked lazy
+      // compilation may suppress a required route/CSS reload.
+      const hasFileBackedWebChange = changes.web.fileBackedInvalidation ?? true;
       const cssOnlyWebManifestChange =
         (cssAssetsRemoved || cssAssetsAdded) &&
         hasOnlyCssAssetOwnershipChanges(
@@ -577,16 +585,25 @@ export const createReactRouterDevRuntime = ({
         if (!committed) {
           return 'ignored';
         }
-        if (cssAssetsRemoved) {
+        let notifiedCssAssetOwnershipChange = false;
+        if (cssAssetsRemoved && hasFileBackedWebChange) {
           reloadAfterCssRemoval = !cssAssetsAdded;
           notifyCssAssetOwnershipChanged('removed');
-        } else if (cssAssetsAdded) {
+          notifiedCssAssetOwnershipChange = true;
+        } else if (cssAssetsAdded && hasFileBackedWebChange) {
           if (reloadAfterCssRemoval) {
             notifyCssAssetOwnershipChanged('restored');
+          } else {
+            notifyCssAssetOwnershipChanged('added');
           }
           reloadAfterCssRemoval = false;
+          notifiedCssAssetOwnershipChange = true;
         }
-        if (routeManifestMetadataChanged) {
+        if (
+          routeManifestMetadataChanged &&
+          hasFileBackedWebChange &&
+          !notifiedCssAssetOwnershipChange
+        ) {
           notifyRouteManifestChanged();
         }
         return 'committed';

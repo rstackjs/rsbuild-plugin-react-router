@@ -189,6 +189,15 @@ export const registerBuildOutputTransforms = ({
       )
   );
 
+  api.transform(
+    {
+      resourceQuery: /route-chunk=/,
+      environments: ['web'],
+      order: 'post',
+    },
+    transformRouteModule
+  );
+
   if (isBuild && splitRouteModules) {
     api.transform(
       {

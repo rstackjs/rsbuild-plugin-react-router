@@ -70,6 +70,12 @@ const escapeHtml = (value: string): string =>
     .replaceAll('>', '&gt;');
 
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
+const LAZY_COMPILATION_CURRENT = Symbol.for('rspack.lazyCompilationCurrent');
+
+const isExplicitLazyCompilation = (compiler: Rspack.Compiler): boolean =>
+  (compiler as unknown as Record<PropertyKey, unknown>)[
+    LAZY_COMPILATION_CURRENT
+  ] === true;
 
 const isHdrRevisionFile = (file: string): boolean =>
   file.includes(DEV_HDR_REVISION_RELATIVE_PATH);
@@ -114,12 +120,14 @@ export const createReactRouterDevRuntimeController = ({
     | undefined;
   let lastCssAssetOwnershipReloadAt = 0;
   let reloadAfterCssAssetOwnershipRemoval = false;
+  let cssAssetOwnershipReloadSentForCurrentAttempt = false;
 
   const sendCssAssetOwnershipReload = (): void => {
     const binding = sessions.getActiveBinding();
-    if (!binding) {
+    if (!binding || cssAssetOwnershipReloadSentForCurrentAttempt) {
       return;
     }
+    cssAssetOwnershipReloadSentForCurrentAttempt = true;
     lastCssAssetOwnershipReloadAt = Date.now();
     binding.server.sockWrite('full-reload', { path: '*' });
   };
@@ -144,6 +152,7 @@ export const createReactRouterDevRuntimeController = ({
       scheduledCssAssetOwnershipReload = undefined;
     }
     reloadAfterCssAssetOwnershipRemoval = false;
+    cssAssetOwnershipReloadSentForCurrentAttempt = false;
     const pair = binding.compilers;
     if (pair) {
       resetDevCompilerPair(pair);
@@ -156,6 +165,8 @@ export const createReactRouterDevRuntimeController = ({
   const sessions = createDevRuntimeSessionManager(closeBinding);
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
+  const fileBackedWebCompilations = new WeakSet<Rspack.Compilation>();
+  const lazyWebCompilations = new WeakSet<Rspack.Compilation>();
 
   // Web-only commits reuse the node compiler's stale `modifiedFiles`
   // snapshot, and every HDR bump itself triggers a web rebuild — so signal
@@ -340,6 +351,7 @@ export const createReactRouterDevRuntimeController = ({
       if (!binding || !pair || hasPendingCompilation(pair)) {
         return;
       }
+      cssAssetOwnershipReloadSentForCurrentAttempt = false;
       beginDevCompilerAttempt(pair);
       binding.runtime.beginAttempt();
     },
@@ -364,6 +376,7 @@ export const createReactRouterDevRuntimeController = ({
     binding.compilers = pair;
     const sessionId = binding.id;
     const runtime = binding.runtime;
+    let pendingWebFileBackedInvalidation = false;
     const failCurrentAttempt = (side: 'web' | 'node', error: Error): void => {
       if (sessions.getActiveBinding()?.id === sessionId) {
         if (side === 'web') {
@@ -375,26 +388,40 @@ export const createReactRouterDevRuntimeController = ({
       }
     };
     const beginCompilerAttempt = (
-      side: 'latestWebStart' | 'latestNodeStart'
+      side: 'latestWebStart' | 'latestNodeStart',
+      fileBackedInvalidation = false
     ): void => {
-      if (
-        sessions.getActiveBinding()?.id === sessionId &&
-        pair[side]?.status !== 'pending'
-      ) {
-        // Invalidation can arrive before the aggregate before-compile hook.
-        // Supersede any evaluation that could resolve in that gap immediately.
-        if (markDevCompilerPending(pair, side)) {
-          runtime.beginAttempt();
-        }
-        if (side === 'latestWebStart' && reloadAfterCssAssetOwnershipRemoval) {
+      if (sessions.getActiveBinding()?.id !== sessionId) {
+        return;
+      }
+      if (side === 'latestWebStart' && fileBackedInvalidation) {
+        // A real file edit can coalesce into an already-pending lazy build.
+        // Reset the per-attempt dedupe before the pending guard so that edit
+        // can still send the CSS ownership reload it requires.
+        cssAssetOwnershipReloadSentForCurrentAttempt = false;
+        if (reloadAfterCssAssetOwnershipRemoval) {
           reloadAfterCssAssetOwnershipRemoval = false;
           scheduleCssAssetOwnershipReload();
         }
       }
+      if (pair[side]?.status === 'pending') {
+        return;
+      }
+      // Invalidation can arrive before the aggregate before-compile hook.
+      // Supersede any evaluation that could resolve in that gap immediately.
+      if (markDevCompilerPending(pair, side)) {
+        runtime.beginAttempt();
+      }
     };
-    web.hooks.invalid.tap(`${PLUGIN_NAME}:dev-web-invalid`, () =>
-      beginCompilerAttempt('latestWebStart')
-    );
+    web.hooks.invalid.tap(`${PLUGIN_NAME}:dev-web-invalid`, fileName => {
+      // Watching.invalidate(), which powers lazy compilation activation,
+      // deliberately reports null. Real watcher events report the changed
+      // path. Keep that signal attached to the compilation it starts so a
+      // lazy activation cannot be mistaken for a CSS topology edit.
+      const fileBackedInvalidation = typeof fileName === 'string';
+      pendingWebFileBackedInvalidation ||= fileBackedInvalidation;
+      beginCompilerAttempt('latestWebStart', fileBackedInvalidation);
+    });
     node.hooks.invalid.tap(`${PLUGIN_NAME}:dev-node-invalid`, () =>
       beginCompilerAttempt('latestNodeStart')
     );
@@ -432,7 +459,19 @@ export const createReactRouterDevRuntimeController = ({
             status: 'started',
             identity: getCompilationIdentity(compilation),
           };
-          if (reloadAfterCssAssetOwnershipRemoval) {
+          const explicitLazyCompilation = isExplicitLazyCompilation(web);
+          const hasFileBackedChanges =
+            (web.modifiedFiles?.size ?? 0) > 0 ||
+            (web.removedFiles?.size ?? 0) > 0;
+          const fileBackedInvalidation =
+            pendingWebFileBackedInvalidation || hasFileBackedChanges;
+          if (fileBackedInvalidation) {
+            fileBackedWebCompilations.add(compilation);
+          } else if (explicitLazyCompilation) {
+            lazyWebCompilations.add(compilation);
+          }
+          pendingWebFileBackedInvalidation = false;
+          if (fileBackedInvalidation && reloadAfterCssAssetOwnershipRemoval) {
             reloadAfterCssAssetOwnershipRemoval = false;
             scheduleCssAssetOwnershipReload();
           }
@@ -515,7 +554,16 @@ export const createReactRouterDevRuntimeController = ({
       return;
     }
     const changes = {
-      web: snapshotDevChangedFiles(pair.web),
+      web: {
+        ...snapshotDevChangedFiles(pair.web),
+        fileBackedInvalidation: webStats
+          ? fileBackedWebCompilations.has(webStats.compilation)
+            ? true
+            : lazyWebCompilations.has(webStats.compilation)
+              ? false
+              : undefined
+          : undefined,
+      },
       node: snapshotDevChangedFiles(pair.node),
     };
     const webAttempt = webStats

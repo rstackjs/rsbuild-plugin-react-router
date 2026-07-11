@@ -505,7 +505,7 @@ describe('pluginReactRouter', () => {
     ).toBe(true);
     expect(
       test({
-        nameForCondition: () =>
+        resource:
           '/project/app/routes/home.tsx?react-router-route',
       })
     ).toBe(true);

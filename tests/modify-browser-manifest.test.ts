@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import {
   collectSubresourceIntegrity,
+  createLazyRouteEntryExportBridge,
+  isLazyRouteEntrySource,
   registerModifyBrowserManifestAssets,
 } from '../src/modify-browser-manifest';
 
@@ -31,6 +33,34 @@ const createAsset = (source: string, integrity?: string) => ({
   info: integrity ? { integrity } : {},
   source: () => source,
   size: () => source.length,
+});
+
+describe('lazy route entry export bridge', () => {
+  it('bridges only supported client route exports without duplicates', () => {
+    expect(
+      createLazyRouteEntryExportBridge([
+        'clientLoader',
+        'clientLoader',
+        'default',
+        'ErrorBoundary',
+      ])
+    ).toContain(
+      'export { __reactRouterLazyRouteExport_0 as clientLoader, __reactRouterLazyRouteExport_1 as default, __reactRouterLazyRouteExport_2 as ErrorBoundary };'
+    );
+  });
+
+  it('detects only the route entry own lazy proxy execution shape', () => {
+    expect(
+      isLazyRouteEntrySource(
+        'var __webpack_exports__ = __webpack_exec__("./route!lazy-compilation-proxy");'
+      )
+    ).toBe(true);
+    expect(
+      isLazyRouteEntrySource(
+        'const unrelated = "lazy-compilation-proxy"; var __webpack_exports__ = __webpack_exec__("./route");'
+      )
+    ).toBe(false);
+  });
 });
 
 class RawSource {
