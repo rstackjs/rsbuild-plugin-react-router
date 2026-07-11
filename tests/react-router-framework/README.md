@@ -1,163 +1,54 @@
 # React Router Framework Tests
 
-This folder contains the React Router framework-mode test corpus. It
-originates from a pinned commit of upstream React Router, but it is
-**repo-owned** and permanently adapted to exercise
-`rsbuild-plugin-react-router`. The upstream sha recorded in `UPSTREAM.json`
-documents provenance only; refreshing the corpus from upstream is a manual,
-deliberate act, never an automatic overwrite.
+This directory contains a repository-owned React Router framework test corpus
+adapted for `rsbuild-plugin-react-router`. It is not an automatically generated
+mirror: the checked-in Rsbuild tests and helpers are authoritative.
 
-## Pinned upstream
+## Upstream review checkpoint
 
-The corpus content is governed by a pinned commit of
-[remix-run/react-router](https://github.com/remix-run/react-router). The pin
-lives in two places:
+[`UPSTREAM.json`](./UPSTREAM.json) records:
 
-- `scripts/sync-react-router-framework-tests.mjs` exports `PINNED_UPSTREAM`
-  (`{ repository, ref }`) — the single source of truth the sync enforces.
-- `tests/react-router-framework/UPSTREAM.json` — a manifest written after
-  every sync recording `repository`, `ref` (the pinned commit sha),
-  `syncedAt`, `sourceDirs`, `fileCount`, `adapterOwnedFiles`, and
-  `corpusVerified`.
+- the upstream React Router repository;
+- the last commit maintainers reviewed;
+- when that review happened;
+- the upstream source directories relevant to this corpus.
 
-Everything under `integration/` and `react-router-dev/__tests__/` derives
-from the pinned upstream sha, but the checked-in tree is authoritative: it
-carries deliberate local adaptations (see `corpusVerified` and the `note`
-field in `UPSTREAM.json`, and "Vite artifact excision" below). The sync
-script is a comparison/refresh aid against the pin, not an enforcement
-mechanism — running it overwrites local adaptations in the working tree, so
-review the diff and restore intentional changes.
-
-## Syncing
-
-The `REACT_ROUTER_REPO` env var (or `--source=`) selects the *location* of a
-local react-router clone; the pin governs the *content*. The clone must be
-clean and have the pinned commit checked out, otherwise the sync refuses to
-run:
+Use the read-only audit command to compare that checkpoint with another commit
+in a local React Router clone:
 
 ```sh
-REACT_ROUTER_REPO=/path/to/react-router pnpm sync:react-router-framework-tests
+pnpm check:react-router-framework-upstream -- \
+  --source=/path/to/react-router \
+  --target=HEAD
 ```
 
-The script copies the upstream test directories, preserves the Rsbuild adapter
-overlay, normalizes upstream `workspace:*` / `catalog:` dependency protocols
-to installable package versions, and rewrites `UPSTREAM.json` (keeping
-`syncedAt` stable when nothing else changed).
+The audit reports added directories and added, modified, deleted, or renamed
+files. It never checks out commits, copies files, rewrites the corpus, updates
+the checkpoint, or requires a clean upstream worktree.
 
-### Updating the pin
+Review the report manually. Copy and adapt only the tests that improve this
+plugin's compatibility coverage, run the relevant local suites, and then update
+`lastReviewedRef` and `reviewedAt` in `UPSTREAM.json` in the same commit.
 
-1. Check out the new upstream commit in your react-router clone:
-   `git -C /path/to/react-router checkout <new-sha>` (working tree must be
-   clean).
-2. Run the sync with `--update-pin`:
+## Rsbuild adaptations
 
-   ```sh
-   REACT_ROUTER_REPO=/path/to/react-router \
-     node scripts/sync-react-router-framework-tests.mjs --update-pin
-   ```
+The corpus deliberately differs from upstream's Vite-oriented harness:
 
-   This rewrites the `PINNED_UPSTREAM.ref` constant in the sync script,
-   regenerates the corpus from the new commit, and updates `UPSTREAM.json`.
-3. Review the diff and commit the script, the manifest, and the regenerated
-   corpus together.
+- fixture projects use `rsbuild.config.ts`;
+- builds and development servers run through Rsbuild;
+- production servers use `react-router-serve`;
+- MDX routes use `@rsbuild/plugin-mdx`;
+- Vite-only configuration, dependencies, and skipped suites are not retained;
+- the upstream Vite template variants are represented by `rsbuild-template`;
+- RSC fixtures use `react-server-dom-rspack` and `rsbuild-plugin-rsc`.
 
-### Normalize-only
-
-To re-apply only dependency protocol normalization to the checked-in corpus
-(no upstream access or pin check):
-
-```sh
-pnpm sync:react-router-framework-tests -- --normalize-only
-```
-
-## Rsbuild adapter overlay
-
-The adapter-owned files (the only hand-editable files in this tree) are
-listed in `adapterOwnedPaths` in
-`scripts/sync-react-router-framework-tests.mjs` — the single source of truth,
-mirrored into `UPSTREAM.json` as `adapterOwnedFiles` on every sync. They are
-preserved across syncs.
-
-The copied integration harness has been renamed from its upstream
-Vite-oriented names to rsbuild-flavored names (see "Renames" below).
-Execution is redirected through `integration/helpers/rsbuild-adapter.ts` and
-the patched helper files:
-
-- fixture projects get `rsbuild.config.ts`, not `vite.config.ts`
-- builds run `@rsbuild/core`
-- dev servers run `rsbuild dev`
-- production servers run `react-router-serve`
-- MDX routes use the official `@rsbuild/plugin-mdx`
-
-Do not add a local ignore list for Rsbuild gaps. Upstream `test.skip` and
-`test.fixme` calls should remain intact, but otherwise unsupported cases should
-fail visibly.
-
-## Vite artifact excision
-
-The corpus carries no inert Vite artifacts: the checked-in fixture/template
-`vite.config.*` files are deleted, and `vite`, `@vitejs/*`, and Vite-plugin
-dependencies (`vite-tsconfig-paths`, `@vanilla-extract/vite-plugin`,
-`@cloudflare/vite-plugin`) are stripped from corpus `package.json` files.
-Tests author `rsbuild.config.ts` fixtures directly: the `rsbuildConfig` helper
-factory in `integration/helpers/rsbuild.ts` (formerly `viteConfig` in
-`helpers/vite.ts`) emits rsbuild config text (see its doc comment for the
-Vite -> rsbuild option mappings), and inline fixture configs are written as
-rsbuild configs with comments marking dropped Vite-only options. The adapter
-rejects `vite.config.*` fixture files and requires tests to author
-`rsbuild.config.ts` explicitly so test-specific options are preserved. The
-upstream `vite-7-template` / `vite-8-template` pair is collapsed into a single
-template, renamed to `rsbuild-template` (the Vite major split is meaningless
-for rsbuild).
-
-## Intentional divergences from upstream
-
-Some corpus files deliberately diverge from the upstream oracle to match how
-`rsbuild-plugin-react-router` actually behaves. These are **not** stale drift —
-do not "restore" them from upstream during a sync. Each is marked with an
-inline `Intentional divergence from upstream` comment at the site; the list
-here exists so a corpus sync doesn't blindly revert them.
-
-- **RSC route-module CSS mechanism** — in
-  `react-router-dev/__tests__/rsc-virtual-route-modules-test.ts`, the expected
-  transform output streams stylesheet links from a route module's
-  `entryCssFiles` array (populated by the rspack RSC runtime for modules marked
-  with the `'use server-entry'` directive) instead of upstream's
-  `import.meta.viteRsc.loadCss()` call. The upstream oracle is Vite-specific;
-  the rsbuild/rspack RSC flavor has no `import.meta.viteRsc`, so the `withCss`
-  helper and the `'use server-entry'` fixtures in that file encode the rsbuild
-  behavior. If a sync reintroduces `import.meta.viteRsc.loadCss()`, restore the
-  `entryCssFiles` / `'use server-entry'` form. Relatedly, that same oracle
-  re-exports route data exports (`links`/`meta`/`handle`/`shouldRevalidate`)
-  from a dedicated CSS-free `?client-route-module=data` chunk instead of the
-  `route` chunk, so the native rspack `RscServerPlugin` never wraps those data
-  functions in a CSS-injecting component wrapper.
-
-## Renames
-
-Because this corpus is repo-owned rather than a verbatim upstream mirror, the
-upstream Vite-oriented filenames, directory names, helper exports, and
-describe/test titles that are misleading under rsbuild have been renamed to
-rsbuild-flavored names via `git mv` (history preserved). The complete
-upstream-path -> corpus-path map lives in `UPSTREAM.json` under `renames`,
-alongside a `renamesNote` documenting the helper-export renames (e.g.
-`viteConfig` -> `rsbuildConfig`, `viteMajorTemplates` -> `bundlerTemplates`)
-and the title renames. Notable moves:
-
-- `integration/vite-*-test.ts` -> `integration/*-test.ts` (drop the `vite-`
-  prefix)
-- `integration/helpers/vite.ts` -> `integration/helpers/rsbuild.ts`
-- `integration/helpers/vite-7-template` -> `integration/helpers/rsbuild-template`
-- `integration/helpers/rsc-vite` -> `integration/helpers/rsc-preview`
-- `integration/helpers/rsc-vite-framework` -> `integration/helpers/rsc-framework`
-
-Vite-only skipped suites are intentionally not carried in this Rsbuild corpus.
-The RSC preview/framework fixtures use `react-server-dom-rspack` and
-`rsbuild-plugin-rsc`.
+Intentional behavior differences should be documented beside the affected test
+or helper. Do not overwrite adapted files from upstream wholesale.
 
 ## Commands
 
 ```sh
 pnpm test:react-router-framework:smoke
 pnpm test:react-router-framework
+pnpm test:react-router-framework:failfast
 ```

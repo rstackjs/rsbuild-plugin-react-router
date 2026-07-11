@@ -169,6 +169,37 @@ describe('build output transforms', () => {
     );
   });
 
+  it('reads dev HMR enablement when route transforms run', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness);
+    let enabled = false;
+
+    registerBuildOutputTransforms({
+      ...options,
+      isBuild: false,
+      isDevHmrEnabled: () => enabled,
+    });
+
+    const routeModuleTransform = harness.transforms.find(
+      transform =>
+        String(transform.descriptor.resourceQuery) ===
+        String(/\?react-router-route/)
+    );
+
+    await routeModuleTransform!.handler(createTransformArgs(options.routePath));
+    enabled = true;
+    await routeModuleTransform!.handler(createTransformArgs(options.routePath));
+
+    expect(options.routeTransformExecutor.run).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ devHmr: false })
+    );
+    expect(options.routeTransformExecutor.run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ devHmr: true })
+    );
+  });
+
   it('does not match queryless route-module transforms for internal route requests', () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);

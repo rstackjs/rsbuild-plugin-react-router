@@ -158,12 +158,9 @@ async function writePackageJson(projectDir: string, templateName?: TemplateName)
       // breaking change — bump all of these locations together:
       //   1. package.json          -> dependencies["rsbuild-plugin-rsc"]
       //   2. package.json          -> peerDependencies["rsbuild-plugin-rsc"]
-      //   3. scripts/sync-react-router-framework-tests.mjs -> packageVersionByName["rsbuild-plugin-rsc"]
-      //        (the source of truth for the fixture package.jsons — a sync
-      //         rewrites them from this map)
-      //   4. this file (rsbuild-adapter.ts) -> synthesized devDependency below
-      //   5. tests/react-router-framework/integration/helpers/rsc-framework/package.json
-      //   6. tests/react-router-framework/integration/helpers/rsc-preview/package.json
+      //   3. this file (rsbuild-adapter.ts) -> synthesized devDependency below
+      //   4. tests/react-router-framework/integration/helpers/rsc-framework/package.json
+      //   5. tests/react-router-framework/integration/helpers/rsc-preview/package.json
       ...(isRscTemplate ? { "rsbuild-plugin-rsc": "^0.1.1" } : {}),
       typescript: "^5.9.3",
     },

@@ -1,15 +1,55 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import type { Rspack } from '@rsbuild/core';
 import { dirname, join } from 'pathe';
 
 export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
 export const DEV_MANIFEST_UPDATE_EVENT = 'react-router:manifest-update';
 
 export type DevHmrPlanOptions = {
-  enabled: true;
+  isEnabled: () => boolean;
   runtimeModule: string;
   onNodeRebuildCommitted: () => void;
 };
+
+type SwcLoaderOptions = {
+  jsc?: { transform?: { react?: { refresh?: boolean } } };
+};
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object';
+
+const isSwcLoader = (loader: unknown): boolean =>
+  typeof loader === 'string' && loader.includes('builtin:swc-loader');
+
+const readSwcLoaderRefresh = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.some(readSwcLoaderRefresh);
+  if (!isObject(value)) return false;
+  if (isSwcLoader(value.loader)) {
+    return (
+      (value.options as SwcLoaderOptions | undefined)?.jsc?.transform?.react
+        ?.refresh === true
+    );
+  }
+  return Object.values(value).some(readSwcLoaderRefresh);
+};
+
+const readRuleSwcRefresh = (rule: unknown): boolean => {
+  if (!isObject(rule)) return false;
+  if (isSwcLoader(rule.loader)) return readSwcLoaderRefresh(rule);
+  return (
+    readSwcLoaderRefresh(rule.use) ||
+    readRuleSetSwcRefresh(rule.oneOf) ||
+    readRuleSetSwcRefresh(rule.rules)
+  );
+};
+
+const readRuleSetSwcRefresh = (rules: unknown): boolean =>
+  Array.isArray(rules) && rules.some(readRuleSwcRefresh);
+
+export const isRspackSwcReactRefreshEnabled = (
+  rspackConfig: Rspack.Configuration
+): boolean => readRuleSetSwcRefresh(rspackConfig.module?.rules);
 
 /**
  * Resolves the `react-refresh/runtime` module that

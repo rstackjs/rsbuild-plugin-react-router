@@ -123,7 +123,7 @@ export const createClassicBuildArtifacts = async ({
       api,
       isBuild,
       buildPlan: serverBuildPlan,
-      clientPatchesRouteMetadata: devHmr?.enabled,
+      clientPatchesRouteMetadata: devHmr?.isEnabled,
       onNodeRebuildCommitted: devHmr?.onNodeRebuildCommitted,
     }),
     prerenderPaths,

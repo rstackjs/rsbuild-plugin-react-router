@@ -56,6 +56,7 @@ import {
   createDevHdrRevisionSignal,
   generateDevHmrRuntimeModule,
   getDevHdrRevisionFilePath,
+  isRspackSwcReactRefreshEnabled,
   resolveReactRefreshRuntimePath,
 } from './dev-hmr.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
@@ -463,8 +464,23 @@ export const pluginReactRouter = (
             ),
         })
       : undefined;
-    devHdrSignal?.ensure();
-    const devHmrEnabled = devHmrRefreshRuntimePath !== undefined;
+    let devHmrEnabled = false;
+    if (devHmrRefreshRuntimePath && devHdrSignal) {
+      api.modifyEnvironmentConfig(
+        async (environmentConfig, { name, mergeEnvironmentConfig }) => {
+          if (name !== 'web') return environmentConfig;
+          return mergeEnvironmentConfig(environmentConfig, {
+            tools: {
+              rspack: rspackConfig => {
+                devHmrEnabled = isRspackSwcReactRefreshEnabled(rspackConfig);
+                if (devHmrEnabled) devHdrSignal.ensure();
+                return rspackConfig;
+              },
+            },
+          });
+        }
+      );
+    }
 
     const commonModeOptions = {
       api,
@@ -511,12 +527,14 @@ export const pluginReactRouter = (
           devHmr:
             devHmrRefreshRuntimePath && devHdrSignal
               ? {
-                  enabled: true,
+                  isEnabled: () => devHmrEnabled,
                   runtimeModule: generateDevHmrRuntimeModule({
                     reactRefreshRuntimePath: devHmrRefreshRuntimePath,
                     hdrRevisionFilePath: devHdrSignal.filePath,
                   }),
-                  onNodeRebuildCommitted: () => devHdrSignal.bump(),
+                  onNodeRebuildCommitted: () => {
+                    if (devHmrEnabled) devHdrSignal.bump();
+                  },
                 }
               : undefined,
         }));
@@ -737,10 +755,7 @@ export const pluginReactRouter = (
         output: config.output,
         isBuild,
       });
-      const vmodPlugin = createVirtualModulePlugin(
-        assetPrefix,
-        jsDistPath
-      );
+      const vmodPlugin = createVirtualModulePlugin(assetPrefix, jsDistPath);
       const useAsyncNodeChunkLoading =
         options.federation && resolvedServerOutput === 'commonjs';
       let nodeChunkLoading: 'import' | 'async-node' | 'require' = 'require';
@@ -961,7 +976,11 @@ export const pluginReactRouter = (
       // node-emitted `?url`/`.css?url` static assets into the client build here.
       // Without this the href baked into `links()` (resolved in the node env)
       // 404s in the browser because the file only exists under `build/server`.
-      registerSsrAssetRelocation({ api, outputClientPath, performanceProfiler });
+      registerSsrAssetRelocation({
+        api,
+        outputClientPath,
+        performanceProfiler,
+      });
     } else {
       registerModifyBrowserManifestAssets(
         api,
@@ -1008,7 +1027,7 @@ export const pluginReactRouter = (
         isSpaMode,
         rootRoutePath,
         outputClientPath,
-        devHmrEnabled,
+        isDevHmrEnabled: () => devHmrEnabled,
         onRouteModuleAnalysis: rememberRouteModuleAnalysis,
       });
     }

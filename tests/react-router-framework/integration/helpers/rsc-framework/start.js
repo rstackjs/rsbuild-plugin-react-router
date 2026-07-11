@@ -6,8 +6,23 @@ import express from "express";
 import build from "./build/server/index.js";
 
 const app = express();
-const clientBuildDirectory = "build/client";
+const clientBuildDirectory = path.resolve("build/client");
 const base = process.env.RSBUILD_BASE || "/";
+
+const resolveClientBuildPath = (requestPath, ...segments) => {
+  const candidatePath = path.resolve(
+    clientBuildDirectory,
+    `.${requestPath}`,
+    ...segments,
+  );
+  if (
+    candidatePath !== clientBuildDirectory &&
+    !candidatePath.startsWith(`${clientBuildDirectory}${path.sep}`)
+  ) {
+    return undefined;
+  }
+  return candidatePath;
+};
 
 app.use(base, express.static(clientBuildDirectory, { index: false }));
 
@@ -15,13 +30,8 @@ app.use(base, express.static(clientBuildDirectory, { index: false }));
 // preview server middleware (`<path>/index.html` written at build time).
 app.use(base, async (req, res, next) => {
   try {
-    const htmlFileBase = (
-      req.path +
-      (req.path.endsWith("/") ? "" : "/") +
-      "index.html"
-    ).slice(1);
-    const htmlFilePath = path.join(clientBuildDirectory, htmlFileBase);
-    if (existsSync(htmlFilePath)) {
+    const htmlFilePath = resolveClientBuildPath(req.path, "index.html");
+    if (htmlFilePath && existsSync(htmlFilePath)) {
       res.setHeader("Content-Type", "text/html");
       res.end(await readFile(htmlFilePath, "utf-8"));
       return;

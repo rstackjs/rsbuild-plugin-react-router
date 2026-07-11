@@ -61,7 +61,7 @@ type CreateControllerOptions = {
    * The browser HMR runtime patches route manifest metadata (loader/action
    * flags) in place, so metadata-only changes no longer need a full reload.
    */
-  clientPatchesRouteMetadata?: boolean;
+  clientPatchesRouteMetadata?: boolean | (() => boolean);
   /**
    * Invoked after a development attempt commits a re-evaluated node build for
    * changed server files. Used to signal hot data revalidation to the client.
@@ -301,7 +301,11 @@ export const createReactRouterDevRuntimeController = ({
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
           }
-          if (clientPatchesRouteMetadata) {
+          const patchesRouteMetadata =
+            typeof clientPatchesRouteMetadata === 'function'
+              ? clientPatchesRouteMetadata()
+              : clientPatchesRouteMetadata;
+          if (patchesRouteMetadata) {
             server.sockWrite('custom', {
               event: DEV_MANIFEST_UPDATE_EVENT,
               data: manifest.routes,

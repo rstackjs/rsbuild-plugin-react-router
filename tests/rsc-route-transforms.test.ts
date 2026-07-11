@@ -177,6 +177,31 @@ describe('RSC route transforms', () => {
     );
   });
 
+  it('escapes route module ids embedded in generated dynamic imports', async () => {
+    const resourcePath = '/app/routes/quote"\\\\line\n);globalThis.pwned=true;//.tsx';
+    const result = await transform({
+      code: `
+        export async function clientLoader() {
+          return null;
+        }
+        export function HydrateFallback() {
+          return null;
+        }
+        export default function Route() {
+          return null;
+        }
+      `,
+      resourcePath,
+      routeId: 'routes/adversarial',
+    });
+
+    for (const chunk of ['clientLoader', 'HydrateFallback']) {
+      const expectedTarget = `${resourcePath}?client-route-module=${chunk}`;
+      expect(result.code).toContain(`import(${JSON.stringify(expectedTarget)})`);
+    }
+    expect(result.code).not.toContain('import("/app/routes/quote"\\\\line');
+  });
+
   it('keeps unsplittable RSC client route exports in the shared client module', async () => {
     const result = await transform({
       code: `

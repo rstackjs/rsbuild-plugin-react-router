@@ -33,6 +33,7 @@ import {
   killProcessGroup,
   withFrameworkTestRunEnv,
 } from "./test-resource-guard.js";
+import { resolvePathWithinRoot } from "./safe-path.js";
 
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 const root = path.join(__dirname, "../..");
@@ -431,21 +432,21 @@ export async function createAppFixture(fixture: Fixture, mode?: ServerMode) {
           express.static(path.join(fixture.projectDir, "build", "client")),
         );
         app.get("*", (req, res, next) => {
-          let dir = path.join(fixture.projectDir, "build", "client");
+          let dir = path.resolve(fixture.projectDir, "build", "client");
           let filePath;
           if (req.path.endsWith(".data")) {
-            filePath = path.join(dir, req.path);
+            filePath = resolvePathWithinRoot(dir, req.path);
           } else {
-            let mainPath = path.join(dir, req.path, "index.html");
+            let mainPath = resolvePathWithinRoot(dir, req.path, "index.html");
             let fallbackPath = path.join(dir, "__spa-fallback.html");
             let fallbackPath2 = path.join(dir, "index.html");
-            filePath = existsSync(mainPath)
+            filePath = mainPath && existsSync(mainPath)
               ? mainPath
               : existsSync(fallbackPath)
                 ? fallbackPath
                 : fallbackPath2;
           }
-          if (existsSync(filePath)) {
+          if (filePath && existsSync(filePath)) {
             res.sendFile(filePath, next);
           } else {
             // Avoid a built-in console error from `sendFile` on 404's
