@@ -22,9 +22,9 @@ pnpm check:react-router-framework-upstream -- \
   --target=HEAD
 ```
 
-The audit reports added directories and added, modified, deleted, or renamed
-files. It never checks out commits, copies files, rewrites the corpus, updates
-the checkpoint, or requires a clean upstream worktree.
+The audit reports directories containing added files plus added, modified,
+deleted, or renamed files. It never checks out commits, copies files, rewrites
+the corpus, updates the checkpoint, or requires a clean upstream worktree.
 
 Review the report manually. Copy and adapt only the tests that improve this
 plugin's compatibility coverage, run the relevant local suites, and then update

@@ -49,7 +49,7 @@ describe('React Router framework upstream audit', () => {
       { kind: 'A', status: 'A', path: 'integration/z/one.ts' },
     ]);
 
-    expect(result.addedDirectories).toEqual([
+    expect(result.directoriesWithAddedFiles).toEqual([
       'integration/a',
       'integration/z',
     ]);

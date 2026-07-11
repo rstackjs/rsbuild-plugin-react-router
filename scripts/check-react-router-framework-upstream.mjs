@@ -52,21 +52,21 @@ export const parseNameStatus = output => {
 
 export const categorizeChanges = changes => {
   const result = {
-    addedDirectories: [],
+    directoriesWithAddedFiles: [],
     added: [],
     modified: [],
     deleted: [],
     renamed: [],
     other: [],
   };
-  const addedDirectories = new Set();
+  const directoriesWithAddedFiles = new Set();
 
   for (const change of changes) {
     if (change.kind === 'A') {
       result.added.push(change.path);
       const directory = path.posix.dirname(change.path);
       if (directory !== '.') {
-        addedDirectories.add(directory);
+        directoriesWithAddedFiles.add(directory);
       }
     } else if (change.kind === 'M') {
       result.modified.push(change.path);
@@ -79,7 +79,7 @@ export const categorizeChanges = changes => {
     }
   }
 
-  result.addedDirectories = [...addedDirectories].sort();
+  result.directoriesWithAddedFiles = [...directoriesWithAddedFiles].sort();
   for (const key of ['added', 'modified', 'deleted']) {
     result[key].sort();
   }
@@ -133,7 +133,7 @@ export const printAudit = audit => {
   console.log(`React Router framework upstream audit`);
   console.log(`  reviewed: ${audit.baseCommit}`);
   console.log(`  target:   ${audit.targetCommit}`);
-  printPaths('Added directories', audit.addedDirectories);
+  printPaths('Directories with added files', audit.directoriesWithAddedFiles);
   printPaths('Added files', audit.added);
   printPaths('Modified files', audit.modified);
   printPaths('Deleted files', audit.deleted);

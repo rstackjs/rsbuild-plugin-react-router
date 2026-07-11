@@ -6,7 +6,7 @@ export interface UpstreamChange {
 }
 
 export interface CategorizedUpstreamChanges {
-  addedDirectories: string[];
+  directoriesWithAddedFiles: string[];
   added: string[];
   modified: string[];
   deleted: string[];
