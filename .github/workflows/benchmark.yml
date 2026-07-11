@@ -240,12 +240,13 @@ jobs:
         working-directory: ${{ steps.synthetic-benchmark.outputs.TOOL_ROOT }}
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          APP_ROOT: ${{ steps.synthetic-benchmark.outputs.APP_ROOT }}
         run: |
           set -euo pipefail
           run_benchmark() {
             local side="$1"
             node scripts/bench-synthetic-app.mjs \
-              --app "${{ steps.synthetic-benchmark.outputs.APP_ROOT }}" \
+              --app "$APP_ROOT" \
               --plugin-root "$GITHUB_WORKSPACE/$side" \
               --skip-install \
               --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/$side" \
