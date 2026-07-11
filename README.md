@@ -667,7 +667,23 @@ pnpm bench:synthetic-app -- --profile all --runs 2
 ```
 
 The PR benchmark workflow reports production build, dev route-load, HMR/update,
-and embedded synthetic app timings in the same benchmark comment.
+and embedded synthetic app timings in the same benchmark comment. It measures
+the PR and its base on the same runner instead of reusing cached timing data,
+counterbalances which side runs first, and excludes one warmup iteration. Small
+fixtures use five measured iterations; expensive large fixtures use three.
+
+Every raw median delta remains visible. The comment also reports each side's
+relative median absolute deviation (rMAD), a conservative noise band, and a
+signal label:
+
+- `regression` or `improvement` means the median delta exceeds the observed
+  run-to-run noise band.
+- `inconclusive` means the raw delta is not clearly separated from that noise.
+- `insufficient data` means either side has fewer than three finite samples.
+
+The labels are triage aids, not pass/fail gates. Use the uploaded diagnostics
+and raw per-run samples to investigate important changes, and rerun an
+inconclusive comparison before treating it as a performance result.
 
 ## React Router Framework Mode
 
