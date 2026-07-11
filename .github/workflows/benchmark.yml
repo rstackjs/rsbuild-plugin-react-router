@@ -13,23 +13,198 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  benchmark:
-    name: Compare full build and dev benchmark
+  build-dev-benchmark:
+    name: Benchmark build/dev (${{ matrix.label }})
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: small
+            label: small fixtures
+            profile: ci-small
+          - shard: large
+            label: large fixtures
+            profile: ci-large
 
     env:
-      BENCHMARK_PROFILE: full
-      BENCHMARK_BUILD_ITERATIONS: '10'
-      BENCHMARK_LARGE_ITERATIONS: '5'
+      BENCHMARK_PROFILE: ${{ matrix.profile }}
+      BENCHMARK_BUILD_ITERATIONS: '3'
+      BENCHMARK_LARGE_ITERATIONS: '3'
       BENCHMARK_MODE: dev
-      BENCHMARK_ITERATIONS: '10'
+      BENCHMARK_ITERATIONS: '3'
       BENCHMARK_WARMUP: '0'
       BENCHMARK_DEV_ROUTES: auto
       BENCHMARK_LOG_PERFORMANCE: '1'
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          path: head
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Checkout PR base
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: head/.nvmrc
+          package-manager-cache: false
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          package_json_file: head/package.json
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-benchmark-pnpm-${{ hashFiles('head/pnpm-lock.yaml', 'base/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-benchmark-pnpm-
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install head dependencies
+        working-directory: head
+        run: pnpm install --frozen-lockfile
+
+      - name: Install base dependencies
+        working-directory: base
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve benchmark-only React plugin
+        id: benchmark-imports
+        shell: bash
+        run: |
+          node -e "const { pathToFileURL } = require('node:url'); console.log('PLUGIN_REACT_IMPORT=' + pathToFileURL(process.argv[1]).href)" \
+            "$GITHUB_WORKSPACE/head/node_modules/@rsbuild/plugin-react/dist/index.js" >> "$GITHUB_OUTPUT"
+
+      - name: Restore base benchmark results
+        id: base-benchmark-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            benchmark-output/${{ matrix.shard }}/build/base
+            benchmark-output/${{ matrix.shard }}/dev/base
+          key: >-
+            ${{ runner.os }}-benchmark-base-${{ matrix.shard }}-${{
+            github.event.pull_request.base.sha }}-${{
+            hashFiles(
+              'head/.nvmrc',
+              'head/package.json',
+              'head/pnpm-lock.yaml',
+              'head/scripts/bench-builds.mts',
+              'head/scripts/benchmark/**',
+              'base/package.json',
+              'base/pnpm-lock.yaml'
+            ) }}-${{ env.BENCHMARK_PROFILE }}-${{ env.BENCHMARK_BUILD_ITERATIONS }}-${{
+            env.BENCHMARK_LARGE_ITERATIONS }}-${{ env.BENCHMARK_MODE }}-${{
+            env.BENCHMARK_ITERATIONS }}-${{ env.BENCHMARK_WARMUP }}-${{
+            env.BENCHMARK_DEV_ROUTES }}-${{ env.BENCHMARK_LOG_PERFORMANCE }}
+
+      - name: Validate cached base benchmark results
+        if: steps.base-benchmark-cache.outputs.cache-hit == 'true'
+        run: |
+          set -euo pipefail
+          test -f "$GITHUB_WORKSPACE/benchmark-output/${{ matrix.shard }}/build/base/baseline.json"
+          test -f "$GITHUB_WORKSPACE/benchmark-output/${{ matrix.shard }}/dev/base/baseline.json"
+
+      - name: Benchmark base production build
+        if: steps.base-benchmark-cache.outputs.cache-hit != 'true'
+        working-directory: base
+        env:
+          REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
+        run: |
+          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mts" \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode build \
+            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --clean build \
+            --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
+            --out "$GITHUB_WORKSPACE/benchmark-output/${{ matrix.shard }}/build/base"
+
+      - name: Benchmark head production build
+        working-directory: head
+        run: |
+          node scripts/bench-builds.mts \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode build \
+            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --clean build \
+            --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
+            --out "$GITHUB_WORKSPACE/benchmark-output/${{ matrix.shard }}/build/head"
+
+      - name: Benchmark base dev
+        if: steps.base-benchmark-cache.outputs.cache-hit != 'true'
+        working-directory: base
+        env:
+          REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
+        run: |
+          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mts" \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode "$BENCHMARK_MODE" \
+            --iterations "$BENCHMARK_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --dev-routes "$BENCHMARK_DEV_ROUTES" \
+            --clean build \
+            --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
+            --out "$GITHUB_WORKSPACE/benchmark-output/${{ matrix.shard }}/dev/base"
+
+      - name: Benchmark head dev
+        working-directory: head
+        run: |
+          node scripts/bench-builds.mts \
+            --profile "$BENCHMARK_PROFILE" \
+            --mode "$BENCHMARK_MODE" \
+            --iterations "$BENCHMARK_ITERATIONS" \
+            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
+            --warmup "$BENCHMARK_WARMUP" \
+            --dev-routes "$BENCHMARK_DEV_ROUTES" \
+            --clean build \
+            --format both \
+            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
+            --out "$GITHUB_WORKSPACE/benchmark-output/${{ matrix.shard }}/dev/head"
+
+      - name: Upload benchmark shard
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: benchmark-${{ matrix.shard }}-${{ github.event.pull_request.head.sha }}
+          path: benchmark-output/${{ matrix.shard }}
+          if-no-files-found: error
+
+  synthetic-benchmark:
+    name: Benchmark synthetic app
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    env:
       BENCHMARK_HISTORY_BRANCH: benchmark-results
       SYNTHETIC_BENCHMARK_PROFILE: all
-      SYNTHETIC_BENCHMARK_RUNS: '2'
+      SYNTHETIC_BENCHMARK_RUNS: '3'
 
     steps:
       - name: Checkout PR head
@@ -85,118 +260,34 @@ jobs:
         run: node head/scripts/benchmark/ci-resolve-synthetic.mjs
 
       - name: Test benchmark scripts
+        if: steps.synthetic-benchmark.outputs.SKIP == 'false'
         working-directory: head/benchmarks/synthetic-web-bundler-benchmark
         run: pnpm test:benchmark
 
-      - name: Resolve benchmark-only React plugin
-        id: benchmark-imports
-        shell: bash
-        run: |
-          node -e "const { pathToFileURL } = require('node:url'); console.log('PLUGIN_REACT_IMPORT=' + pathToFileURL(process.argv[1]).href)" \
-            "$GITHUB_WORKSPACE/head/node_modules/@rsbuild/plugin-react/dist/index.js" >> "$GITHUB_OUTPUT"
-
-      - name: Restore base benchmark results
+      - name: Restore base synthetic benchmark results
         id: base-benchmark-cache
+        if: steps.synthetic-benchmark.outputs.SKIP == 'false'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
-          path: |
-            benchmark-output/build/base
-            benchmark-output/dev/base
-            benchmark-output/synthetic/base
+          path: benchmark-output/synthetic/base
           key: >-
-            ${{ runner.os }}-benchmark-base-${{ github.event.pull_request.base.sha }}-${{
+            ${{ runner.os }}-benchmark-base-synthetic-${{
+            github.event.pull_request.base.sha }}-${{
             hashFiles(
               'head/.nvmrc',
               'head/package.json',
               'head/pnpm-lock.yaml',
-              'head/scripts/bench-builds.mts',
               'head/scripts/bench-synthetic-app.mjs',
               'head/scripts/benchmark/**',
               'head/benchmarks/synthetic-web-bundler-benchmark/**',
               'base/package.json',
               'base/pnpm-lock.yaml'
-            ) }}-${{ env.BENCHMARK_PROFILE }}-${{ env.BENCHMARK_BUILD_ITERATIONS }}-${{
-            env.BENCHMARK_LARGE_ITERATIONS }}-${{ env.BENCHMARK_MODE }}-${{
-            env.BENCHMARK_ITERATIONS }}-${{ env.BENCHMARK_WARMUP }}-${{
-            env.BENCHMARK_DEV_ROUTES }}-${{ env.BENCHMARK_LOG_PERFORMANCE }}-${{
-            env.SYNTHETIC_BENCHMARK_PROFILE }}-${{
+            ) }}-${{ env.SYNTHETIC_BENCHMARK_PROFILE }}-${{
             env.SYNTHETIC_BENCHMARK_RUNS }}
 
-      - name: Validate cached base benchmark results
-        if: steps.base-benchmark-cache.outputs.cache-hit == 'true'
-        env:
-          SYNTHETIC_BENCHMARK_SKIP: ${{ steps.synthetic-benchmark.outputs.SKIP }}
-        run: |
-          set -euo pipefail
-          test -f "$GITHUB_WORKSPACE/benchmark-output/build/base/baseline.json"
-          test -f "$GITHUB_WORKSPACE/benchmark-output/dev/base/baseline.json"
-          if [ "$SYNTHETIC_BENCHMARK_SKIP" = "false" ]; then
-            test -f "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json"
-          fi
-
-      - name: Benchmark base production build
-        if: steps.base-benchmark-cache.outputs.cache-hit != 'true'
-        working-directory: base
-        env:
-          REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
-        run: |
-          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mts" \
-            --profile "$BENCHMARK_PROFILE" \
-            --mode build \
-            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
-            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
-            --warmup "$BENCHMARK_WARMUP" \
-            --clean build \
-            --format both \
-            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
-            --out "$GITHUB_WORKSPACE/benchmark-output/build/base"
-
-      - name: Benchmark head production build
-        working-directory: head
-        run: |
-          node scripts/bench-builds.mts \
-            --profile "$BENCHMARK_PROFILE" \
-            --mode build \
-            --iterations "$BENCHMARK_BUILD_ITERATIONS" \
-            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
-            --warmup "$BENCHMARK_WARMUP" \
-            --clean build \
-            --format both \
-            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
-            --out "$GITHUB_WORKSPACE/benchmark-output/build/head"
-
-      - name: Benchmark base dev
-        if: steps.base-benchmark-cache.outputs.cache-hit != 'true'
-        working-directory: base
-        env:
-          REACT_ROUTER_BENCHMARK_PLUGIN_REACT_IMPORT: ${{ steps.benchmark-imports.outputs.PLUGIN_REACT_IMPORT }}
-        run: |
-          node "$GITHUB_WORKSPACE/head/scripts/bench-builds.mts" \
-            --profile "$BENCHMARK_PROFILE" \
-            --mode "$BENCHMARK_MODE" \
-            --iterations "$BENCHMARK_ITERATIONS" \
-            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
-            --warmup "$BENCHMARK_WARMUP" \
-            --dev-routes "$BENCHMARK_DEV_ROUTES" \
-            --clean build \
-            --format both \
-            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
-            --out "$GITHUB_WORKSPACE/benchmark-output/dev/base"
-
-      - name: Benchmark head dev
-        working-directory: head
-        run: |
-          node scripts/bench-builds.mts \
-            --profile "$BENCHMARK_PROFILE" \
-            --mode "$BENCHMARK_MODE" \
-            --iterations "$BENCHMARK_ITERATIONS" \
-            --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
-            --warmup "$BENCHMARK_WARMUP" \
-            --dev-routes "$BENCHMARK_DEV_ROUTES" \
-            --clean build \
-            --format both \
-            $(if [ "$BENCHMARK_LOG_PERFORMANCE" = "1" ]; then printf '%s\n' --log-performance; fi) \
-            --out "$GITHUB_WORKSPACE/benchmark-output/dev/head"
+      - name: Validate cached base synthetic benchmark results
+        if: steps.synthetic-benchmark.outputs.SKIP == 'false' && steps.base-benchmark-cache.outputs.cache-hit == 'true'
+        run: test -f "$GITHUB_WORKSPACE/benchmark-output/synthetic/base/latest.json"
 
       - name: Benchmark embedded synthetic app with base plugin
         if: steps.synthetic-benchmark.outputs.SKIP == 'false' && steps.base-benchmark-cache.outputs.cache-hit != 'true'
@@ -221,6 +312,87 @@ jobs:
             --out "$GITHUB_WORKSPACE/benchmark-output/synthetic/head" \
             --runs "$SYNTHETIC_BENCHMARK_RUNS" \
             --profile "$SYNTHETIC_BENCHMARK_PROFILE"
+
+      - name: Ensure skipped synthetic artifact path exists
+        if: steps.synthetic-benchmark.outputs.SKIP == 'true'
+        run: |
+          mkdir -p benchmark-output/synthetic
+          touch benchmark-output/synthetic/SKIPPED
+
+      - name: Upload synthetic benchmark shard
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: benchmark-synthetic-${{ github.event.pull_request.head.sha }}
+          path: benchmark-output/synthetic
+          if-no-files-found: error
+
+  benchmark:
+    name: Compare full build and dev benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - build-dev-benchmark
+      - synthetic-benchmark
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          path: head
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: head/.nvmrc
+          package-manager-cache: false
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          package_json_file: head/package.json
+
+      - name: Install head runtime dependencies
+        working-directory: head
+        run: pnpm install --filter rsbuild-plugin-react-router --prod --frozen-lockfile
+
+      - name: Download small benchmark shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: benchmark-small-${{ github.event.pull_request.head.sha }}
+          path: benchmark-output/shards/small
+
+      - name: Download large benchmark shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: benchmark-large-${{ github.event.pull_request.head.sha }}
+          path: benchmark-output/shards/large
+
+      - name: Download synthetic benchmark shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: benchmark-synthetic-${{ github.event.pull_request.head.sha }}
+          path: benchmark-output/synthetic
+
+      - name: Merge benchmark shards
+        run: |
+          node head/scripts/benchmark/ci-merge-results.mjs \
+            --out "$GITHUB_WORKSPACE/benchmark-output/build/base/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/small/build/base/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/large/build/base/baseline.json"
+          node head/scripts/benchmark/ci-merge-results.mjs \
+            --out "$GITHUB_WORKSPACE/benchmark-output/build/head/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/small/build/head/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/large/build/head/baseline.json"
+          node head/scripts/benchmark/ci-merge-results.mjs \
+            --out "$GITHUB_WORKSPACE/benchmark-output/dev/base/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/small/dev/base/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/large/dev/base/baseline.json"
+          node head/scripts/benchmark/ci-merge-results.mjs \
+            --out "$GITHUB_WORKSPACE/benchmark-output/dev/head/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/small/dev/head/baseline.json" \
+            "$GITHUB_WORKSPACE/benchmark-output/shards/large/dev/head/baseline.json"
 
       - name: Generate benchmark report
         working-directory: head
