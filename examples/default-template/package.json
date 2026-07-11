@@ -9,7 +9,8 @@
     "start:cjs": "react-router-serve ./cjs-serve-patch.cjs",
     "typecheck": "react-router typegen && tsc",
     "test:e2e": "playwright test",
-    "test:e2e:lazy": "cross-env RR_LAZY_COMPILATION=entries playwright test tests/e2e/lazy-compilation.test.ts"
+    "test:e2e:lazy": "cross-env RR_LAZY_COMPILATION=entries playwright test tests/e2e/lazy-compilation.test.ts",
+    "test:e2e:full-lazy": "cross-env RR_LAZY_COMPILATION=full playwright test tests/e2e/lazy-compilation.test.ts --grep \"activates a lazy route entry\""
   },
   "dependencies": {
     "@react-router/express": "^7.13.0",

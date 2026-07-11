@@ -150,19 +150,8 @@ const appendLazyRouteEntryExportBridges = ({
         `[rsbuild-plugin-react-router] Lazy route-entry asset \`${routeEntryAssetName}\` was empty.`
       );
     }
-    const routeEntryExecution = sourceText.match(/__webpack_exec__\(([^)]*)\)/);
-    if (!routeEntryExecution) {
-      throw new Error(
-        `[rsbuild-plugin-react-router] Could not find the route-entry execution call in \`${routeEntryAssetName}\`.`
-      );
-    }
-    if (!routeEntryExecution[1]?.includes('lazy-compilation-proxy')) {
-      continue;
-    }
     if (!isLazyRouteEntrySource(sourceText)) {
-      throw new Error(
-        `[rsbuild-plugin-react-router] Could not find the lazy route-entry execution shape in \`${routeEntryAssetName}\`.`
-      );
+      continue;
     }
     if (sourceText.includes(LAZY_ROUTE_EXPORTS_IDENTIFIER)) {
       continue;
