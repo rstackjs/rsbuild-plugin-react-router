@@ -1,6 +1,6 @@
 import type { Route, PluginOptions } from './types.js';
 import type { RsbuildPluginAPI, Rspack } from '@rsbuild/core';
-import { CLIENT_ROUTE_EXPORTS_SET } from './constants.js';
+import { appendLazyRouteEntryExportBridges } from './lazy-compilation.js';
 import {
   createReactRouterManifestStats,
   generateReactRouterManifestForDev,
@@ -67,109 +67,6 @@ type GeneratedManifest = {
 
 const BROWSER_MANIFEST_ASSET =
   'static/js/virtual/react-router/browser-manifest.js';
-const LAZY_ROUTE_ENTRY_EXECUTION =
-  /var __webpack_exports__ = __webpack_exec__\([^)]*!lazy-compilation-proxy/;
-const LAZY_ROUTE_EXPORTS_IDENTIFIER = '__reactRouterLazyRouteExports';
-
-export const isLazyRouteEntrySource = (source: string): boolean =>
-  LAZY_ROUTE_ENTRY_EXECUTION.test(source);
-
-export const createLazyRouteEntryExportBridge = (
-  exportNames: readonly string[]
-): string => {
-  const clientExportNames = Array.from(
-    new Set(
-      exportNames.filter(exportName => CLIENT_ROUTE_EXPORTS_SET.has(exportName))
-    )
-  );
-  if (clientExportNames.length === 0) {
-    return '';
-  }
-
-  const bindings = clientExportNames.map(
-    (exportName, index) =>
-      `const __reactRouterLazyRouteExport_${index} = ${LAZY_ROUTE_EXPORTS_IDENTIFIER}[${JSON.stringify(
-        exportName
-      )}];`
-  );
-  const exports = clientExportNames.map(
-    (exportName, index) =>
-      `__reactRouterLazyRouteExport_${index} as ${exportName}`
-  );
-
-  return [
-    `const ${LAZY_ROUTE_EXPORTS_IDENTIFIER} = await __webpack_exports__;`,
-    ...bindings,
-    `export { ${exports.join(', ')} };`,
-  ].join('\n');
-};
-
-const appendLazyRouteEntryExportBridges = ({
-  assets,
-  compilation,
-  moduleExportsByRouteId,
-  routes,
-  sources,
-  stats,
-}: {
-  assets: Record<string, Rspack.sources.Source>;
-  compilation: Rspack.Compilation;
-  moduleExportsByRouteId: RouteManifestModuleExports;
-  routes: Record<string, Route>;
-  sources: Pick<typeof Rspack.sources, 'ConcatSource'>;
-  stats: ReturnType<typeof createReactRouterManifestStats>;
-}) => {
-  for (const [routeId, route] of Object.entries(routes)) {
-    const extensionIndex = route.file.lastIndexOf('.');
-    if (extensionIndex === -1) {
-      continue;
-    }
-    const entryName = route.file.slice(0, extensionIndex);
-    const routeEntryAssets = stats?.assetsByChunkName?.[entryName];
-    const routeEntryAssetName = routeEntryAssets?.find(assetName =>
-      assetName.endsWith(`${entryName}.js`)
-    );
-    if (!routeEntryAssetName) {
-      if (routeEntryAssets && routeEntryAssets.length > 0) {
-        throw new Error(
-          `[rsbuild-plugin-react-router] Expected a JavaScript route-entry asset for lazy route \`${routeId}\`.`
-        );
-      }
-      continue;
-    }
-
-    const source = assets[routeEntryAssetName];
-    if (!source) {
-      throw new Error(
-        `[rsbuild-plugin-react-router] Could not read lazy route-entry asset \`${routeEntryAssetName}\`.`
-      );
-    }
-    const sourceText = source?.source().toString();
-    if (!sourceText) {
-      throw new Error(
-        `[rsbuild-plugin-react-router] Lazy route-entry asset \`${routeEntryAssetName}\` was empty.`
-      );
-    }
-    if (!isLazyRouteEntrySource(sourceText)) {
-      continue;
-    }
-    if (sourceText.includes(LAZY_ROUTE_EXPORTS_IDENTIFIER)) {
-      continue;
-    }
-
-    const exportBridge = createLazyRouteEntryExportBridge(
-      moduleExportsByRouteId[routeId] ?? []
-    );
-    if (!exportBridge) {
-      continue;
-    }
-    compilation.updateAsset(
-      routeEntryAssetName,
-      new sources.ConcatSource(source, '\n', exportBridge, '\n')
-    );
-  }
-};
-
 const ABSOLUTE_URL_RE = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 
 const toManifestAssetUrl = (assetPrefix: string, assetName: string) => {

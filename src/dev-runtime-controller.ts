@@ -165,8 +165,10 @@ export const createReactRouterDevRuntimeController = ({
   const sessions = createDevRuntimeSessionManager(closeBinding);
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
-  const fileBackedWebCompilations = new WeakSet<Rspack.Compilation>();
-  const lazyWebCompilations = new WeakSet<Rspack.Compilation>();
+  const webCompilationFileBackedInvalidation = new WeakMap<
+    Rspack.Compilation,
+    boolean
+  >();
 
   // Web-only commits reuse the node compiler's stale `modifiedFiles`
   // snapshot, and every HDR bump itself triggers a web rebuild — so signal
@@ -466,9 +468,9 @@ export const createReactRouterDevRuntimeController = ({
           const fileBackedInvalidation =
             pendingWebFileBackedInvalidation || hasFileBackedChanges;
           if (fileBackedInvalidation) {
-            fileBackedWebCompilations.add(compilation);
+            webCompilationFileBackedInvalidation.set(compilation, true);
           } else if (explicitLazyCompilation) {
-            lazyWebCompilations.add(compilation);
+            webCompilationFileBackedInvalidation.set(compilation, false);
           }
           pendingWebFileBackedInvalidation = false;
           if (fileBackedInvalidation && reloadAfterCssAssetOwnershipRemoval) {
@@ -557,11 +559,7 @@ export const createReactRouterDevRuntimeController = ({
       web: {
         ...snapshotDevChangedFiles(pair.web),
         fileBackedInvalidation: webStats
-          ? fileBackedWebCompilations.has(webStats.compilation)
-            ? true
-            : lazyWebCompilations.has(webStats.compilation)
-              ? false
-              : undefined
+          ? webCompilationFileBackedInvalidation.get(webStats.compilation)
           : undefined,
       },
       node: snapshotDevChangedFiles(pair.node),

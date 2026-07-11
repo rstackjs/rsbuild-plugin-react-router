@@ -4,10 +4,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import {
   collectSubresourceIntegrity,
-  createLazyRouteEntryExportBridge,
-  isLazyRouteEntrySource,
   registerModifyBrowserManifestAssets,
 } from '../src/modify-browser-manifest';
+import {
+  createLazyRouteEntryExportBridge,
+  isLazyRouteEntrySource,
+} from '../src/lazy-compilation';
 
 const BROWSER_MANIFEST_PATH =
   'static/js/virtual/react-router/browser-manifest.js';
