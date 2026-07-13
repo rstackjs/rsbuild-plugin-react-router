@@ -48,6 +48,10 @@ const matchesLazyCompilationTest = (
 };
 
 const createReactRouterHydrationModuleTest = (entryClientPath: string) => {
+  // TODO: Remove these eager-module exceptions after web-infra-dev/rspack#14753
+  // and web-infra-dev/rsbuild#8091 are available in our minimum versions.
+  // Lazy activation currently changes the initial chunk set and makes Rsbuild
+  // reload the document before React Router can hydrate it.
   const eagerPatterns = [
     'virtual/react-router/browser-manifest',
     ...(entryClientPath
@@ -83,7 +87,11 @@ export const guardReactRouterLazyCompilation = ({
     lazyCompilation === true
       ? { entries: true, imports: true }
       : lazyCompilation;
+  // Preserve the user's entries/imports/test policy. The workaround only
+  // composes an eager exception for React Router's hydration-critical modules.
   const userTest = options.test;
+  // The unstable prewarm path deliberately activates React Router's client and
+  // route modules, so only the browser manifest remains eagerly compiled.
   const isReactRouterHydrationModule = prewarmReactRouterModules
     ? createReactRouterHydrationModuleTest('')
     : createReactRouterHydrationModuleTest(entryClientPath);

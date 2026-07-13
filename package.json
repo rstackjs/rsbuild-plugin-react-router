@@ -58,7 +58,7 @@
     "bench:full": "node scripts/bench-builds.mts --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",
     "bench:large": "node scripts/bench-builds.mts --profile large --iterations 1 --warmup 0 --clean cold --format both --out .benchmark/results/large",
     "bench:synthetic-app": "node scripts/bench-synthetic-app.mjs",
-    "e2e": "pnpm build && pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e",
+    "e2e": "pnpm build && pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e && pnpm --filter default-template test:e2e:lazy",
     "dev": "rslib build --watch",
     "test": "rstest run",
     "test:watch": "rstest watch",

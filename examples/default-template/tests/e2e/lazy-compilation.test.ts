@@ -108,6 +108,27 @@ test.describe('lazy compilation', () => {
       errors.push(error.message);
     });
 
+    const documentRequests: string[] = [];
+    const websocketFrames: string[] = [];
+    page.on('request', (request) => {
+      if (
+        request.isNavigationRequest() &&
+        request.frame() === page.mainFrame()
+      ) {
+        documentRequests.push(request.url());
+      }
+    });
+    page.on('websocket', (websocket) => {
+      websocket.on('framereceived', ({ payload }) => {
+        websocketFrames.push(payload.toString());
+      });
+    });
+
+    // Workaround regression: React Router hydration modules stay eager while
+    // the application still opts into lazy entry compilation.
+    // TODO: After web-infra-dev/rspack#14753 and web-infra-dev/rsbuild#8091
+    // ship, expect reload-free lazy activation instead of an eager route asset.
+
     await page.goto('/');
 
     await page.waitForFunction(() => {
@@ -140,23 +161,17 @@ test.describe('lazy compilation', () => {
       'lazy-compilation-proxy'
     );
 
-    const documentRequests: string[] = [];
-    page.on('request', (request) => {
-      if (
-        request.isNavigationRequest() &&
-        request.frame() === page.mainFrame()
-      ) {
-        documentRequests.push(request.url());
-      }
-    });
-
     await page.locator('a[href="/about"]').first().click();
 
     await expect(page).toHaveURL('/about');
     await expect(
       page.locator('h1:has-text("About This Demo")')
     ).toBeVisible();
-    expect(documentRequests).toEqual([]);
+    await page.waitForTimeout(1000);
+    expect(documentRequests).toHaveLength(1);
+    expect(
+      websocketFrames.some((frame) => /"type"\s*:\s*"full-reload"/.test(frame))
+    ).toBe(false);
     expect(errors.join('\n')).not.toMatch(/hydration|Hydration|Component/);
   });
 

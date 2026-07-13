@@ -761,12 +761,16 @@ export const pluginReactRouter = (
         serverBundleEntries,
       });
 
+      // Prefer an explicit plugin option; otherwise preserve the user's
+      // Rsbuild dev.lazyCompilation value, including entries/imports/test.
       const configuredLazyCompilation = Object.prototype.hasOwnProperty.call(
         options,
         'lazyCompilation'
       )
         ? pluginOptions.lazyCompilation
         : (config.dev?.lazyCompilation ?? pluginOptions.lazyCompilation);
+      // TODO: Remove this hydration workaround after web-infra-dev/rspack#14753
+      // and web-infra-dev/rsbuild#8091 are available in our minimum versions.
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
         entryClientPath: finalEntryClientPath,
