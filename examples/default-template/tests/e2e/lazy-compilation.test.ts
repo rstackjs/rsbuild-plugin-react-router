@@ -101,6 +101,7 @@ test.describe('lazy compilation', () => {
     test.skip(process.env.RR_LAZY_COMPILATION !== 'full');
     const errors: string[] = [];
     const lazyTriggerRequests: string[] = [];
+    const socketFrames: string[] = [];
     page.on('console', message => {
       if (message.type() === 'error') errors.push(message.text());
     });
@@ -109,6 +110,11 @@ test.describe('lazy compilation', () => {
       if (request.url().includes('/_rspack/lazy/trigger')) {
         lazyTriggerRequests.push(request.url());
       }
+    });
+    page.on('websocket', socket => {
+      socket.on('framereceived', ({ payload }) => {
+        socketFrames.push(String(payload));
+      });
     });
     await page.addInitScript(() => {
       const key = 'full-lazy-document-loads';
@@ -119,6 +125,13 @@ test.describe('lazy compilation', () => {
     });
 
     await page.goto('/');
+    const clientFeaturesRouteAsset = await page.request.get(
+      '/static/js/routes/client-features.js'
+    );
+    expect(clientFeaturesRouteAsset.ok()).toBe(true);
+    expect(await clientFeaturesRouteAsset.text()).toContain(
+      'lazy-compilation-proxy'
+    );
     await page.getByRole('link', { name: 'Client Features' }).click();
 
     await expect(page).toHaveURL('/client-features', { timeout: 60000 });
@@ -132,6 +145,7 @@ test.describe('lazy compilation', () => {
       )
     ).toBe('1');
     expect(lazyTriggerRequests.length).toBeGreaterThan(0);
+    expect(socketFrames.join('\n')).not.toContain('full-reload');
     expect(errors).toEqual([]);
   });
 

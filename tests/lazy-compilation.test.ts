@@ -202,6 +202,27 @@ describe('guardReactRouterLazyCompilation', () => {
     expect(test.test('/project/app/styles.css')).toBe(false);
   });
 
+  it('keeps all but the hydration route lazy in a 1000-route application', () => {
+    const hydrationRoute = '/project/app/routes/route-0.tsx';
+    const guarded = guardReactRouterLazyCompilation({
+      lazyCompilation: true,
+      entryClientPath,
+      lazyRouteEntries: true,
+      eagerRouteFiles: [hydrationRoute],
+    });
+    const test = (guarded as { test: RegExp }).test;
+    const routeResources = Array.from(
+      { length: 1000 },
+      (_, index) =>
+        `/project/app/routes/route-${index}.tsx?__react-router-build-client-route`
+    );
+
+    expect(routeResources.filter(resource => test.test(resource))).toHaveLength(
+      999
+    );
+    expect(test.test(`${hydrationRoute}?react-router-route`)).toBe(false);
+  });
+
   it('runs user tests for lazy route entries before generated query guards', () => {
     let calls = 0;
     const guarded = guardReactRouterLazyCompilation({

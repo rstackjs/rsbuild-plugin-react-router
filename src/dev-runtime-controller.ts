@@ -70,6 +70,10 @@ const escapeHtml = (value: string): string =>
     .replaceAll('>', '&gt;');
 
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
+// TODO: Remove the null-invalidation fallback once the upstream provenance and
+// HMR protocol fixes are in the minimum supported Rspack and Rsbuild versions.
+// https://github.com/web-infra-dev/rspack/pull/14753
+// https://github.com/web-infra-dev/rsbuild/pull/8091
 const LAZY_COMPILATION_CURRENT = Symbol.for('rspack.lazyCompilationCurrent');
 
 const isExplicitLazyCompilation = (compiler: Rspack.Compiler): boolean =>

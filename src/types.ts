@@ -52,8 +52,8 @@ export type PluginOptions = {
 
   /**
    * Allow generated browser route entries to participate in Rsbuild lazy
-   * compilation while keeping the browser manifest, entry client, and React
-   * Router route transforms eager.
+   * compilation while keeping only the browser manifest, entry client, styles,
+   * and explicitly configured hydration routes eager.
    *
    * Use `lazyCompilation.test` to keep application-specific route entries
    * eager.
