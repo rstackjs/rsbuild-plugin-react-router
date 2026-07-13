@@ -81,7 +81,7 @@ const createTransformArgs = (
   }) as never;
 
 describe('build output transforms', () => {
-  it('registers post-order transforms for explicit, chunked, and queryless route modules', async () => {
+  it('registers post-order route-module transforms for explicit and queryless route modules', async () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);
 
@@ -90,45 +90,25 @@ describe('build output transforms', () => {
     const routeModuleTransforms = harness.transforms.filter(
       transform => transform.descriptor.order === 'post'
     );
-    const explicitRouteTransform = routeModuleTransforms.find(
-      transform =>
-        transform.descriptor.resourceQuery instanceof RegExp &&
-        transform.descriptor.resourceQuery.source.includes('react-router-route')
-    );
-    const chunkedRouteTransform = routeModuleTransforms.find(
-      transform =>
-        transform.descriptor.resourceQuery instanceof RegExp &&
-        transform.descriptor.resourceQuery.source === 'route-chunk='
-    );
-    const querylessRouteTransform = routeModuleTransforms.find(
-      transform => typeof transform.descriptor.test === 'function'
-    );
 
-    expect(routeModuleTransforms).toHaveLength(3);
-    expect(explicitRouteTransform?.descriptor).toMatchObject({
+    expect(routeModuleTransforms).toHaveLength(2);
+    expect(routeModuleTransforms[0].descriptor).toMatchObject({
       resourceQuery: /\?react-router-route/,
       order: 'post',
     });
-    expect(chunkedRouteTransform?.descriptor).toMatchObject({
-      resourceQuery: /route-chunk=/,
-      order: 'post',
-    });
-    expect(querylessRouteTransform?.descriptor).toMatchObject({
+    expect(routeModuleTransforms[1].descriptor).toMatchObject({
       order: 'post',
     });
     expect(
-      (querylessRouteTransform?.descriptor.test as (path: string) => boolean)(
+      (routeModuleTransforms[1].descriptor.test as (path: string) => boolean)(
         options.routePath
       )
     ).toBe(true);
 
-    await explicitRouteTransform?.handler(
+    await routeModuleTransforms[0].handler(
       createTransformArgs(options.routePath, '?react-router-route')
     );
-    await chunkedRouteTransform?.handler(
-      createTransformArgs(options.routePath, '?route-chunk=clientLoader')
-    );
-    await querylessRouteTransform?.handler(
+    await routeModuleTransforms[1].handler(
       createTransformArgs(options.routePath)
     );
 
@@ -136,7 +116,7 @@ describe('build output transforms', () => {
     expect(run).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'routeModule' })
     );
-    expect(run).toHaveBeenCalledTimes(3);
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it('reads dev HMR enablement when route transforms run', async () => {

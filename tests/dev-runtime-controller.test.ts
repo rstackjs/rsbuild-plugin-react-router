@@ -26,7 +26,7 @@ const afterDoneByCompiler = new WeakMap<
 
 const createCompiler = (name: 'web' | 'node') => {
   let failed: FailedCallback | undefined;
-  let invalid: ((fileName?: string) => void) | undefined;
+  let invalid: (() => void) | undefined;
   let thisCompilation: ((compilation: Rspack.Compilation) => void) | undefined;
   const doneTaps: Array<{
     stage: number;
@@ -63,7 +63,7 @@ const createCompiler = (name: 'web' | 'node') => {
         },
       },
       invalid: {
-        tap(_name: string, callback: (fileName?: string) => void) {
+        tap(_name: string, callback: () => void) {
           invalid = callback;
         },
       },
@@ -100,7 +100,7 @@ const createCompiler = (name: 'web' | 'node') => {
     completeLate: (compilation: Rspack.Compilation) =>
       runDoneTaps(compilation, stage => stage >= 0),
     fail: (error: Error) => failed?.(error),
-    invalidate: (fileName?: string) => invalid?.(fileName),
+    invalidate: () => invalid?.(),
     setChanges: (files: string[]) => {
       compiler.modifiedFiles = new Set(files);
       compiler.removedFiles = undefined;
@@ -445,7 +445,7 @@ describe('React Router development runtime controller', () => {
       path: '*',
     });
 
-    web.invalidate('/app/routes/about.tsx');
+    web.invalidate();
     await expect
       .poll(() => (server.sockWrite as any).mock.calls.length, {
         timeout: 2000,

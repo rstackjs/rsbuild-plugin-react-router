@@ -36,13 +36,6 @@ export type DependencySnapshot = {
 export type DevChangedFiles = {
   known: boolean;
   files: ReadonlySet<string>;
-  /**
-   * Rspack reports file-watcher invalidations with a concrete file name and
-   * lazy-compilation/programmatic invalidations with null. Only an explicitly
-   * marked lazy compilation may set this to false; unknown provenance must
-   * stay undefined so reload decisions fail closed.
-   */
-  fileBackedInvalidation?: boolean;
 };
 
 export type DevGraphChanges = {

@@ -95,60 +95,6 @@ test.describe('lazy compilation', () => {
     restoreAboutRoute();
   });
 
-  test('activates a lazy route entry without reloading the document', async ({
-    page,
-  }) => {
-    test.skip(process.env.RR_LAZY_COMPILATION !== 'full');
-    const errors: string[] = [];
-    const lazyTriggerRequests: string[] = [];
-    const socketFrames: string[] = [];
-    page.on('console', message => {
-      if (message.type() === 'error') errors.push(message.text());
-    });
-    page.on('pageerror', error => errors.push(error.message));
-    page.on('request', request => {
-      if (request.url().includes('/_rspack/lazy/trigger')) {
-        lazyTriggerRequests.push(request.url());
-      }
-    });
-    page.on('websocket', socket => {
-      socket.on('framereceived', ({ payload }) => {
-        socketFrames.push(String(payload));
-      });
-    });
-    await page.addInitScript(() => {
-      const key = 'full-lazy-document-loads';
-      sessionStorage.setItem(
-        key,
-        String(Number(sessionStorage.getItem(key) ?? 0) + 1)
-      );
-    });
-
-    await page.goto('/');
-    const clientFeaturesRouteAsset = await page.request.get(
-      '/static/js/routes/client-features.js'
-    );
-    expect(clientFeaturesRouteAsset.ok()).toBe(true);
-    expect(await clientFeaturesRouteAsset.text()).toContain(
-      'lazy-compilation-proxy'
-    );
-    await page.getByRole('link', { name: 'Client Features' }).click();
-
-    await expect(page).toHaveURL('/client-features', { timeout: 60000 });
-    await expect(
-      page.getByRole('heading', { name: 'Client Features' })
-    ).toBeVisible();
-    await expect(page.getByTestId('loader-source')).toHaveText('client');
-    expect(
-      await page.evaluate(() =>
-        sessionStorage.getItem('full-lazy-document-loads')
-      )
-    ).toBe('1');
-    expect(lazyTriggerRequests.length).toBeGreaterThan(0);
-    expect(socketFrames.join('\n')).not.toContain('full-reload');
-    expect(errors).toEqual([]);
-  });
-
   test('hydrates with entries:true while manifest route modules stay synchronous', async ({
     page,
   }) => {

@@ -90,38 +90,4 @@ describe('React Router development runtime CSS ownership', () => {
       assets: { version: 'without-entry-css' },
     });
   });
-
-  it('suppresses transient lazy-compilation css ownership changes', async () => {
-    const onCssAssetOwnershipChanged = rstest.fn();
-    const { runtime } = createDevRuntimeHarness(() => createBuild('build'), {
-      onCssAssetOwnershipChanged,
-    });
-    const firstWeb = createCompilation('web');
-    const firstNode = createCompilation('node');
-
-    runtime.beginAttempt();
-    captureWeb(runtime, firstWeb, 'with-css', {
-      routes: { 'routes/about': ['/assets/about.css'] },
-    });
-    await runtime.finishAttempt(
-      createGraphStats(firstWeb, firstNode),
-      noKnownChanges,
-      graphIdentity(firstWeb, firstNode)
-    );
-
-    const lazyWeb = createCompilation('web');
-    const nextNode = createCompilation('node');
-    runtime.beginAttempt();
-    captureWeb(runtime, lazyWeb, 'lazy-without-css');
-    await runtime.finishAttempt(
-      createGraphStats(lazyWeb, nextNode),
-      {
-        ...noKnownChanges,
-        web: { ...noKnownChanges.web, fileBackedInvalidation: false },
-      },
-      graphIdentity(lazyWeb, nextNode)
-    );
-
-    expect(onCssAssetOwnershipChanged).not.toHaveBeenCalled();
-  });
 });

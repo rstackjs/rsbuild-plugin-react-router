@@ -6,10 +6,6 @@ import {
   collectSubresourceIntegrity,
   registerModifyBrowserManifestAssets,
 } from '../src/modify-browser-manifest';
-import {
-  createLazyRouteEntryExportBridge,
-  isLazyRouteEntrySource,
-} from '../src/lazy-compilation';
 
 const BROWSER_MANIFEST_PATH =
   'static/js/virtual/react-router/browser-manifest.js';
@@ -37,34 +33,6 @@ const createAsset = (source: string, integrity?: string) => ({
   size: () => source.length,
 });
 
-describe('lazy route entry export bridge', () => {
-  it('bridges only supported client route exports without duplicates', () => {
-    expect(
-      createLazyRouteEntryExportBridge([
-        'clientLoader',
-        'clientLoader',
-        'default',
-        'ErrorBoundary',
-      ])
-    ).toContain(
-      'export { __reactRouterLazyRouteExport_0 as clientLoader, __reactRouterLazyRouteExport_1 as default, __reactRouterLazyRouteExport_2 as ErrorBoundary };'
-    );
-  });
-
-  it('detects only the route entry own lazy proxy execution shape', () => {
-    expect(
-      isLazyRouteEntrySource(
-        'var __webpack_exports__ = __webpack_exec__("./route!lazy-compilation-proxy");'
-      )
-    ).toBe(true);
-    expect(
-      isLazyRouteEntrySource(
-        'const unrelated = "lazy-compilation-proxy"; var __webpack_exports__ = __webpack_exec__("./route");'
-      )
-    ).toBe(false);
-  });
-});
-
 class RawSource {
   constructor(private readonly value: string) {}
   source() {
@@ -72,16 +40,6 @@ class RawSource {
   }
   size() {
     return this.value.length;
-  }
-}
-
-class ConcatSource extends RawSource {
-  constructor(...items: Array<string | { source(): string | Buffer }>) {
-    super(
-      items
-        .map(item => (typeof item === 'string' ? item : item.source().toString()))
-        .join('')
-    );
   }
 }
 
@@ -95,12 +53,7 @@ type ProcessAssetsDescriptor = {
   environments?: string[];
 };
 type ProcessAssetsHandler = (
-  context: ProcessAssetsContext & {
-    sources: {
-      ConcatSource: typeof ConcatSource;
-      RawSource: typeof RawSource;
-    };
-  }
+  context: ProcessAssetsContext & { sources: { RawSource: typeof RawSource } }
 ) => Promise<void> | void;
 type ProcessAssetsRegistration = {
   descriptor: ProcessAssetsDescriptor;
@@ -128,20 +81,14 @@ const createProcessAssetsHarness = () => {
     run(context: ProcessAssetsContext) {
       const registration = registrations[0];
       expect(registration).toBeDefined();
-      return registration!.handler({
-        ...context,
-        sources: { ConcatSource, RawSource },
-      });
+      return registration!.handler({ ...context, sources: { RawSource } });
     },
     runStage(stage: string, context: ProcessAssetsContext) {
       const registration = registrations.find(
         registration => registration.descriptor.stage === stage
       );
       expect(registration).toBeDefined();
-      return registration!.handler({
-        ...context,
-        sources: { ConcatSource, RawSource },
-      });
+      return registration!.handler({ ...context, sources: { RawSource } });
     },
   };
 };
@@ -283,53 +230,6 @@ describe('modify browser manifest plugin', () => {
       await harness.run({ assets, compilation });
 
       expect(assets[BROWSER_MANIFEST_PATH].source()).toContain('routes');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('appends lazy route exports after preceding runtime executions', async () => {
-    const { root, appDir } = createTempApp();
-    const harness = createProcessAssetsHarness();
-    writeFileSync(
-      join(appDir, 'routes/page.tsx'),
-      `export const clientLoader = () => null; export default function Page() { return null; }`
-    );
-    const routeAssetName = 'static/js/routes/page.js';
-    const assets = {
-      ...createBrowserManifestAssets(),
-      'static/js/root.js': createAsset(
-        `var __webpack_exports__ = __webpack_exec__("./root");`
-      ),
-      [routeAssetName]: createAsset(
-        `__webpack_exec__("react-refresh");\nvar __webpack_exports__ = __webpack_exec__("./route!lazy-compilation-proxy");`
-      ),
-    };
-    const compilation = createCompilation(
-      [
-        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
-        ['root', { files: new Set(['static/js/root.js']) }],
-        ['routes/page', { files: new Set([routeAssetName]) }],
-      ],
-      assets
-    );
-
-    try {
-      registerModifyBrowserManifestAssets(
-        harness.api as never,
-        createRoutesWithPage(),
-        { unstableLazyCompilationRouteEntries: {} },
-        appDir
-      );
-
-      await harness.run({ assets, compilation });
-
-      expect(assets[routeAssetName].source()).toContain(
-        'await __webpack_exports__'
-      );
-      expect(assets[routeAssetName].source()).toContain(
-        'as clientLoader'
-      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

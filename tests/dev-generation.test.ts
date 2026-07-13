@@ -197,8 +197,7 @@ describe('React Router development runtime', () => {
       graphIdentity(stableCssWeb, nodeOnly)
     );
 
-    expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
-    expect(onCssAssetOwnershipChanged).toHaveBeenCalledWith('added');
+    expect(onCssAssetOwnershipChanged).not.toHaveBeenCalled();
     await expect(runtime.load()).resolves.toMatchObject({
       assets: { version: 'same-css' },
     });

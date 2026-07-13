@@ -51,24 +51,6 @@ export type PluginOptions = {
   unstableLazyCompilationPrewarm?: boolean;
 
   /**
-   * Allow generated browser route entries to participate in Rsbuild lazy
-   * compilation while keeping only the browser manifest, entry client, styles,
-   * and explicitly configured hydration routes eager.
-   *
-   * Use `lazyCompilation.test` to keep application-specific route entries
-   * eager.
-   *
-   * @default false
-   */
-  unstableLazyCompilationRouteEntries?: {
-    /**
-     * Route files that must stay eager for the application's initial
-     * hydration path.
-     */
-    eagerRouteFiles?: string[];
-  };
-
-  /**
    * Emit structured React Router plugin timing logs.
    * @default false
    */

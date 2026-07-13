@@ -1,6 +1,5 @@
 import type { Route, PluginOptions } from './types.js';
 import type { RsbuildPluginAPI, Rspack } from '@rsbuild/core';
-import { appendLazyRouteEntryExportBridges } from './lazy-compilation.js';
 import {
   createReactRouterManifestStats,
   generateReactRouterManifestForDev,
@@ -157,16 +156,6 @@ export function registerModifyBrowserManifestAssets(
           currentAssetPrefix,
           routeChunkOptions
         );
-      if (pluginOptions.unstableLazyCompilationRouteEntries) {
-        appendLazyRouteEntryExportBridges({
-          assets,
-          compilation,
-          moduleExportsByRouteId,
-          routes,
-          sources,
-          stats,
-        });
-      }
       const manifestForBrowser = finalizeSri
         ? { ...manifest, sri: true as const }
         : manifest;
