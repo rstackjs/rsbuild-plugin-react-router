@@ -11,31 +11,31 @@ The noise band is the larger of 2% or two combined robust standard deviations es
 
 | Benchmark | Runs | Base total | Head total | Delta | Base rMAD | Head rMAD | Noise band | Signal |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| `large-355-ssr-esm (build)` | 3 | 8.40s | 9.34s | +11.2% | 0.3% | 0.9% | ±2.8% | 🔴 regression |
-| `synthetic-1024-ssr-esm (build)` | 3 | 3.92s | 4.03s | +2.8% | 0.6% | 2.9% | ±8.7% | ⚪ inconclusive |
-| `synthetic-1024-ssr-esm-split (build)` | 3 | 5.16s | 5.76s | +11.6% | 0.3% | 0.9% | ±2.9% | 🔴 regression |
-| `synthetic-256-sourcemaps (build)` | 5 | 2.17s | 2.22s | +2.5% | 0.6% | 0.7% | ±2.7% | ⚪ inconclusive |
-| `synthetic-256-ssr-esm (build)` | 5 | 2.03s | 2.10s | +3.4% | 0.6% | 0.2% | ±2.0% | 🔴 regression |
-| `synthetic-256-ssr-esm-split (build)` | 5 | 2.45s | 2.62s | +6.9% | 1.0% | 0.9% | ±3.9% | 🔴 regression |
-| `synthetic-48-ssr-esm (build)` | 5 | 1.33s | 1.37s | +2.5% | 0.3% | 0.3% | ±2.0% | 🔴 regression |
-| `large-355-ssr-esm (dev)` | 3 | 15.21s | 17.54s | +15.3% | 0.3% | 6.2% | ±18.5% | ⚪ inconclusive |
-| `synthetic-1024-ssr-esm (dev)` | 3 | 4.48s | 4.71s | +5.3% | 1.2% | 1.9% | ±6.6% | ⚪ inconclusive |
-| `synthetic-1024-ssr-esm-split (dev)` | 3 | 4.58s | 4.75s | +3.8% | 0.8% | 0.3% | ±2.6% | 🔴 regression |
-| `synthetic-256-sourcemaps (dev)` | 5 | 2.12s | 2.21s | +4.2% | 3.5% | 1.0% | ±10.8% | ⚪ inconclusive |
-| `synthetic-256-ssr-esm (dev)` | 5 | 1.79s | 1.88s | +5.2% | 0.5% | 0.7% | ±2.6% | 🔴 regression |
-| `synthetic-256-ssr-esm-split (dev)` | 5 | 1.83s | 1.93s | +5.1% | 1.6% | 2.4% | ±8.4% | ⚪ inconclusive |
-| `synthetic-48-ssr-esm (dev)` | 5 | 0.92s | 0.92s | -0.1% | 0.7% | 0.4% | ±2.4% | ⚪ inconclusive |
-| `complex app (cold)` | 3 | 115.69s | 120.51s | +4.2% | 0.2% | 0.3% | ±2.0% | 🔴 regression |
-| `complex app (dev)` | 3 | 101.82s | 104.03s | +2.2% | 1.1% | 0.7% | ±4.0% | ⚪ inconclusive |
-| `complex app (warm)` | 3 | 78.66s | 87.87s | +11.7% | 0.5% | 0.2% | ±2.0% | 🔴 regression |
+| `large-355-ssr-esm (build)` | 3 | 8.27s | 9.29s | +12.3% | 0.1% | 0.3% | ±2.0% | 🔴 regression |
+| `synthetic-1024-ssr-esm (build)` | 3 | 3.84s | 3.84s | -0.1% | 1.5% | 0.5% | ±4.8% | ⚪ inconclusive |
+| `synthetic-1024-ssr-esm-split (build)` | 3 | 5.19s | 5.69s | +9.5% | 0.4% | 0.5% | ±2.0% | 🔴 regression |
+| `synthetic-256-sourcemaps (build)` | 5 | 2.21s | 2.24s | +1.3% | 0.9% | 0.4% | ±3.1% | ⚪ inconclusive |
+| `synthetic-256-ssr-esm (build)` | 5 | 2.02s | 2.09s | +3.4% | 0.5% | 0.6% | ±2.3% | 🔴 regression |
+| `synthetic-256-ssr-esm-split (build)` | 5 | 2.44s | 2.62s | +7.3% | 1.2% | 0.2% | ±3.5% | 🔴 regression |
+| `synthetic-48-ssr-esm (build)` | 5 | 1.33s | 1.35s | +1.8% | 1.2% | 0.4% | ±3.9% | ⚪ inconclusive |
+| `large-355-ssr-esm (dev)` | 3 | 14.99s | 16.07s | +7.2% | 0.5% | 0.2% | ±2.0% | 🔴 regression |
+| `synthetic-1024-ssr-esm (dev)` | 3 | 4.54s | 4.68s | +3.0% | 0.4% | 0.6% | ±2.2% | 🔴 regression |
+| `synthetic-1024-ssr-esm-split (dev)` | 3 | 4.51s | 4.64s | +2.8% | 0.3% | 2.3% | ±6.9% | ⚪ inconclusive |
+| `synthetic-256-sourcemaps (dev)` | 5 | 2.08s | 2.16s | +4.2% | 3.1% | 1.4% | ±10.2% | ⚪ inconclusive |
+| `synthetic-256-ssr-esm (dev)` | 5 | 1.82s | 1.89s | +4.1% | 1.1% | 1.2% | ±4.8% | ⚪ inconclusive |
+| `synthetic-256-ssr-esm-split (dev)` | 5 | 1.83s | 1.94s | +6.2% | 3.0% | 2.2% | ±11.1% | ⚪ inconclusive |
+| `synthetic-48-ssr-esm (dev)` | 5 | 0.94s | 0.93s | -1.4% | 1.0% | 0.9% | ±3.9% | ⚪ inconclusive |
+| `complex app (cold)` | 3 | 119.45s | 136.26s | +14.1% | 1.1% | 4.9% | ±14.8% | ⚪ inconclusive |
+| `complex app (dev)` | 3 | 127.78s | 107.65s | -15.8% | 0.2% | 0.5% | ±2.0% | 🟢 improvement |
+| `complex app (warm)` | 3 | 81.33s | 97.22s | +19.5% | 0.5% | 4.8% | ±14.4% | 🔴 regression |
 
 ### Dev Rollup
 
 | Group | Fixtures | Base total | Head total | Delta | Base ready | Head ready | Ready delta | Base routes | Head routes | Route delta | Base update/HMR | Head update/HMR | Update delta | Speedup |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| All dev fixtures | 7 | 30.92s | 33.94s | +9.8% | 18.86s | 21.35s | +13.2% | 3.87s | 3.65s | -5.6% | 2.89s | 2.71s | -6.3% | 0.91x |
-| Large app | 1 | 15.21s | 17.54s | +15.3% | 8.12s | 9.45s | +16.3% | 1.93s | 1.80s | -7.0% | 1.70s | 1.72s | +1.2% | 0.87x |
-| Standard fixtures | 6 | 15.72s | 16.40s | +4.3% | 10.74s | 11.90s | +10.8% | 1.94s | 1.86s | -4.1% | 1.19s | 0.99s | -17.0% | 0.96x |
+| All dev fixtures | 7 | 30.71s | 32.31s | +5.2% | 18.67s | 21.05s | +12.7% | 3.84s | 3.66s | -4.8% | 2.84s | 2.61s | -8.1% | 0.95x |
+| Large app | 1 | 14.99s | 16.07s | +7.2% | 7.90s | 9.25s | +17.0% | 1.86s | 1.81s | -2.6% | 1.72s | 1.62s | -5.9% | 0.93x |
+| Standard fixtures | 6 | 15.71s | 16.24s | +3.3% | 10.77s | 11.81s | +9.6% | 1.99s | 1.85s | -6.9% | 1.12s | 0.99s | -11.3% | 0.97x |
 
 ### Production Build Benchmarks
 
@@ -43,13 +43,13 @@ Rendered 7 production build benchmarks.
 
 | Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| `large-355-ssr-esm` | 3 | 8.40s | 9.34s | +11.2% | 9.32s | 9.42s | 0.90x | 1623 MB |
-| `synthetic-1024-ssr-esm` | 3 | 3.92s | 4.03s | +2.8% | 4.03s | 4.14s | 0.97x | 646 MB |
-| `synthetic-1024-ssr-esm-split` | 3 | 5.16s | 5.76s | +11.6% | 5.76s | 5.82s | 0.90x | 805 MB |
-| `synthetic-256-sourcemaps` | 5 | 2.17s | 2.22s | +2.5% | 2.23s | 2.26s | 0.98x | 447 MB |
-| `synthetic-256-ssr-esm` | 5 | 2.03s | 2.10s | +3.4% | 2.10s | 2.11s | 0.97x | 421 MB |
-| `synthetic-256-ssr-esm-split` | 5 | 2.45s | 2.62s | +6.9% | 2.61s | 2.66s | 0.94x | 462 MB |
-| `synthetic-48-ssr-esm` | 5 | 1.33s | 1.37s | +2.5% | 1.36s | 1.37s | 0.98x | 319 MB |
+| `large-355-ssr-esm` | 3 | 8.27s | 9.29s | +12.3% | 9.28s | 9.32s | 0.89x | 1620 MB |
+| `synthetic-1024-ssr-esm` | 3 | 3.84s | 3.84s | -0.1% | 3.86s | 3.94s | 1.00x | 639 MB |
+| `synthetic-1024-ssr-esm-split` | 3 | 5.19s | 5.69s | +9.5% | 5.64s | 5.71s | 0.91x | 824 MB |
+| `synthetic-256-sourcemaps` | 5 | 2.21s | 2.24s | +1.3% | 2.25s | 2.32s | 0.99x | 449 MB |
+| `synthetic-256-ssr-esm` | 5 | 2.02s | 2.09s | +3.4% | 2.09s | 2.11s | 0.97x | 421 MB |
+| `synthetic-256-ssr-esm-split` | 5 | 2.44s | 2.62s | +7.3% | 2.62s | 2.65s | 0.93x | 465 MB |
+| `synthetic-48-ssr-esm` | 5 | 1.33s | 1.35s | +1.8% | 1.36s | 1.39s | 0.98x | 303 MB |
 
 ### ci-small+ci-large Dev Fixture Summary
 
@@ -57,36 +57,36 @@ Rendered 7 dev benchmark fixtures from the `ci-small+ci-large` profile.
 
 | Benchmark | Runs | Base total | Head total | Delta | Base ready | Head ready | Base routes | Head routes | Base update/HMR | Head update/HMR | Update delta | Head mean | Head p95 | Speedup | Head RSS p95 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `large-355-ssr-esm` | 3 | 15.21s | 17.54s | +15.3% | 8.12s | 9.45s | 1.93s | 1.80s | 1.70s | 1.72s | +1.2% | 17.50s | 18.63s | 0.87x | - |
-| `synthetic-1024-ssr-esm` | 3 | 4.48s | 4.71s | +5.3% | 3.03s | 3.45s | 0.57s | 0.52s | 0.35s | 0.30s | -14.7% | 4.73s | 4.84s | 0.95x | - |
-| `synthetic-1024-ssr-esm-split` | 3 | 4.58s | 4.75s | +3.8% | 3.11s | 3.46s | 0.53s | 0.53s | 0.40s | 0.30s | -25.0% | 4.79s | 4.90s | 0.96x | - |
-| `synthetic-256-sourcemaps` | 5 | 2.12s | 2.21s | +4.2% | 1.47s | 1.60s | 0.25s | 0.23s | 0.13s | 0.13s | +0.2% | 2.20s | 2.23s | 0.96x | - |
-| `synthetic-256-ssr-esm` | 5 | 1.79s | 1.88s | +5.2% | 1.23s | 1.37s | 0.23s | 0.23s | 0.13s | 0.10s | -19.6% | 1.87s | 1.89s | 0.95x | - |
-| `synthetic-256-ssr-esm-split` | 5 | 1.83s | 1.93s | +5.1% | 1.26s | 1.38s | 0.24s | 0.23s | 0.13s | 0.10s | -19.8% | 1.96s | 2.06s | 0.95x | - |
-| `synthetic-48-ssr-esm` | 5 | 0.92s | 0.92s | -0.1% | 0.64s | 0.64s | 0.12s | 0.13s | 0.05s | 0.05s | +1.2% | 0.92s | 0.94s | 1.00x | - |
+| `large-355-ssr-esm` | 3 | 14.99s | 16.07s | +7.2% | 7.90s | 9.25s | 1.86s | 1.81s | 1.72s | 1.62s | -5.9% | 16.04s | 16.10s | 0.93x | - |
+| `synthetic-1024-ssr-esm` | 3 | 4.54s | 4.68s | +3.0% | 3.12s | 3.43s | 0.57s | 0.51s | 0.35s | 0.30s | -14.0% | 4.67s | 4.71s | 0.97x | - |
+| `synthetic-1024-ssr-esm-split` | 3 | 4.51s | 4.64s | +2.8% | 3.09s | 3.37s | 0.57s | 0.53s | 0.33s | 0.30s | -7.7% | 4.70s | 4.92s | 0.97x | - |
+| `synthetic-256-sourcemaps` | 5 | 2.08s | 2.16s | +4.2% | 1.44s | 1.61s | 0.24s | 0.23s | 0.13s | 0.13s | -1.0% | 2.16s | 2.19s | 0.96x | - |
+| `synthetic-256-ssr-esm` | 5 | 1.82s | 1.89s | +4.1% | 1.25s | 1.36s | 0.25s | 0.23s | 0.13s | 0.10s | -20.9% | 1.91s | 2.01s | 0.96x | - |
+| `synthetic-256-ssr-esm-split` | 5 | 1.83s | 1.94s | +6.2% | 1.23s | 1.38s | 0.24s | 0.22s | 0.13s | 0.10s | -19.2% | 1.94s | 2.01s | 0.94x | - |
+| `synthetic-48-ssr-esm` | 5 | 0.94s | 0.93s | -1.4% | 0.65s | 0.65s | 0.12s | 0.13s | 0.05s | 0.05s | +0.8% | 0.97s | 1.14s | 1.01x | - |
 
 #### large-355-ssr-esm Plugin Operations
 
 | Environment | Operation | Count | Base total | Head total | Delta | Head wall | Head max | Reports |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| web | `route:module` | 1072 | 1023.8ms | 928.8ms | -9.3% | 928.8ms | 11.9ms | 7 |
-| node | `route:module` | 1071 | 494.6ms | 470.0ms | -5.0% | 470.0ms | 7.5ms | 6 |
-| web | `route:client-entry` | 1072 | 271.5ms | 271.8ms | +0.1% | 271.8ms | 7.3ms | 7 |
-| node | `manifest:transform` | 3 | 70.0ms | 62.6ms | -10.6% | 62.6ms | 24.2ms | 3 |
-| web | `manifest:stage` | 10 | 15.5ms | 12.8ms | -17.4% | 12.8ms | 1.9ms | 10 |
+| web | `route:module` | 1071 | 1074.2ms | 918.8ms | -14.5% | 918.8ms | 23.4ms | 6 |
+| node | `route:module` | 1071 | 535.6ms | 446.3ms | -16.7% | 446.3ms | 10.1ms | 6 |
+| web | `route:client-entry` | 1071 | 261.9ms | 228.4ms | -12.8% | 228.4ms | 7.1ms | 6 |
+| node | `manifest:transform` | 3 | 77.5ms | 56.7ms | -26.8% | 56.7ms | 20.3ms | 3 |
+| web | `manifest:stage` | 9 | 15.4ms | 11.8ms | -23.4% | 11.8ms | 2.0ms | 9 |
 | web | `manifest:transform` | 3 | 0.3ms | 0.3ms | 0.0% | 0.3ms | 0.1ms | 3 |
-| node | `assets:relocate-ssr-only` | 7 | - | 109.4ms | - | 109.4ms | 21.5ms | 7 |
+| node | `assets:relocate-ssr-only` | 6 | - | 79.5ms | - | 79.5ms | 13.8ms | 6 |
 
 #### synthetic-1024-ssr-esm Plugin Operations
 
 | Environment | Operation | Count | Base total | Head total | Delta | Head wall | Head max | Reports |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| web | `route:module` | 3078 | 1219.8ms | 1111.8ms | -8.9% | 1111.8ms | 10.3ms | 6 |
-| node | `route:module` | 3078 | 577.3ms | 531.7ms | -7.9% | 531.7ms | 18.7ms | 6 |
-| web | `route:client-entry` | 3078 | 399.7ms | 372.6ms | -6.8% | 372.6ms | 8.0ms | 6 |
-| node | `module:client-only-stub` | 3 | 168.9ms | 102.2ms | -39.5% | 102.2ms | 53.6ms | 3 |
-| node | `manifest:transform` | 3 | 114.9ms | 114.7ms | -0.2% | 114.7ms | 38.5ms | 3 |
-| web | `manifest:stage` | 9 | 43.5ms | 37.2ms | -14.5% | 37.2ms | 7.1ms | 9 |
+| web | `route:module` | 3078 | 1225.8ms | 1099.1ms | -10.3% | 1099.1ms | 13.1ms | 6 |
+| node | `route:module` | 3078 | 582.2ms | 522.3ms | -10.3% | 522.3ms | 15.9ms | 6 |
+| web | `route:client-entry` | 3078 | 388.3ms | 349.2ms | -10.1% | 349.2ms | 8.6ms | 6 |
+| node | `manifest:transform` | 3 | 116.6ms | 112.9ms | -3.2% | 112.9ms | 39.4ms | 3 |
+| node | `module:client-only-stub` | 3 | 109.3ms | 102.9ms | -5.9% | 102.9ms | 49.8ms | 3 |
+| web | `manifest:stage` | 9 | 44.0ms | 36.1ms | -18.0% | 36.1ms | 7.0ms | 9 |
 | web | `manifest:transform` | 3 | 0.3ms | 0.3ms | 0.0% | 0.3ms | 0.1ms | 3 |
 | node | `assets:relocate-ssr-only` | 6 | - | 1.3ms | - | 1.3ms | 0.4ms | 6 |
 
@@ -94,66 +94,66 @@ Rendered 7 dev benchmark fixtures from the `ci-small+ci-large` profile.
 
 | Environment | Operation | Count | Base total | Head total | Delta | Head wall | Head max | Reports |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| web | `route:module` | 3078 | 1241.9ms | 1080.2ms | -13.0% | 1080.2ms | 6.9ms | 6 |
-| node | `route:module` | 3078 | 568.0ms | 548.0ms | -3.5% | 548.0ms | 19.3ms | 6 |
-| web | `route:client-entry` | 3078 | 343.3ms | 323.7ms | -5.7% | 323.7ms | 8.2ms | 6 |
-| node | `module:client-only-stub` | 3 | 317.8ms | 88.9ms | -72.0% | 88.9ms | 51.6ms | 3 |
-| node | `manifest:transform` | 3 | 129.5ms | 124.0ms | -4.2% | 124.0ms | 45.4ms | 3 |
-| web | `manifest:stage` | 9 | 46.6ms | 36.3ms | -22.1% | 36.3ms | 7.1ms | 9 |
+| web | `route:module` | 3078 | 1256.7ms | 1079.8ms | -14.1% | 1079.8ms | 7.4ms | 6 |
+| node | `route:module` | 3078 | 566.0ms | 529.8ms | -6.4% | 529.8ms | 18.8ms | 6 |
+| web | `route:client-entry` | 3078 | 358.4ms | 316.8ms | -11.6% | 316.8ms | 8.0ms | 6 |
+| node | `manifest:transform` | 3 | 115.7ms | 137.9ms | +19.2% | 137.9ms | 58.2ms | 3 |
+| web | `manifest:stage` | 9 | 37.8ms | 36.6ms | -3.2% | 36.6ms | 7.2ms | 9 |
+| node | `module:client-only-stub` | 3 | 31.9ms | 70.2ms | +120.1% | 70.2ms | 51.9ms | 3 |
 | web | `manifest:transform` | 3 | 0.3ms | 0.3ms | 0.0% | 0.3ms | 0.1ms | 3 |
-| node | `assets:relocate-ssr-only` | 6 | - | 1.4ms | - | 1.4ms | 0.4ms | 6 |
+| node | `assets:relocate-ssr-only` | 6 | - | 1.5ms | - | 1.5ms | 0.4ms | 6 |
 
 #### synthetic-256-sourcemaps Plugin Operations
 
 | Environment | Operation | Count | Base total | Head total | Delta | Head wall | Head max | Reports |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| web | `route:module` | 1293 | 708.4ms | 657.6ms | -7.2% | 657.6ms | 16.6ms | 13 |
-| node | `route:module` | 1290 | 281.3ms | 291.6ms | +3.7% | 291.6ms | 3.4ms | 10 |
-| web | `route:client-entry` | 1293 | 196.6ms | 199.3ms | +1.4% | 199.3ms | 5.3ms | 13 |
-| node | `manifest:transform` | 5 | 64.9ms | 72.5ms | +11.7% | 72.5ms | 16.5ms | 5 |
-| node | `module:client-only-stub` | 5 | 42.5ms | 9.9ms | -76.7% | 9.9ms | 2.3ms | 5 |
-| web | `manifest:stage` | 18 | 19.8ms | 15.2ms | -23.2% | 15.2ms | 1.3ms | 18 |
+| web | `route:module` | 1290 | 735.1ms | 675.6ms | -8.1% | 675.6ms | 10.4ms | 10 |
+| node | `route:module` | 1290 | 278.6ms | 307.4ms | +10.3% | 307.4ms | 4.6ms | 10 |
+| web | `route:client-entry` | 1290 | 196.9ms | 194.5ms | -1.2% | 194.5ms | 5.2ms | 10 |
+| node | `module:client-only-stub` | 5 | 96.2ms | 9.5ms | -90.1% | 9.5ms | 2.0ms | 5 |
+| node | `manifest:transform` | 5 | 78.3ms | 80.0ms | +2.2% | 80.0ms | 19.5ms | 5 |
+| web | `manifest:stage` | 15 | 15.3ms | 12.9ms | -15.7% | 12.9ms | 1.3ms | 15 |
 | web | `manifest:transform` | 5 | 0.5ms | 0.5ms | 0.0% | 0.5ms | 0.1ms | 5 |
-| node | `assets:relocate-ssr-only` | 13 | - | 3.5ms | - | 3.5ms | 0.4ms | 13 |
+| node | `assets:relocate-ssr-only` | 10 | - | 2.9ms | - | 2.9ms | 0.5ms | 10 |
 
 #### synthetic-256-ssr-esm Plugin Operations
 
 | Environment | Operation | Count | Base total | Head total | Delta | Head wall | Head max | Reports |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| web | `route:module` | 1290 | 683.0ms | 650.7ms | -4.7% | 650.7ms | 17.7ms | 10 |
-| node | `route:module` | 1290 | 275.7ms | 257.9ms | -6.5% | 257.9ms | 4.9ms | 10 |
-| web | `route:client-entry` | 1290 | 202.1ms | 184.9ms | -8.5% | 184.9ms | 5.1ms | 10 |
-| node | `module:client-only-stub` | 5 | 87.8ms | 14.1ms | -83.9% | 14.1ms | 4.4ms | 5 |
-| node | `manifest:transform` | 5 | 85.2ms | 72.7ms | -14.7% | 72.7ms | 19.2ms | 5 |
-| web | `manifest:stage` | 15 | 13.8ms | 13.0ms | -5.8% | 13.0ms | 1.3ms | 15 |
+| web | `route:module` | 1291 | 687.4ms | 628.0ms | -8.6% | 628.0ms | 17.4ms | 11 |
+| node | `route:module` | 1290 | 268.5ms | 258.1ms | -3.9% | 258.1ms | 4.3ms | 10 |
+| web | `route:client-entry` | 1291 | 205.0ms | 184.9ms | -9.8% | 184.9ms | 5.7ms | 11 |
+| node | `manifest:transform` | 5 | 74.2ms | 83.9ms | +13.1% | 83.9ms | 20.8ms | 5 |
+| node | `module:client-only-stub` | 5 | 20.1ms | 26.1ms | +29.9% | 26.1ms | 17.0ms | 5 |
+| web | `manifest:stage` | 16 | 15.5ms | 13.9ms | -10.3% | 13.9ms | 1.3ms | 16 |
 | web | `manifest:transform` | 5 | 0.5ms | 0.5ms | 0.0% | 0.5ms | 0.1ms | 5 |
-| node | `assets:relocate-ssr-only` | 10 | - | 2.2ms | - | 2.2ms | 0.4ms | 10 |
+| node | `assets:relocate-ssr-only` | 11 | - | 2.4ms | - | 2.4ms | 0.4ms | 11 |
 
 #### synthetic-256-ssr-esm-split Plugin Operations
 
 | Environment | Operation | Count | Base total | Head total | Delta | Head wall | Head max | Reports |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| web | `route:module` | 1292 | 696.4ms | 603.7ms | -13.3% | 603.7ms | 16.5ms | 12 |
-| node | `route:module` | 1290 | 283.7ms | 260.4ms | -8.2% | 260.4ms | 4.7ms | 10 |
-| web | `route:client-entry` | 1292 | 206.3ms | 195.6ms | -5.2% | 195.6ms | 5.2ms | 12 |
-| node | `manifest:transform` | 5 | 88.4ms | 64.4ms | -27.1% | 64.4ms | 18.8ms | 5 |
-| node | `module:client-only-stub` | 5 | 55.1ms | 13.6ms | -75.3% | 13.6ms | 5.4ms | 5 |
-| web | `manifest:stage` | 17 | 14.0ms | 14.7ms | +5.0% | 14.7ms | 1.6ms | 17 |
+| web | `route:module` | 1292 | 677.4ms | 643.5ms | -5.0% | 643.5ms | 12.8ms | 12 |
+| node | `route:module` | 1290 | 260.1ms | 254.0ms | -2.3% | 254.0ms | 5.3ms | 10 |
+| web | `route:client-entry` | 1292 | 207.1ms | 184.0ms | -11.2% | 184.0ms | 5.5ms | 12 |
+| node | `manifest:transform` | 5 | 91.4ms | 82.8ms | -9.4% | 82.8ms | 21.0ms | 5 |
+| node | `module:client-only-stub` | 5 | 58.9ms | 10.3ms | -82.5% | 10.3ms | 2.5ms | 5 |
+| web | `manifest:stage` | 17 | 14.9ms | 14.2ms | -4.7% | 14.2ms | 1.3ms | 17 |
 | web | `manifest:transform` | 5 | 0.5ms | 0.5ms | 0.0% | 0.5ms | 0.1ms | 5 |
-| node | `assets:relocate-ssr-only` | 12 | - | 2.2ms | - | 2.2ms | 0.3ms | 12 |
+| node | `assets:relocate-ssr-only` | 12 | - | 2.5ms | - | 2.5ms | 0.4ms | 12 |
 
 #### synthetic-48-ssr-esm Plugin Operations
 
 | Environment | Operation | Count | Base total | Head total | Delta | Head wall | Head max | Reports |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| web | `route:module` | 250 | 250.8ms | 190.9ms | -23.9% | 190.9ms | 7.7ms | 10 |
-| node | `route:module` | 250 | 81.6ms | 65.8ms | -19.4% | 65.8ms | 0.5ms | 10 |
-| web | `route:client-entry` | 250 | 57.8ms | 44.2ms | -23.5% | 44.2ms | 2.0ms | 10 |
-| node | `module:client-only-stub` | 5 | 44.8ms | 30.7ms | -31.5% | 30.7ms | 8.6ms | 5 |
-| node | `manifest:transform` | 5 | 27.0ms | 22.9ms | -15.2% | 22.9ms | 6.3ms | 5 |
-| web | `manifest:stage` | 15 | 3.6ms | 3.8ms | +5.6% | 3.8ms | 0.4ms | 15 |
+| web | `route:module` | 250 | 239.9ms | 184.7ms | -23.0% | 184.7ms | 5.3ms | 10 |
+| node | `route:module` | 250 | 78.2ms | 63.3ms | -19.1% | 63.3ms | 0.6ms | 10 |
+| web | `route:client-entry` | 250 | 59.3ms | 42.5ms | -28.3% | 42.5ms | 1.9ms | 10 |
+| node | `module:client-only-stub` | 5 | 44.6ms | 41.6ms | -6.7% | 41.6ms | 13.3ms | 5 |
+| node | `manifest:transform` | 5 | 26.1ms | 22.6ms | -13.4% | 22.6ms | 5.2ms | 5 |
+| web | `manifest:stage` | 15 | 3.7ms | 3.8ms | +2.7% | 3.8ms | 0.4ms | 15 |
 | web | `manifest:transform` | 5 | 0.5ms | 0.5ms | 0.0% | 0.5ms | 0.1ms | 5 |
-| node | `assets:relocate-ssr-only` | 10 | - | 2.2ms | - | 2.2ms | 0.4ms | 10 |
+| node | `assets:relocate-ssr-only` | 10 | - | 2.1ms | - | 2.1ms | 0.4ms | 10 |
 
 ### Synthetic Rsbuild App
 
@@ -161,16 +161,16 @@ Rendered 2 production build benchmarks.
 
 | Benchmark | Runs | Base total | Head total | Delta | Head mean | Head p95 | Speedup | Head RSS p95 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| complex app | 3 | 115.69s | 120.51s | +4.2% | 120.67s | - | 0.96x | - |
-| complex app | 3 | 78.66s | 87.87s | +11.7% | 87.85s | - | 0.90x | - |
+| complex app | 3 | 119.45s | 136.26s | +14.1% | 137.52s | - | 0.88x | - |
+| complex app | 3 | 81.33s | 97.22s | +19.5% | 96.94s | - | 0.84x | - |
 
 Rendered 1 dev benchmark fixture from the embedded complex app.
 
 | Benchmark | Runs | Base total | Head total | Delta | Base ready | Head ready | Base routes | Head routes | Base update/HMR | Head update/HMR | Update delta | Head mean | Head p95 | Speedup | Head RSS p95 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| complex app | 3 | 101.82s | 104.03s | +2.2% | 90.86s | 92.91s | 2.98s | 3.04s | 3.36s | 3.39s | +1.0% | 104.56s | - | 0.98x | - |
+| complex app | 3 | 127.78s | 107.65s | -15.8% | 114.51s | 96.83s | 3.39s | 3.10s | 4.24s | 3.43s | -19.1% | 108.09s | - | 1.19x | - |
 
 Profile: `ci-small+ci-large`; mode: `dev`; iterations: `5`; warmup: `1`.
 The uploaded benchmark artifact includes `diagnostics/summary.md` and `diagnostics/summary.json` with runner metadata, per-run timing samples, CPU/RSS samples, and plugin timing hot spots.
-[Workflow run](https://github.com/rstackjs/rsbuild-plugin-react-router/actions/runs/29136160075)
+[Workflow run](https://github.com/rstackjs/rsbuild-plugin-react-router/actions/runs/29465689575)
 
