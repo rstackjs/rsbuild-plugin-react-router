@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from '@rstest/core';
 import { getExportNames } from '../src/export-utils';
 import {
@@ -131,6 +132,16 @@ const resolveWorkerMessage = (
 };
 
 describe('parallel route transforms', () => {
+  it('keeps the worker entrypoint Effect-free', async () => {
+    const source = await readFile(
+      new URL('../src/parallel-route-transform-worker.ts', import.meta.url),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/from ['"]effect(?:\/|['"])/);
+    expect(source).not.toContain("import('effect");
+  });
+
   it('keeps route chunk tasks limited to chunk extraction', async () => {
     const result = await executeRouteTransformTask(createMainRouteChunkTask());
 
