@@ -95,6 +95,15 @@ describe('CodSpeed benchmark comparison model', () => {
     );
   });
 
+  it('rejects benchmark cases without samples', () => {
+    const head = headPayload();
+    head.cases[0].samplesMs = [];
+
+    expect(() => compareBenchmarkResults(basePayload(), head)).toThrow(
+      'Benchmark case "build-256-ssr" in head result must include at least one sample.'
+    );
+  });
+
   it('rejects zero base medians', () => {
     const base = basePayload();
     base.cases[0] = {

@@ -59,6 +59,11 @@ const validatePayload = (payload: unknown, side: BenchmarkSide) => {
         `Benchmark case "${result.id}" in ${side} result must include samples.`
       );
     }
+    if (result.samplesMs.length === 0) {
+      throw new Error(
+        `Benchmark case "${result.id}" in ${side} result must include at least one sample.`
+      );
+    }
     if (result.samplesMs.some(sample => !Number.isFinite(sample))) {
       throw new Error(
         `Benchmark case "${result.id}" in ${side} result contains a non-finite sample.`
