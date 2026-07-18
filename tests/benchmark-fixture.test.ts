@@ -505,7 +505,3 @@ describe('focused local benchmark runner', () => {
     expect(unknown.stderr).toContain('Unknown benchmark case "unknown".');
   });
 });
-
-function writeJson(file: string, value: unknown) {
-  writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
-}
