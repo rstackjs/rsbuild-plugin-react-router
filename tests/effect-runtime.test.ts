@@ -19,7 +19,7 @@ const createDelayedTaskFixture = (delayMs: number) => {
     onError,
   });
 
-  return { runtime, run, onError, task };
+  return { runtime, run, task };
 };
 
 describe('effect runtime helpers', () => {
@@ -123,7 +123,7 @@ describe('effect runtime helpers', () => {
     const { runtime, run, task } = createDelayedTaskFixture(1000);
 
     task.schedule();
-    await task.cancel();
+    await runtime.runPromise(task.cancelEffect());
     await new Promise(resolve => setTimeout(resolve, 20));
 
     expect(run).not.toHaveBeenCalled();

@@ -68,8 +68,7 @@ const verifyRegistration = async (writer, reader) => {
   assert(startHook, 'Expected a pre dev-server start hook');
   assert(closeHook, 'Expected a pre dev-server close hook');
   assert.equal(closeBuilds.length, 1);
-  assert.equal(exits.length, 1);
-  assert.equal(closeBuilds[0], exits[0]);
+  assert.deepEqual(closeBuilds, exits);
   assert.deepEqual(
     closeDevServers.filter(hook => typeof hook === 'function'),
     closeBuilds

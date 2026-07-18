@@ -92,7 +92,6 @@ type DelayedPluginTask = {
   schedule(): void;
   reschedule(): void;
   cancelEffect(): Effect.Effect<void>;
-  cancel(): Promise<void>;
 };
 
 export const createDelayedPluginTask = ({
@@ -173,6 +172,5 @@ export const createDelayedPluginTask = ({
     schedule: start,
     reschedule: reschedule,
     cancelEffect: cancelEffect,
-    cancel: cancel,
   };
 };

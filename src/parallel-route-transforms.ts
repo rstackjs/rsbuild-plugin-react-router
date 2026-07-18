@@ -460,10 +460,7 @@ const acquireRouteTransformExecutorWithWorkerFactory = Effect.fn(
     Effect.sync(() =>
       createRouteTransformExecutorWithWorkerFactory(options, createWorker)
     ),
-    executor =>
-      tryPluginPromise(() => executor.close()).pipe(
-        Effect.catchAll(() => Effect.void)
-      )
+    executor => Effect.ignore(tryPluginPromise(() => executor.close()))
   );
 });
 

@@ -179,9 +179,7 @@ export const registerReactRouterTypegen = async (
             Effect.orDie(tryPluginPromise(() => resolvedRunner.closeWatch()))
           )
         );
-    await runtime.runPromise(
-      Effect.acquireRelease(Effect.void, closeWatchEffect)
-    );
+    await runtime.runPromise(Effect.addFinalizer(closeWatchEffect));
     // Reschedule on every compile so the typegen watch only starts after a
     // quiet period with no compiles. Starting it during the initial compile
     // burst competes with HMR rebuilds for CPU on small machines.
