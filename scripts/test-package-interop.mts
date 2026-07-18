@@ -24,6 +24,8 @@ const build = {
 
 const collect = hooks => hook => hooks.push(hook);
 const noop = () => undefined;
+const invoke = hook =>
+  typeof hook === 'function' ? hook() : hook.handler?.();
 
 const loadEntryPoints = async () => {
   const esm = await import('../dist/index.js');
@@ -33,7 +35,9 @@ const loadEntryPoints = async () => {
 
 const verifyRegistration = async (writer, reader) => {
   const starts = [];
-  const closes = [];
+  const closeBuilds = [];
+  const closeDevServers = [];
+  const exits = [];
   const api = {
     context: { action: 'dev', rootPath: process.cwd() },
     logger: { info: noop, warn: noop, error: noop },
@@ -46,9 +50,9 @@ const verifyRegistration = async (writer, reader) => {
     isPluginExists: () => false,
     onBeforeStartDevServer: collect(starts),
     onAfterStartDevServer: noop,
-    onCloseDevServer: collect(closes),
-    onCloseBuild: noop,
-    onExit: collect(closes),
+    onCloseDevServer: collect(closeDevServers),
+    onCloseBuild: collect(closeBuilds),
+    onExit: collect(exits),
     onAfterEnvironmentCompile: noop,
     onAfterBuild: noop,
     processAssets: noop,
@@ -60,9 +64,16 @@ const verifyRegistration = async (writer, reader) => {
   await writer.pluginReactRouter({ customServer: true }).setup(api);
 
   const startHook = starts.find(hook => hook.order === 'pre');
-  const closeHook = closes.find(hook => hook.order === 'pre');
+  const closeHook = closeDevServers.find(hook => hook.order === 'pre');
   assert(startHook, 'Expected a pre dev-server start hook');
   assert(closeHook, 'Expected a pre dev-server close hook');
+  assert.equal(closeBuilds.length, 1);
+  assert.equal(exits.length, 1);
+  assert.equal(closeBuilds[0], exits[0]);
+  assert.deepEqual(
+    closeDevServers.filter(hook => typeof hook === 'function'),
+    closeBuilds
+  );
   const start = startHook.handler;
   const server = {
     close: async () => undefined,
@@ -72,13 +83,9 @@ const verifyRegistration = async (writer, reader) => {
   await start({ environments: {}, server });
 
   const pending = reader.loadReactRouterServerBuild(server);
-  for (const close of closes) {
-    if (typeof close === 'function') {
-      await close();
-    } else {
-      await close.handler?.();
-    }
-  }
+  await Promise.all(
+    [...closeBuilds, ...closeDevServers, ...exits].map(invoke)
+  );
   await assert.rejects(pending, /closed before a React Router build was ready/);
   await assert.rejects(
     reader.loadReactRouterServerBuild(server),

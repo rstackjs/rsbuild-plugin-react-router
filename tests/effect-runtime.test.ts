@@ -52,26 +52,8 @@ describe('effect runtime helpers', () => {
       )
     );
 
-    await runtime.dispose();
-    expect(events).toEqual(['acquire', 'fiber', 'release:resource']);
-  });
-
-  it('interrupts supervised fibers and disposes idempotently', async () => {
-    let finalized = 0;
-    const runtime = createPluginEffectRuntime();
-
-    runtime.runFork(
-      Effect.never.pipe(
-        Effect.ensuring(
-          Effect.sync(() => {
-            finalized += 1;
-          })
-        )
-      )
-    );
-
     await Promise.all([runtime.dispose(), runtime.dispose()]);
-    expect(finalized).toBe(1);
+    expect(events).toEqual(['acquire', 'fiber', 'release:resource']);
   });
 
   it('settles shutdown when a fiber forks during finalization', async () => {
