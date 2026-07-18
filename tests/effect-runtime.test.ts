@@ -87,7 +87,9 @@ describe('effect runtime helpers', () => {
 
   it('runs delayed plugin tasks after their delay', async () => {
     const run = rstest.fn();
+    const runtime = createPluginEffectRuntime();
     const task = createDelayedPluginTask({
+      runtime,
       delayMs: 10,
       run: () => Effect.sync(run),
       onError: error => {
@@ -98,11 +100,14 @@ describe('effect runtime helpers', () => {
     task.schedule();
     expect(run).not.toHaveBeenCalled();
     await expect.poll(() => run.mock.calls.length, { timeout: 1000 }).toBe(1);
+    await runtime.dispose();
   });
 
   it('reschedules delayed plugin tasks by replacing the pending run', async () => {
     const run = rstest.fn();
+    const runtime = createPluginEffectRuntime();
     const task = createDelayedPluginTask({
+      runtime,
       delayMs: 10,
       run: () => Effect.sync(run),
       onError: error => {
@@ -115,11 +120,14 @@ describe('effect runtime helpers', () => {
     task.reschedule();
 
     await expect.poll(() => run.mock.calls.length, { timeout: 1000 }).toBe(1);
+    await runtime.dispose();
   });
 
   it('cancels delayed plugin tasks before they start', async () => {
     const run = rstest.fn();
+    const runtime = createPluginEffectRuntime();
     const task = createDelayedPluginTask({
+      runtime,
       delayMs: 1000,
       run: () => Effect.sync(run),
       onError: error => {
@@ -132,12 +140,15 @@ describe('effect runtime helpers', () => {
     await new Promise(resolve => setTimeout(resolve, 20));
 
     expect(run).not.toHaveBeenCalled();
+    await runtime.dispose();
   });
 
-  it('supports Effect-based cancellation for delayed plugin tasks', async () => {
+  it('cancels delayed plugin tasks when the plugin runtime is disposed', async () => {
     const run = rstest.fn();
+    const runtime = createPluginEffectRuntime();
     const task = createDelayedPluginTask({
-      delayMs: 1000,
+      runtime,
+      delayMs: 25,
       run: () => Effect.sync(run),
       onError: error => {
         throw error;
@@ -145,9 +156,10 @@ describe('effect runtime helpers', () => {
     });
 
     task.schedule();
-    await runPluginEffect(task.cancelEffect());
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await runtime.dispose();
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     expect(run).not.toHaveBeenCalled();
   });
+
 });

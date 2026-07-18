@@ -232,7 +232,10 @@ export const pluginReactRouter = (
       buildEnd,
     } = resolvedConfig;
 
-    registerReactRouterTypegen(api, { appDirectory });
+    await registerReactRouterTypegen(api, {
+      runtime: effectRuntime,
+      appDirectory,
+    });
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
       options,
@@ -609,17 +612,19 @@ export const pluginReactRouter = (
       });
     }
 
-    const devBackgroundResources = registerReactRouterDevBackgroundResources({
-      api,
-      isBuild,
-      lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor,
-      routeRestartMarkerPath,
-      watchDirectory,
-      getRouteTopology: routeTopology.getRouteTopology,
-      initialRouteTopology: routeTopology.initialRouteTopology,
-      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-    });
+    const devBackgroundResources =
+      await registerReactRouterDevBackgroundResources({
+        api,
+        runtime: effectRuntime,
+        isBuild,
+        lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
+        routeTransformExecutor,
+        routeRestartMarkerPath,
+        watchDirectory,
+        getRouteTopology: routeTopology.getRouteTopology,
+        initialRouteTopology: routeTopology.initialRouteTopology,
+        onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
+      });
 
     const stageLatestManifests = (
       manifest: ReactRouterManifest,

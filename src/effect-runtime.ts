@@ -106,48 +106,53 @@ export const tryPluginPromise = <A>(
     catch: normalizeEffectError,
   });
 
-type DelayedPluginTask = {
-  schedule(): void;
-  reschedule(): void;
-  cancelEffect(): Effect.Effect<void, Error, never>;
-  cancel(): Promise<void>;
-};
-
 export const createDelayedPluginTask = ({
+  runtime,
   delayMs,
   run,
   onError,
 }: {
+  runtime: PluginEffectRuntime;
   delayMs: number;
-  run: () => Effect.Effect<void, Error, never>;
+  run: () => Effect.Effect<void, Error, PluginScope>;
   onError: (error: Error) => void;
-}): DelayedPluginTask => {
-  let activeFiber: ReturnType<typeof Effect.runFork> | undefined;
-  let version = 0;
+}) => {
+  let fiber: ReturnType<PluginEffectRuntime['runFork']> | null | undefined;
 
-  const cancelActiveEffect = (): Effect.Effect<void, Error, never> =>
-    Effect.sync(() => {
-      const fiber = activeFiber;
-      activeFiber = undefined;
-      return fiber;
-    }).pipe(
-      Effect.flatMap(fiber =>
-        fiber ? Fiber.interrupt(fiber).pipe(Effect.asVoid) : Effect.void
-      )
-    );
+  const cancelEffect = (): Effect.Effect<void> =>
+    Effect.suspend(() => {
+      const activeFiber = fiber;
+      fiber = null;
+      return activeFiber
+        ? Fiber.interrupt(activeFiber).pipe(Effect.asVoid)
+        : Effect.void;
+    });
 
-  const cancelEffect = (): Effect.Effect<void, Error, never> =>
-    Effect.sync(() => {
-      version += 1;
-    }).pipe(Effect.zipRight(cancelActiveEffect()));
+  const cancel = (): Promise<void> => {
+    const activeFiber = fiber;
+    return activeFiber
+      ? runtime.runPromise(
+          Fiber.interrupt(activeFiber).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                if (fiber === activeFiber) {
+                  fiber = undefined;
+                }
+              })
+            ),
+            Effect.asVoid
+          )
+        )
+      : Promise.resolve();
+  };
 
-  const start = (taskVersion: number): void => {
-    if (activeFiber || version !== taskVersion) {
+  const start = (): void => {
+    if (fiber !== undefined) {
       return;
     }
 
-    let fiber: ReturnType<typeof Effect.runFork>;
-    fiber = Effect.runFork(
+    let activeFiber: ReturnType<PluginEffectRuntime['runFork']>;
+    activeFiber = runtime.runFork(
       Effect.sleep(Duration.millis(delayMs)).pipe(
         Effect.zipRight(Effect.suspend(run)),
         Effect.catchAll(error =>
@@ -157,37 +162,28 @@ export const createDelayedPluginTask = ({
         ),
         Effect.ensuring(
           Effect.sync(() => {
-            if (activeFiber === fiber) {
-              activeFiber = undefined;
+            if (fiber === activeFiber) {
+              fiber = undefined;
             }
           })
         )
       )
     );
-    activeFiber = fiber;
+    fiber = activeFiber;
   };
 
   return {
-    schedule(): void {
-      if (activeFiber) {
-        return;
-      }
-      version += 1;
-      start(version);
-    },
+    schedule: (): void => start(),
 
     reschedule(): void {
-      version += 1;
-      const taskVersion = version;
-      void runPluginEffect(cancelActiveEffect())
-        .then(() => start(taskVersion))
-        .catch(onError);
+      if (fiber) {
+        void cancel().then(start).catch(onError);
+      } else {
+        start();
+      }
     },
 
-    cancelEffect,
-
-    async cancel(): Promise<void> {
-      await runPluginEffect(cancelEffect());
-    },
+    cancelEffect: (): Effect.Effect<void> => cancelEffect(),
+    cancel: (): Promise<void> => cancel(),
   };
 };

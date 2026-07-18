@@ -1,5 +1,6 @@
 import { describe, expect, it, rstest } from '@rstest/core';
 import type { ResultPromise } from 'execa';
+import { createPluginEffectRuntime } from '../src/effect-runtime';
 import {
   createReactRouterTypegenRunner,
   registerReactRouterTypegen,
@@ -54,6 +55,23 @@ describe('React Router typegen runner', () => {
 
     await runner.startWatch();
     expect(execa).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not launch a watch after close finishes during execa loading', async () => {
+    let resolveExeca!: (execa: ReturnType<typeof rstest.fn>) => void;
+    const execaLoaded = new Promise<ReturnType<typeof rstest.fn>>(resolve => {
+      resolveExeca = resolve;
+    });
+    const process = createProcess();
+    const execa = rstest.fn().mockReturnValue(process.process);
+    const runner = createReactRouterTypegenRunner(async () => execaLoaded);
+
+    const startWatch = runner.startWatch();
+    await runner.closeWatch();
+    resolveExeca(execa);
+    await startWatch;
+
+    expect(execa).not.toHaveBeenCalled();
   });
 
   it('runs one-shot build typegen through npx when no app directory is given', async () => {
@@ -111,6 +129,7 @@ describe('React Router typegen runner', () => {
       closeWatch: rstest.fn().mockResolvedValue(undefined),
       runBuild: rstest.fn().mockResolvedValue(undefined),
     };
+    const runtime = createPluginEffectRuntime();
     const api = {
       context: { action: 'dev' },
       logger: { warn: rstest.fn() },
@@ -122,7 +141,11 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, { runner, devWatchDelayMs: 0 });
+    await registerReactRouterTypegen(api as never, {
+      runtime,
+      runner,
+      devWatchDelayMs: 0,
+    });
 
     expect(api.onBeforeStartDevServer).not.toHaveBeenCalled();
     const result = afterDevCompile();
@@ -130,6 +153,7 @@ describe('React Router typegen runner', () => {
     afterDevCompile();
     expect(startWatch).not.toHaveBeenCalled();
     await expect.poll(() => startWatch.mock.calls.length).toBe(1);
+    await runtime.dispose();
   });
 
   it('defers the dev watch while compiles keep happening', async () => {
@@ -140,6 +164,7 @@ describe('React Router typegen runner', () => {
       closeWatch: rstest.fn().mockResolvedValue(undefined),
       runBuild: rstest.fn().mockResolvedValue(undefined),
     };
+    const runtime = createPluginEffectRuntime();
     const api = {
       context: { action: 'dev' },
       logger: { warn: rstest.fn() },
@@ -151,7 +176,11 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, { runner, devWatchDelayMs: 200 });
+    await registerReactRouterTypegen(api as never, {
+      runtime,
+      runner,
+      devWatchDelayMs: 200,
+    });
 
     // Compiles arriving faster than the idle delay keep pushing the start out.
     for (let i = 0; i < 4; i += 1) {
@@ -168,11 +197,11 @@ describe('React Router typegen runner', () => {
     afterDevCompile();
     await new Promise(resolve => setTimeout(resolve, 100));
     expect(startWatch).toHaveBeenCalledTimes(1);
+    await runtime.dispose();
   });
 
   it('cancels delayed dev watch startup on close', async () => {
     let afterDevCompile!: () => void;
-    let closeDevServer!: () => Promise<void>;
     const startWatch = rstest.fn().mockResolvedValue(undefined);
     const closeWatch = rstest.fn().mockResolvedValue(undefined);
     const runner: ReactRouterTypegenRunner = {
@@ -180,6 +209,7 @@ describe('React Router typegen runner', () => {
       closeWatch,
       runBuild: rstest.fn().mockResolvedValue(undefined),
     };
+    const runtime = createPluginEffectRuntime();
     const api = {
       context: { action: 'dev' },
       logger: { warn: rstest.fn() },
@@ -187,31 +217,52 @@ describe('React Router typegen runner', () => {
         afterDevCompile = callback;
       }),
       onBeforeStartDevServer: rstest.fn(),
-      onCloseDevServer: rstest.fn(callback => {
-        closeDevServer = callback;
-      }),
+      onCloseDevServer: rstest.fn(),
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, {
+    await registerReactRouterTypegen(api as never, {
+      runtime,
       runner,
       devWatchDelayMs: 1000,
     });
 
     afterDevCompile();
-    await closeDevServer();
+    await runtime.dispose();
     await new Promise(resolve => setTimeout(resolve, 20));
 
     expect(startWatch).not.toHaveBeenCalled();
     expect(closeWatch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not register the dev watch hook during production builds', () => {
+  it('surfaces typegen close failures during plugin disposal', async () => {
+    const runtime = createPluginEffectRuntime();
+    const runner: ReactRouterTypegenRunner = {
+      startWatch: rstest.fn().mockResolvedValue(undefined),
+      closeWatch: rstest.fn().mockRejectedValue(new Error('typegen close failed')),
+      runBuild: rstest.fn().mockResolvedValue(undefined),
+    };
+    const api = {
+      context: { action: 'dev' },
+      logger: { warn: rstest.fn() },
+      onAfterDevCompile: rstest.fn(),
+      onBeforeStartDevServer: rstest.fn(),
+      onCloseDevServer: rstest.fn(),
+      onBeforeBuild: rstest.fn(),
+    };
+
+    await registerReactRouterTypegen(api as never, { runtime, runner });
+
+    await expect(runtime.dispose()).rejects.toThrow('typegen close failed');
+  });
+
+  it('does not register the dev watch hook during production builds', async () => {
     const runner: ReactRouterTypegenRunner = {
       startWatch: rstest.fn().mockResolvedValue(undefined),
       closeWatch: rstest.fn().mockResolvedValue(undefined),
       runBuild: rstest.fn().mockResolvedValue(undefined),
     };
+    const runtime = createPluginEffectRuntime();
     const api = {
       context: { action: 'build' },
       logger: { warn: rstest.fn() },
@@ -221,9 +272,10 @@ describe('React Router typegen runner', () => {
       onBeforeBuild: rstest.fn(),
     };
 
-    registerReactRouterTypegen(api as never, { runner });
+    await registerReactRouterTypegen(api as never, { runtime, runner });
 
     expect(api.onAfterDevCompile).not.toHaveBeenCalled();
     expect(api.onBeforeBuild).toHaveBeenCalled();
+    await runtime.dispose();
   });
 });

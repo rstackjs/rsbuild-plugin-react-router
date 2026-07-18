@@ -8,15 +8,60 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it, rstest } from '@rstest/core';
+import { afterAll, describe, expect, it, rstest } from '@rstest/core';
+import { createPluginEffectRuntime } from '../src/effect-runtime';
 import {
+  acquireRouteTopologyWatcher,
   createRouteManifestSnapshot,
-  createRouteTopologyWatcher,
+  createRouteTopologyWatcher as createRouteTopologyWatcherWithRuntime,
   ensureDevRestartMarker,
   getRouteRestartMarkerPath,
+  type CreateRouteTopologyWatcherOptions,
 } from '../src/route-watch';
 
+const routeWatchRuntime = createPluginEffectRuntime();
+const createRouteTopologyWatcher = (
+  options: Omit<CreateRouteTopologyWatcherOptions, 'runtime'>
+) =>
+  createRouteTopologyWatcherWithRuntime({
+    runtime: routeWatchRuntime,
+    ...options,
+  });
+
+afterAll(() => routeWatchRuntime.dispose());
+
 describe('route watch restart marker', () => {
+  it('closes all route watchers when the plugin scope is disposed', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    const closeWatcher = rstest.fn();
+    const runtime = createPluginEffectRuntime();
+    mkdirSync(watchedDirectory, { recursive: true });
+
+    try {
+      await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          getRouteTopology: async () => new Set(['initial']),
+          onError: error => {
+            throw error;
+          },
+          watchDirectoryEntry: () => ({ close: closeWatcher }),
+        })
+      );
+
+      await runtime.dispose();
+
+      expect(closeWatcher).toHaveBeenCalledTimes(1);
+    } finally {
+      await runtime.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('allows a topology callback to await watcher shutdown', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
     const markerPath = join(root, 'build/.react-router-route-watch');
@@ -101,9 +146,10 @@ describe('route watch restart marker', () => {
       const closePromise = close();
       releaseRescan();
       await closePromise;
+      await close();
 
       expect(readFileSync(markerPath, 'utf8')).toBe(initialMarker);
-      expect(closeWatcher).toHaveBeenCalled();
+      expect(closeWatcher).toHaveBeenCalledTimes(1);
     } finally {
       releaseRescan();
       rmSync(root, { recursive: true, force: true });
