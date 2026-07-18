@@ -189,6 +189,7 @@ export const runDevServerBenchmark = async ({
   updateMarker,
   timeoutMs,
   captureOutput = true,
+  stopAfterReady = true,
 }) =>
   new Promise(resolve => {
     const startedAt = performance.now();
@@ -267,7 +268,12 @@ export const runDevServerBenchmark = async ({
     const waitForNextReady = baselineCounts =>
       new Promise((resolveReady, rejectReady) => {
         const check = () => {
-          if (settled || child.exitCode !== null) {
+          if (
+            settled ||
+            timedOut ||
+            child.exitCode !== null ||
+            child.signalCode !== null
+          ) {
             clearInterval(interval);
             rejectReady(
               new Error('Dev server exited before update rebuild completed.')
@@ -337,7 +343,9 @@ export const runDevServerBenchmark = async ({
         }
       }
 
-      stopChild();
+      if (stopAfterReady) {
+        stopChild();
+      }
     };
 
     const observe = stream => chunk => {
@@ -403,7 +411,11 @@ export const runDevServerBenchmark = async ({
     child.on('exit', (code, signal) => {
       if (ready) {
         readyTask?.then(
-          () => finish(statusAfterReady, signal),
+          () =>
+            finish(
+              stopping || code === null || code === 0 ? statusAfterReady : code,
+              signal
+            ),
           error => {
             appendError(error);
             finish(1, signal);

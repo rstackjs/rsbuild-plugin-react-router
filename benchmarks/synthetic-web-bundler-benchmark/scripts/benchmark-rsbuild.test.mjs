@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -184,8 +185,107 @@ test('runDevServerBenchmark stops a ready dev server successfully', async () => 
     });
 
     assert.equal(result.status, 0);
+    assert.equal(result.signal, 'SIGTERM');
     assert.equal(result.timedOut, false);
     assert.equal(typeof result.readyMs, 'number');
+  });
+});
+
+test('runDevServerBenchmark preserves successful cleanup when SIGTERM maps to a nonzero exit', async () => {
+  await withTempDir(async dir => {
+    const script = await writeChildScript(
+      dir,
+      [
+        "process.on('SIGTERM', () => process.exit(143));",
+        "console.log('ready built in 1.0s (web)');",
+        'setTimeout(() => {}, 10_000);',
+      ].join('\n')
+    );
+
+    const result = await runDevServerBenchmark({
+      command: process.execPath,
+      args: [script],
+      cwd: dir,
+      readyEnvironments: ['web'],
+      origin: 'http://127.0.0.1:1',
+      routeTimeoutMs: 100,
+      timeoutMs: 1_000,
+      captureOutput: false,
+    });
+
+    assert.equal(result.status, 0);
+    assert.equal(result.signal, null);
+  });
+});
+
+test('runDevServerBenchmark propagates a nonzero exit after readiness before cleanup', async () => {
+  await withTempDir(async dir => {
+    const script = await writeChildScript(
+      dir,
+      [
+        "console.log('ready built in 1.0s (web)');",
+        'setTimeout(() => process.exit(7), 50);',
+      ].join('\n')
+    );
+
+    const result = await runDevServerBenchmark({
+      command: process.execPath,
+      args: [script],
+      cwd: dir,
+      readyEnvironments: ['web'],
+      origin: 'http://127.0.0.1:1',
+      routeTimeoutMs: 100,
+      timeoutMs: 1_000,
+      stopAfterReady: false,
+      captureOutput: false,
+    });
+
+    assert.equal(result.status, 7);
+    assert.equal(result.signal, null);
+  });
+});
+
+test('runDevServerBenchmark settles a timed-out ready rebuild', async () => {
+  await withTempDir(async dir => {
+    const updateFile = join(dir, 'route.ts');
+    const source = 'export const value = 1;\n';
+    await writeFile(updateFile, source);
+    const script = await writeChildScript(
+      dir,
+      [
+        "console.log('ready built in 1.0s (web)');",
+        'setTimeout(() => {}, 10_000);',
+      ].join('\n')
+    );
+    const runner = [
+      "import { runDevServerBenchmark } from './scripts/benchmark/dev-server.mjs';",
+      `const result = await runDevServerBenchmark(${JSON.stringify({
+        command: process.execPath,
+        args: [script],
+        cwd: dir,
+        readyEnvironments: ['web'],
+        origin: 'http://127.0.0.1:1',
+        routeTimeoutMs: 100,
+        updateFile,
+        updateRoutePaths: [],
+        timeoutMs: 100,
+        captureOutput: false,
+      })});`,
+      'console.log(JSON.stringify(result));',
+    ].join('\n');
+
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '--eval', runner],
+      { cwd: process.cwd(), encoding: 'utf8', timeout: 2_000 }
+    );
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    const benchmark = JSON.parse(result.stdout);
+    assert.equal(benchmark.status, 1);
+    assert.equal(benchmark.timedOut, true);
+    assert.equal(await readFile(updateFile, 'utf8'), source);
   });
 });
 

@@ -84,7 +84,10 @@ const parseRunnerOptions = (argv: string[]) => {
   };
 };
 
-const run = async (argv: string[]) => {
+export const run = async (
+  argv: string[],
+  executeCase: typeof runBenchmarkCase = runBenchmarkCase
+) => {
   const { iterations, warmup, out, pluginRoot, selectedCases } =
     parseRunnerOptions(argv);
   const cases = [];
@@ -94,7 +97,7 @@ const run = async (argv: string[]) => {
     const samplesMs = [];
 
     for (let runIndex = 0; runIndex < warmup + iterations; runIndex += 1) {
-      const result = await runBenchmarkCase(definition, {
+      const result = await executeCase(definition, {
         pluginRoot,
         workRoot,
         port: 43000 + caseIndex * 100 + runIndex,

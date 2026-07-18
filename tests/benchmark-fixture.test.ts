@@ -864,6 +864,55 @@ describe('focused local benchmark cases', () => {
 });
 
 describe('focused local benchmark runner', () => {
+  it('writes measured samples after successful warmup runs', async () => {
+    const { run } = await import('../benchmarks/run.mts');
+    const root = mkdtempSync(join(process.cwd(), '.benchmark-runner-test-'));
+    const pluginRoot = join(root, 'plugin');
+    const out = join(root, 'local.json');
+    const samples = [99, 30, 10];
+    const ports: number[] = [];
+
+    try {
+      mkdirSync(pluginRoot, { recursive: true });
+      writeFileSync(out, 'previous result\n');
+
+      await run(
+        [
+          '--plugin-root',
+          pluginRoot,
+          '--out',
+          out,
+          '--case',
+          'build-256-ssr',
+          '--iterations',
+          '2',
+          '--warmup',
+          '1',
+        ],
+        async (_definition, options) => {
+          ports.push(options.port ?? 0);
+          expect(readFileSync(out, 'utf8')).toBe('previous result\n');
+          return { wallMs: samples[ports.length - 1] };
+        }
+      );
+
+      expect(ports).toEqual([43000, 43001, 43002]);
+      expect(JSON.parse(readFileSync(out, 'utf8'))).toEqual({
+        version: 1,
+        pluginRoot,
+        cases: [
+          {
+            id: 'build-256-ssr',
+            samplesMs: [30, 10],
+            medianMs: 20,
+          },
+        ],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects invalid iteration counts before starting benchmarks', () => {
     const result = spawnSync(
       process.execPath,
