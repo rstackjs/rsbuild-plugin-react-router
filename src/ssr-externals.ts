@@ -41,19 +41,8 @@ function isPathInNodeModules(pathname: string): boolean {
 }
 
 export function getSsrExternals(rootDirectory: string): string[] {
-  const externals: string[] = [];
-
-  for (const name of REACT_ROUTER_EXTERNALS) {
+  return REACT_ROUTER_EXTERNALS.filter(name => {
     const resolved = resolvePackageJson(name, rootDirectory);
-    if (!resolved) {
-      continue;
-    }
-
-    const realPath = safeRealpath(resolved);
-    if (!isPathInNodeModules(realPath)) {
-      externals.push(name);
-    }
-  }
-
-  return externals;
+    return resolved !== null && !isPathInNodeModules(safeRealpath(resolved));
+  });
 }

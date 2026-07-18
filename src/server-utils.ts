@@ -33,7 +33,13 @@ interface ServerBuildOptions {
     | undefined;
 }
 
-function generateStaticTemplate(
+/**
+ * Generates the server build module content
+ * @param routes The route manifest
+ * @param options Build options
+ * @returns The generated module content as a string
+ */
+export function generateServerBuild(
   routes: Record<string, Route>,
   options: ServerBuildOptions
 ): string {
@@ -82,19 +88,6 @@ function generateStaticTemplate(
   `;
 }
 
-/**
- * Generates the server build module content
- * @param routes The route manifest
- * @param options Build options
- * @returns The generated module content as a string
- */
-function generateServerBuild(
-  routes: Record<string, Route>,
-  options: ServerBuildOptions
-): string {
-  return generateStaticTemplate(routes, options);
-}
-
 export { resolveServerBuildModule };
 
 export function resolveReactRouterServerBuild(
@@ -102,5 +95,3 @@ export function resolveReactRouterServerBuild(
 ): Promise<ServerBuild> {
   return resolveServerBuildModule(buildModule, 'Imported module');
 }
-
-export { generateServerBuild };
