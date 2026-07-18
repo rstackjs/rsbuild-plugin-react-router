@@ -6,7 +6,7 @@ export default defineConfig({
       module: {
         rules: [
           {
-            test: /parallel-route-transforms\.test\.ts$/,
+            test: /(?:effect-runtime|parallel-route-transforms)\.test\.ts$/,
             parser: { url: false },
           },
         ],

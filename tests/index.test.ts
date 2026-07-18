@@ -59,6 +59,32 @@ const captureEnv = (keys: string[]) => {
 };
 
 describe('pluginReactRouter', () => {
+  it('shares one Effect runtime and closes it from every Rsbuild shutdown path', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    await rsbuild.unwrapConfig();
+
+    expect(rsbuild.shutdownHooks.onCloseBuild).toHaveLength(1);
+    expect(rsbuild.shutdownHooks.onExit).toHaveLength(1);
+    expect(rsbuild.shutdownHooks.onCloseBuild[0]).toBe(
+      rsbuild.shutdownHooks.onCloseDevServer[0]
+    );
+    expect(rsbuild.shutdownHooks.onCloseBuild[0]).toBe(
+      rsbuild.shutdownHooks.onExit[0]
+    );
+
+    await Promise.all(
+      ['onCloseBuild', 'onCloseDevServer', 'onExit'].map(
+        rsbuild.runShutdownHook
+      )
+    );
+
+    expect(rsbuild.logger.error).not.toHaveBeenCalled();
+  });
+
   it('should configure basic plugin options', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},

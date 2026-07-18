@@ -95,6 +95,12 @@ const deepMerge = (base: any, overrides: any): any => {
   return result;
 };
 
+type ShutdownHookName = 'onCloseBuild' | 'onCloseDevServer' | 'onExit';
+type ShutdownCallback = () => unknown;
+type ShutdownHookRegistration =
+  | ShutdownCallback
+  | { handler: ShutdownCallback };
+
 // Mock the @scripts/test-helper module
 rstest.mock('@scripts/test-helper', () => ({
   createStubRsbuild: rstest.fn().mockImplementation(async ({ action = 'dev', rsbuildConfig = {} } = {}) => {
@@ -149,6 +155,20 @@ rstest.mock('@scripts/test-helper', () => ({
 
     const mergeRsbuildConfig = (a: any, b: any) => deepMerge(a, b);
     const pending: Promise<unknown>[] = [];
+    const shutdownHooks: Record<ShutdownHookName, ShutdownCallback[]> = {
+      onCloseBuild: [],
+      onCloseDevServer: [],
+      onExit: [],
+    };
+    const registerShutdownHook = (hookName: ShutdownHookName) => (
+      registration: ShutdownHookRegistration
+    ): void => {
+      const callback =
+        typeof registration === 'function'
+          ? registration
+          : registration.handler;
+      shutdownHooks[hookName].push(callback);
+    };
 
     const stub: any = {
       addPlugins: rstest.fn(),
@@ -156,8 +176,9 @@ rstest.mock('@scripts/test-helper', () => ({
       processAssets: rstest.fn(),
       onBeforeStartDevServer: rstest.fn(),
       onAfterStartDevServer: rstest.fn(),
-      onCloseDevServer: rstest.fn(),
-      onCloseBuild: rstest.fn(),
+      onCloseDevServer: rstest.fn(registerShutdownHook('onCloseDevServer')),
+      onCloseBuild: rstest.fn(registerShutdownHook('onCloseBuild')),
+      onExit: rstest.fn(registerShutdownHook('onExit')),
       onBeforeBuild: rstest.fn(),
       onAfterBuild: rstest.fn(),
       onBeforeDevCompile: rstest.fn(),
@@ -189,6 +210,12 @@ rstest.mock('@scripts/test-helper', () => ({
             RawSource: mockRawSource,
           },
         },
+      },
+      shutdownHooks,
+      runShutdownHook: async (hookName: ShutdownHookName): Promise<void> => {
+        await Promise.all(
+          shutdownHooks[hookName].map(callback => callback())
+        );
       },
     };
 

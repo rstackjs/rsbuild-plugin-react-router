@@ -59,7 +59,10 @@ import {
   isRspackSwcReactRefreshEnabled,
   resolveReactRefreshRuntimePath,
 } from './dev-hmr.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import {
+  createPluginEffectRuntime,
+  tryPluginPromise,
+} from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import {
   createConfigImporter,
@@ -78,6 +81,10 @@ import {
   setupReactRouterRscPlugin,
 } from './rsc-support.js';
 import { createReactRouterModePlan } from './mode-plan.js';
+import {
+  acquireRouteTransformExecutor,
+  shouldParallelizeRouteTransforms,
+} from './parallel-route-transforms.js';
 import { createQuerylessRouteImportPlugin } from './route-imports.js';
 
 export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
@@ -113,6 +120,13 @@ export const pluginReactRouter = (
   name: PLUGIN_NAME,
 
   async setup(api) {
+    const effectRuntime = createPluginEffectRuntime();
+    const disposeEffectRuntime = (): Promise<void> => effectRuntime.dispose();
+
+    api.onCloseBuild(disposeEffectRuntime);
+    api.onCloseDevServer(disposeEffectRuntime);
+    api.onExit(disposeEffectRuntime);
+
     const defaultOptions = {
       customServer: false,
       lazyCompilation: true,
@@ -539,6 +553,19 @@ export const pluginReactRouter = (
               : undefined,
         }));
 
+    if (modePlan.kind === 'classic') {
+      modePlan.routeTransformExecutor = await effectRuntime.runPromise(
+        acquireRouteTransformExecutor({
+          parallelRouteTransform:
+            pluginOptions.parallelRouteTransform ??
+            shouldParallelizeRouteTransforms(routeCount),
+          routeChunkCache,
+          splitRouteModules: Boolean(splitRouteModules),
+          isBuild,
+        })
+      );
+    }
+
     const { manifestChunkNames } = modePlan;
 
     let sendRscDevUpdate: (() => void) | undefined;
@@ -682,7 +709,7 @@ export const pluginReactRouter = (
 
     if (modePlan.kind === 'classic') {
       api.onAfterBuild(({ environments }) =>
-        runPluginEffect(
+        effectRuntime.runPromise(
           tryPluginPromise(() =>
             runReactRouterPrerenderBuild({
               api,
@@ -713,7 +740,7 @@ export const pluginReactRouter = (
       );
     } else {
       api.onAfterBuild(({ environments }) =>
-        runPluginEffect(
+        effectRuntime.runPromise(
           tryPluginPromise(() =>
             runReactRouterRscPrerenderBuild({
               api,

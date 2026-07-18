@@ -233,20 +233,12 @@ export const registerReactRouterDevBackgroundResources = ({
     );
   };
 
-  const closeRouteTransformExecutor = (): Promise<void> =>
-    routeTransformExecutor?.close() ?? Promise.resolve();
-
   api.onCloseDevServer(() =>
     closeAll(
       '[rsbuild-plugin-react-router] Failed to close dev server resources.',
-      [
-        closeRouteTopologyWatcher,
-        closeLazyCompilationPrewarm,
-        closeRouteTransformExecutor,
-      ]
+      [closeRouteTopologyWatcher, closeLazyCompilationPrewarm]
     )
   );
-  api.onCloseBuild(closeRouteTransformExecutor);
 
   return {
     setManifest(manifest) {
