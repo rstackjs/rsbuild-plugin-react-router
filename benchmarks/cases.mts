@@ -84,7 +84,6 @@ export const runBenchmarkCase = async (
     const fixture = await generateSyntheticFixture({
       root: fixtureRoot,
       routeCount: definition.routeCount,
-      variant: 'ssr-esm',
       pluginImportPath,
     });
     await cleanBuildOutputs(fixtureRoot);

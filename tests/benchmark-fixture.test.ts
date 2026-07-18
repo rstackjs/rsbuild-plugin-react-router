@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from '@rstest/core';
 
 describe('benchmark fixture generator', () => {
-  it('creates a deterministic synthetic React Router app', async () => {
+  it('creates the default focused SSR fixture', async () => {
     const { generateSyntheticFixture } = await import(
       '../scripts/benchmark/fixture.mts'
     );
@@ -23,14 +23,12 @@ describe('benchmark fixture generator', () => {
       const result = await generateSyntheticFixture({
         root,
         routeCount: 8,
-        variant: 'ssr-esm-split',
-        sourceMap: true,
       });
 
-      expect(result.routeCount).toBe(8);
-      expect(result.variant).toBe('ssr-esm-split');
-      expect(result.updateFile).toBe(join(root, 'app/routes/route-0001.tsx'));
-      expect(result.updateRoutePaths).toEqual(['/']);
+      expect(result).toEqual({
+        updateFile: join(root, 'app/routes/route-0001.tsx'),
+        updateRoutePaths: ['/'],
+      });
       expect(existsSync(join(root, 'app/routes.ts'))).toBe(true);
       expect(existsSync(join(root, 'rsbuild.config.mjs'))).toBe(true);
 
@@ -55,17 +53,17 @@ describe('benchmark fixture generator', () => {
       expect(rsbuildConfig.indexOf('pluginReact(),')).toBeLessThan(
         rsbuildConfig.indexOf('pluginReactRouter({')
       );
+      expect(rsbuildConfig).toContain("serverOutput: 'module'");
       expect(rsbuildConfig).toContain('logPerformance');
-      expect(rsbuildConfig).toContain(
-        "sourceMap: { js: 'cheap-module-source-map', css: false }"
-      );
+      expect(rsbuildConfig).toContain('sourceMap: false');
       expect(rsbuildConfig).not.toContain('parallelRouteTransform:');
 
       const reactRouterConfig = readFileSync(
         join(root, 'react-router.config.ts'),
         'utf8'
       );
-      expect(reactRouterConfig).toContain('splitRouteModules: true');
+      expect(reactRouterConfig).toContain('ssr: true');
+      expect(reactRouterConfig).toContain('splitRouteModules: false');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -81,7 +79,6 @@ describe('benchmark fixture generator', () => {
       await generateSyntheticFixture({
         root,
         routeCount: 1,
-        variant: 'ssr-esm',
         pluginImportPath: 'file:///repo/dist/index.js',
       });
 
@@ -90,50 +87,6 @@ describe('benchmark fixture generator', () => {
         "import { pluginReactRouter } from 'file:///repo/dist/index.js';"
       );
       expect(rsbuildConfig).toContain("serverOutput: 'module'");
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('can enable parallel route transforms in benchmark config', async () => {
-    const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mts'
-    );
-    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
-
-    try {
-      const result = await generateSyntheticFixture({
-        root,
-        routeCount: 1,
-        variant: 'ssr-esm',
-        parallelRouteTransform: 3,
-      });
-
-      const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
-      expect(result.parallelRouteTransform).toBe(3);
-      expect(rsbuildConfig).toContain('parallelRouteTransform: 3,');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('can explicitly disable parallel route transforms in benchmark config', async () => {
-    const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mts'
-    );
-    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
-
-    try {
-      const result = await generateSyntheticFixture({
-        root,
-        routeCount: 1,
-        variant: 'ssr-esm',
-        parallelRouteTransform: false,
-      });
-
-      const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
-      expect(result.parallelRouteTransform).toBe(false);
-      expect(rsbuildConfig).toContain('parallelRouteTransform: false,');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -149,7 +102,6 @@ describe('benchmark fixture generator', () => {
       await generateSyntheticFixture({
         root,
         routeCount: 1,
-        variant: 'ssr-esm',
       });
 
       const rsbuildConfig = readFileSync(join(root, 'rsbuild.config.mjs'), 'utf8');
@@ -163,204 +115,6 @@ describe('benchmark fixture generator', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
-  it('omits server-only route exports from SPA benchmark fixtures', async () => {
-    const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mts'
-    );
-    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-'));
-
-    try {
-      await generateSyntheticFixture({
-        root,
-        routeCount: 8,
-        variant: 'spa',
-      });
-
-      const rootModule = readFileSync(join(root, 'app/root.tsx'), 'utf8');
-      expect(rootModule).toContain('Scripts');
-
-      for (let index = 1; index <= 8; index += 1) {
-        const routeModule = readFileSync(
-          join(root, `app/routes/route-${String(index).padStart(4, '0')}.tsx`),
-          'utf8'
-        );
-        expect(routeModule).not.toContain('function loader');
-        expect(routeModule).not.toContain('function action');
-        expect(routeModule).not.toContain('function headers');
-        expect(routeModule).not.toContain('HydrateFallback');
-        expect(routeModule).not.toContain('server-data.server');
-      }
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('generates deterministic named stress fixture shapes', async () => {
-    const { benchmarkFixtureNames, generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mts'
-    );
-    expect(benchmarkFixtureNames).toEqual([
-      'default',
-      'export-heavy',
-      'reexports',
-      'import-fanout',
-      'chunk-saturated',
-      'large',
-    ]);
-
-    const expectations = [
-      {
-        fixture: 'export-heavy',
-        routeFile: 'app/routes/route-0001.tsx',
-        snippets: ['unusedExport0001_31', 'export async function clientLoader'],
-      },
-      {
-        fixture: 'reexports',
-        routeFile: 'app/routes/route-0001.tsx',
-        snippets: [
-          "export * from '../route-reexports/reexport-all-0001'",
-          'app/route-reexports/reexport-0001.ts',
-        ],
-      },
-      {
-        fixture: 'import-fanout',
-        routeFile: 'app/routes/route-0001.tsx',
-        snippets: ["from '../fanout/fanout-15'", 'fanoutValues'],
-      },
-      {
-        fixture: 'chunk-saturated',
-        routeFile: 'app/routes/route-0001.tsx',
-        snippets: ['export async function clientAction', 'HydrateFallback'],
-      },
-    ];
-
-    for (const { fixture, routeFile, snippets } of expectations) {
-      const rootA = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-a-'));
-      const rootB = mkdtempSync(join(tmpdir(), 'rr-benchmark-fixture-b-'));
-
-      try {
-        const result = await generateSyntheticFixture({
-          root: rootA,
-          routeCount: 4,
-          variant: 'ssr-esm-split',
-          fixture,
-        });
-        await generateSyntheticFixture({
-          root: rootB,
-          routeCount: 4,
-          variant: 'ssr-esm-split',
-          fixture,
-        });
-
-        expect(result.fixture).toBe(fixture);
-        const routeModuleA = readFileSync(join(rootA, routeFile), 'utf8');
-        const routeModuleB = readFileSync(join(rootB, routeFile), 'utf8');
-        expect(routeModuleA).toBe(routeModuleB);
-
-        for (const snippet of snippets) {
-          if (snippet.startsWith('app/')) {
-            expect(existsSync(join(rootA, snippet))).toBe(true);
-          } else {
-            expect(routeModuleA).toContain(snippet);
-          }
-        }
-      } finally {
-        rmSync(rootA, { recursive: true, force: true });
-        rmSync(rootB, { recursive: true, force: true });
-      }
-    }
-  });
-
-  it('generates the large synthetic app shape and statistics', async () => {
-    const { generateSyntheticFixture } = await import(
-      '../scripts/benchmark/fixture.mts'
-    );
-    const root = mkdtempSync(join(tmpdir(), 'rr-benchmark-large-'));
-
-    try {
-      const result = await generateSyntheticFixture({
-        root,
-        routeCount: 2,
-        variant: 'ssr-esm',
-        fixture: 'large',
-        largeConfig: {
-          routes: 2,
-          componentsPerRoute: 2,
-          utilitiesPerRoute: 1,
-          lazyModulesPerRoute: 1,
-          workers: 2,
-          restrictedModules: 2,
-          svgAssets: 2,
-          cssModules: 2,
-          localeFiles: 2,
-          localeTotalBytes: 2048,
-          payloadEntriesPerComponent: 4,
-          reactCompilerEvery: 2,
-          secretEvery: 2,
-          restrictedImportEvery: 2,
-        },
-      });
-
-      expect(result.fixture).toBe('large');
-      expect(result.routeCount).toBe(2);
-      expect(result.updateFile).toBe(
-        join(root, 'app/generated/routes/route-0000.tsx')
-      );
-      expect(result.updateRoutePaths).toEqual(['/']);
-      expect(result.stats).toEqual({
-        codeModules: 19,
-        dynamicImports: 2,
-        routes: 2,
-        components: 4,
-        utilities: 2,
-        lazyModules: 2,
-        workers: 2,
-        restrictedModules: 2,
-        svgAssets: 2,
-        cssModules: 2,
-        localeFiles: 2,
-        localeTotalBytes: 2048,
-      });
-      expect(existsSync(join(root, 'app/generated/route-config.ts'))).toBe(
-        true
-      );
-      expect(
-        existsSync(join(root, 'app/generated/routes/route-0000.tsx'))
-      ).toBe(true);
-      expect(
-        existsSync(
-          join(root, 'app/generated/features/feature-0000/components/card-00.tsx')
-        )
-      ).toBe(true);
-      expect(
-        existsSync(join(root, 'app/generated/features/feature-0001/lazy/lazy-00.tsx'))
-      ).toBe(true);
-      expect(
-        existsSync(join(root, 'app/generated/styles/style-0000.module.css'))
-      ).toBe(true);
-      expect(
-        existsSync(join(root, 'public/generated/locales/synthetic-0001.json'))
-      ).toBe(true);
-
-      const routeModule = readFileSync(
-        join(root, 'app/generated/routes/route-0000.tsx'),
-        'utf8'
-      );
-      expect(routeModule).toContain(
-        "import { FeatureShell0000 } from '../features/feature-0000/shell';"
-      );
-      expect(routeModule).toContain(
-        "import('../features/feature-0000/lazy/lazy-00')"
-      );
-      expect(routeModule).toContain(
-        "new Worker(new URL('../workers/worker-0000.ts', import.meta.url)"
-      );
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
 });
 
 describe('focused local benchmark cases', () => {
