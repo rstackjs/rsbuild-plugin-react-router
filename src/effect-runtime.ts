@@ -11,16 +11,11 @@ import * as ManagedRuntime from 'effect/ManagedRuntime';
 import * as Option from 'effect/Option';
 import * as Scope from 'effect/Scope';
 
-interface PluginFibers {
-  readonly _: unique symbol;
-}
+const PluginFibers = Context.GenericTag<FiberSet.FiberSet>(
+  'rsbuild-plugin-react-router/PluginFibers'
+);
 
-const PluginFibers: Context.Tag<PluginFibers, FiberSet.FiberSet> =
-  Context.GenericTag<PluginFibers, FiberSet.FiberSet>(
-    'rsbuild-plugin-react-router/PluginFibers'
-  );
-
-type PluginRuntimeContext = Scope.Scope | PluginFibers;
+type PluginRuntimeContext = Scope.Scope | FiberSet.FiberSet;
 
 const PluginRuntimeLive = Layer.scopedContext(
   Effect.gen(function* () {
@@ -155,7 +150,7 @@ export const createDelayedPluginTask = ({
 
   return {
     schedule: start,
-    reschedule: reschedule,
-    cancelEffect: cancelEffect,
+    reschedule,
+    cancelEffect,
   };
 };
