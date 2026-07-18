@@ -326,7 +326,7 @@ const createRouteTopologyWatcher = async ({
         watcher.close();
       }
       directoryWatchers.clear();
-    }).pipe(Effect.zipRight(rescanTask.cancelEffect()));
+    }).pipe(Effect.ensuring(rescanTask.cancelEffect()));
 
   const close = () => runtime.runPromise(closeEffect());
   return Object.assign(close, { closeEffect });

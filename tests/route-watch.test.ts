@@ -9,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it, rstest } from '@rstest/core';
+import * as Option from 'effect/Option';
 import { createPluginEffectRuntime } from '../src/effect-runtime';
 import {
   acquireRouteTopologyWatcher,
@@ -185,6 +186,57 @@ describe('route watch restart marker', () => {
       triggerChange();
 
       expect(runFork).not.toHaveBeenCalled();
+    } finally {
+      await runtime.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('finalizes a pending rescan when watcher close fails', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    const runtime = createPluginEffectRuntime();
+    const closeError = new Error('watcher close failed');
+    const runFork = runtime.runFork;
+    let rescanFiber: ReturnType<typeof runtime.runFork> | undefined;
+    let triggerChange!: () => void;
+    rstest.spyOn(runtime, 'runFork').mockImplementation((effect, options) => {
+      const fiber = runFork(effect, options);
+      rescanFiber = fiber;
+      return fiber;
+    });
+    mkdirSync(watchedDirectory, { recursive: true });
+
+    try {
+      const close = await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          getRouteTopology: async () => new Set(['initial']),
+          onError: () => {},
+          watchDirectoryEntry: (_directory, onChange) => {
+            triggerChange = onChange;
+            return {
+              close: () => {
+                throw closeError;
+              },
+            };
+          },
+        })
+      );
+
+      triggerChange();
+      if (!rescanFiber) {
+        throw new Error('Expected route watcher rescan to be scheduled.');
+      }
+      const fiber = rescanFiber;
+      expect(Option.isNone(await runtime.runPromise(fiber.poll))).toBe(true);
+
+      await expect(close()).rejects.toThrow(closeError.message);
+
+      expect(Option.isSome(await runtime.runPromise(fiber.poll))).toBe(true);
     } finally {
       await runtime.dispose();
       rmSync(root, { recursive: true, force: true });
