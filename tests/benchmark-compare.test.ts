@@ -7,6 +7,7 @@ import {
   compareBenchmarkResults,
   renderBenchmarkComment,
 } from '../scripts/benchmark/compare-model.mts';
+import { findBenchmarkComment } from '../scripts/benchmark/comment.mts';
 
 type BenchmarkCaseResult = {
   id: string;
@@ -189,5 +190,35 @@ describe('benchmark comparison CLI', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('benchmark pull-request comments', () => {
+  it('selects the newest comment with the benchmark marker', () => {
+    const olderComment = {
+      id: 101,
+      body: '<!-- react-router-benchmark-ci -->\nOlder report',
+    };
+    const newestComment = {
+      id: 303,
+      body: '<!-- react-router-benchmark-ci -->\nNewest report',
+    };
+
+    expect(
+      findBenchmarkComment([
+        olderComment,
+        { id: 202, body: 'Unrelated comment' },
+        newestComment,
+      ])
+    ).toBe(newestComment);
+  });
+
+  it('returns null when no comment has the benchmark marker', () => {
+    expect(
+      findBenchmarkComment([
+        { id: 101, body: 'First comment' },
+        { id: 202, body: null },
+      ])
+    ).toBeNull();
   });
 });
