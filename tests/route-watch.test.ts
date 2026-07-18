@@ -117,6 +117,7 @@ describe('route watch restart marker', () => {
     });
     let triggerChange!: () => void;
     const closeWatcher = rstest.fn();
+    const runFork = rstest.spyOn(routeWatchRuntime, 'runFork');
 
     try {
       const close = await createRouteTopologyWatcher({
@@ -146,48 +147,15 @@ describe('route watch restart marker', () => {
       releaseRescan();
       await closePromise;
       await close();
-
-      expect(readFileSync(markerPath, 'utf8')).toBe(initialMarker);
-      expect(closeWatcher).toHaveBeenCalledTimes(1);
-    } finally {
-      releaseRescan();
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('does not schedule a rescan from a retained directory callback after close', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
-    const markerPath = join(root, 'build/.react-router-route-watch');
-    const watchedDirectory = join(root, 'app');
-    const runtime = createPluginEffectRuntime();
-    let triggerChange!: () => void;
-    const runFork = rstest.spyOn(runtime, 'runFork');
-    mkdirSync(watchedDirectory, { recursive: true });
-
-    try {
-      const close = await runtime.runPromise(
-        acquireRouteTopologyWatcher({
-          runtime,
-          watchDirectory: watchedDirectory,
-          restartMarkerPath: markerPath,
-          getRouteTopology: async () => new Set(['initial']),
-          onError: error => {
-            throw error;
-          },
-          watchDirectoryEntry: (_directory, onChange) => {
-            triggerChange = onChange;
-            return { close: () => {} };
-          },
-        })
-      );
-
-      await close();
       runFork.mockClear();
       triggerChange();
 
+      expect(readFileSync(markerPath, 'utf8')).toBe(initialMarker);
+      expect(closeWatcher).toHaveBeenCalledTimes(1);
       expect(runFork).not.toHaveBeenCalled();
     } finally {
-      await runtime.dispose();
+      runFork.mockRestore();
+      releaseRescan();
       rmSync(root, { recursive: true, force: true });
     }
   });

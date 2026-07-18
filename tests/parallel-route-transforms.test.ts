@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import { getExportNames } from '../src/export-utils';
 import {
@@ -134,9 +135,9 @@ const resolveWorkerMessage = (
 };
 
 describe('parallel route transforms', () => {
-  it('keeps the worker entrypoint Effect-free', async () => {
-    const source = await readFile(
-      new URL('../src/parallel-route-transform-worker.ts', import.meta.url),
+  it('keeps the worker entrypoint Effect-free', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/parallel-route-transform-worker.ts'),
       'utf8'
     );
 

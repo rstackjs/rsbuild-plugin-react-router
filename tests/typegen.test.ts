@@ -212,27 +212,7 @@ describe('React Router typegen runner', () => {
     await harness.runtime.dispose();
   });
 
-  it('cancels delayed dev watch startup on close', async () => {
-    const closeWatch = rstest.fn().mockResolvedValue(undefined);
-    const harness = createTypegenRegistrationHarness({
-      runner: { closeWatch },
-    });
-
-    await registerReactRouterTypegen(harness.api as never, {
-      runtime: harness.runtime,
-      runner: harness.runner,
-      devWatchDelayMs: 1000,
-    });
-
-    harness.afterDevCompile();
-    await harness.runtime.dispose();
-    await new Promise(resolve => setTimeout(resolve, 20));
-
-    expect(harness.startWatch).not.toHaveBeenCalled();
-    expect(closeWatch).toHaveBeenCalledTimes(1);
-  });
-
-  it('surfaces typegen close failures during plugin disposal', async () => {
+  it('cancels delayed startup and surfaces close failures during disposal', async () => {
     const closeWatch = rstest
       .fn()
       .mockRejectedValue(new Error('typegen close failed'));
@@ -243,9 +223,15 @@ describe('React Router typegen runner', () => {
     await registerReactRouterTypegen(harness.api as never, {
       runtime: harness.runtime,
       runner: harness.runner,
+      devWatchDelayMs: 25,
     });
 
+    harness.afterDevCompile();
     await expect(harness.runtime.dispose()).rejects.toThrow('typegen close failed');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(harness.startWatch).not.toHaveBeenCalled();
+    expect(closeWatch).toHaveBeenCalledTimes(1);
   });
 
   it('does not register the dev watch hook during production builds', async () => {
