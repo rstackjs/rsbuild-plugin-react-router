@@ -28,21 +28,14 @@ export function resolvePackageJson(
   }
 }
 
-function safeRealpath(pathname: string): string {
-  try {
-    return realpathSync(pathname);
-  } catch {
-    return pathname;
-  }
-}
-
-function isPathInNodeModules(pathname: string): boolean {
-  return pathname.split(sep).includes('node_modules');
-}
-
 export function getSsrExternals(rootDirectory: string): string[] {
   return REACT_ROUTER_EXTERNALS.filter(name => {
     const resolved = resolvePackageJson(name, rootDirectory);
-    return resolved !== null && !isPathInNodeModules(safeRealpath(resolved));
+    if (resolved === null) return false;
+    let packageJsonPath = resolved;
+    try {
+      packageJsonPath = realpathSync(packageJsonPath);
+    } catch {}
+    return !packageJsonPath.split(sep).includes('node_modules');
   });
 }
