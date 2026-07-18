@@ -2,12 +2,12 @@ import { watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { RsbuildConfig } from '@rsbuild/core';
 import * as Effect from 'effect/Effect';
+import type * as Scope from 'effect/Scope';
 import { dirname, resolve } from 'pathe';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import {
   createDelayedPluginTask,
   type PluginEffectRuntime,
-  PluginScope,
   tryPluginPromise,
 } from './effect-runtime.js';
 import type { Route } from './types.js';
@@ -334,15 +334,13 @@ const createRouteTopologyWatcher = async ({
 
 export const acquireRouteTopologyWatcher = (
   options: CreateRouteTopologyWatcherOptions
-): Effect.Effect<() => Promise<void>, Error, PluginScope> =>
-  Effect.flatMap(PluginScope, pluginScope =>
-    pluginScope.acquire(
-      tryPluginPromise(() => createRouteTopologyWatcher(options)),
-      close =>
-        close
-          .closeEffect()
-          .pipe(
-            Effect.catchAll(error => Effect.sync(() => options.onError(error)))
-          )
-    )
+): Effect.Effect<() => Promise<void>, Error, Scope.Scope> =>
+  Effect.acquireRelease(
+    tryPluginPromise(() => createRouteTopologyWatcher(options)),
+    close =>
+      close
+        .closeEffect()
+        .pipe(
+          Effect.catchAll(error => Effect.sync(() => options.onError(error)))
+        )
   );

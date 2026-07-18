@@ -1,10 +1,10 @@
 import { Worker } from 'node:worker_threads';
 import * as Effect from 'effect/Effect';
+import type * as Scope from 'effect/Scope';
 import { setBoundedCacheEntry } from './bounded-cache.js';
 import { getAvailableCpuCount, getDefaultConcurrency } from './concurrency.js';
 import {
   normalizeEffectError,
-  PluginScope,
   tryPluginPromise,
 } from './effect-runtime.js';
 import {
@@ -456,8 +456,7 @@ const acquireRouteTransformExecutorWithWorkerFactory = Effect.fn(
   options: RouteTransformExecutorOptions,
   createWorker: RouteTransformWorkerFactory
 ) {
-  const pluginScope = yield* PluginScope;
-  return yield* pluginScope.acquire(
+  return yield* Effect.acquireRelease(
     Effect.sync(() =>
       createRouteTransformExecutorWithWorkerFactory(options, createWorker)
     ),
@@ -470,11 +469,11 @@ const acquireRouteTransformExecutorWithWorkerFactory = Effect.fn(
 
 export const acquireRouteTransformExecutor = (
   options: RouteTransformExecutorOptions = {}
-): Effect.Effect<RouteTransformExecutor, Error, PluginScope> =>
+): Effect.Effect<RouteTransformExecutor, Error, Scope.Scope> =>
   acquireRouteTransformExecutorWithWorkerFactory(options, createDefaultWorker);
 
 export const acquireRouteTransformExecutorForTesting = (
   options: RouteTransformExecutorOptions,
   createWorker: RouteTransformWorkerFactory
-): Effect.Effect<RouteTransformExecutor, Error, PluginScope> =>
+): Effect.Effect<RouteTransformExecutor, Error, Scope.Scope> =>
   acquireRouteTransformExecutorWithWorkerFactory(options, createWorker);

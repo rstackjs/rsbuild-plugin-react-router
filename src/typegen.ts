@@ -6,7 +6,6 @@ import * as Effect from 'effect/Effect';
 import {
   createDelayedPluginTask,
   type PluginEffectRuntime,
-  PluginScope,
   tryPluginPromise,
 } from './effect-runtime.js';
 import { resolvePackageJson } from './ssr-externals.js';
@@ -181,9 +180,7 @@ export const registerReactRouterTypegen = async (
           )
         );
     await runtime.runPromise(
-      Effect.flatMap(PluginScope, pluginScope =>
-        pluginScope.acquire(Effect.void, closeWatchEffect)
-      )
+      Effect.acquireRelease(Effect.void, closeWatchEffect)
     );
     // Reschedule on every compile so the typegen watch only starts after a
     // quiet period with no compiles. Starting it during the initial compile

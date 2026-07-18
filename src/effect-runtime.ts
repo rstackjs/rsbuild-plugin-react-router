@@ -11,44 +11,37 @@ import * as ManagedRuntime from 'effect/ManagedRuntime';
 import * as Option from 'effect/Option';
 import * as Scope from 'effect/Scope';
 
-type Acquire = <A, E, R, R2>(
-  acquire: Effect.Effect<A, E, R>,
-  release: (resource: A) => Effect.Effect<void, never, R2>
-) => Effect.Effect<A, E, R | R2>;
-
-export interface PluginScope {
-  readonly acquire: Acquire;
-  readonly fibers: FiberSet.FiberSet;
+interface PluginFibers {
+  readonly _: unique symbol;
 }
 
-export const PluginScope: Context.Tag<PluginScope, PluginScope> =
-  Context.GenericTag<PluginScope>('rsbuild-plugin-react-router/PluginScope');
+const PluginFibers: Context.Tag<PluginFibers, FiberSet.FiberSet> =
+  Context.GenericTag<PluginFibers, FiberSet.FiberSet>(
+    'rsbuild-plugin-react-router/PluginFibers'
+  );
 
-const PluginScopeLive = Layer.scoped(
-  PluginScope,
+type PluginRuntimeContext = Scope.Scope | PluginFibers;
+
+const PluginRuntimeLive = Layer.scopedContext(
   Effect.gen(function* () {
     const scope = yield* Effect.scope;
     const resources = yield* Scope.fork(scope, ExecutionStrategy.sequential);
     const fibers = yield* FiberSet.make();
-    return {
-      acquire: (acquire, release) =>
-        Effect.acquireRelease(acquire, release).pipe(
-          Effect.provideService(Scope.Scope, resources)
-        ),
-      fibers,
-    };
+    return Context.make(Scope.Scope, resources).pipe(
+      Context.add(PluginFibers, fibers)
+    );
   })
 );
 
 export type PluginEffectRuntime = Pick<
-  ManagedRuntime.ManagedRuntime<PluginScope, never>,
+  ManagedRuntime.ManagedRuntime<PluginRuntimeContext, never>,
   'runFork' | 'runPromise'
 > & {
   readonly dispose: () => Promise<void>;
 };
 
 export const createPluginEffectRuntime = (): PluginEffectRuntime => {
-  const runtime = ManagedRuntime.make(PluginScopeLive);
+  const runtime = ManagedRuntime.make(PluginRuntimeLive);
   let fiberRunFork: typeof runtime.runFork | undefined;
 
   let disposePromise: Promise<void> | undefined;
@@ -57,8 +50,8 @@ export const createPluginEffectRuntime = (): PluginEffectRuntime => {
     runPromise: runtime.runPromise,
     runFork: (effect, options) =>
       (fiberRunFork ??= runtime.runSync(
-        Effect.flatMap(PluginScope, pluginScope =>
-          FiberSet.runtime(pluginScope.fibers)<PluginScope>()
+        Effect.flatMap(PluginFibers, fibers =>
+          FiberSet.runtime(fibers)<PluginRuntimeContext>()
         )
       ))(effect, options),
     dispose: (): Promise<void> => (disposePromise ??= runtime.dispose()),
@@ -118,7 +111,7 @@ export const createDelayedPluginTask = ({
 }: {
   runtime: PluginEffectRuntime;
   delayMs: number;
-  run: () => Effect.Effect<void, Error, PluginScope>;
+  run: () => Effect.Effect<void, Error, Scope.Scope>;
   onError: (error: Error) => void;
 }): DelayedPluginTask => {
   let fiber: ReturnType<PluginEffectRuntime['runFork']> | null | undefined;

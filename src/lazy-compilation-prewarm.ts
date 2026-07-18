@@ -1,10 +1,10 @@
 import * as Effect from 'effect/Effect';
+import type * as Scope from 'effect/Scope';
 import type { ReactRouterManifestForDev } from './manifest.js';
 import type { RouteManifestItem } from './types.js';
 import {
   createDelayedPluginTask,
   type PluginEffectRuntime,
-  PluginScope,
   tryPluginPromise,
 } from './effect-runtime.js';
 
@@ -288,10 +288,8 @@ export const createLazyCompilationPrewarmController = ({
 
 export const acquireLazyCompilationPrewarm = (
   options: Parameters<typeof createLazyCompilationPrewarmController>[0]
-): Effect.Effect<LazyCompilationPrewarmController, never, PluginScope> =>
-  Effect.flatMap(PluginScope, pluginScope =>
-    pluginScope.acquire(
-      Effect.sync(() => createLazyCompilationPrewarmController(options)),
-      controller => controller.cancelEffect()
-    )
+): Effect.Effect<LazyCompilationPrewarmController, never, Scope.Scope> =>
+  Effect.acquireRelease(
+    Effect.sync(() => createLazyCompilationPrewarmController(options)),
+    controller => controller.cancelEffect()
   );

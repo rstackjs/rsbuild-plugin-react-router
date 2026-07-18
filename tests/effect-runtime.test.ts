@@ -4,7 +4,6 @@ import * as Fiber from 'effect/Fiber';
 import {
   createPluginEffectRuntime,
   createDelayedPluginTask,
-  PluginScope,
   runPluginEffect,
   tryPluginSync,
 } from '../src/effect-runtime';
@@ -31,19 +30,16 @@ describe('effect runtime helpers', () => {
     const runtime = createPluginEffectRuntime();
 
     await runtime.runPromise(
-      Effect.gen(function* () {
-        const scope = yield* PluginScope;
-        return yield* scope.acquire(
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          events.push('acquire');
+          return 'resource';
+        }),
+        resource =>
           Effect.sync(() => {
-            events.push('acquire');
-            return 'resource';
-          }),
-          resource =>
-            Effect.sync(() => {
-              events.push(`release:${resource}`);
-            })
-        );
-      })
+            events.push(`release:${resource}`);
+          })
+      )
     );
 
     runtime.runFork(
