@@ -1,7 +1,6 @@
 import { resolve } from 'pathe';
 import type { ServerBuild } from 'react-router';
-import { runPluginEffect } from './effect-runtime.js';
-import { resolveServerBuildModuleEffect } from './server-build-resolution.js';
+import { resolveServerBuildModule } from './server-build-resolution.js';
 import type { Route } from './types.js';
 
 /**
@@ -96,19 +95,12 @@ function generateServerBuild(
   return generateStaticTemplate(routes, options);
 }
 
-export function resolveServerBuildModule(
-  buildModule: unknown,
-  source: string
-): Promise<ServerBuild> {
-  return runPluginEffect(resolveServerBuildModuleEffect(buildModule, source));
-}
+export { resolveServerBuildModule };
 
 export function resolveReactRouterServerBuild(
   buildModule: unknown
 ): Promise<ServerBuild> {
-  return runPluginEffect(
-    resolveServerBuildModuleEffect(buildModule, 'Imported module')
-  );
+  return resolveServerBuildModule(buildModule, 'Imported module');
 }
 
 export { generateServerBuild };
