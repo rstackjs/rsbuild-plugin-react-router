@@ -532,10 +532,8 @@ export const pluginReactRouter = (
           finalEntryClientPath,
           future,
           hasServerApp,
-          parallelRouteTransform: pluginOptions.parallelRouteTransform,
           reactRouterConfig: resolvedConfigWithRoutes,
           routeChunkCache,
-          routeCount,
           serverAppPath,
           shouldDependOnWebCompiler,
           devHmr:
@@ -553,18 +551,19 @@ export const pluginReactRouter = (
               : undefined,
         }));
 
-    if (modePlan.kind === 'classic') {
-      modePlan.routeTransformExecutor = await effectRuntime.runPromise(
-        acquireRouteTransformExecutor({
-          parallelRouteTransform:
-            pluginOptions.parallelRouteTransform ??
-            shouldParallelizeRouteTransforms(routeCount),
-          routeChunkCache,
-          splitRouteModules: Boolean(splitRouteModules),
-          isBuild,
-        })
-      );
-    }
+    const routeTransformExecutor =
+      modePlan.kind === 'classic'
+        ? await effectRuntime.runPromise(
+            acquireRouteTransformExecutor({
+              parallelRouteTransform:
+                pluginOptions.parallelRouteTransform ??
+                shouldParallelizeRouteTransforms(routeCount),
+              routeChunkCache,
+              splitRouteModules: Boolean(splitRouteModules),
+              isBuild,
+            })
+          )
+        : undefined;
 
     const { manifestChunkNames } = modePlan;
 
@@ -614,10 +613,7 @@ export const pluginReactRouter = (
       api,
       isBuild,
       lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor:
-        modePlan.kind === 'classic'
-          ? modePlan.routeTransformExecutor
-          : undefined,
+      routeTransformExecutor,
       routeRestartMarkerPath,
       watchDirectory,
       getRouteTopology: routeTopology.getRouteTopology,
@@ -1009,6 +1005,10 @@ export const pluginReactRouter = (
         performanceProfiler,
       });
     } else {
+      if (!routeTransformExecutor) {
+        throw new Error('Route transform executor was not initialized.');
+      }
+
       registerModifyBrowserManifestAssets(
         api,
         routes,
@@ -1045,7 +1045,7 @@ export const pluginReactRouter = (
         getAssetPrefix: () => assetPrefix,
         routeChunkOptions: modePlan.routeChunkOptions,
         routeModuleAnalysis,
-        routeTransformExecutor: modePlan.routeTransformExecutor,
+        routeTransformExecutor,
         routeByFilePath,
         routeChunkConfig: modePlan.routeChunkConfig,
         isBuild,

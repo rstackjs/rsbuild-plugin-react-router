@@ -2,6 +2,7 @@ import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -59,6 +60,15 @@ const captureEnv = (keys: string[]) => {
 };
 
 describe('pluginReactRouter', () => {
+  it('acquires the classic route transform executor only from PluginScope', async () => {
+    const source = await readFile(
+      join(process.cwd(), 'src/mode-plan.ts'),
+      'utf8'
+    );
+
+    expect(source).not.toContain('createRouteTransformExecutor');
+  });
+
   it('shares one Effect runtime and closes it from every Rsbuild shutdown path', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
