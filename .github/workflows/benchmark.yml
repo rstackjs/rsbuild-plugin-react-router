@@ -27,11 +27,13 @@ jobs:
             profile: ci-small
             build_order: base,head
             dev_order: head,base
+            parallel_route_transform: auto
           - shard: large
             label: large fixtures
             profile: ci-large
             build_order: head,base
             dev_order: base,head
+            parallel_route_transform: 1
 
     env:
       BENCHMARK_PROFILE: ${{ matrix.profile }}
@@ -41,6 +43,7 @@ jobs:
       BENCHMARK_ITERATIONS: '5'
       BENCHMARK_WARMUP: '1'
       BENCHMARK_DEV_ROUTES: auto
+      BENCHMARK_PARALLEL_ROUTE_TRANSFORM: ${{ matrix.parallel_route_transform }}
 
     steps:
       - name: Checkout PR head
@@ -120,6 +123,7 @@ jobs:
                 --iterations "$BENCHMARK_BUILD_ITERATIONS" \
                 --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
                 --warmup "$BENCHMARK_WARMUP" \
+                --parallel-route-transform "$BENCHMARK_PARALLEL_ROUTE_TRANSFORM" \
                 --clean build \
                 --format both \
                 --log-performance \
@@ -150,6 +154,7 @@ jobs:
                 --large-iterations "$BENCHMARK_LARGE_ITERATIONS" \
                 --warmup "$BENCHMARK_WARMUP" \
                 --dev-routes "$BENCHMARK_DEV_ROUTES" \
+                --parallel-route-transform "$BENCHMARK_PARALLEL_ROUTE_TRANSFORM" \
                 --clean build \
                 --format both \
                 --log-performance \
