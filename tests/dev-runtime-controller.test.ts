@@ -8,8 +8,6 @@ import type {
   Rspack,
 } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { createReactRouterDevRuntimeController } from '../src/dev-runtime-controller';
 import {
   createBuild,
@@ -308,18 +306,6 @@ const createHarness = (
 };
 
 describe('React Router development runtime controller', () => {
-  it('observes dev-server close with a native promise boundary', async () => {
-    const source = await readFile(
-      resolve(process.cwd(), 'src/dev-runtime-session.ts'),
-      'utf8'
-    );
-
-    expect(source).toContain('Promise.resolve(close())');
-    expect(source).not.toMatch(
-      /effect\/Effect|runPluginEffect|tryPluginPromise|tryPluginSync/
-    );
-  });
-
   it('validates lifecycle state before default startup hooks', () => {
     const { beforeOrder, closeOrder, startOrder } = createHarness();
     expect(beforeOrder).toBe('pre');

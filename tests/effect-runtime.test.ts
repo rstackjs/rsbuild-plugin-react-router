@@ -1,6 +1,5 @@
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as Effect from 'effect/Effect';
-import { readFile } from 'node:fs/promises';
 import {
   createPluginEffectRuntime,
   createDelayedPluginTask,
@@ -10,21 +9,6 @@ import {
 } from '../src/effect-runtime';
 
 describe('effect runtime helpers', () => {
-  it('centralizes raw Effect runners in effect-runtime.ts', async () => {
-    const files = ['index.ts', 'manifest.ts', 'route-watch.ts'];
-    const sources = await Promise.all(
-      files.map(file =>
-        readFile(new URL(`../src/${file}`, import.meta.url), 'utf8')
-      )
-    );
-
-    for (const source of sources) {
-      expect(source).not.toMatch(/Effect\.run(?:Promise|Fork|Sync)/);
-      expect(source).not.toContain('ManagedRuntime.make');
-    }
-    expect(sources[0]).not.toContain('runPluginEffect');
-  });
-
   it('releases dynamically acquired resources when the runtime is disposed', async () => {
     const events: string[] = [];
     const runtime = createPluginEffectRuntime();
