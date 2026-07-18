@@ -7,7 +7,10 @@ import {
   compareBenchmarkResults,
   renderBenchmarkComment,
 } from '../scripts/benchmark/compare-model.mts';
-import { findBenchmarkComment } from '../scripts/benchmark/comment.mts';
+import {
+  findBenchmarkComment,
+  run,
+} from '../scripts/benchmark/comment.mts';
 
 type BenchmarkCaseResult = {
   id: string;
@@ -35,6 +38,21 @@ const headPayload = () =>
     { id: 'build-256-ssr', samplesMs: [100, 110, 120], medianMs: 110 },
     { id: 'dev-48-ssr', samplesMs: [170, 180, 190], medianMs: 180 },
   ]);
+
+const captureEnvironment = (keys: readonly string[]) => {
+  const previousValues = new Map(
+    keys.map(key => [key, process.env[key]] as const)
+  );
+  return () => {
+    for (const [key, value] of previousValues) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  };
+};
 
 describe('CodSpeed benchmark comparison model', () => {
   it('renders every case with base, head, and signed median deltas', () => {
@@ -220,5 +238,104 @@ describe('benchmark pull-request comments', () => {
         { id: 202, body: null },
       ])
     ).toBeNull();
+  });
+
+  it('paginates comments and patches the newest marker match', async () => {
+    const restoreEnvironment = captureEnvironment([
+      'GH_TOKEN',
+      'GITHUB_REPOSITORY',
+      'PR_NUMBER',
+      'COMMENT_BODY',
+    ]);
+    const originalFetch = globalThis.fetch;
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const repositoryUrl = 'https://api.github.com/repos/acme/widgets';
+    const commentsUrl = `${repositoryUrl}/issues/17/comments`;
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 1,
+      body:
+        index === 0
+          ? '<!-- react-router-benchmark-ci -->\nOlder report'
+          : 'Unrelated comment',
+    }));
+
+    process.env.GH_TOKEN = 'token';
+    process.env.GITHUB_REPOSITORY = 'acme/widgets';
+    process.env.PR_NUMBER = '17';
+    process.env.COMMENT_BODY = 'Updated report';
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, init });
+      if (url.endsWith('?per_page=100&page=1')) {
+        return { ok: true, json: async () => firstPage } as Response;
+      }
+      if (url.endsWith('?per_page=100&page=2')) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 303,
+              body: '<!-- react-router-benchmark-ci -->\nNewest report',
+            },
+          ],
+        } as Response;
+      }
+      return { ok: true } as Response;
+    }) as typeof fetch;
+
+    try {
+      await run();
+
+      expect(requests.map(request => request.url)).toEqual([
+        `${commentsUrl}?per_page=100&page=1`,
+        `${commentsUrl}?per_page=100&page=2`,
+        `${repositoryUrl}/issues/comments/303`,
+      ]);
+      expect(requests[2].init).toMatchObject({
+        method: 'PATCH',
+        body: JSON.stringify({ body: 'Updated report' }),
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      restoreEnvironment();
+    }
+  });
+
+  it('creates a comment when no marker exists', async () => {
+    const restoreEnvironment = captureEnvironment([
+      'GH_TOKEN',
+      'GITHUB_REPOSITORY',
+      'PR_NUMBER',
+      'COMMENT_BODY',
+    ]);
+    const originalFetch = globalThis.fetch;
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const repositoryUrl = 'https://api.github.com/repos/acme/widgets';
+    const commentsUrl = `${repositoryUrl}/issues/17/comments`;
+
+    process.env.GH_TOKEN = 'token';
+    process.env.GITHUB_REPOSITORY = 'acme/widgets';
+    process.env.PR_NUMBER = '17';
+    process.env.COMMENT_BODY = 'New report';
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), init });
+      return { ok: true, json: async () => [] } as Response;
+    }) as typeof fetch;
+
+    try {
+      await run();
+
+      expect(requests.map(request => request.url)).toEqual([
+        `${commentsUrl}?per_page=100&page=1`,
+        commentsUrl,
+      ]);
+      expect(requests[1].init).toMatchObject({
+        method: 'POST',
+        body: JSON.stringify({ body: 'New report' }),
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      restoreEnvironment();
+    }
   });
 });
