@@ -26,7 +26,7 @@ const createDelayedTaskFixture = (delayMs: number) => {
 };
 
 describe('effect runtime helpers', () => {
-  it('releases dynamically acquired resources when the runtime is disposed', async () => {
+  it('releases resources after interrupting fibers when the runtime is disposed', async () => {
     const events: string[] = [];
     const runtime = createPluginEffectRuntime();
 
@@ -46,8 +46,18 @@ describe('effect runtime helpers', () => {
       })
     );
 
+    runtime.runFork(
+      Effect.never.pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            events.push('fiber');
+          })
+        )
+      )
+    );
+
     await runtime.dispose();
-    expect(events).toEqual(['acquire', 'release:resource']);
+    expect(events).toEqual(['acquire', 'fiber', 'release:resource']);
   });
 
   it('interrupts supervised fibers and disposes idempotently', async () => {

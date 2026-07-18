@@ -49,19 +49,18 @@ export type PluginEffectRuntime = Pick<
 
 export const createPluginEffectRuntime = (): PluginEffectRuntime => {
   const runtime = ManagedRuntime.make(PluginScopeLive);
-
-  // ManagedRuntime builds lazily; initialize its scoped layer before forks.
-  runtime.runSync(Effect.void);
-  const pluginScope = runtime.runSync(PluginScope);
-  const runFork: typeof runtime.runFork = runtime.runSync(
-    FiberSet.runtime(pluginScope.fibers)<PluginScope>()
-  );
+  let fiberRunFork: typeof runtime.runFork | undefined;
 
   let disposePromise: Promise<void> | undefined;
 
   return {
     runPromise: runtime.runPromise,
-    runFork,
+    runFork: (effect, options) =>
+      (fiberRunFork ??= runtime.runSync(
+        Effect.flatMap(PluginScope, pluginScope =>
+          FiberSet.runtime(pluginScope.fibers)<PluginScope>()
+        )
+      ))(effect, options),
     dispose: (): Promise<void> => (disposePromise ??= runtime.dispose()),
   };
 };
