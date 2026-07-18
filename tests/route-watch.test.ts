@@ -20,12 +20,14 @@ import {
 } from '../src/route-watch';
 
 const routeWatchRuntime = createPluginEffectRuntime();
-const createRouteTopologyWatcher = (
+const createRouteTopologyWatcher = async (
   options: Omit<CreateRouteTopologyWatcherOptions, 'runtime'>
-) =>
-  routeWatchRuntime.runPromise(
+) => {
+  const closeEffect = await routeWatchRuntime.runPromise(
     acquireRouteTopologyWatcher({ runtime: routeWatchRuntime, ...options })
   );
+  return () => routeWatchRuntime.runPromise(closeEffect());
+};
 
 afterAll(() => routeWatchRuntime.dispose());
 
@@ -150,7 +152,7 @@ describe('route watch restart marker', () => {
     mkdirSync(watchedDirectory, { recursive: true });
 
     try {
-      const close = await runtime.runPromise(
+      const closeEffect = await runtime.runPromise(
         acquireRouteTopologyWatcher({
           runtime,
           watchDirectory: watchedDirectory,
@@ -175,7 +177,9 @@ describe('route watch restart marker', () => {
       const fiber = rescanFiber;
       expect(Option.isNone(await runtime.runPromise(fiber.poll))).toBe(true);
 
-      await expect(close()).rejects.toThrow(closeError.message);
+      await expect(runtime.runPromise(closeEffect())).rejects.toThrow(
+        closeError.message
+      );
 
       expect(Option.isSome(await runtime.runPromise(fiber.poll))).toBe(true);
     } finally {
