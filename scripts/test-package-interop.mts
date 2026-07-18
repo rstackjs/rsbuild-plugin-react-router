@@ -24,8 +24,7 @@ const build = {
 
 const collect = hooks => hook => hooks.push(hook);
 const noop = () => undefined;
-const invoke = hook =>
-  typeof hook === 'function' ? hook() : hook.handler?.();
+const invoke = hook => (typeof hook === 'function' ? hook() : hook.handler?.());
 
 const loadEntryPoints = async () => {
   const esm = await import('../dist/index.js');
@@ -69,10 +68,7 @@ const verifyRegistration = async (writer, reader) => {
   assert(closeHook, 'Expected a pre dev-server close hook');
   assert.equal(closeBuilds.length, 1);
   assert.deepEqual(closeBuilds, exits);
-  assert.deepEqual(
-    closeDevServers.filter(hook => typeof hook === 'function'),
-    closeBuilds
-  );
+  assert.deepEqual(closeDevServers, [closeBuilds[0], closeHook]);
   const start = startHook.handler;
   const server = {
     close: async () => undefined,
@@ -82,9 +78,7 @@ const verifyRegistration = async (writer, reader) => {
   await start({ environments: {}, server });
 
   const pending = reader.loadReactRouterServerBuild(server);
-  await Promise.all(
-    [...closeBuilds, ...closeDevServers, ...exits].map(invoke)
-  );
+  await Promise.all([...closeBuilds, ...closeDevServers, ...exits].map(invoke));
   await assert.rejects(pending, /closed before a React Router build was ready/);
   await assert.rejects(
     reader.loadReactRouterServerBuild(server),

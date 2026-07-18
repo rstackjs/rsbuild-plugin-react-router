@@ -121,11 +121,9 @@ export const pluginReactRouter = (
 
   async setup(api) {
     const effectRuntime = createPluginEffectRuntime();
-    const disposeEffectRuntime = (): Promise<void> => effectRuntime.dispose();
-
-    api.onCloseBuild(disposeEffectRuntime);
-    api.onCloseDevServer(disposeEffectRuntime);
-    api.onExit(disposeEffectRuntime);
+    api.onCloseBuild(effectRuntime.dispose);
+    api.onCloseDevServer(effectRuntime.dispose);
+    api.onExit(effectRuntime.dispose);
 
     const defaultOptions = {
       customServer: false,
