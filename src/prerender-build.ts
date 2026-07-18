@@ -550,35 +550,6 @@ const createPrerenderDataRequestInit = (
     : undefined;
 };
 
-const runPrerenderPaths = async ({
-  build,
-  requestHandler,
-  clientBuildDir,
-  options,
-}: {
-  build: PrerenderServerBuild;
-  requestHandler: (request: Request) => Promise<Response>;
-  clientBuildDir: string;
-  options: RunReactRouterPrerenderBuildOptions;
-}): Promise<void> => {
-  const { prerenderConfig, prerenderPaths } = options;
-  const buildRoutes = createPrerenderRoutes(build.routes);
-  const concurrency = getPrerenderConcurrency(prerenderConfig);
-
-  await runPluginEffect(
-    createBoundedPrerenderTasksEffect(prerenderPaths, concurrency, path =>
-      createPrerenderPathEffect({
-        path,
-        build,
-        buildRoutes,
-        requestHandler,
-        clientBuildDir,
-        options,
-      })
-    )
-  );
-};
-
 export const runReactRouterPrerenderBuild = async (
   options: RunReactRouterPrerenderBuildOptions
 ): Promise<void> => {
@@ -592,6 +563,7 @@ export const runReactRouterPrerenderBuild = async (
     serverBuildFile,
     ssr,
     isPrerenderEnabled,
+    prerenderConfig,
     prerenderPaths,
     routes,
     latestBrowserManifest,
@@ -667,12 +639,22 @@ export const runReactRouterPrerenderBuild = async (
         );
       }
 
-      await runPrerenderPaths({
-        build,
-        requestHandler,
-        clientBuildDir,
-        options,
-      });
+      const buildRoutes = createPrerenderRoutes(build.routes);
+      await runPluginEffect(
+        createBoundedPrerenderTasksEffect(
+          prerenderPaths,
+          getPrerenderConcurrency(prerenderConfig),
+          path =>
+            createPrerenderPathEffect({
+              path,
+              build,
+              buildRoutes,
+              requestHandler,
+              clientBuildDir,
+              options,
+            })
+        )
+      );
     }
 
     if (!ssr) {
