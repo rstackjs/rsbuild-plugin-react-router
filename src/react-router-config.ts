@@ -287,8 +287,3 @@ export const resolveReactRouterConfigEffect = (
         userAndPresetConfigs.serverModuleFormat !== undefined,
     };
   });
-
-export const resolveReactRouterConfig = (
-  reactRouterUserConfig: Config
-): Promise<ResolveReactRouterConfigResult> =>
-  runPluginEffect(resolveReactRouterConfigEffect(reactRouterUserConfig));

@@ -1,11 +1,13 @@
 import { describe, expect, it } from '@rstest/core';
 import {
   getDefaultTrailingSlashAwareDataRequests,
-  resolveReactRouterConfig,
   resolveReactRouterConfigEffect,
 } from '../src/react-router-config';
 import { runPluginEffect } from '../src/effect-runtime';
 import type { Config } from '../src/react-router-config';
+
+const resolveReactRouterConfig = (config: Config) =>
+  runPluginEffect(resolveReactRouterConfigEffect(config));
 
 describe('resolveReactRouterConfig', () => {
   it('merges presets and combines buildEnd hooks', async () => {
@@ -29,36 +31,6 @@ describe('resolveReactRouterConfig', () => {
     });
 
     expect(result.resolved.basename).toBe('/preset');
-    await result.resolved.buildEnd?.({
-      buildManifest: { routes: {} },
-      reactRouterConfig: result.resolved,
-      rsbuildConfig: {} as any,
-    });
-    expect(buildEndCalls).toBe(2);
-  });
-
-  it('resolves presets through the Effect config path', async () => {
-    let buildEndCalls = 0;
-    const result = await runPluginEffect(
-      resolveReactRouterConfigEffect({
-        presets: [
-          {
-            name: 'preset-a',
-            reactRouterConfig: async () => ({
-              basename: '/effect-preset',
-              buildEnd: async () => {
-                buildEndCalls += 1;
-              },
-            }),
-          },
-        ],
-        buildEnd: async () => {
-          buildEndCalls += 1;
-        },
-      })
-    );
-
-    expect(result.resolved.basename).toBe('/effect-preset');
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,

@@ -25,7 +25,7 @@ import { validatePrerenderConfig } from './prerender.js';
 import { runReactRouterPrerenderBuild } from './prerender-build.js';
 import { runReactRouterRscPrerenderBuild } from './rsc-prerender.js';
 import {
-  resolveReactRouterConfig,
+  resolveReactRouterConfigEffect,
   resolveRouteDiscoveryConfig,
   type ResolvedReactRouterConfig,
 } from './react-router-config.js';
@@ -213,7 +213,9 @@ export const pluginReactRouter = (
       userAndPresetConfig,
       presets: configPresets,
       hasConfiguredServerModuleFormat,
-    } = await resolveReactRouterConfig(reactRouterUserConfig);
+    } = await effectRuntime.runPromise(
+      resolveReactRouterConfigEffect(reactRouterUserConfig)
+    );
 
     const {
       appDirectory,
