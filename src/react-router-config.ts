@@ -6,7 +6,7 @@ import type { NormalizedConfig } from '@rsbuild/core';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import { normalizeEffectError, tryPluginPromise } from './effect-runtime.js';
 import { getPackageVersion, parseVersionMajorMinor } from './plugin-utils.js';
 import type { PrerenderConfigObject, PrerenderPathsConfig } from './types.js';
 
@@ -158,15 +158,12 @@ const mergeReactRouterConfig = (...configs: Config[]): Config => {
             buildEnd: async (
               ...args: Parameters<NonNullable<Config['buildEnd']>>
             ) => {
-              await runPluginEffect(
-                Effect.all(
-                  [
-                    tryPluginPromise(() => configA.buildEnd?.(...args)),
-                    tryPluginPromise(() => configB.buildEnd?.(...args)),
-                  ],
-                  { discard: true }
-                )
-              );
+              try {
+                await configA.buildEnd?.(...args);
+                await configB.buildEnd?.(...args);
+              } catch (cause) {
+                throw normalizeEffectError(cause);
+              }
             },
           }
         : {}),

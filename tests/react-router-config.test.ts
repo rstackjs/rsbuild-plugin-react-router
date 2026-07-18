@@ -11,7 +11,7 @@ const resolveReactRouterConfig = (config: Config) =>
 
 describe('resolveReactRouterConfig', () => {
   it('merges presets and combines buildEnd hooks', async () => {
-    let buildEndCalls = 0;
+    const buildEndCalls: string[] = [];
     const result = await resolveReactRouterConfig({
       presets: [
         {
@@ -20,13 +20,13 @@ describe('resolveReactRouterConfig', () => {
             basename: '/preset',
             future: { v8_middleware: true },
             buildEnd: async () => {
-              buildEndCalls += 1;
+              buildEndCalls.push('preset');
             },
           }),
         },
       ],
       buildEnd: async () => {
-        buildEndCalls += 1;
+        buildEndCalls.push('user');
       },
     });
 
@@ -36,7 +36,7 @@ describe('resolveReactRouterConfig', () => {
       reactRouterConfig: result.resolved,
       rsbuildConfig: {} as any,
     });
-    expect(buildEndCalls).toBe(2);
+    expect(buildEndCalls).toEqual(['preset', 'user']);
   });
 
   it('preserves server bundle selection in SSR mode', async () => {
