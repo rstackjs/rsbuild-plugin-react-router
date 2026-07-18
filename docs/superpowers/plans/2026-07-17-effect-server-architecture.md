@@ -6,7 +6,7 @@
 
 **Architecture:** Create one `ManagedRuntime` per plugin instance. Rsbuild hooks and exported Promise APIs are the only runtime boundaries; internal Node-side workflows return `Effect`. A runtime-owned `PluginScope` service owns dynamically created workers, watchers, timers, background fibers, and dev-server resources. Pure transforms, generated/browser runtime code, and worker entrypoints remain ordinary TypeScript.
 
-**Tech Stack:** TypeScript 5.9, Effect 3.21, Rsbuild/Rspack, Rstest, Playwright, Node `worker_threads`, existing benchmark harness.
+**Tech Stack:** TypeScript 5.9, Effect 3.22, Rsbuild/Rspack, Rstest, Playwright, Node `worker_threads`, existing benchmark harness.
 
 ## Global Constraints
 
