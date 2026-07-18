@@ -1,12 +1,56 @@
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as Effect from 'effect/Effect';
 import {
+  createPluginEffectRuntime,
   createDelayedPluginTask,
+  PluginScope,
   runPluginEffect,
   tryPluginSync,
 } from '../src/effect-runtime';
 
 describe('effect runtime helpers', () => {
+  it('releases dynamically acquired resources when the runtime is disposed', async () => {
+    const events: string[] = [];
+    const runtime = createPluginEffectRuntime();
+
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const scope = yield* PluginScope;
+        return yield* scope.acquire(
+          Effect.sync(() => {
+            events.push('acquire');
+            return 'resource';
+          }),
+          resource =>
+            Effect.sync(() => {
+              events.push(`release:${resource}`);
+            })
+        );
+      })
+    );
+
+    await runtime.dispose();
+    expect(events).toEqual(['acquire', 'release:resource']);
+  });
+
+  it('interrupts supervised fibers and disposes idempotently', async () => {
+    let finalized = 0;
+    const runtime = createPluginEffectRuntime();
+
+    runtime.runFork(
+      Effect.never.pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            finalized += 1;
+          })
+        )
+      )
+    );
+
+    await Promise.all([runtime.dispose(), runtime.dispose()]);
+    expect(finalized).toBe(1);
+  });
+
   it('preserves typed errors at promise boundaries', async () => {
     const error = new Error('typed failure');
 
