@@ -48,6 +48,7 @@ const verifyRegistration = async (writer, reader) => {
     onAfterStartDevServer: noop,
     onCloseDevServer: collect(closes),
     onCloseBuild: noop,
+    onExit: collect(closes),
     onAfterEnvironmentCompile: noop,
     onAfterBuild: noop,
     processAssets: noop,
@@ -106,6 +107,32 @@ const verifyPackIncludesOriginalSource = async () => {
   );
 };
 
+const verifyEffectFreeRuntimeOutputs = () => {
+  const dist = new URL('../dist/', import.meta.url);
+  const pending = [
+    'parallel-route-transform-worker.js',
+    'templates/entry.client.js',
+    'templates/entry.client.cjs',
+    'templates/entry.rsc.client.js',
+  ].map(file => new URL(file, dist));
+  const visited = new Set<string>();
+
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (!file || visited.has(file.href)) continue;
+    visited.add(file.href);
+    const source = readFileSync(file, 'utf8');
+    assert.doesNotMatch(source, /["']effect(?:\/|["'])/);
+    for (const [, specifier] of source.matchAll(
+      /(?:\bfrom\s*|\b(?:import|require)\s*\(?\s*)["'](\.{1,2}\/[^"']+)["']/g
+    )) {
+      const dependency = new URL(specifier, file);
+      assert(dependency.href.startsWith(dist.href));
+      pending.push(dependency);
+    }
+  }
+};
+
 const verifyRscPublicSurface = (esm, commonjs) => {
   assert.equal(typeof esm.pluginReactRouterRSC, 'function');
   assert.equal(typeof commonjs.pluginReactRouterRSC, 'function');
@@ -147,6 +174,7 @@ const verifyRscPublicSurface = (esm, commonjs) => {
 const main = async () => {
   const [esm, commonjs] = await loadEntryPoints();
   await verifyPackIncludesOriginalSource();
+  verifyEffectFreeRuntimeOutputs();
   verifyRscPublicSurface(esm, commonjs);
   process.chdir(
     fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
