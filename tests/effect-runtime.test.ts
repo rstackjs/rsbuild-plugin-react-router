@@ -8,6 +8,22 @@ import {
   tryPluginSync,
 } from '../src/effect-runtime';
 
+const createDelayedTaskFixture = (delayMs: number) => {
+  const run = rstest.fn();
+  const onError = rstest.fn((error: Error) => {
+    throw error;
+  });
+  const runtime = createPluginEffectRuntime();
+  const task = createDelayedPluginTask({
+    runtime,
+    delayMs,
+    run: () => Effect.sync(run),
+    onError,
+  });
+
+  return { runtime, run, onError, task };
+};
+
 describe('effect runtime helpers', () => {
   it('releases dynamically acquired resources when the runtime is disposed', async () => {
     const events: string[] = [];
@@ -70,16 +86,7 @@ describe('effect runtime helpers', () => {
   });
 
   it('runs delayed plugin tasks after their delay', async () => {
-    const run = rstest.fn();
-    const runtime = createPluginEffectRuntime();
-    const task = createDelayedPluginTask({
-      runtime,
-      delayMs: 10,
-      run: () => Effect.sync(run),
-      onError: error => {
-        throw error;
-      },
-    });
+    const { runtime, run, task } = createDelayedTaskFixture(10);
 
     task.schedule();
     expect(run).not.toHaveBeenCalled();
@@ -88,16 +95,7 @@ describe('effect runtime helpers', () => {
   });
 
   it('reschedules delayed plugin tasks by replacing the pending run', async () => {
-    const run = rstest.fn();
-    const runtime = createPluginEffectRuntime();
-    const task = createDelayedPluginTask({
-      runtime,
-      delayMs: 10,
-      run: () => Effect.sync(run),
-      onError: error => {
-        throw error;
-      },
-    });
+    const { runtime, run, task } = createDelayedTaskFixture(10);
 
     task.schedule();
     task.reschedule();
@@ -108,16 +106,7 @@ describe('effect runtime helpers', () => {
   });
 
   it('cancels delayed plugin tasks before they start', async () => {
-    const run = rstest.fn();
-    const runtime = createPluginEffectRuntime();
-    const task = createDelayedPluginTask({
-      runtime,
-      delayMs: 1000,
-      run: () => Effect.sync(run),
-      onError: error => {
-        throw error;
-      },
-    });
+    const { runtime, run, task } = createDelayedTaskFixture(1000);
 
     task.schedule();
     await task.cancel();
@@ -128,16 +117,7 @@ describe('effect runtime helpers', () => {
   });
 
   it('cancels delayed plugin tasks when the plugin runtime is disposed', async () => {
-    const run = rstest.fn();
-    const runtime = createPluginEffectRuntime();
-    const task = createDelayedPluginTask({
-      runtime,
-      delayMs: 25,
-      run: () => Effect.sync(run),
-      onError: error => {
-        throw error;
-      },
-    });
+    const { runtime, run, task } = createDelayedTaskFixture(25);
 
     task.schedule();
     await runtime.dispose();
