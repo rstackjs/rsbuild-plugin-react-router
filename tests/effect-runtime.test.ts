@@ -134,6 +134,7 @@ describe('effect runtime helpers', () => {
     const { runtime, run, task } = createDelayedTaskFixture(25);
 
     task.schedule();
+    task.reschedule();
     await runtime.dispose();
     await new Promise(resolve => setTimeout(resolve, 50));
 

@@ -116,24 +116,6 @@ export const createDelayedPluginTask = ({
         : Effect.void;
     });
 
-  const cancel = (): Promise<void> => {
-    const activeFiber = fiber;
-    return activeFiber
-      ? runtime.runPromise(
-          Fiber.interrupt(activeFiber).pipe(
-            Effect.ensuring(
-              Effect.sync(() => {
-                if (fiber === activeFiber) {
-                  fiber = undefined;
-                }
-              })
-            ),
-            Effect.asVoid
-          )
-        )
-      : Promise.resolve();
-  };
-
   const start = (): void => {
     if (fiber !== undefined) {
       return;
@@ -162,7 +144,10 @@ export const createDelayedPluginTask = ({
 
   const reschedule = (): void => {
     if (fiber) {
-      void cancel().then(start).catch(onError);
+      void runtime
+        .runPromise(Fiber.interrupt(fiber))
+        .then(start)
+        .catch(onError);
     } else {
       start();
     }
