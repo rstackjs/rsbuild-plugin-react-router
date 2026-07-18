@@ -160,20 +160,6 @@ export const withBuildRequest = <T>(
   handle: (request: Request) => Promise<T>
 ): Promise<T> => runPluginEffect(createBuildRequestEffect(input, init, handle));
 
-export const writePrerenderedFile = async (
-  clientBuildDir: string,
-  filePath: string,
-  contents: string | Uint8Array
-): Promise<string> => {
-  const normalizedPath = filePath.startsWith('/')
-    ? filePath.slice(1)
-    : filePath;
-  const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
-  await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, contents);
-  return outputPath;
-};
-
 const prerenderData = async ({
   handler,
   prerenderPath,
@@ -225,11 +211,12 @@ const prerenderData = async ({
       );
     }
 
-    const outputPath = await writePrerenderedFile(
+    const outputPath = resolve(
       clientBuildDir,
-      outputNormalizedPath,
-      data
+      ...outputNormalizedPath.split('/')
     );
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, data);
     api.logger.info(
       `Prerender (data): ${prerenderPath} -> ${relative(
         process.cwd(),
@@ -286,11 +273,13 @@ const prerenderRoute = async ({
         );
       }
 
-      const outputPath = await writePrerenderedFile(
+      const outputPath = resolve(
         clientBuildDir,
-        `${normalizedPath}index.html`,
-        html
+        ...normalizedPath.split('/'),
+        'index.html'
       );
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, html);
       api.logger.info(
         `Prerender (html): ${prerenderPath} -> ${relative(
           process.cwd(),
@@ -334,11 +323,9 @@ const prerenderResourceRoute = async ({
         );
       }
 
-      const outputPath = await writePrerenderedFile(
-        clientBuildDir,
-        normalizedPath,
-        content
-      );
+      const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, content);
       api.logger.info(
         `Prerender (resource): ${prerenderPath} -> ${relative(
           process.cwd(),
@@ -402,11 +389,8 @@ const handleSpaMode = async ({
         );
       }
 
-      const outputPath = await writePrerenderedFile(
-        clientBuildDir,
-        filename,
-        html
-      );
+      const outputPath = resolve(clientBuildDir, filename);
+      await writeFile(outputPath, html);
       const prettyPath = relative(process.cwd(), outputPath);
       if (build.prerender?.length) {
         api.logger.info(`Prerender (html): SPA Fallback -> ${prettyPath}`);

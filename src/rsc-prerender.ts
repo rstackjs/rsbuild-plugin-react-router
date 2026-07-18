@@ -1,13 +1,12 @@
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
-import { relative, resolve } from 'pathe';
+import { dirname, relative, resolve } from 'pathe';
 import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import {
   createBoundedPrerenderTasksEffect,
   withBuildRequest,
-  writePrerenderedFile,
 } from './prerender-build.js';
 import { normalizeAssetPrefix } from './plugin-utils.js';
 import { getPrerenderConcurrency } from './prerender.js';
@@ -168,17 +167,23 @@ const resolveRscRequestHandler = (
   return handler as RscRequestHandler;
 };
 
-const writeRscPrerenderedFile = async (
-  api: RscPrerenderBuildApi,
-  clientBuildDir: string,
-  filePath: string,
-  contents: string | Uint8Array
-): Promise<void> => {
-  const outputPath = await writePrerenderedFile(
-    clientBuildDir,
-    filePath,
-    contents
-  );
+const writePrerenderedFile = async ({
+  api,
+  clientBuildDir,
+  filePath,
+  contents,
+}: {
+  api: RscPrerenderBuildApi;
+  clientBuildDir: string;
+  filePath: string;
+  contents: string | Uint8Array;
+}): Promise<void> => {
+  const normalizedPath = filePath.startsWith('/')
+    ? filePath.slice(1)
+    : filePath;
+  const outputPath = resolve(clientBuildDir, ...normalizedPath.split('/'));
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, contents);
   api.logger.info(`Prerendered ${relative(process.cwd(), outputPath)}`);
 };
 
@@ -221,16 +226,16 @@ const prerenderRscUrl = async ({
 
     if (redirectStatusCodes.has(response.status)) {
       const location = response.headers.get('Location') ?? '';
-      await writeRscPrerenderedFile(
+      await writePrerenderedFile({
         api,
         clientBuildDir,
-        getRscHtmlFilePath(outputPathname),
-        createRedirectHtml({
+        filePath: getRscHtmlFilePath(outputPathname),
+        contents: createRedirectHtml({
           pathname,
           location,
           status: response.status,
-        })
-      );
+        }),
+      });
       return;
     }
 
@@ -240,20 +245,20 @@ const prerenderRscUrl = async ({
 
     if (isHtml) {
       const html = await response.text();
-      await writeRscPrerenderedFile(
+      await writePrerenderedFile({
         api,
         clientBuildDir,
-        getRscHtmlFilePath(outputPathname),
-        html
-      );
+        filePath: getRscHtmlFilePath(outputPathname),
+        contents: html,
+      });
       const flightData = extractRscFlightData(html);
       if (flightData !== null) {
-        await writeRscPrerenderedFile(
+        await writePrerenderedFile({
           api,
           clientBuildDir,
-          getRscPayloadFilePath(outputPathname),
-          flightData
-        );
+          filePath: getRscPayloadFilePath(outputPathname),
+          contents: flightData,
+        });
       }
       return;
     }
@@ -261,12 +266,12 @@ const prerenderRscUrl = async ({
     // Non-HTML response (e.g. a resource route): emit the raw payload at the
     // request path and also prerender its `.rsc` variant for client
     // navigations, matching upstream RSC behavior.
-    await writeRscPrerenderedFile(
+    await writePrerenderedFile({
       api,
       clientBuildDir,
-      outputPathname,
-      new Uint8Array(await response.arrayBuffer())
-    );
+      filePath: outputPathname,
+      contents: new Uint8Array(await response.arrayBuffer()),
+    });
     if (!pathname.endsWith('.rsc')) {
       const dataUrl = new URL(url);
       dataUrl.pathname += '.rsc';
