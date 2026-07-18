@@ -123,6 +123,7 @@ describe('effect runtime helpers', () => {
     const { runtime, run, task } = createDelayedTaskFixture(1000);
 
     task.schedule();
+    task.reschedule();
     await runtime.runPromise(task.cancelEffect());
     await new Promise(resolve => setTimeout(resolve, 20));
 

@@ -139,10 +139,9 @@ export const createDelayedPluginTask = ({
 
   const reschedule = (): void => {
     if (fiber) {
-      void runtime
-        .runPromise(Fiber.interrupt(fiber))
-        .then(start)
-        .catch(onError);
+      runtime.runFork(
+        Fiber.interrupt(fiber).pipe(Effect.ensuring(Effect.sync(start)))
+      );
     } else {
       start();
     }
