@@ -655,35 +655,17 @@ The plugin automatically:
 
 ### Benchmarking
 
-`pnpm bench:large` runs this repository's generated stress fixture for quick
-regression checks. `pnpm bench:synthetic-app` runs the embedded complex Rsbuild
-app under `benchmarks/synthetic-web-bundler-benchmark`, which adds heavier
-loader and transform contention for benchmark coverage closer to a large
-real-world application.
+Run the focused local suite for plugin regression checks:
 
 ```bash
-pnpm bench:large
-pnpm bench:synthetic-app -- --profile all --runs 2
+pnpm bench
+pnpm bench:smoke
+pnpm bench:codspeed
 ```
 
-The PR benchmark workflow reports production build, dev route-load, HMR/update,
-and embedded synthetic app timings in the same benchmark comment. It measures
-the PR and its base on the same runner instead of reusing cached timing data,
-counterbalances which side runs first, and excludes one warmup iteration. Small
-fixtures use five measured iterations; expensive large fixtures use three.
-
-Every raw median delta remains visible. The comment also reports each side's
-relative median absolute deviation (rMAD), a conservative noise band, and a
-signal label:
-
-- `regression` or `improvement` means the median delta exceeds the observed
-  run-to-run noise band.
-- `inconclusive` means the raw delta is not clearly separated from that noise.
-- `insufficient data` means either side has fewer than three finite samples.
-
-The labels are triage aids, not pass/fail gates. Use the uploaded diagnostics
-and raw per-run samples to investigate important changes, and rerun an
-inconclusive comparison before treating it as a performance result.
+See the [benchmark guide](./benchmarks/README.md) for JSON output, pull-request
+comparisons and comments, `BENCHMARK_PLUGIN_ROOT`, and optional CodSpeed
+publication.
 
 ## React Router Framework Mode
 

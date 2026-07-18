@@ -396,7 +396,7 @@ export const runDevServerBenchmark = async ({
               `Readiness is matched against rsbuild ` +
               `"ready built in ... (<env>)" lines; if the plugin renamed a ` +
               `dev environment, update the expected environments in ` +
-              `scripts/bench-builds.mts.`
+              `benchmarks/cases.mts.`
           )
         );
       }

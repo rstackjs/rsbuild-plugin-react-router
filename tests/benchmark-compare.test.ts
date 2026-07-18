@@ -339,3 +339,27 @@ describe('benchmark pull-request comments', () => {
     }
   });
 });
+
+describe('benchmark workflow documentation', () => {
+  it('removes legacy scripts and documents the focused commands', () => {
+    const packageJson = JSON.parse(
+      readFileSync('package.json', 'utf8')
+    ) as { scripts: Record<string, string> };
+    const benchmarkReadme = readFileSync('benchmarks/README.md', 'utf8');
+
+    for (const script of [
+      'bench:baseline',
+      'bench:full',
+      'bench:large',
+      'bench:synthetic-app',
+      'bench:compare',
+      'bench:ci-report',
+    ]) {
+      expect(Object.keys(packageJson.scripts)).not.toContain(script);
+    }
+
+    expect(benchmarkReadme).toContain('pnpm bench');
+    expect(benchmarkReadme).toContain('pnpm bench:smoke');
+    expect(benchmarkReadme).toContain('pnpm bench:codspeed');
+  });
+});
