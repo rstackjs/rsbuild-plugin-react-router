@@ -406,22 +406,10 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   }
 }
 
-export const createRouteTransformExecutor = ({
-  parallelRouteTransform,
-  routeChunkCache,
-  splitRouteModules,
-  isBuild,
-}: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
-  return createRouteTransformExecutorWithWorkerFactory(
-    {
-      parallelRouteTransform,
-      routeChunkCache,
-      splitRouteModules,
-      isBuild,
-    },
-    createDefaultWorker
-  );
-};
+export const createRouteTransformExecutor = (
+  options: RouteTransformExecutorOptions = {}
+): RouteTransformExecutor =>
+  createRouteTransformExecutorWithWorkerFactory(options, createDefaultWorker);
 
 const createRouteTransformExecutorWithWorkerFactory = (
   {
