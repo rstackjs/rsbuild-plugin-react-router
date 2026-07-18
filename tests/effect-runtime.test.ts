@@ -4,8 +4,6 @@ import * as Fiber from 'effect/Fiber';
 import {
   createPluginEffectRuntime,
   createDelayedPluginTask,
-  runPluginEffect,
-  tryPluginSync,
 } from '../src/effect-runtime';
 
 const createDelayedTaskFixture = (delayMs: number) => {
@@ -99,24 +97,6 @@ describe('effect runtime helpers', () => {
       }
       await dispose;
     }
-  });
-
-  it('preserves typed errors at promise boundaries', async () => {
-    const error = new Error('typed failure');
-
-    await expect(runPluginEffect(tryPluginSync(() => {
-      throw error;
-    }))).rejects.toBe(error);
-  });
-
-  it('normalizes synchronous thrown causes to errors', async () => {
-    await expect(
-      runPluginEffect(
-        tryPluginSync(() => {
-          throw 'dev runtime failed';
-        })
-      )
-    ).rejects.toThrow('dev runtime failed');
   });
 
   it('runs delayed plugin tasks after their delay', async () => {

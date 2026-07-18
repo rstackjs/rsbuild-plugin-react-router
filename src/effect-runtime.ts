@@ -80,14 +80,6 @@ export const runPluginEffect = async <A, E>(
   throw normalizeEffectCause(exit.cause);
 };
 
-export const tryPluginSync = <A>(
-  evaluate: () => A
-): Effect.Effect<A, Error, never> =>
-  Effect.try({
-    try: evaluate,
-    catch: normalizeEffectError,
-  });
-
 export const tryPluginPromise = <A>(
   evaluate: () => PromiseLike<A> | A
 ): Effect.Effect<A, Error, never> =>
