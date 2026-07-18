@@ -1,5 +1,6 @@
 import { describe, expect, it, rstest } from '@rstest/core';
 import * as Effect from 'effect/Effect';
+import * as Fiber from 'effect/Fiber';
 import {
   createPluginEffectRuntime,
   createDelayedPluginTask,
@@ -65,6 +66,51 @@ describe('effect runtime helpers', () => {
 
     await Promise.all([runtime.dispose(), runtime.dispose()]);
     expect(finalized).toBe(1);
+  });
+
+  it('settles shutdown when a fiber forks during finalization', async () => {
+    const runtime = createPluginEffectRuntime();
+    let nestedFiber: ReturnType<typeof runtime.runFork> | undefined;
+    let nestedRan = false;
+    let resolveNestedStarted!: () => void;
+    const nestedStarted = new Promise<void>(resolve => {
+      resolveNestedStarted = resolve;
+    });
+
+    runtime.runFork(
+      Effect.never.pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            nestedFiber = runtime.runFork(
+              Effect.sync(() => {
+                nestedRan = true;
+              }).pipe(Effect.zipRight(Effect.never))
+            );
+            resolveNestedStarted();
+          })
+        )
+      )
+    );
+
+    const dispose = runtime.dispose();
+    await nestedStarted;
+    let settled = false;
+    try {
+      settled = await Promise.race([
+        dispose.then(() => true),
+        new Promise(resolve => setTimeout(() => resolve(false), 1_000)),
+      ]);
+      expect(settled).toBe(true);
+      if (nestedFiber) {
+        await Effect.runPromise(Fiber.await(nestedFiber));
+      }
+      expect(nestedRan).toBe(false);
+    } finally {
+      if (!settled && nestedFiber) {
+        await runtime.runPromise(Fiber.interrupt(nestedFiber).pipe(Effect.asVoid));
+      }
+      await dispose;
+    }
   });
 
   it('preserves typed errors at promise boundaries', async () => {

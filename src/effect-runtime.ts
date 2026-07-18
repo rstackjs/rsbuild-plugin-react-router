@@ -2,8 +2,10 @@ import * as Cause from 'effect/Cause';
 import * as Context from 'effect/Context';
 import * as Duration from 'effect/Duration';
 import * as Effect from 'effect/Effect';
+import * as ExecutionStrategy from 'effect/ExecutionStrategy';
 import * as Exit from 'effect/Exit';
 import * as Fiber from 'effect/Fiber';
+import * as FiberSet from 'effect/FiberSet';
 import * as Layer from 'effect/Layer';
 import * as ManagedRuntime from 'effect/ManagedRuntime';
 import * as Option from 'effect/Option';
@@ -16,6 +18,7 @@ type Acquire = <A, E, R, R2>(
 
 export interface PluginScope {
   readonly acquire: Acquire;
+  readonly fibers: FiberSet.FiberSet;
 }
 
 export const PluginScope: Context.Tag<PluginScope, PluginScope> =
@@ -25,11 +28,14 @@ const PluginScopeLive = Layer.scoped(
   PluginScope,
   Effect.gen(function* () {
     const scope = yield* Effect.scope;
+    const resources = yield* Scope.fork(scope, ExecutionStrategy.sequential);
+    const fibers = yield* FiberSet.make();
     return {
       acquire: (acquire, release) =>
         Effect.acquireRelease(acquire, release).pipe(
-          Effect.provideService(Scope.Scope, scope)
+          Effect.provideService(Scope.Scope, resources)
         ),
+      fibers,
     };
   })
 );
@@ -43,28 +49,20 @@ export type PluginEffectRuntime = Pick<
 
 export const createPluginEffectRuntime = (): PluginEffectRuntime => {
   const runtime = ManagedRuntime.make(PluginScopeLive);
-  const supervisedFibers = new Set<Fiber.RuntimeFiber<unknown, unknown>>();
-  const runFork: typeof runtime.runFork = (effect, options) => {
-    const fiber = runtime.runFork(effect, options);
-    supervisedFibers.add(fiber);
-    fiber.addObserver(() => {
-      supervisedFibers.delete(fiber);
-    });
-    return fiber;
-  };
 
   // ManagedRuntime builds lazily; initialize its scoped layer before forks.
   runtime.runSync(Effect.void);
+  const pluginScope = runtime.runSync(PluginScope);
+  const runFork: typeof runtime.runFork = runtime.runSync(
+    FiberSet.runtime(pluginScope.fibers)<PluginScope>()
+  );
 
   let disposePromise: Promise<void> | undefined;
 
   return {
     runPromise: runtime.runPromise,
     runFork,
-    dispose: (): Promise<void> =>
-      (disposePromise ??= runtime
-        .runPromise(Fiber.interruptAll(supervisedFibers))
-        .then(() => runtime.dispose())),
+    dispose: (): Promise<void> => (disposePromise ??= runtime.dispose()),
   };
 };
 
