@@ -306,9 +306,7 @@ const createRouteTopologyWatcher = async ({
     runtime,
     delayMs: ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS,
     run: () =>
-      Effect.suspend(() =>
-        closed ? Effect.void : Effect.uninterruptible(runRescanEffect())
-      ),
+      Effect.suspend(() => (closed ? Effect.void : runRescanEffect())),
     onError,
   });
 

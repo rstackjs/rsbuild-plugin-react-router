@@ -30,37 +30,6 @@ const createRouteTopologyWatcher = (
 afterAll(() => routeWatchRuntime.dispose());
 
 describe('route watch restart marker', () => {
-  it('closes all route watchers when the plugin scope is disposed', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
-    const markerPath = join(root, 'build/.react-router-route-watch');
-    const watchedDirectory = join(root, 'app');
-    const closeWatcher = rstest.fn();
-    const runtime = createPluginEffectRuntime();
-    mkdirSync(watchedDirectory, { recursive: true });
-
-    try {
-      await runtime.runPromise(
-        acquireRouteTopologyWatcher({
-          runtime,
-          watchDirectory: watchedDirectory,
-          restartMarkerPath: markerPath,
-          getRouteTopology: async () => new Set(['initial']),
-          onError: error => {
-            throw error;
-          },
-          watchDirectoryEntry: () => ({ close: closeWatcher }),
-        })
-      );
-
-      await runtime.dispose();
-
-      expect(closeWatcher).toHaveBeenCalledTimes(1);
-    } finally {
-      await runtime.dispose();
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
   it('allows a topology callback to await watcher shutdown', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
     const markerPath = join(root, 'build/.react-router-route-watch');
@@ -99,7 +68,7 @@ describe('route watch restart marker', () => {
     }
   });
 
-  it('does not recreate watchers or touch the marker after close', async () => {
+  it('does not recreate watchers or touch the marker after scope disposal', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
     const markerPath = join(root, 'build/.react-router-route-watch');
     const watchedDirectory = join(root, 'app');
@@ -117,36 +86,39 @@ describe('route watch restart marker', () => {
     });
     let triggerChange!: () => void;
     const closeWatcher = rstest.fn();
-    const runFork = rstest.spyOn(routeWatchRuntime, 'runFork');
+    const runtime = createPluginEffectRuntime();
+    const runFork = rstest.spyOn(runtime, 'runFork');
 
     try {
-      const close = await createRouteTopologyWatcher({
-        watchDirectory: watchedDirectory,
-        restartMarkerPath: markerPath,
-        onError: error => {
-          throw error;
-        },
-        getRouteTopology: async () => {
-          topologyReads += 1;
-          if (topologyReads === 1) {
-            return new Set(['initial']);
-          }
-          markRescanStarted();
-          await rescanReleased;
-          return new Set(['changed']);
-        },
-        watchDirectoryEntry: (_directory, onChange) => {
-          triggerChange = onChange;
-          return { close: closeWatcher };
-        },
-      });
+      await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          onError: error => {
+            throw error;
+          },
+          getRouteTopology: async () => {
+            topologyReads += 1;
+            if (topologyReads === 1) {
+              return new Set(['initial']);
+            }
+            markRescanStarted();
+            await rescanReleased;
+            return new Set(['changed']);
+          },
+          watchDirectoryEntry: (_directory, onChange) => {
+            triggerChange = onChange;
+            return { close: closeWatcher };
+          },
+        })
+      );
 
       triggerChange();
       await rescanStarted;
-      const closePromise = close();
+      await runtime.dispose();
       releaseRescan();
-      await closePromise;
-      await close();
+      await new Promise(resolve => setImmediate(resolve));
       runFork.mockClear();
       triggerChange();
 
@@ -154,8 +126,9 @@ describe('route watch restart marker', () => {
       expect(closeWatcher).toHaveBeenCalledTimes(1);
       expect(runFork).not.toHaveBeenCalled();
     } finally {
-      runFork.mockRestore();
       releaseRescan();
+      await runtime.dispose();
+      runFork.mockRestore();
       rmSync(root, { recursive: true, force: true });
     }
   });
