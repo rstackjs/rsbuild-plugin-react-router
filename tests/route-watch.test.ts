@@ -13,7 +13,6 @@ import { createPluginEffectRuntime } from '../src/effect-runtime';
 import {
   acquireRouteTopologyWatcher,
   createRouteManifestSnapshot,
-  createRouteTopologyWatcher as createRouteTopologyWatcherWithRuntime,
   ensureDevRestartMarker,
   getRouteRestartMarkerPath,
   type CreateRouteTopologyWatcherOptions,
@@ -23,10 +22,9 @@ const routeWatchRuntime = createPluginEffectRuntime();
 const createRouteTopologyWatcher = (
   options: Omit<CreateRouteTopologyWatcherOptions, 'runtime'>
 ) =>
-  createRouteTopologyWatcherWithRuntime({
-    runtime: routeWatchRuntime,
-    ...options,
-  });
+  routeWatchRuntime.runPromise(
+    acquireRouteTopologyWatcher({ runtime: routeWatchRuntime, ...options })
+  );
 
 afterAll(() => routeWatchRuntime.dispose());
 
@@ -152,6 +150,43 @@ describe('route watch restart marker', () => {
       expect(closeWatcher).toHaveBeenCalledTimes(1);
     } finally {
       releaseRescan();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not schedule a rescan from a retained directory callback after close', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    const runtime = createPluginEffectRuntime();
+    let triggerChange!: () => void;
+    const runFork = rstest.spyOn(runtime, 'runFork');
+    mkdirSync(watchedDirectory, { recursive: true });
+
+    try {
+      const close = await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          getRouteTopology: async () => new Set(['initial']),
+          onError: error => {
+            throw error;
+          },
+          watchDirectoryEntry: (_directory, onChange) => {
+            triggerChange = onChange;
+            return { close: () => {} };
+          },
+        })
+      );
+
+      await close();
+      runFork.mockClear();
+      triggerChange();
+
+      expect(runFork).not.toHaveBeenCalled();
+    } finally {
+      await runtime.dispose();
       rmSync(root, { recursive: true, force: true });
     }
   });

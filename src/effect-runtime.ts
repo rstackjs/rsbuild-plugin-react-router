@@ -106,6 +106,13 @@ export const tryPluginPromise = <A>(
     catch: normalizeEffectError,
   });
 
+type DelayedPluginTask = {
+  schedule(): void;
+  reschedule(): void;
+  cancelEffect(): Effect.Effect<void>;
+  cancel(): Promise<void>;
+};
+
 export const createDelayedPluginTask = ({
   runtime,
   delayMs,
@@ -116,7 +123,7 @@ export const createDelayedPluginTask = ({
   delayMs: number;
   run: () => Effect.Effect<void, Error, PluginScope>;
   onError: (error: Error) => void;
-}) => {
+}): DelayedPluginTask => {
   let fiber: ReturnType<PluginEffectRuntime['runFork']> | null | undefined;
 
   const cancelEffect = (): Effect.Effect<void> =>
@@ -172,18 +179,18 @@ export const createDelayedPluginTask = ({
     fiber = activeFiber;
   };
 
+  const reschedule = (): void => {
+    if (fiber) {
+      void cancel().then(start).catch(onError);
+    } else {
+      start();
+    }
+  };
+
   return {
-    schedule: (): void => start(),
-
-    reschedule(): void {
-      if (fiber) {
-        void cancel().then(start).catch(onError);
-      } else {
-        start();
-      }
-    },
-
-    cancelEffect: (): Effect.Effect<void> => cancelEffect(),
-    cancel: (): Promise<void> => cancel(),
+    schedule: start,
+    reschedule: reschedule,
+    cancelEffect: cancelEffect,
+    cancel: cancel,
   };
 };

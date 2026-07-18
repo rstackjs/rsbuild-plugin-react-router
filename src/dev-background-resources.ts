@@ -8,6 +8,7 @@ import {
   DEV_BACKGROUND_STARTUP_DELAY_MS,
   normalizeEffectError,
   type PluginEffectRuntime,
+  PluginScope,
 } from './effect-runtime.js';
 import {
   acquireLazyCompilationPrewarm,
@@ -170,6 +171,12 @@ export const registerReactRouterDevBackgroundResources = async ({
     : null;
 
   if (!isBuild) {
+    await runtime.runPromise(
+      Effect.flatMap(PluginScope, scope =>
+        scope.acquire(Effect.void, routeTopologyWatcherTask.cancelEffect)
+      )
+    );
+
     api.onBeforeStartDevServer(async () => {
       await ensureDevRestartMarker(routeRestartMarkerPath);
     });

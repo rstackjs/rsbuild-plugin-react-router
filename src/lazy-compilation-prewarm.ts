@@ -289,10 +289,9 @@ export const createLazyCompilationPrewarmController = ({
 export const acquireLazyCompilationPrewarm = (
   options: Parameters<typeof createLazyCompilationPrewarmController>[0]
 ): Effect.Effect<LazyCompilationPrewarmController, never, PluginScope> =>
-  Effect.gen(function* () {
-    const pluginScope = yield* PluginScope;
-    return yield* pluginScope.acquire(
+  Effect.flatMap(PluginScope, pluginScope =>
+    pluginScope.acquire(
       Effect.sync(() => createLazyCompilationPrewarmController(options)),
       controller => controller.cancelEffect()
-    );
-  });
+    )
+  );

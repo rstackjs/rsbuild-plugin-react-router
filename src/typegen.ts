@@ -172,21 +172,18 @@ export const registerReactRouterTypegen = async (
         );
       },
     });
-    await runtime.runPromise(
-      Effect.gen(function* () {
-        const pluginScope = yield* PluginScope;
-        yield* pluginScope.acquire(Effect.void, () =>
-          devWatchTask
-            .cancelEffect()
-            .pipe(
-              Effect.zipRight(
-                Effect.orDie(
-                  tryPluginPromise(() => resolvedRunner.closeWatch())
-                )
-              )
-            )
+    const closeWatchEffect = () =>
+      devWatchTask
+        .cancelEffect()
+        .pipe(
+          Effect.zipRight(
+            Effect.orDie(tryPluginPromise(() => resolvedRunner.closeWatch()))
+          )
         );
-      })
+    await runtime.runPromise(
+      Effect.flatMap(PluginScope, pluginScope =>
+        pluginScope.acquire(Effect.void, closeWatchEffect)
+      )
     );
     // Reschedule on every compile so the typegen watch only starts after a
     // quiet period with no compiles. Starting it during the initial compile

@@ -156,7 +156,7 @@ const readRouteDirectoriesEffect = (
   return walkDirectory(watchDirectory).pipe(Effect.as(directories));
 };
 
-export const createRouteTopologyWatcher = async ({
+const createRouteTopologyWatcher = async ({
   runtime,
   watchDirectory,
   getRouteTopology,
@@ -165,7 +165,7 @@ export const createRouteTopologyWatcher = async ({
   onError,
   onRouteTopologyChange,
   watchDirectoryEntry: watchDirectoryOverride = defaultWatchDirectoryEntry,
-}: CreateRouteTopologyWatcherOptions): Promise<() => Promise<void>> => {
+}: CreateRouteTopologyWatcherOptions) => {
   const discoveredDirectories = await runtime.runPromise(
     readRouteDirectoriesEffect(watchDirectory)
   );
@@ -221,8 +221,11 @@ export const createRouteTopologyWatcher = async ({
         let watcher: DirectoryWatcher;
         watcher = watchDirectoryOverride(
           directory,
-          () => rescanTask.reschedule(),
+          () => {
+            if (!closed) rescanTask.reschedule();
+          },
           error => {
+            if (closed) return;
             if (directoryWatchers.get(directory) === watcher) {
               watcher.close();
               directoryWatchers.delete(directory);
@@ -246,9 +249,7 @@ export const createRouteTopologyWatcher = async ({
     nextState: RouteDirectoryState
   ): Effect.Effect<void, Error, never> =>
     Effect.suspend(() => {
-      if (closed) {
-        return Effect.void;
-      }
+      if (closed) return Effect.void;
       syncDirectoryWatchers(nextState.directories);
       if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
         if (onRouteTopologyChange) {
@@ -281,27 +282,20 @@ export const createRouteTopologyWatcher = async ({
   const runRescanEffect = (): Effect.Effect<void, never, never> => {
     let nextDirectories: Set<string> | undefined;
     return Effect.gen(function* () {
-      if (closed) {
-        return;
-      }
+      if (closed) return;
       nextDirectories = yield* readRouteDirectoriesEffect(watchDirectory);
-      if (closed) {
-        return;
-      }
+      if (closed) return;
       const nextState = {
         directories: nextDirectories,
         routeTopology: yield* tryPluginPromise(getRouteTopology),
       };
-      if (closed) {
-        return;
-      }
+      if (closed) return;
       yield* applyNextStateEffect(nextState);
     }).pipe(
       Effect.catchAll(error =>
         Effect.sync(() => {
-          if (nextDirectories && !closed) {
+          if (nextDirectories && !closed)
             syncDirectoryWatchers(nextDirectories);
-          }
           onError(error);
         })
       )
@@ -324,30 +318,31 @@ export const createRouteTopologyWatcher = async ({
     onError(error);
   }
 
-  return async () => {
-    if (closed) {
-      await rescanTask.cancel();
-      return;
-    }
-    closed = true;
-    await rescanTask.cancel();
-    for (const watcher of directoryWatchers.values()) {
-      watcher.close();
-    }
-    directoryWatchers.clear();
-  };
+  const closeEffect = (): Effect.Effect<void, Error> =>
+    tryPluginPromise(() => {
+      if (closed) return;
+      closed = true;
+      for (const watcher of directoryWatchers.values()) {
+        watcher.close();
+      }
+      directoryWatchers.clear();
+    }).pipe(Effect.zipRight(rescanTask.cancelEffect()));
+
+  const close = () => runtime.runPromise(closeEffect());
+  return Object.assign(close, { closeEffect });
 };
 
 export const acquireRouteTopologyWatcher = (
   options: CreateRouteTopologyWatcherOptions
 ): Effect.Effect<() => Promise<void>, Error, PluginScope> =>
-  Effect.gen(function* () {
-    const pluginScope = yield* PluginScope;
-    return yield* pluginScope.acquire(
+  Effect.flatMap(PluginScope, pluginScope =>
+    pluginScope.acquire(
       tryPluginPromise(() => createRouteTopologyWatcher(options)),
       close =>
-        tryPluginPromise(close).pipe(
-          Effect.catchAll(error => Effect.sync(() => options.onError(error)))
-        )
-    );
-  });
+        close
+          .closeEffect()
+          .pipe(
+            Effect.catchAll(error => Effect.sync(() => options.onError(error)))
+          )
+    )
+  );
