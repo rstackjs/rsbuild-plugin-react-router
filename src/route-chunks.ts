@@ -829,7 +829,7 @@ export const getRouteChunkModuleId = (
     `${routeChunkQueryStringPrefix}${encodeURIComponent(chunkName)}`
   }`;
 
-export const isRouteChunkModuleId: (id: string) => boolean = (id: string) =>
+export const isRouteChunkModuleId = (id: string): boolean =>
   getRouteChunkNameFromModuleId(id) !== null;
 
 const isRouteChunkName = (name: string): name is RouteChunkName =>
