@@ -16,21 +16,14 @@ import {
   type AnyNode,
 } from './route-ast.js';
 
-export function toFunctionExpression(decl: AnyNode): AnyNode {
-  return {
-    ...decl,
-    type: 'FunctionExpression',
-    declare: undefined,
-  };
-}
-
-export function toClassExpression(decl: AnyNode): AnyNode {
-  return {
-    ...decl,
-    type: 'ClassExpression',
-    declare: undefined,
-  };
-}
+const toExpression = (
+  decl: AnyNode,
+  type: 'FunctionExpression' | 'ClassExpression'
+): AnyNode => ({
+  ...decl,
+  type,
+  declare: undefined,
+});
 
 const getComponentExportName = (exportedName: string): string | null => {
   if (exportedName === 'default') {
@@ -132,9 +125,9 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
     const uid = getHocUid(`with${name}Props`);
     const expression =
       declaration.type === 'FunctionDeclaration'
-        ? toFunctionExpression(declaration)
+        ? toExpression(declaration, 'FunctionExpression')
         : declaration.type === 'ClassDeclaration'
-          ? toClassExpression(declaration)
+          ? toExpression(declaration, 'ClassExpression')
           : declaration;
     return variableDeclaration(name, callExpression(uid, [expression]));
   }
@@ -166,9 +159,9 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
       }
       const expression =
         declaration.type === 'FunctionDeclaration'
-          ? toFunctionExpression(declaration)
+          ? toExpression(declaration, 'FunctionExpression')
           : declaration.type === 'ClassDeclaration'
-            ? toClassExpression(declaration)
+            ? toExpression(declaration, 'ClassExpression')
             : declaration;
       statement.declaration = callExpression(uid, [expression]);
       continue;
