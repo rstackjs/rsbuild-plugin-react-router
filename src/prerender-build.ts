@@ -10,12 +10,15 @@ import {
   type ServerBuild,
 } from 'react-router';
 import { dirname, relative, resolve } from 'pathe';
-import { PLUGIN_NAME } from './constants.js';
+import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import { getBuildManifest } from './build-manifest.js';
 import {
+  createReactRouterManifestOptions,
   generateReactRouterManifestForDev,
-  getReactRouterManifestForDev,
+  type ReactRouterManifestForDev as ReactRouterManifest,
   type ReactRouterManifestStats,
+  type RouteChunkManifestOptions,
+  type RouteModuleAnalysisProvider,
   type RouteManifestModuleExports,
 } from './manifest.js';
 import {
@@ -31,10 +34,6 @@ import type {
 import { resolveServerBuildModule } from './server-utils.js';
 import type { PluginOptions, Route } from './types.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-
-type ReactRouterManifest = Awaited<
-  ReturnType<typeof getReactRouterManifestForDev>
->;
 
 type BuildRouteModule = {
   loader?: unknown;
@@ -73,9 +72,10 @@ type RunReactRouterPrerenderBuildOptions = {
   pluginOptions: PluginOptions;
   appDirectory: string;
   assetPrefix: string;
-  routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
+  routeChunkOptions: RouteChunkManifestOptions | undefined;
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
   buildManifest: Awaited<ReturnType<typeof getBuildManifest>>;
-  resolvedConfigWithRoutes: ResolvedReactRouterConfig;
+  buildEndReactRouterConfig: ResolvedReactRouterConfig;
   buildEnd: Config['buildEnd'];
 };
 
@@ -160,7 +160,7 @@ export const withBuildRequest = <T>(
   handle: (request: Request) => Promise<T>
 ): Promise<T> => runPluginEffect(createBuildRequestEffect(input, init, handle));
 
-const prerenderData = async ({
+const prerenderDataEffect = ({
   handler,
   prerenderPath,
   onlyRoutes,
@@ -178,7 +178,7 @@ const prerenderData = async ({
   trailingSlashAwareDataRequests: boolean;
   api: PrerenderBuildApi;
   requestInit?: RequestInit;
-}): Promise<string> => {
+}) => {
   const dataOutputPath = createDataRequestPath(
     prerenderPath,
     trailingSlashAwareDataRequests
@@ -199,7 +199,7 @@ const prerenderData = async ({
     url.searchParams.set('_routes', onlyRoutes.join(','));
   }
 
-  return withBuildRequest(url, requestInit, async request => {
+  return createBuildRequestEffect(url, requestInit, async request => {
     const response = await handler(request);
     const data = await response.text();
 
@@ -227,7 +227,7 @@ const prerenderData = async ({
   });
 };
 
-const prerenderRoute = async ({
+const prerenderRouteEffect = ({
   handler,
   prerenderPath,
   clientBuildDir,
@@ -241,9 +241,9 @@ const prerenderRoute = async ({
   basename: string;
   api: PrerenderBuildApi;
   requestInit?: RequestInit;
-}): Promise<void> => {
+}) => {
   const normalizedPath = `${basename}${prerenderPath}/`.replace(/\/\/+/g, '/');
-  await withBuildRequest(
+  return createBuildRequestEffect(
     `http://localhost${normalizedPath}`,
     requestInit,
     async request => {
@@ -290,7 +290,7 @@ const prerenderRoute = async ({
   );
 };
 
-const prerenderResourceRoute = async ({
+const prerenderResourceRouteEffect = ({
   handler,
   prerenderPath,
   clientBuildDir,
@@ -304,11 +304,11 @@ const prerenderResourceRoute = async ({
   basename: string;
   api: PrerenderBuildApi;
   requestInit?: RequestInit;
-}): Promise<void> => {
+}) => {
   const normalizedPath = `${basename}${prerenderPath}/`
     .replace(/\/\/+/g, '/')
     .replace(/\/$/g, '');
-  await withBuildRequest(
+  return createBuildRequestEffect(
     `http://localhost${normalizedPath}`,
     requestInit,
     async request => {
@@ -361,7 +361,7 @@ const handleSpaMode = async ({
       const html = await response.text();
       const isPrerenderSpaFallback = build.prerender?.includes('/');
       const filename = isPrerenderSpaFallback
-        ? '__spa-fallback.html'
+        ? SPA_FALLBACK_HTML_FILE
         : 'index.html';
 
       if (response.status !== 200) {
@@ -374,7 +374,7 @@ const handleSpaMode = async ({
         }
         throw new Error(
           `SPA Mode: Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
+            '`entry.server.tsx` while prerendering your SPA Fallback HTML file.\n' +
             html
         );
       }
@@ -443,10 +443,10 @@ const validatePrerenderPathMatches = (
   }
 };
 
-export const createBoundedPrerenderTasksEffect = (
-  prerenderPaths: string[],
+export const createBoundedPrerenderTasksEffect = <T>(
+  prerenderPaths: T[],
   concurrency: number,
-  renderPath: (path: string) => Effect.Effect<void, Error, never>
+  renderPath: (path: T) => Effect.Effect<void, Error, never>
 ): Effect.Effect<void, Error, never> =>
   Effect.forEach(prerenderPaths, renderPath, { concurrency, discard: true });
 
@@ -480,27 +480,23 @@ const createPrerenderPathEffect = ({
 
     if (isResourceRoute) {
       if (manifestRoute.loader && routeId) {
-        yield* tryPluginPromise(() =>
-          prerenderData({
-            handler: requestHandler,
-            prerenderPath: path,
-            onlyRoutes: [routeId],
-            clientBuildDir,
-            basename,
-            trailingSlashAwareDataRequests:
-              future.unstable_trailingSlashAwareDataRequests,
-            api,
-          })
-        );
-        yield* tryPluginPromise(() =>
-          prerenderResourceRoute({
-            handler: requestHandler,
-            prerenderPath: path,
-            clientBuildDir,
-            basename,
-            api,
-          })
-        );
+        yield* prerenderDataEffect({
+          handler: requestHandler,
+          prerenderPath: path,
+          onlyRoutes: [routeId],
+          clientBuildDir,
+          basename,
+          trailingSlashAwareDataRequests:
+            future.unstable_trailingSlashAwareDataRequests,
+          api,
+        });
+        yield* prerenderResourceRouteEffect({
+          handler: requestHandler,
+          prerenderPath: path,
+          clientBuildDir,
+          basename,
+          api,
+        });
       } else {
         yield* Effect.sync(() => {
           api.logger.warn(
@@ -519,30 +515,26 @@ const createPrerenderPathEffect = ({
       return build.assets?.routes?.[matchedRouteId]?.hasLoader;
     });
     const data = hasLoaders
-      ? yield* tryPluginPromise(() =>
-          prerenderData({
-            handler: requestHandler,
-            prerenderPath: path,
-            onlyRoutes: null,
-            clientBuildDir,
-            basename,
-            trailingSlashAwareDataRequests:
-              future.unstable_trailingSlashAwareDataRequests,
-            api,
-          })
-        )
+      ? yield* prerenderDataEffect({
+          handler: requestHandler,
+          prerenderPath: path,
+          onlyRoutes: null,
+          clientBuildDir,
+          basename,
+          trailingSlashAwareDataRequests:
+            future.unstable_trailingSlashAwareDataRequests,
+          api,
+        })
       : undefined;
 
-    yield* tryPluginPromise(() =>
-      prerenderRoute({
-        handler: requestHandler,
-        prerenderPath: path,
-        clientBuildDir,
-        basename,
-        api,
-        requestInit: data ? createPrerenderDataRequestInit(data) : undefined,
-      })
-    );
+    yield* prerenderRouteEffect({
+      handler: requestHandler,
+      prerenderPath: path,
+      clientBuildDir,
+      basename,
+      api,
+      requestInit: data ? createPrerenderDataRequestInit(data) : undefined,
+    });
   });
 
 const createPrerenderDataRequestInit = (
@@ -558,35 +550,6 @@ const createPrerenderDataRequestInit = (
     : undefined;
 };
 
-const runPrerenderPaths = async ({
-  build,
-  requestHandler,
-  clientBuildDir,
-  options,
-}: {
-  build: PrerenderServerBuild;
-  requestHandler: (request: Request) => Promise<Response>;
-  clientBuildDir: string;
-  options: RunReactRouterPrerenderBuildOptions;
-}): Promise<void> => {
-  const { prerenderConfig, prerenderPaths } = options;
-  const buildRoutes = createPrerenderRoutes(build.routes);
-  const concurrency = getPrerenderConcurrency(prerenderConfig);
-
-  await runPluginEffect(
-    createBoundedPrerenderTasksEffect(prerenderPaths, concurrency, path =>
-      createPrerenderPathEffect({
-        path,
-        build,
-        buildRoutes,
-        requestHandler,
-        clientBuildDir,
-        options,
-      })
-    )
-  );
-};
-
 export const runReactRouterPrerenderBuild = async (
   options: RunReactRouterPrerenderBuildOptions
 ): Promise<void> => {
@@ -600,6 +563,7 @@ export const runReactRouterPrerenderBuild = async (
     serverBuildFile,
     ssr,
     isPrerenderEnabled,
+    prerenderConfig,
     prerenderPaths,
     routes,
     latestBrowserManifest,
@@ -609,8 +573,9 @@ export const runReactRouterPrerenderBuild = async (
     appDirectory,
     assetPrefix,
     routeChunkOptions,
+    routeModuleAnalysis,
     buildManifest,
-    resolvedConfigWithRoutes,
+    buildEndReactRouterConfig,
     buildEnd,
     basename,
   } = options;
@@ -652,7 +617,10 @@ export const runReactRouterPrerenderBuild = async (
               clientStats,
               appDirectory,
               assetPrefix,
-              routeChunkOptions
+              createReactRouterManifestOptions({
+                routeChunks: routeChunkOptions,
+                routeModuleAnalysis,
+              })
             );
         assertValidSsrFalsePrerenderExports({
           routes,
@@ -671,12 +639,22 @@ export const runReactRouterPrerenderBuild = async (
         );
       }
 
-      await runPrerenderPaths({
-        build,
-        requestHandler,
-        clientBuildDir,
-        options,
-      });
+      const buildRoutes = createPrerenderRoutes(build.routes);
+      await runPluginEffect(
+        createBoundedPrerenderTasksEffect(
+          prerenderPaths,
+          getPrerenderConcurrency(prerenderConfig),
+          path =>
+            createPrerenderPathEffect({
+              path,
+              build,
+              buildRoutes,
+              requestHandler,
+              clientBuildDir,
+              options,
+            })
+        )
+      );
     }
 
     if (!ssr) {
@@ -700,8 +678,8 @@ export const runReactRouterPrerenderBuild = async (
   if (buildEnd) {
     await buildEnd({
       buildManifest,
-      reactRouterConfig: resolvedConfigWithRoutes,
-      viteConfig: api.getNormalizedConfig(),
+      reactRouterConfig: buildEndReactRouterConfig,
+      rsbuildConfig: api.getNormalizedConfig(),
     });
   }
 };

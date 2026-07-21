@@ -119,7 +119,10 @@ type TestConfig = {
   server?: { setup?: TestServerSetup | TestServerSetup[] };
 };
 
-const createHarness = (userSetup?: TestServerSetup) => {
+const createHarness = (
+  userSetup?: TestServerSetup,
+  options: { clientPatchesRouteMetadata?: boolean } = {}
+) => {
   let start!: OnBeforeStartDevServerFn;
   let startOrder: 'pre' | 'post' | 'default' = 'default';
   let before!: OnBeforeDevCompileFn;
@@ -209,6 +212,7 @@ const createHarness = (userSetup?: TestServerSetup) => {
       defaultEntryName: 'static/js/app',
       entryNames: ['static/js/app'],
     },
+    clientPatchesRouteMetadata: options.clientPatchesRouteMetadata,
     onNodeRebuildCommitted,
   });
   const createServer = (
@@ -319,6 +323,30 @@ describe('React Router development runtime controller', () => {
     await expect(controller.createBuildLoader()()).rejects.toThrow(
       'did not create a multi-compiler'
     );
+  });
+
+  it('resolves a loader created before dev server startup', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    const loadBuild = controller.createBuildLoader();
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    loadBundle.mockImplementation(() => createBuild('initial'));
+
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+    callbacks.before();
+    const webCompilation = web.compile();
+    controller.captureWeb(webCompilation, createManifestSet('initial'));
+    web.complete(webCompilation);
+    const nodeCompilation = node.compile();
+    await callbacks.after({ stats: createGraphStats(webCompilation, nodeCompilation) });
+
+    await expect(loadBuild()).resolves.toMatchObject({
+      marker: 'initial',
+      assets: { version: 'initial' },
+    });
   });
 
   it('rejects initial readiness when aggregate stats omit an environment', async () => {
@@ -511,8 +539,11 @@ describe('React Router development runtime controller', () => {
     });
   });
 
-  it('hard reloads when route export metadata changes', async () => {
-    const { callbacks, controller, loadBundle, server } = createHarness();
+  it('publishes route metadata changes to the HMR runtime', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness(
+      undefined,
+      { clientPatchesRouteMetadata: true }
+    );
     loadBundle.mockImplementation(() => createBuild('base'));
     const web = createCompiler('web');
     const node = createCompiler('node');
@@ -543,11 +574,22 @@ describe('React Router development runtime controller', () => {
       clientLoaderModule: '/routes/about.clientLoader.js',
     });
 
-    expect(server.sockWrite).toHaveBeenCalledWith('full-reload', { path: '*' });
+    expect(server.sockWrite).toHaveBeenCalledWith('custom', {
+      event: 'react-router:manifest-update',
+      data: expect.objectContaining({
+        'routes/about': expect.objectContaining({ hasClientLoader: true }),
+      }),
+    });
   });
 
   it('publishes a safe node-only compile after the aggregate pre-hook', async () => {
-    const { callbacks, controller, loadBundle, server } = createHarness();
+    const {
+      callbacks,
+      controller,
+      loadBundle,
+      onNodeRebuildCommitted,
+      server,
+    } = createHarness();
     let build = createBuild('base');
     loadBundle.mockImplementation(() => build);
     const web = createCompiler('web');
@@ -574,6 +616,7 @@ describe('React Router development runtime controller', () => {
       assets: { version: 'web-base' },
     });
     expect(loadBundle).toHaveBeenCalledTimes(2);
+    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
   });
 
   it('signals a node rebuild for paired web and node route changes', async () => {

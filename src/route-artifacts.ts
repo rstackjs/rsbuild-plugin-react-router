@@ -1,5 +1,3 @@
-import { basename } from 'pathe';
-
 import {
   CLIENT_EXPORTS,
   CLIENT_ROUTE_EXPORTS_SET,
@@ -12,6 +10,7 @@ import {
   detectRouteChunksIfEnabled,
   emptyRouteChunkSnippet,
   getRouteChunkIfEnabled,
+  getRouteChunkModuleId,
   getRouteChunkNameFromModuleId,
   shouldAnalyzeRouteChunks,
   validateRouteChunks,
@@ -50,9 +49,8 @@ type RouteChunkArtifact = {
   map: null;
 };
 
-// Exactly the route-manifest flags the client HMR runtime can patch in place
-// without a full reload. Array order defines the bit layout shared by the
-// encoder below and the decoder emitted in `generateDevHmrRuntimeModule`.
+// Shared with the dev manifest differ: exactly the route flags the client HMR
+// runtime can patch in place without a full reload.
 export const HMR_PATCHABLE_ROUTE_FLAGS = [
   'hasAction',
   'hasClientAction',
@@ -62,88 +60,104 @@ export const HMR_PATCHABLE_ROUTE_FLAGS = [
   'hasLoader',
 ] as const;
 
-const HMR_FLAG_EXPORT_NAME: Record<
+type RouteHmrMetadata = Record<
   (typeof HMR_PATCHABLE_ROUTE_FLAGS)[number],
-  string
-> = {
-  hasAction: SERVER_EXPORTS.action,
-  hasClientAction: CLIENT_EXPORTS.clientAction,
-  hasClientLoader: CLIENT_EXPORTS.clientLoader,
-  hasClientMiddleware: CLIENT_EXPORTS.clientMiddleware,
-  hasErrorBoundary: CLIENT_EXPORTS.ErrorBoundary,
-  hasLoader: SERVER_EXPORTS.loader,
-};
+  boolean
+>;
 
-export const buildRouteHmrFlags = (exportNames: readonly string[]): number => {
+export const buildRouteHmrMetadata = (
+  exportNames: readonly string[]
+): RouteHmrMetadata => {
   const exports = new Set(exportNames);
-  let flags = 0;
-  HMR_PATCHABLE_ROUTE_FLAGS.forEach((flag, index) => {
-    if (exports.has(HMR_FLAG_EXPORT_NAME[flag])) flags |= 1 << index;
-  });
-  return flags;
+  return {
+    hasAction: exports.has(SERVER_EXPORTS.action),
+    hasClientAction: exports.has(CLIENT_EXPORTS.clientAction),
+    hasClientLoader: exports.has(CLIENT_EXPORTS.clientLoader),
+    hasClientMiddleware: exports.has(CLIENT_EXPORTS.clientMiddleware),
+    hasErrorBoundary: exports.has(CLIENT_EXPORTS.ErrorBoundary),
+    hasLoader: exports.has(SERVER_EXPORTS.loader),
+  };
 };
 
 /**
  * Development-only HMR glue for a web route client entry.
  *
  * The route client entry is the webpack entry for a route, so it must
- * self-accept hot updates to stop them from bubbling into a full reload. It
- * also accepts updates of the underlying route module and forwards fresh
- * exports plus route metadata (loader/action flags derived from the current
- * export names) to the shared HMR runtime, which applies the React Router
- * route-module update contract and revalidates loader data.
+ * self-accept hot updates to stop them from bubbling into a full reload. The
+ * route entry itself must re-run on updates so route metadata (loader/action
+ * flags derived from current export names) does not get stuck in an old accept
+ * callback while the underlying route module changes.
  */
 const buildRouteClientEntryHmrCode = ({
   routeId,
   target,
-  acceptTarget,
-  flags,
+  metadata,
 }: {
   routeId: string;
   target: string;
-  acceptTarget: string;
-  flags: number;
+  metadata: RouteHmrMetadata;
 }): string => {
   const targetJson = JSON.stringify(target);
-  const acceptTargetJson = JSON.stringify(acceptTarget);
   return `
-import * as __rrm from ${targetJson};
+import * as __reactRouterRouteModule from ${targetJson};
 import {
-  registerReactRouterRouteExports as __rrr,
-  scheduleReactRouterRouteUpdate as __rru,
+  registerReactRouterRouteExports as __reactRouterRegisterRouteExports,
+  scheduleReactRouterRouteUpdate as __reactRouterScheduleRouteUpdate,
 } from "virtual/react-router/hmr-runtime";
 
-const __rrid = ${JSON.stringify(routeId)};
-const __rrf = ${flags};
-const __rrg = () => __rrm;
-const __rru0 = () => {
-  __rrr(__rrid, __rrm);
-  __rru(__rrid, __rrf, __rrg);
-};
+const __reactRouterRouteId = ${JSON.stringify(routeId)};
+const __reactRouterRouteMetadata = ${JSON.stringify(metadata)};
+const __reactRouterGetRouteModule = () => __reactRouterRouteModule;
 
-__rrr(__rrid, __rrm);
+__reactRouterRegisterRouteExports(
+  __reactRouterRouteId,
+  __reactRouterRouteModule
+);
 
 if (import.meta.webpackHot) {
-  const __rrh = import.meta.webpackHot;
-  __rrh.accept(${acceptTargetJson}, __rru0);
-  __rrh.accept();
-  __rrh.dispose(data => { data.__rr = true; });
-  if (__rrh.data && __rrh.data.__rr) __rru0();
+  import.meta.webpackHot.accept();
+  import.meta.webpackHot.dispose(data => {
+    data.__reactRouterRouteShim = true;
+  });
+  if (
+    import.meta.webpackHot.data &&
+    import.meta.webpackHot.data.__reactRouterRouteShim
+  ) {
+    __reactRouterScheduleRouteUpdate(
+      __reactRouterRouteId,
+      __reactRouterRouteMetadata,
+      __reactRouterGetRouteModule
+    );
+  }
 }
 `;
 };
 
-// The accept target is spelled relative (`./name?react-router-route`) while
-// the import above uses the absolute resource path; both resolve to the same
-// module because the client entry replaces the route file in place, so its
-// resolution context is the route's own directory.
-const createRouteHmrAcceptTarget = (resourcePath: string): string => {
-  return `./${basename(resourcePath)}?react-router-route`;
+const shouldReexportFromRouteEntry = ({
+  chunkedExportSet,
+  exportName,
+  isServer,
+}: {
+  chunkedExportSet?: ReadonlySet<string>;
+  exportName: string;
+  isServer: boolean;
+}): boolean => {
+  if (chunkedExportSet?.has(exportName)) {
+    return false;
+  }
+  if (isServer) {
+    return (
+      CLIENT_ROUTE_EXPORTS_SET.has(exportName) ||
+      SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName)
+    );
+  }
+  return CLIENT_ROUTE_EXPORTS_SET.has(exportName);
 };
 
 export const buildRouteClientEntryCode = ({
   exportNames,
   chunkedExports,
+  sharedChunkedExports = [],
   isServer,
   resourcePath,
   routeId,
@@ -151,26 +165,39 @@ export const buildRouteClientEntryCode = ({
 }: {
   exportNames: readonly string[];
   chunkedExports: readonly string[];
+  sharedChunkedExports?: readonly string[];
   isServer: boolean;
   resourcePath: string;
   routeId?: string;
   devHmr?: boolean;
 }): string => {
   const chunkedExportSet =
-    chunkedExports.length > 0 ? new Set<string>(chunkedExports) : undefined;
+    chunkedExports.length > 0 || sharedChunkedExports.length > 0
+      ? new Set<string>([...chunkedExports, ...sharedChunkedExports])
+      : undefined;
+  const target = isServer
+    ? resourcePath
+    : chunkedExports.length > 0
+      ? getRouteChunkModuleId(resourcePath, 'main')
+      : `${resourcePath}?react-router-route`;
   const reexports = exportNames
-    .filter(exp => {
-      if (chunkedExportSet?.has(exp)) {
-        return false;
-      }
-      return (
-        CLIENT_ROUTE_EXPORTS_SET.has(exp) ||
-        (isServer && SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp))
-      );
-    })
+    .filter(exportName =>
+      shouldReexportFromRouteEntry({ chunkedExportSet, exportName, isServer })
+    )
     .sort();
-  const target = `${resourcePath}?react-router-route`;
-  const reexportCode = `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`;
+  const reexportCode = [
+    reexports.length > 0
+      ? `export { ${reexports.join(', ')} } from ${JSON.stringify(target)};`
+      : null,
+    ...sharedChunkedExports.map(
+      exportName =>
+        `export { ${exportName} } from ${JSON.stringify(
+          getRouteChunkModuleId(resourcePath, exportName)
+        )};`
+    ),
+  ]
+    .filter(Boolean)
+    .join('\n');
   if (!devHmr || isServer || routeId === undefined) {
     return reexportCode;
   }
@@ -179,8 +206,7 @@ export const buildRouteClientEntryCode = ({
     buildRouteClientEntryHmrCode({
       routeId,
       target,
-      acceptTarget: createRouteHmrAcceptTarget(resourcePath),
-      flags: buildRouteHmrFlags(exportNames),
+      metadata: buildRouteHmrMetadata(exportNames),
     })
   );
 };
@@ -211,10 +237,12 @@ export const createRouteClientEntryArtifact = async ({
   const exportNames =
     routeChunkInfo?.exportNames ?? (await getExportNames(code, resourcePath));
   const chunkedExports = routeChunkInfo?.chunkedExports ?? [];
+  const sharedChunkedExports = routeChunkInfo?.sharedChunkedExports ?? [];
   return {
     code: buildRouteClientEntryCode({
       exportNames,
       chunkedExports,
+      sharedChunkedExports,
       isServer,
       resourcePath,
       routeId,

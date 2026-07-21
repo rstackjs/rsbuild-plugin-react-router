@@ -1,7 +1,12 @@
 import { Worker } from 'node:worker_threads';
+import * as Effect from 'effect/Effect';
+import type * as Scope from 'effect/Scope';
 import { setBoundedCacheEntry } from './bounded-cache.js';
 import { getAvailableCpuCount, getDefaultConcurrency } from './concurrency.js';
-import { normalizeEffectError } from './effect-runtime.js';
+import {
+  normalizeEffectError,
+  tryPluginPromise,
+} from './effect-runtime.js';
 import {
   executeRouteTransformTask,
   type RouteTransformResult,
@@ -401,22 +406,10 @@ class ParallelRouteTransformExecutor implements RouteTransformExecutor {
   }
 }
 
-export const createRouteTransformExecutor = ({
-  parallelRouteTransform,
-  routeChunkCache,
-  splitRouteModules,
-  isBuild,
-}: RouteTransformExecutorOptions = {}): RouteTransformExecutor => {
-  return createRouteTransformExecutorWithWorkerFactory(
-    {
-      parallelRouteTransform,
-      routeChunkCache,
-      splitRouteModules,
-      isBuild,
-    },
-    createDefaultWorker
-  );
-};
+export const createRouteTransformExecutor = (
+  options: RouteTransformExecutorOptions = {}
+): RouteTransformExecutor =>
+  createRouteTransformExecutorWithWorkerFactory(options, createDefaultWorker);
 
 const createRouteTransformExecutorWithWorkerFactory = (
   {
@@ -456,3 +449,28 @@ export const createRouteTransformExecutorForTesting = (
   createWorker: RouteTransformWorkerFactory
 ): RouteTransformExecutor =>
   createRouteTransformExecutorWithWorkerFactory(options, createWorker);
+
+const acquireRouteTransformExecutorWithWorkerFactory = Effect.fn(
+  'RouteTransformExecutor.acquire'
+)(function* (
+  options: RouteTransformExecutorOptions,
+  createWorker: RouteTransformWorkerFactory
+) {
+  return yield* Effect.acquireRelease(
+    Effect.sync(() =>
+      createRouteTransformExecutorWithWorkerFactory(options, createWorker)
+    ),
+    executor => Effect.ignore(tryPluginPromise(() => executor.close()))
+  );
+});
+
+export const acquireRouteTransformExecutor = (
+  options: RouteTransformExecutorOptions = {}
+): Effect.Effect<RouteTransformExecutor, Error, Scope.Scope> =>
+  acquireRouteTransformExecutorWithWorkerFactory(options, createDefaultWorker);
+
+export const acquireRouteTransformExecutorForTesting = (
+  options: RouteTransformExecutorOptions,
+  createWorker: RouteTransformWorkerFactory
+): Effect.Effect<RouteTransformExecutor, Error, Scope.Scope> =>
+  acquireRouteTransformExecutorWithWorkerFactory(options, createWorker);

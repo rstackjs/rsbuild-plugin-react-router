@@ -2,11 +2,12 @@ import { watch, type FSWatcher } from 'node:fs';
 import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
 import type { RsbuildConfig } from '@rsbuild/core';
 import * as Effect from 'effect/Effect';
+import type * as Scope from 'effect/Scope';
 import { dirname, resolve } from 'pathe';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import {
   createDelayedPluginTask,
-  runPluginEffect,
+  type PluginEffectRuntime,
   tryPluginPromise,
 } from './effect-runtime.js';
 import type { Route } from './types.js';
@@ -47,6 +48,17 @@ type WatchDirectoryEntry = (
   onError: (error: unknown) => void
 ) => DirectoryWatcher;
 
+export type CreateRouteTopologyWatcherOptions = {
+  runtime: PluginEffectRuntime;
+  watchDirectory: string;
+  getRouteTopology: () => Promise<Set<string>>;
+  initialRouteTopology?: Set<string>;
+  restartMarkerPath: string;
+  onError: (error: unknown) => void;
+  onRouteTopologyChange?: () => void | Promise<void>;
+  watchDirectoryEntry?: WatchDirectoryEntry;
+};
+
 const defaultWatchDirectoryEntry: WatchDirectoryEntry = (
   directory,
   onChange,
@@ -70,8 +82,8 @@ export const mergeWatchFiles = (
   ] as WatchFilesConfig;
 };
 
-export const getRouteRestartMarkerPath = (outputClientPath: string): string =>
-  resolve(outputClientPath, ROUTE_RESTART_MARKER_ASSET);
+export const getRouteRestartMarkerPath = (appDirectory: string): string =>
+  resolve(appDirectory, '..', ROUTE_RESTART_MARKER_ASSET);
 
 export const createRouteManifestSnapshot = (
   routes: RouteManifestSnapshotEntries
@@ -120,10 +132,6 @@ const areSetsEqual = <T>(left: Set<T>, right: Set<T>): boolean => {
   return true;
 };
 
-const readRouteDirectories = (watchDirectory: string): Promise<Set<string>> => {
-  return runPluginEffect(readRouteDirectoriesEffect(watchDirectory));
-};
-
 const readRouteDirectoriesEffect = (
   watchDirectory: string
 ): Effect.Effect<Set<string>, Error, never> => {
@@ -148,7 +156,8 @@ const readRouteDirectoriesEffect = (
   return walkDirectory(watchDirectory).pipe(Effect.as(directories));
 };
 
-export const createRouteTopologyWatcher = async ({
+const createRouteTopologyWatcherEffect = ({
+  runtime,
   watchDirectory,
   getRouteTopology,
   initialRouteTopology,
@@ -156,202 +165,171 @@ export const createRouteTopologyWatcher = async ({
   onError,
   onRouteTopologyChange,
   watchDirectoryEntry: watchDirectoryOverride = defaultWatchDirectoryEntry,
-}: {
-  watchDirectory: string;
-  getRouteTopology: () => Promise<Set<string>>;
-  initialRouteTopology?: Set<string>;
-  restartMarkerPath: string;
-  onError: (error: unknown) => void;
-  onRouteTopologyChange?: () => void | Promise<void>;
-  watchDirectoryEntry?: WatchDirectoryEntry;
-}): Promise<() => Promise<void>> => {
-  const discoveredDirectories = await readRouteDirectories(watchDirectory);
-  let discoveredState: RouteDirectoryState;
-  try {
-    discoveredState = {
-      directories: discoveredDirectories,
-      routeTopology: await getRouteTopology(),
-    };
-  } catch (error) {
-    if (!initialRouteTopology) {
-      throw error;
-    }
-    onError(error);
-    discoveredState = {
-      directories: discoveredDirectories,
-      routeTopology: initialRouteTopology,
-    };
-  }
-  let state = {
-    ...discoveredState,
-    routeTopology: initialRouteTopology ?? discoveredState.routeTopology,
-  };
-  let closed = false;
-  let rescanQueue = Promise.resolve();
-  const directoryWatchers = new Map<string, DirectoryWatcher>();
-
-  const touchRestartMarkerEffect = (): Effect.Effect<void, Error, never> =>
-    tryPluginPromise(() =>
-      mkdir(dirname(restartMarkerPath), { recursive: true })
-    ).pipe(
-      Effect.zipRight(
-        tryPluginPromise(() => writeFile(restartMarkerPath, String(Date.now())))
-      )
-    );
-
-  const closeRemovedDirectoryWatchers = (
-    nextDirectories: Set<string>
-  ): void => {
-    for (const [directory, watcher] of directoryWatchers) {
-      if (!nextDirectories.has(directory)) {
-        watcher.close();
-        directoryWatchers.delete(directory);
-      }
-    }
-  };
-
-  const watchNewDirectories = (nextDirectories: Set<string>): void => {
-    for (const directory of nextDirectories) {
-      if (directoryWatchers.has(directory)) {
-        continue;
-      }
-      try {
-        let watcher: DirectoryWatcher;
-        watcher = watchDirectoryOverride(
-          directory,
-          () => rescanTask.reschedule(),
-          error => {
-            if (directoryWatchers.get(directory) === watcher) {
-              watcher.close();
-              directoryWatchers.delete(directory);
-            }
-            onError(error);
-          }
-        );
-        directoryWatchers.set(directory, watcher);
-      } catch (error) {
+}: CreateRouteTopologyWatcherOptions) =>
+  Effect.gen(function* () {
+    const discoveredDirectories =
+      yield* readRouteDirectoriesEffect(watchDirectory);
+    const routeTopology = yield* tryPluginPromise(getRouteTopology).pipe(
+      Effect.catchAll(error => {
+        if (!initialRouteTopology) return Effect.fail(error);
         onError(error);
-      }
-    }
-  };
+        return Effect.succeed(initialRouteTopology);
+      })
+    );
+    const discoveredState: RouteDirectoryState = {
+      directories: discoveredDirectories,
+      routeTopology,
+    };
+    let state = {
+      ...discoveredState,
+      routeTopology: initialRouteTopology ?? discoveredState.routeTopology,
+    };
+    let closed = false;
+    const directoryWatchers = new Map<string, DirectoryWatcher>();
 
-  const syncDirectoryWatchers = (nextDirectories: Set<string>): void => {
-    closeRemovedDirectoryWatchers(nextDirectories);
-    watchNewDirectories(nextDirectories);
-  };
+    const touchRestartMarkerEffect = (): Effect.Effect<void, Error, never> =>
+      tryPluginPromise(() =>
+        mkdir(dirname(restartMarkerPath), { recursive: true })
+      ).pipe(
+        Effect.zipRight(
+          tryPluginPromise(() =>
+            writeFile(restartMarkerPath, String(Date.now()))
+          )
+        )
+      );
 
-  const applyNextStateEffect = (
-    nextState: RouteDirectoryState
-  ): Effect.Effect<void, Error, never> =>
-    Effect.suspend(() => {
-      if (closed) {
-        return Effect.void;
+    const closeRemovedDirectoryWatchers = (
+      nextDirectories: Set<string>
+    ): void => {
+      for (const [directory, watcher] of directoryWatchers) {
+        if (!nextDirectories.has(directory)) {
+          watcher.close();
+          directoryWatchers.delete(directory);
+        }
       }
-      syncDirectoryWatchers(nextState.directories);
-      if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
-        if (onRouteTopologyChange) {
-          // This is a notification boundary, not part of the rescan
-          // transaction. A custom-server callback may close this watcher while
-          // replacing its compiler, so awaiting it here would deadlock close().
-          state = nextState;
-          return Effect.sync(() => {
-            try {
-              void Promise.resolve(onRouteTopologyChange()).catch(onError);
-            } catch (error) {
+    };
+
+    const watchNewDirectories = (nextDirectories: Set<string>): void => {
+      for (const directory of nextDirectories) {
+        if (directoryWatchers.has(directory)) {
+          continue;
+        }
+        try {
+          let watcher: DirectoryWatcher;
+          watcher = watchDirectoryOverride(
+            directory,
+            () => {
+              if (!closed) rescanTask.reschedule();
+            },
+            error => {
+              if (closed) return;
+              if (directoryWatchers.get(directory) === watcher) {
+                watcher.close();
+                directoryWatchers.delete(directory);
+              }
               onError(error);
             }
-          });
+          );
+          directoryWatchers.set(directory, watcher);
+        } catch (error) {
+          onError(error);
         }
-        return touchRestartMarkerEffect().pipe(
-          Effect.zipRight(
-            Effect.sync(() => {
-              if (!closed) {
-                state = nextState;
-              }
-            })
-          )
-        );
       }
-      state = nextState;
-      return Effect.void;
+    };
+
+    const syncDirectoryWatchers = (nextDirectories: Set<string>): void => {
+      closeRemovedDirectoryWatchers(nextDirectories);
+      watchNewDirectories(nextDirectories);
+    };
+
+    const applyNextStateEffect = (
+      nextState: RouteDirectoryState
+    ): Effect.Effect<void, Error, never> =>
+      Effect.suspend(() => {
+        if (closed) return Effect.void;
+        syncDirectoryWatchers(nextState.directories);
+        if (!areSetsEqual(state.routeTopology, nextState.routeTopology)) {
+          if (onRouteTopologyChange) {
+            // This is a notification boundary, not part of the rescan
+            // transaction. A custom-server callback may close this watcher while
+            // replacing its compiler, so awaiting it here would deadlock close().
+            state = nextState;
+            return Effect.sync(() => {
+              try {
+                void Promise.resolve(onRouteTopologyChange()).catch(onError);
+              } catch (error) {
+                onError(error);
+              }
+            });
+          }
+          return touchRestartMarkerEffect().pipe(
+            Effect.zipRight(
+              Effect.sync(() => {
+                if (!closed) {
+                  state = nextState;
+                }
+              })
+            )
+          );
+        }
+        state = nextState;
+        return Effect.void;
+      });
+
+    const runRescanEffect = (): Effect.Effect<void, never, never> => {
+      let nextDirectories: Set<string> | undefined;
+      return Effect.gen(function* () {
+        if (closed) return;
+        nextDirectories = yield* readRouteDirectoriesEffect(watchDirectory);
+        if (closed) return;
+        const nextState = {
+          directories: nextDirectories,
+          routeTopology: yield* tryPluginPromise(getRouteTopology),
+        };
+        if (closed) return;
+        yield* applyNextStateEffect(nextState);
+      }).pipe(
+        Effect.catchAll(error =>
+          Effect.sync(() => {
+            if (nextDirectories && !closed)
+              syncDirectoryWatchers(nextDirectories);
+            onError(error);
+          })
+        )
+      );
+    };
+
+    const rescanTask = createDelayedPluginTask({
+      runtime,
+      delayMs: ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS,
+      run: () =>
+        Effect.suspend(() => (closed ? Effect.void : runRescanEffect())),
+      onError,
     });
 
-  const runRescanEffect = (): Effect.Effect<void, never, never> => {
-    let nextDirectories: Set<string> | undefined;
-    return Effect.gen(function* () {
-      if (closed) {
-        return;
-      }
-      nextDirectories = yield* readRouteDirectoriesEffect(watchDirectory);
-      if (closed) {
-        return;
-      }
-      const nextState = {
-        directories: nextDirectories,
-        routeTopology: yield* tryPluginPromise(getRouteTopology),
-      };
-      if (closed) {
-        return;
-      }
-      yield* applyNextStateEffect(nextState);
-    }).pipe(
-      Effect.catchAll(error =>
-        Effect.sync(() => {
-          if (nextDirectories && !closed) {
-            syncDirectoryWatchers(nextDirectories);
-          }
-          onError(error);
-        })
-      )
-    );
-  };
+    const closeEffect = (): Effect.Effect<void, Error> =>
+      tryPluginPromise(() => {
+        if (closed) return;
+        closed = true;
+        for (const watcher of directoryWatchers.values()) {
+          watcher.close();
+        }
+        directoryWatchers.clear();
+      }).pipe(Effect.ensuring(rescanTask.cancelEffect()));
 
-  const rescan = (): Promise<void> => {
-    rescanQueue = rescanQueue.then(
-      () => runPluginEffect(runRescanEffect()),
-      () => runPluginEffect(runRescanEffect())
+    yield* applyNextStateEffect(discoveredState).pipe(
+      Effect.catchAll(error => Effect.sync(() => onError(error))),
+      Effect.onInterrupt(() => Effect.ignore(closeEffect()))
     );
-    return rescanQueue;
-  };
 
-  const rescanTask = createDelayedPluginTask({
-    delayMs: ROUTE_TOPOLOGY_RESCAN_DEBOUNCE_MS,
-    run: () =>
-      Effect.suspend(() =>
-        closed ? Effect.void : tryPluginPromise(rescan).pipe(Effect.asVoid)
-      ),
-    onError,
+    return closeEffect;
   });
 
-  const cancelScheduledRescan = (): Promise<void> =>
-    runPluginEffect(rescanTask.cancelEffect());
-
-  const applyNextState = async (nextState: RouteDirectoryState) => {
-    await runPluginEffect(applyNextStateEffect(nextState));
-  };
-
-  try {
-    await applyNextState(discoveredState);
-  } catch (error) {
-    onError(error);
-  }
-
-  return async () => {
-    if (closed) {
-      await cancelScheduledRescan();
-      await rescanQueue;
-      return;
-    }
-    closed = true;
-    await cancelScheduledRescan();
-    for (const watcher of directoryWatchers.values()) {
-      watcher.close();
-    }
-    directoryWatchers.clear();
-    await rescanQueue;
-    for (const watcher of directoryWatchers.values()) {
-      watcher.close();
-    }
-    directoryWatchers.clear();
-  };
-};
+export const acquireRouteTopologyWatcher = (
+  options: CreateRouteTopologyWatcherOptions
+): Effect.Effect<() => Effect.Effect<void, Error>, Error, Scope.Scope> =>
+  Effect.acquireRelease(createRouteTopologyWatcherEffect(options), close =>
+    close().pipe(
+      Effect.catchAll(error => Effect.sync(() => options.onError(error)))
+    )
+  );

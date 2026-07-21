@@ -24,10 +24,7 @@ import {
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
-import {
-  getProgram,
-  type AnyNode,
-} from './route-ast.js';
+import { getProgram } from './route-ast.js';
 
 export type RouteTransformResult = {
   code: string;
@@ -159,6 +156,14 @@ const createClientOnlyStub = async (
 
 const isComponentishName = (name: string): boolean => /^[A-Z]/.test(name);
 
+type AnyNode = {
+  type?: string;
+  name?: string;
+  body?: { type?: string };
+  callee?: { type?: string; name?: string };
+  arguments?: Array<AnyNode>;
+};
+
 /**
  * Whether an expression that appears as the first argument of a wrapping call
  * resolves to a component, mirroring react-refresh/babel's
@@ -226,7 +231,14 @@ const initResolvesToComponent = (init: AnyNode): boolean => {
 };
 
 const collectDeclaredComponentNames = (
-  declaration: AnyNode,
+  declaration: {
+    type?: string;
+    id?: { name?: string };
+    declarations?: Array<{
+      id?: { type?: string; name?: string };
+      init?: AnyNode;
+    }>;
+  },
   names: Set<string>
 ): void => {
   if (
@@ -269,7 +281,15 @@ const collectDeclaredComponentNames = (
  * subtree instead of updating it in place.
  */
 const collectUnregisteredComponentNames = (program: {
-  body?: AnyNode[];
+  body?: Array<{
+    type?: string;
+    declaration?: Parameters<typeof collectDeclaredComponentNames>[0];
+    expression?: {
+      type?: string;
+      callee?: { type?: string; name?: string };
+      arguments?: Array<{ type?: string; value?: unknown }>;
+    };
+  }>;
 }): string[] => {
   const declared = new Set<string>();
   const registered = new Set<string>();
@@ -290,7 +310,10 @@ const collectUnregisteredComponentNames = (program: {
       }
       continue;
     }
-    collectDeclaredComponentNames(statement, declared);
+    collectDeclaredComponentNames(
+      statement as Parameters<typeof collectDeclaredComponentNames>[0],
+      declared
+    );
   }
   return [...declared].filter(name => !registered.has(name));
 };
@@ -309,6 +332,41 @@ const buildComponentRefreshRegistrations = (names: string[]): string => {
   return `\nif (typeof $RefreshReg$ === 'function') {\n${registrations}\n}\n`;
 };
 
+export const validateSpaModeRouteExports = ({
+  exportNames,
+  resourcePath,
+  rootRoutePath,
+}: {
+  exportNames: readonly string[];
+  resourcePath: string;
+  rootRoutePath: string | null;
+}): void => {
+  const isRootRoute = resourcePath === rootRoutePath;
+  const relativePath = relative(process.cwd(), resourcePath);
+  const invalidServerOnly = exportNames.filter(exp => {
+    if (isRootRoute && exp === 'loader') return false;
+    return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
+  });
+
+  if (invalidServerOnly.length > 0) {
+    const list = invalidServerOnly.map(exp => `\`${exp}\``).join(', ');
+    throw new Error(
+      `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
+        `\`${relativePath}\`: ${list}. ` +
+        `See https://reactrouter.com/how-to/spa for more information.`
+    );
+  }
+
+  if (!isRootRoute && exportNames.includes('HydrateFallback')) {
+    throw new Error(
+      `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
+        `\`${relativePath}\`. ` +
+        `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
+        `See https://reactrouter.com/how-to/spa for more information.`
+    );
+  }
+};
+
 const transformRouteModule = async (
   task: RouteModuleTransformTask
 ): Promise<RouteTransformResult> => {
@@ -324,32 +382,11 @@ const transformRouteModule = async (
 
   const ast = parse(code, { sourceType: 'module' });
   if (task.environmentName === 'web' && !task.ssr && task.isSpaMode) {
-    const resolvedExportNames = collectProgramExportNames(getProgram(ast));
-    const isRootRoute = task.resourcePath === task.rootRoutePath;
-    const relativePath = relative(process.cwd(), task.resourcePath);
-
-    const invalidServerOnly = resolvedExportNames.filter(exp => {
-      if (isRootRoute && exp === 'loader') return false;
-      return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
+    validateSpaModeRouteExports({
+      exportNames: collectProgramExportNames(getProgram(ast)),
+      resourcePath: task.resourcePath,
+      rootRoutePath: task.rootRoutePath,
     });
-
-    if (invalidServerOnly.length > 0) {
-      const list = invalidServerOnly.map(e => `\`${e}\``).join(', ');
-      throw new Error(
-        `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
-          `\`${relativePath}\`: ${list}. ` +
-          `See https://reactrouter.com/how-to/spa for more information.`
-      );
-    }
-
-    if (!isRootRoute && resolvedExportNames.includes('HydrateFallback')) {
-      throw new Error(
-        `SPA Mode: Invalid \`HydrateFallback\` export found in ` +
-          `\`${relativePath}\`. ` +
-          `\`HydrateFallback\` is only permitted on the root route in SPA Mode. ` +
-          `See https://reactrouter.com/how-to/spa for more information.`
-      );
-    }
   }
 
   const removedServerOnlyExports =

@@ -1,14 +1,17 @@
 import { describe, expect, it } from '@rstest/core';
 import {
-  resolveReactRouterConfig,
+  getDefaultTrailingSlashAwareDataRequests,
   resolveReactRouterConfigEffect,
 } from '../src/react-router-config';
 import { runPluginEffect } from '../src/effect-runtime';
 import type { Config } from '../src/react-router-config';
 
+const resolveReactRouterConfig = (config: Config) =>
+  runPluginEffect(resolveReactRouterConfigEffect(config));
+
 describe('resolveReactRouterConfig', () => {
   it('merges presets and combines buildEnd hooks', async () => {
-    let buildEndCalls = 0;
+    const buildEndCalls: string[] = [];
     const result = await resolveReactRouterConfig({
       presets: [
         {
@@ -17,13 +20,13 @@ describe('resolveReactRouterConfig', () => {
             basename: '/preset',
             future: { v8_middleware: true },
             buildEnd: async () => {
-              buildEndCalls += 1;
+              buildEndCalls.push('preset');
             },
           }),
         },
       ],
       buildEnd: async () => {
-        buildEndCalls += 1;
+        buildEndCalls.push('user');
       },
     });
 
@@ -31,39 +34,9 @@ describe('resolveReactRouterConfig', () => {
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,
-      viteConfig: {} as any,
+      rsbuildConfig: {} as any,
     });
-    expect(buildEndCalls).toBe(2);
-  });
-
-  it('resolves presets through the Effect config path', async () => {
-    let buildEndCalls = 0;
-    const result = await runPluginEffect(
-      resolveReactRouterConfigEffect({
-        presets: [
-          {
-            name: 'preset-a',
-            reactRouterConfig: async () => ({
-              basename: '/effect-preset',
-              buildEnd: async () => {
-                buildEndCalls += 1;
-              },
-            }),
-          },
-        ],
-        buildEnd: async () => {
-          buildEndCalls += 1;
-        },
-      })
-    );
-
-    expect(result.resolved.basename).toBe('/effect-preset');
-    await result.resolved.buildEnd?.({
-      buildManifest: { routes: {} },
-      reactRouterConfig: result.resolved,
-      viteConfig: {} as any,
-    });
-    expect(buildEndCalls).toBe(2);
+    expect(buildEndCalls).toEqual(['preset', 'user']);
   });
 
   it('preserves server bundle selection in SSR mode', async () => {
@@ -91,10 +64,10 @@ describe('resolveReactRouterConfig', () => {
     const defaultResult = await resolveReactRouterConfig({});
     const disabledResult = await resolveReactRouterConfig({
       splitRouteModules: false,
-    } as any);
+    });
     const enforcedResult = await resolveReactRouterConfig({
       splitRouteModules: 'enforce',
-    } as any);
+    });
 
     expect(defaultResult.resolved.splitRouteModules).toBe(true);
     expect(disabledResult.resolved.splitRouteModules).toBe(false);
@@ -176,5 +149,56 @@ describe('resolveReactRouterConfig', () => {
     expect(
       disabledByTopLevel.resolved.future.unstable_subResourceIntegrity
     ).toBe(false);
+  });
+
+  it('keeps React Router 7 future aliases while exposing React Router 8 stable fields', async () => {
+    const result = await resolveReactRouterConfig({
+      subResourceIntegrity: true,
+      future: {
+        unstable_subResourceIntegrity: true,
+        unstable_trailingSlashAwareDataRequests: true,
+      },
+    } as any);
+
+    expect(result.resolved.subResourceIntegrity).toBe(true);
+    expect(result.resolved.future.unstable_subResourceIntegrity).toBe(true);
+    expect(
+      result.resolved.future.unstable_trailingSlashAwareDataRequests
+    ).toBe(true);
+  });
+
+  it('uses the legacy subresource integrity future flag when the stable field is absent', async () => {
+    const result = await resolveReactRouterConfig({
+      future: { unstable_subResourceIntegrity: true },
+    } as any);
+
+    expect(result.resolved.subResourceIntegrity).toBe(true);
+  });
+
+  it('types prerender object config with required paths', () => {
+    const validObjectConfig = {
+      prerender: { paths: ['/'], concurrency: 2 },
+    } satisfies Config;
+    const validFunctionConfig = {
+      prerender: () => ['/'],
+    } satisfies Config;
+
+    expect(validObjectConfig.prerender.concurrency).toBe(2);
+    expect(typeof validFunctionConfig.prerender).toBe('function');
+  });
+
+  it('rejects prerender object config without paths at type-check time', () => {
+    const invalidConfig = {
+      // @ts-expect-error prerender object config must include paths
+      prerender: { concurrency: 2 },
+    } satisfies Config;
+
+    expect(invalidConfig.prerender.concurrency).toBe(2);
+  });
+
+  it('defaults trailing slash-aware data requests for React Router 8 and newer', () => {
+    expect(getDefaultTrailingSlashAwareDataRequests('7.13.0')).toBe(false);
+    expect(getDefaultTrailingSlashAwareDataRequests('8.0.1')).toBe(true);
+    expect(getDefaultTrailingSlashAwareDataRequests('9.0.0')).toBe(true);
   });
 });

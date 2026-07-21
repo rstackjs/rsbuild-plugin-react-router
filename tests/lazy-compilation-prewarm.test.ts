@@ -1,8 +1,8 @@
 import { describe, expect, it, rstest } from '@rstest/core';
-import { runPluginEffect } from '../src/effect-runtime';
+import { createPluginEffectRuntime } from '../src/effect-runtime';
 import {
+  acquireLazyCompilationPrewarm,
   collectLazyCompilationPrewarmAssets,
-  createLazyCompilationPrewarmController,
   createRspackLazyCompilationTriggerClient,
   normalizeLazyCompilationPrewarmOptions,
 } from '../src/lazy-compilation-prewarm';
@@ -128,12 +128,16 @@ describe('lazy compilation prewarm helpers', () => {
       }
     ) as unknown as typeof fetch;
 
-    const controller = createLazyCompilationPrewarmController({
-      config,
-      onError: error => {
-        throw error;
-      },
-    });
+    const runtime = createPluginEffectRuntime();
+    const controller = await runtime.runPromise(
+      acquireLazyCompilationPrewarm({
+        runtime,
+        config,
+        onError: error => {
+          throw error;
+        },
+      })
+    );
 
     try {
       controller.setServerOrigin('http://localhost:3000');
@@ -151,8 +155,38 @@ describe('lazy compilation prewarm helpers', () => {
         .toBe(true);
       await expect.poll(() => posts.length).toBeGreaterThan(0);
     } finally {
-      await runPluginEffect(controller.cancelEffect());
+      await runtime.dispose();
       globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('does not fetch after runtime disposal cancels a scheduled prewarm', async () => {
+    const config = normalizeLazyCompilationPrewarmOptions(true);
+    if (!config) {
+      throw new Error('Expected prewarm config.');
+    }
+
+    const runtime = createPluginEffectRuntime();
+    const fetchSpy = rstest.spyOn(globalThis, 'fetch');
+    const controller = await runtime.runPromise(
+      acquireLazyCompilationPrewarm({
+        runtime,
+        config: { ...config, delayMs: 1_000 },
+        onError: error => {
+          throw error;
+        },
+      })
+    );
+
+    try {
+      controller.setServerOrigin('http://localhost:3000');
+      controller.setManifest(createManifest());
+      controller.schedule();
+      await runtime.dispose();
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
     }
   });
 });

@@ -1,5 +1,8 @@
 export const PLUGIN_NAME = 'rsbuild:react-router';
 
+/** Default web `output.distPath.js` segment when the user has not customized it. */
+export const DEFAULT_JS_DIST_PATH = 'static/js';
+
 export const JS_EXTENSIONS = [
   '.tsx',
   '.ts',
@@ -32,8 +35,6 @@ export const SERVER_ONLY_ROUTE_EXPORTS_SET: ReadonlySet<string> = new Set(
   SERVER_ONLY_ROUTE_EXPORTS
 );
 
-// Client route exports are split into non-component exports and component exports.
-// This mirrors upstream React Router Vite plugin intent and is used for export filtering.
 export const CLIENT_NON_COMPONENT_EXPORTS = [
   'clientAction',
   'clientLoader',
@@ -89,3 +90,6 @@ export const CLIENT_EXPORTS = {
   meta: 'meta',
   shouldRevalidate: 'shouldRevalidate',
 } as const;
+
+// SPA-mode prerender fallback document, served when no prerendered page matches.
+export const SPA_FALLBACK_HTML_FILE = '__spa-fallback.html';

@@ -28,32 +28,14 @@ export function resolvePackageJson(
   }
 }
 
-function safeRealpath(pathname: string): string {
-  try {
-    return realpathSync(pathname);
-  } catch {
-    return pathname;
-  }
-}
-
-function isPathInNodeModules(pathname: string): boolean {
-  return pathname.split(sep).includes('node_modules');
-}
-
 export function getSsrExternals(rootDirectory: string): string[] {
-  const externals: string[] = [];
-
-  for (const name of REACT_ROUTER_EXTERNALS) {
+  return REACT_ROUTER_EXTERNALS.filter(name => {
     const resolved = resolvePackageJson(name, rootDirectory);
-    if (!resolved) {
-      continue;
-    }
-
-    const realPath = safeRealpath(resolved);
-    if (!isPathInNodeModules(realPath)) {
-      externals.push(name);
-    }
-  }
-
-  return externals;
+    if (resolved === null) return false;
+    let packageJsonPath = resolved;
+    try {
+      packageJsonPath = realpathSync(packageJsonPath);
+    } catch {}
+    return !packageJsonPath.split(sep).includes('node_modules');
+  });
 }

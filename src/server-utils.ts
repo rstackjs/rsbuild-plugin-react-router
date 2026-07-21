@@ -1,7 +1,6 @@
 import { resolve } from 'pathe';
 import type { ServerBuild } from 'react-router';
-import { runPluginEffect } from './effect-runtime.js';
-import { resolveServerBuildModuleEffect } from './server-build-resolution.js';
+import { resolveServerBuildModule } from './server-build-resolution.js';
 import type { Route } from './types.js';
 
 /**
@@ -17,6 +16,7 @@ interface ServerBuildOptions {
   basename: string;
   appDirectory: string;
   ssr: boolean;
+  isSpaMode: boolean;
   future?: unknown;
   allowedActionOrigins?: string[];
   prerender?: string[];
@@ -33,19 +33,28 @@ interface ServerBuildOptions {
     | undefined;
 }
 
-function generateStaticTemplate(
+/**
+ * Generates the server build module content
+ * @param routes The route manifest
+ * @param options Build options
+ * @returns The generated module content as a string
+ */
+export function generateServerBuild(
   routes: Record<string, Route>,
   options: ServerBuildOptions
 ): string {
   const manifestId =
     options.serverManifestId ?? 'virtual/react-router/server-manifest';
+  const routeEntries = Object.entries(routes);
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
-    ${Object.keys(routes)
-      .map((key, index) => {
-        const route = routes[key];
+    ${routeEntries
+      .map(([, route], index) => {
+        if (options.isSpaMode && route.id !== 'root') {
+          return `const route${index} = { default: () => null };`;
+        }
         return `import * as route${index} from ${JSON.stringify(
-          `${resolve(options.appDirectory, route.file)}?react-router-route`
+          resolve(options.appDirectory, route.file)
         )};`;
       })
       .join('\n')}
@@ -56,7 +65,7 @@ function generateStaticTemplate(
     )};
     export const basename = ${JSON.stringify(options.basename)};
     export const future = ${JSON.stringify(options.future ?? {})};
-    export const isSpaMode = ${!options.ssr};
+    export const isSpaMode = ${options.isSpaMode};
     export const ssr = ${options.ssr};
     export const routeDiscovery = ${JSON.stringify(options.routeDiscovery)};
     export const prerender = ${JSON.stringify(options.prerender ?? [])};
@@ -64,9 +73,8 @@ function generateStaticTemplate(
     export const entry = { module: entryServer };
     export const allowedActionOrigins = ${JSON.stringify(options.allowedActionOrigins)};
     export var routes = {};
-    ${Object.keys(routes)
-      .map((key, index) => {
-        const route = routes[key];
+    ${routeEntries
+      .map(([key, route], index) => {
         return `routes[${JSON.stringify(key)}] = {
           id: ${JSON.stringify(route.id)},
           parentId: ${JSON.stringify(route.parentId)},
@@ -80,32 +88,10 @@ function generateStaticTemplate(
   `;
 }
 
-/**
- * Generates the server build module content
- * @param routes The route manifest
- * @param options Build options
- * @returns The generated module content as a string
- */
-function generateServerBuild(
-  routes: Record<string, Route>,
-  options: ServerBuildOptions & { federation?: boolean }
-): string {
-  return generateStaticTemplate(routes, options);
-}
-
-export function resolveServerBuildModule(
-  buildModule: unknown,
-  source: string
-): Promise<ServerBuild> {
-  return runPluginEffect(resolveServerBuildModuleEffect(buildModule, source));
-}
+export { resolveServerBuildModule };
 
 export function resolveReactRouterServerBuild(
   buildModule: unknown
 ): Promise<ServerBuild> {
-  return runPluginEffect(
-    resolveServerBuildModuleEffect(buildModule, 'Imported module')
-  );
+  return resolveServerBuildModule(buildModule, 'Imported module');
 }
-
-export { generateServerBuild };

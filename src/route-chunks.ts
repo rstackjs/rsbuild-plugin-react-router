@@ -5,7 +5,8 @@ import {
 } from 'yuku-analyzer';
 import { print } from 'yuku-codegen';
 import { walk } from 'yuku-parser';
-import { normalize, relative, resolve } from 'pathe';
+import { dirname, normalize, relative, resolve } from 'pathe';
+import { SERVER_ONLY_ROUTE_EXPORTS_SET } from './constants.js';
 
 type AnyNode = Record<string, any>;
 
@@ -15,7 +16,7 @@ export type RouteChunkExportName =
   | 'clientMiddleware'
   | 'HydrateFallback';
 
-export type RouteChunkName = 'main' | RouteChunkExportName;
+export type RouteChunkName = 'main' | RouteChunkExportName | (string & {});
 
 export type RouteChunkConfig = {
   splitRouteModules?: boolean | 'enforce';
@@ -35,6 +36,7 @@ export type RouteChunkInfo = {
   hasRouteChunks: boolean;
   hasRouteChunkByExportName: Record<RouteChunkExportName, boolean>;
   chunkedExports: RouteChunkExportName[];
+  sharedChunkedExports: string[];
 };
 
 export const routeChunkExportNames: RouteChunkExportName[] = [
@@ -63,7 +65,7 @@ export const emptyRouteChunkSnippet = (): string => 'export {};';
 
 const routeChunkQueryStringPrefix = '?route-chunk=';
 
-const routeChunkQueryStrings: Record<RouteChunkName, string> = {
+const routeChunkQueryStrings: Record<RouteChunkExportName | 'main', string> = {
   main: `${routeChunkQueryStringPrefix}main`,
   clientAction: `${routeChunkQueryStringPrefix}clientAction`,
   clientLoader: `${routeChunkQueryStringPrefix}clientLoader`,
@@ -141,6 +143,7 @@ type ExportDependencies = {
   topLevelStatements: Set<AnyNode>;
   topLevelNonModuleStatements: Set<AnyNode>;
   importedIdentifierNames: Set<string>;
+  importSources: Set<string>;
   exportedVariableDeclarators: Set<AnyNode>;
 };
 
@@ -172,6 +175,18 @@ const getVariableDeclaratorForNode = (
   return null;
 };
 
+const isTopLevelExportedVariableDeclarator = (
+  module: Module,
+  node: AnyNode
+): boolean => {
+  const declaration = module.parentOf(node as never) as AnyNode | null;
+  if (declaration?.type !== 'VariableDeclaration') {
+    return false;
+  }
+  const statement = module.parentOf(declaration as never) as AnyNode | null;
+  return statement?.type === 'ExportNamedDeclaration';
+};
+
 const getExportedName = (exported: AnyNode): string => {
   if (exported.type === 'Identifier') {
     return exported.name;
@@ -188,6 +203,26 @@ const setsIntersect = <T>(set1: Set<T>, set2: Set<T>) => {
   }
   for (const element of smallerSet) {
     if (largerSet.has(element)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const isEntryClientImport = (source: string, importer: string): boolean => {
+  if (!source.startsWith('.') && !source.startsWith('/')) {
+    return false;
+  }
+  const resolved = normalize(resolve('/', dirname(importer), source));
+  return /(?:^|\/)entry\.client(?:\.[cm]?[jt]sx?)?$/.test(resolved);
+};
+
+const hasEntryClientImport = (
+  dependencies: ExportDependencies,
+  importer: string
+): boolean => {
+  for (const source of dependencies.importSources) {
+    if (isEntryClientImport(source, importer)) {
       return true;
     }
   }
@@ -253,6 +288,7 @@ const getExportDependencies = (
           topLevelStatements: new Set(),
           topLevelNonModuleStatements: new Set(),
           importedIdentifierNames: new Set(),
+          importSources: new Set(),
           exportedVariableDeclarators: new Set(),
         };
         const visitedSymbols = new Set<YukuSymbol>();
@@ -278,6 +314,9 @@ const getExportDependencies = (
             return;
           }
           visitedSymbols.add(symbol);
+          if (symbol.declarations.length === 0) {
+            return;
+          }
 
           for (const declaration of symbol.declarations as AnyNode[]) {
             const statement = addCachedTopLevelStatement(
@@ -286,12 +325,15 @@ const getExportDependencies = (
             );
             if (statement.type === 'ImportDeclaration') {
               dependencies.importedIdentifierNames.add(symbol.name);
+              if (typeof statement.source?.value === 'string') {
+                dependencies.importSources.add(statement.source.value);
+              }
+              return;
             }
             const declarator = getCachedVariableDeclaratorForNode(declaration);
             if (
               declarator &&
-              getCachedTopLevelStatementForNode(declarator).type ===
-                'ExportNamedDeclaration'
+              isTopLevelExportedVariableDeclarator(module, declarator)
             ) {
               dependencies.exportedVariableDeclarators.add(declarator);
             }
@@ -336,10 +378,20 @@ const getExportDependencies = (
 
 const isExportChunkable = (
   exportName: string,
-  exportDependencies: Map<string, ExportDependencies>
+  exportDependencies: Map<string, ExportDependencies>,
+  importer: string
 ) => {
   const dependencies = exportDependencies.get(exportName);
   if (!dependencies) {
+    return false;
+  }
+  if (exportName === 'clientLoader' && hasHydrateAssignment(dependencies)) {
+    return false;
+  }
+  if (
+    exportName === 'clientLoader' &&
+    hasEntryClientImport(dependencies, importer)
+  ) {
     return false;
   }
   for (const [currentExportName, currentDependencies] of exportDependencies) {
@@ -376,6 +428,21 @@ const isExportChunkable = (
   return true;
 };
 
+const hasHydrateAssignment = (dependencies: ExportDependencies): boolean =>
+  Array.from(dependencies.topLevelNonModuleStatements).some(statement => {
+    const expression = statement.expression;
+    const left = expression?.left;
+    return (
+      statement.type === 'ExpressionStatement' &&
+      expression?.type === 'AssignmentExpression' &&
+      left?.type === 'MemberExpression' &&
+      left.object?.type === 'Identifier' &&
+      left.object.name === 'clientLoader' &&
+      left.property?.type === 'Identifier' &&
+      left.property.name === 'hydrate'
+    );
+  });
+
 const getChunkableExportMap = (
   code: string,
   cache: RouteChunkCache,
@@ -384,7 +451,7 @@ const getChunkableExportMap = (
   getOrSetFromCache(cache, `${cacheKey}::getChunkableExportMap`, code, () => {
     const exportDependencies = getExportDependencies(code, cache, cacheKey);
     return createRouteChunkExportMap(exportName =>
-      isExportChunkable(exportName, exportDependencies)
+      isExportChunkable(exportName, exportDependencies, cacheKey)
     );
   });
 
@@ -393,12 +460,18 @@ const hasChunkableExport = (
   exportName: string,
   cache: RouteChunkCache,
   cacheKey: string
-) =>
-  (routeChunkExportNames as string[]).includes(exportName)
-    ? getChunkableExportMap(code, cache, cacheKey)[
-        exportName as RouteChunkExportName
-      ]
-    : false;
+) => {
+  if ((routeChunkExportNames as string[]).includes(exportName)) {
+    return getChunkableExportMap(code, cache, cacheKey)[
+      exportName as RouteChunkExportName
+    ];
+  }
+  return isExportChunkable(
+    exportName,
+    getExportDependencies(code, cache, cacheKey),
+    cacheKey
+  );
+};
 
 const generateCode = (program: AnyNode): string | undefined => {
   if (program.body.length === 0) {
@@ -501,14 +574,12 @@ const getChunkedExport = (
   );
 };
 
-const getChunkedExportCacheKey = (
-  cacheKey: string,
-  exportName: RouteChunkExportName
-) => `${cacheKey}::getChunkedExport::${exportName}`;
+const getChunkedExportCacheKey = (cacheKey: string, exportName: string) =>
+  `${cacheKey}::getChunkedExport::${exportName}`;
 
 const hasCachedChunkedExport = (
   code: string,
-  exportName: RouteChunkExportName,
+  exportName: string,
   cache: RouteChunkCache,
   cacheKey: string
 ): boolean =>
@@ -525,11 +596,10 @@ const omitChunkedExports = (
     `${cacheKey}::omitChunkedExports::${exportNames.join(',')}`,
     code,
     () => {
-      const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
       const exportNameSet = new Set(exportNames);
       const isOmitted = (exportName: string) =>
         exportNameSet.has(exportName) &&
-        Boolean(chunkableExportMap[exportName as RouteChunkExportName]);
+        hasChunkableExport(code, exportName, cache, cacheKey);
       const isRetained = (exportName: string) => !isOmitted(exportName);
 
       const exportDependencies = getExportDependencies(code, cache, cacheKey);
@@ -633,15 +703,55 @@ const precomputeChunkedExports = (
   cache: RouteChunkCache,
   cacheKey: string
 ) => {
-  const chunkableExportMap = getChunkableExportMap(code, cache, cacheKey);
-  for (const exportName of routeChunkExportNames) {
-    if (!chunkableExportMap[exportName]) {
+  for (const exportName of getChunkedExportNames(code, cache, cacheKey)) {
+    if (!hasChunkableExport(code, exportName, cache, cacheKey)) {
       continue;
     }
-    if (!hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
+    if (hasCachedChunkedExport(code, exportName, cache, cacheKey)) {
+      continue;
+    }
+    if (
+      !hasCachedValue(
+        cache,
+        getChunkedExportCacheKey(cacheKey, exportName),
+        code
+      )
+    ) {
       getChunkedExport(code, exportName, cache, cacheKey);
     }
   }
+};
+
+const getSharedChunkedExports = (
+  exportDependencies: Map<string, ExportDependencies>,
+  cacheKey: string
+): string[] =>
+  Array.from(exportDependencies.keys())
+    .filter(
+      exportName =>
+        exportName !== 'default' &&
+        !(routeChunkExportNames as string[]).includes(exportName) &&
+        !SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName) &&
+        isExportChunkable(exportName, exportDependencies, cacheKey)
+    )
+    .sort();
+
+const getChunkedExportNames = (
+  code: string,
+  cache: RouteChunkCache,
+  cacheKey: string
+): string[] => {
+  const exportDependencies = getExportDependencies(code, cache, cacheKey);
+  const routeChunkedExports = routeChunkExportNames.filter(exportName =>
+    isExportChunkable(exportName, exportDependencies, cacheKey)
+  );
+  if (routeChunkedExports.length === 0) {
+    return [];
+  }
+  return [
+    ...routeChunkedExports,
+    ...getSharedChunkedExports(exportDependencies, cacheKey),
+  ];
 };
 
 export const detectRouteChunks = (
@@ -663,31 +773,43 @@ export const detectRouteChunks = (
   const chunkedExports = Object.entries(hasRouteChunkByExportName)
     .filter(([, isChunked]) => isChunked)
     .map(([exportName]) => exportName as RouteChunkExportName);
-  const hasRouteChunks = chunkedExports.length > 0;
+  const sharedChunkedExports =
+    chunkedExports.length > 0
+      ? getSharedChunkedExports(exportDependencies, cacheKey)
+      : [];
+  const hasRouteChunks =
+    chunkedExports.length > 0 || sharedChunkedExports.length > 0;
   return {
     exportNames: Array.from(exportDependencies.keys()),
     hasRouteChunks,
     hasRouteChunkByExportName,
     chunkedExports,
+    sharedChunkedExports,
   };
 };
 
-export const getRouteChunkCode: (
+export const getRouteChunkCode = (
   code: string,
   chunkName: RouteChunkName,
   cache: RouteChunkCache | undefined,
   cacheKey: string
-) => string | undefined = (
-  code: string,
-  chunkName: RouteChunkName,
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
-) => {
+): string | undefined => {
   const analysisCache = cache ?? new Map();
   if (chunkName === 'main') {
+    const exportDependencies = getExportDependencies(
+      code,
+      analysisCache,
+      cacheKey
+    );
+    const serverOnlyExports = Array.from(exportDependencies.keys()).filter(
+      exportName => SERVER_ONLY_ROUTE_EXPORTS_SET.has(exportName)
+    );
     return omitChunkedExports(
       code,
-      routeChunkExportNames,
+      [
+        ...getChunkedExportNames(code, analysisCache, cacheKey),
+        ...serverOnlyExports,
+      ],
       analysisCache,
       cacheKey
     );
@@ -701,13 +823,17 @@ export const getRouteChunkCode: (
 export const getRouteChunkModuleId = (
   filePath: string,
   chunkName: RouteChunkName
-) => `${filePath}${routeChunkQueryStrings[chunkName]}`;
+) =>
+  `${filePath}${
+    routeChunkQueryStrings[chunkName as RouteChunkExportName | 'main'] ??
+    `${routeChunkQueryStringPrefix}${encodeURIComponent(chunkName)}`
+  }`;
 
-export const isRouteChunkModuleId: (id: string) => boolean = (id: string) =>
+export const isRouteChunkModuleId = (id: string): boolean =>
   getRouteChunkNameFromModuleId(id) !== null;
 
 const isRouteChunkName = (name: string): name is RouteChunkName =>
-  name === 'main' || (routeChunkExportNames as string[]).includes(name);
+  name === 'main' || /^[A-Za-z_$][\w$]*$/.test(name);
 
 export const getRouteChunkNameFromModuleId = (
   id: string
@@ -769,20 +895,16 @@ export const buildManifestChunkValidity = (
       !exportNames.has(exportName) || hasRouteChunkByExportName[exportName]
   );
 
-export const detectRouteChunksIfEnabled: (
+export const detectRouteChunksIfEnabled = async (
   cache: RouteChunkCache | undefined,
   config: RouteChunkConfig,
   id: string,
   code: string
-) => Promise<RouteChunkInfo> = async (
-  cache: RouteChunkCache | undefined,
-  config: RouteChunkConfig,
-  id: string,
-  code: string
-) => {
+): Promise<RouteChunkInfo> => {
   const noRouteChunks = (): RouteChunkInfo => ({
     exportNames: [],
     chunkedExports: [] as RouteChunkExportName[],
+    sharedChunkedExports: [],
     hasRouteChunks: false,
     hasRouteChunkByExportName: createEmptyRouteChunkByExportName(),
   });
@@ -795,19 +917,13 @@ export const detectRouteChunksIfEnabled: (
   return detectRouteChunks(code, cache, cacheKey);
 };
 
-export const getRouteChunkIfEnabled: (
+export const getRouteChunkIfEnabled = async (
   cache: RouteChunkCache | undefined,
   config: RouteChunkConfig,
   id: string,
   chunkName: RouteChunkName,
   code: string
-) => Promise<string | null> = async (
-  cache: RouteChunkCache | undefined,
-  config: RouteChunkConfig,
-  id: string,
-  chunkName: RouteChunkName,
-  code: string
-) => {
+): Promise<string | null> => {
   if (!config.splitRouteModules) {
     return null;
   }

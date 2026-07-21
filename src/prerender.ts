@@ -1,24 +1,11 @@
 import type { Config } from './react-router-config.js';
+import type { PrerenderConfigObject, PrerenderPathsConfig } from './types.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
 import { matchRoutes } from 'react-router';
 
 type ReactRouterPrerenderConfig = Config['prerender'];
 type MatchRouteObject =
   Parameters<typeof matchRoutes>[0] extends Array<infer R> ? R : never;
-
-type PrerenderPathsConfig =
-  | boolean
-  | string[]
-  | ((args: {
-      getStaticPaths: () => string[];
-    }) => boolean | string[] | Promise<boolean | string[]>);
-
-type PrerenderConfigObject = Extract<
-  NonNullable<ReactRouterPrerenderConfig>,
-  { paths: unknown }
-> & {
-  unstable_concurrency?: number;
-};
 
 type PrerenderConfig = ReactRouterPrerenderConfig | PrerenderConfigObject;
 type PrerenderConcurrencyConfig =
@@ -78,7 +65,11 @@ export const createPrerenderRoutes = (
   grouped: Record<string, any[]> = groupRoutesByParentId(manifest)
 ): MatchRouteObject[] => {
   return (grouped[parentId] || []).map(route => {
-    const common = { id: route.id, path: route.path };
+    const common = {
+      id: route.id,
+      path: route.path,
+      caseSensitive: route.caseSensitive,
+    };
     if (route.index) {
       return { index: true, ...common } as MatchRouteObject;
     }
@@ -120,10 +111,9 @@ export const getSsrFalsePrerenderExportErrors = ({
   const errors: string[] = [];
   for (const [routeId, route] of Object.entries(manifestRoutes)) {
     const exports = routeExports[routeId] ?? [];
-    const invalidApis: string[] = [];
-
-    if (exports.includes('headers')) invalidApis.push('headers');
-    if (exports.includes('action')) invalidApis.push('action');
+    const invalidApis = ['headers', 'action', 'middleware'].filter(api =>
+      exports.includes(api)
+    );
 
     if (invalidApis.length > 0) {
       errors.push(
@@ -143,11 +133,17 @@ export const getSsrFalsePrerenderExportErrors = ({
         );
       }
 
+      // A loader on an ancestor route is only invalid when the ancestor is not
+      // itself fully prerendered. The root route is exempt: its loader always
+      // runs to render the app shell and it is always part of the prerender set
+      // whenever any path is prerendered, so upstream never flags it here.
       let parentRoute =
-        route.parentId && manifestRoutes[route.parentId]
+        route.parentId &&
+        route.parentId !== 'root' &&
+        manifestRoutes[route.parentId]
           ? manifestRoutes[route.parentId]
           : null;
-      while (parentRoute) {
+      while (parentRoute && parentRoute.id !== 'root') {
         if (parentRoute.hasLoader && !parentRoute.hasClientLoader) {
           errors.push(
             `Prerender: 1 invalid route export in \`${parentRoute.id}\` when ` +
@@ -156,7 +152,9 @@ export const getSsrFalsePrerenderExportErrors = ({
           );
         }
         parentRoute =
-          parentRoute.parentId && manifestRoutes[parentRoute.parentId]
+          parentRoute.parentId &&
+          parentRoute.parentId !== 'root' &&
+          manifestRoutes[parentRoute.parentId]
             ? manifestRoutes[parentRoute.parentId]
             : null;
       }
@@ -247,8 +245,9 @@ export const resolvePrerenderPaths = async (
         });
       warn(
         [
-          'Warning: Paths with dynamic/splat params cannot be prerendered when using `prerender: true`.',
-          'You may want to use the `prerender()` API to prerender the following paths:',
+          '⚠️ Paths with dynamic/splat params cannot be prerendered when ' +
+            'using `prerender: true`. You may want to use the `prerender()` ' +
+            'API to prerender the following paths:',
           ...paramRoutes.map(path => `  - ${path.replace(/^\/(?=[:*])/, '')}`),
         ].join('\n')
       );

@@ -8,15 +8,79 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it, rstest } from '@rstest/core';
+import { afterAll, describe, expect, it, rstest } from '@rstest/core';
+import * as Option from 'effect/Option';
+import { createPluginEffectRuntime } from '../src/effect-runtime';
 import {
+  acquireRouteTopologyWatcher,
   createRouteManifestSnapshot,
-  createRouteTopologyWatcher,
   ensureDevRestartMarker,
   getRouteRestartMarkerPath,
+  type CreateRouteTopologyWatcherOptions,
 } from '../src/route-watch';
 
+const routeWatchRuntime = createPluginEffectRuntime();
+const createRouteTopologyWatcher = async (
+  options: Omit<CreateRouteTopologyWatcherOptions, 'runtime'>
+) => {
+  const closeEffect = await routeWatchRuntime.runPromise(
+    acquireRouteTopologyWatcher({ runtime: routeWatchRuntime, ...options })
+  );
+  return () => routeWatchRuntime.runPromise(closeEffect());
+};
+
+afterAll(() => routeWatchRuntime.dispose());
+
 describe('route watch restart marker', () => {
+  it('settles runtime disposal triggered by a topology change', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    mkdirSync(watchedDirectory, { recursive: true });
+    let topology = new Set(['initial']);
+    const errors: unknown[] = [];
+    let triggerChange!: () => void;
+    let disposePromise: Promise<void> | undefined;
+    const runtime = createPluginEffectRuntime();
+
+    try {
+      await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          getRouteTopology: async () => topology,
+          onRouteTopologyChange: () => {
+            disposePromise = runtime.dispose();
+          },
+          onError: error => errors.push(error),
+          watchDirectoryEntry: (_directory, onChange) => {
+            triggerChange = onChange;
+            return { close: () => {} };
+          },
+        })
+      );
+
+      topology = new Set(['changed']);
+      triggerChange();
+
+      await expect.poll(() => disposePromise !== undefined).toBe(true);
+      expect(errors).toEqual([]);
+      if (!disposePromise) throw new Error('Expected runtime disposal.');
+      await expect(
+        Promise.race([
+          disposePromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('dispose timed out')), 1_000)
+          ),
+        ])
+      ).resolves.toBeUndefined();
+    } finally {
+      await runtime.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('allows a topology callback to await watcher shutdown', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
     const markerPath = join(root, 'build/.react-router-route-watch');
@@ -55,7 +119,7 @@ describe('route watch restart marker', () => {
     }
   });
 
-  it('does not recreate watchers or touch the marker after close', async () => {
+  it('does not recreate watchers or touch the marker after scope disposal', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
     const markerPath = join(root, 'build/.react-router-route-watch');
     const watchedDirectory = join(root, 'app');
@@ -73,46 +137,109 @@ describe('route watch restart marker', () => {
     });
     let triggerChange!: () => void;
     const closeWatcher = rstest.fn();
+    const runtime = createPluginEffectRuntime();
+    const runFork = rstest.spyOn(runtime, 'runFork');
 
     try {
-      const close = await createRouteTopologyWatcher({
-        watchDirectory: watchedDirectory,
-        restartMarkerPath: markerPath,
-        onError: error => {
-          throw error;
-        },
-        getRouteTopology: async () => {
-          topologyReads += 1;
-          if (topologyReads === 1) {
-            return new Set(['initial']);
-          }
-          markRescanStarted();
-          await rescanReleased;
-          return new Set(['changed']);
-        },
-        watchDirectoryEntry: (_directory, onChange) => {
-          triggerChange = onChange;
-          return { close: closeWatcher };
-        },
-      });
+      await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          onError: error => {
+            throw error;
+          },
+          getRouteTopology: async () => {
+            topologyReads += 1;
+            if (topologyReads === 1) {
+              return new Set(['initial']);
+            }
+            markRescanStarted();
+            await rescanReleased;
+            return new Set(['changed']);
+          },
+          watchDirectoryEntry: (_directory, onChange) => {
+            triggerChange = onChange;
+            return { close: closeWatcher };
+          },
+        })
+      );
 
       triggerChange();
       await rescanStarted;
-      const closePromise = close();
+      await runtime.dispose();
       releaseRescan();
-      await closePromise;
+      await new Promise(resolve => setImmediate(resolve));
+      runFork.mockClear();
+      triggerChange();
 
       expect(readFileSync(markerPath, 'utf8')).toBe(initialMarker);
-      expect(closeWatcher).toHaveBeenCalled();
+      expect(closeWatcher).toHaveBeenCalledTimes(1);
+      expect(runFork).not.toHaveBeenCalled();
     } finally {
       releaseRescan();
+      await runtime.dispose();
+      runFork.mockRestore();
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('places the restart marker in the client build output', () => {
-    expect(getRouteRestartMarkerPath('/project/build/client')).toBe(
-      resolve('/project/build/client', '.react-router/route-watch')
+  it('finalizes a pending rescan when watcher close fails', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    const runtime = createPluginEffectRuntime();
+    const closeError = new Error('watcher close failed');
+    const runFork = runtime.runFork;
+    let rescanFiber: ReturnType<typeof runtime.runFork> | undefined;
+    let triggerChange!: () => void;
+    rstest.spyOn(runtime, 'runFork').mockImplementation((effect, options) => {
+      const fiber = runFork(effect, options);
+      rescanFiber = fiber;
+      return fiber;
+    });
+    mkdirSync(watchedDirectory, { recursive: true });
+
+    try {
+      const closeEffect = await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          getRouteTopology: async () => new Set(['initial']),
+          onError: () => {},
+          watchDirectoryEntry: (_directory, onChange) => {
+            triggerChange = onChange;
+            return {
+              close: () => {
+                throw closeError;
+              },
+            };
+          },
+        })
+      );
+
+      triggerChange();
+      if (!rescanFiber) {
+        throw new Error('Expected route watcher rescan to be scheduled.');
+      }
+      const fiber = rescanFiber;
+      expect(Option.isNone(await runtime.runPromise(fiber.poll))).toBe(true);
+
+      await expect(runtime.runPromise(closeEffect())).rejects.toThrow(
+        closeError.message
+      );
+
+      expect(Option.isSome(await runtime.runPromise(fiber.poll))).toBe(true);
+    } finally {
+      await runtime.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('places the restart marker beside the app directory', () => {
+    expect(getRouteRestartMarkerPath('/project/app')).toBe(
+      resolve('/project', '.react-router/route-watch')
     );
   });
 

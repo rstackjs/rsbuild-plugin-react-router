@@ -5,7 +5,7 @@ import type { ServerBuild } from 'react-router';
 import type { ReactRouterManifestForDev } from './manifest.js';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-import { resolveServerBuildModuleEffect } from './server-build-resolution.js';
+import { resolveServerBuildModule } from './server-build-resolution.js';
 
 export type ReactRouterDevManifest = ReactRouterManifestForDev;
 
@@ -137,14 +137,17 @@ export const getEnvironmentStats = (
 const startServerBuildEvaluationEffect = (
   server: RsbuildDevServer,
   entryName: string
-): Effect.Effect<ServerBuild, Error, never> =>
+): Effect.Effect<readonly [string, ServerBuild], Error, never> =>
   tryPluginPromise(() => server.environments.node.loadBundle(entryName)).pipe(
     Effect.flatMap(buildModule =>
-      resolveServerBuildModuleEffect(
-        buildModule,
-        `Server entry ${JSON.stringify(entryName)}`
+      tryPluginPromise(() =>
+        resolveServerBuildModule(
+          buildModule,
+          `Server entry ${JSON.stringify(entryName)}`
+        )
       )
-    )
+    ),
+    Effect.map(build => [entryName, build] as const)
   );
 
 const evaluateServerBuildsEffect = (
@@ -152,12 +155,8 @@ const evaluateServerBuildsEffect = (
   entryNames: readonly string[]
 ): Effect.Effect<ReactRouterServerBuilds, Error, never> =>
   Effect.forEach(
-    entryNames.map(entryName =>
-      startServerBuildEvaluationEffect(server, entryName).pipe(
-        Effect.map(build => [entryName, build] as const)
-      )
-    ),
-    evaluation => evaluation,
+    entryNames,
+    entryName => startServerBuildEvaluationEffect(server, entryName),
     { concurrency: getCappedPluginConcurrency() }
   ).pipe(
     Effect.map(

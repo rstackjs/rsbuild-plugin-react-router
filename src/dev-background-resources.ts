@@ -7,11 +7,10 @@ import {
   createDelayedPluginTask,
   DEV_BACKGROUND_STARTUP_DELAY_MS,
   normalizeEffectError,
-  runPluginEffect,
-  tryPluginPromise,
+  type PluginEffectRuntime,
 } from './effect-runtime.js';
 import {
-  createLazyCompilationPrewarmController,
+  acquireLazyCompilationPrewarm,
   normalizeLazyCompilationPrewarmOptions,
 } from './lazy-compilation-prewarm.js';
 import {
@@ -20,8 +19,8 @@ import {
 } from './manifest.js';
 import type { RouteTransformExecutor } from './parallel-route-transforms.js';
 import {
+  acquireRouteTopologyWatcher,
   createRouteManifestSnapshot,
-  createRouteTopologyWatcher,
   ensureDevRestartMarker,
   type WatchFileConfig,
 } from './route-watch.js';
@@ -29,9 +28,10 @@ import type { PluginOptions } from './types.js';
 
 type RegisterReactRouterDevBackgroundResourcesOptions = {
   api: RsbuildPluginAPI;
+  runtime: PluginEffectRuntime;
   isBuild: boolean;
   lazyCompilationPrewarm: PluginOptions['unstableLazyCompilationPrewarm'];
-  routeTransformExecutor: RouteTransformExecutor;
+  routeTransformExecutor?: RouteTransformExecutor;
   routeRestartMarkerPath: string;
   watchDirectory: string;
   getRouteTopology: () => Promise<Set<string>>;
@@ -100,7 +100,7 @@ export const createReactRouterRouteWatchFiles = ({
     watchFiles.push(
       {
         paths: routeConfigWatchPaths,
-        type: 'reload-server',
+        type: 'reload-page',
       },
       {
         paths: routeRestartMarkerPath,
@@ -112,27 +112,9 @@ export const createReactRouterRouteWatchFiles = ({
   return watchFiles;
 };
 
-const closeAll = async (
-  message: string,
-  closers: Array<() => Promise<void>>
-): Promise<void> => {
-  const results = await Promise.allSettled(closers.map(closer => closer()));
-  const errors = results
-    .filter(
-      (result): result is PromiseRejectedResult => result.status === 'rejected'
-    )
-    .map(result => normalizeEffectError(result.reason));
-
-  if (errors.length === 1) {
-    throw errors[0];
-  }
-  if (errors.length > 1) {
-    throw new AggregateError(errors, message);
-  }
-};
-
-export const registerReactRouterDevBackgroundResources = ({
+export const registerReactRouterDevBackgroundResources = async ({
   api,
+  runtime,
   isBuild,
   lazyCompilationPrewarm,
   routeTransformExecutor,
@@ -141,9 +123,8 @@ export const registerReactRouterDevBackgroundResources = ({
   getRouteTopology,
   initialRouteTopology,
   onRouteTopologyChange,
-}: RegisterReactRouterDevBackgroundResourcesOptions): ReactRouterDevBackgroundResources => {
-  let closeActiveRouteTopologyWatcher: (() => Promise<void>) | undefined;
-  let routeTopologyWatcherClosed = false;
+}: RegisterReactRouterDevBackgroundResourcesOptions): Promise<ReactRouterDevBackgroundResources> => {
+  let routeTopologyWatcherStarted = false;
 
   const reportRouteTopologyWatcherError = (error: unknown): void => {
     api.logger.warn(
@@ -152,54 +133,49 @@ export const registerReactRouterDevBackgroundResources = ({
   };
 
   const routeTopologyWatcherTask = createDelayedPluginTask({
+    runtime,
     delayMs: DEV_BACKGROUND_STARTUP_DELAY_MS,
     run: () =>
-      Effect.gen(function* () {
-        yield* tryPluginPromise(() =>
-          ensureDevRestartMarker(routeRestartMarkerPath)
-        );
-        const closeWatcher = yield* tryPluginPromise(() =>
-          createRouteTopologyWatcher({
-            watchDirectory,
-            getRouteTopology,
-            initialRouteTopology,
-            restartMarkerPath: routeRestartMarkerPath,
-            onRouteTopologyChange,
-            onError: reportRouteTopologyWatcherError,
-          })
-        );
-        if (routeTopologyWatcherClosed) {
-          yield* tryPluginPromise(() => closeWatcher());
-          return;
-        }
-        closeActiveRouteTopologyWatcher = closeWatcher;
-      }),
+      acquireRouteTopologyWatcher({
+        runtime,
+        watchDirectory,
+        getRouteTopology,
+        initialRouteTopology,
+        restartMarkerPath: routeRestartMarkerPath,
+        onRouteTopologyChange,
+        onError: reportRouteTopologyWatcherError,
+      }).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => (routeTopologyWatcherStarted = true))
+        ),
+        Effect.asVoid
+      ),
     onError: reportRouteTopologyWatcherError,
   });
-
-  const scheduleRouteTopologyWatcher = (): void => {
-    if (routeTopologyWatcherClosed || closeActiveRouteTopologyWatcher) {
-      return;
-    }
-    routeTopologyWatcherTask.schedule();
-  };
 
   const lazyCompilationPrewarmConfig = normalizeLazyCompilationPrewarmOptions(
     lazyCompilationPrewarm
   );
   const lazyCompilationPrewarmController = lazyCompilationPrewarmConfig
-    ? createLazyCompilationPrewarmController({
-        config: lazyCompilationPrewarmConfig,
-        onError: error =>
-          api.logger.warn(
-            `[${PLUGIN_NAME}] Lazy compilation prewarm skipped: ${error.message}`
-          ),
-      })
+    ? await runtime.runPromise(
+        acquireLazyCompilationPrewarm({
+          runtime,
+          config: lazyCompilationPrewarmConfig,
+          onError: error =>
+            api.logger.warn(
+              `[${PLUGIN_NAME}] Lazy compilation prewarm skipped: ${error.message}`
+            ),
+        })
+      )
     : null;
 
   if (!isBuild) {
-    api.onBeforeStartDevServer(() => {
-      routeTopologyWatcherClosed = false;
+    await runtime.runPromise(
+      Effect.acquireRelease(Effect.void, routeTopologyWatcherTask.cancelEffect)
+    );
+
+    api.onBeforeStartDevServer(async () => {
+      await ensureDevRestartMarker(routeRestartMarkerPath);
     });
 
     api.onAfterStartDevServer(({ port }) => {
@@ -210,42 +186,16 @@ export const registerReactRouterDevBackgroundResources = ({
     });
 
     api.onAfterDevCompile(() => {
-      scheduleRouteTopologyWatcher();
+      if (!routeTopologyWatcherStarted) {
+        routeTopologyWatcherTask.schedule();
+      }
       lazyCompilationPrewarmController?.schedule();
     });
 
     // Spawn transform workers now so thread startup overlaps Rsbuild's own
     // compiler creation instead of delaying the first route transform.
-    routeTransformExecutor.prewarm();
+    routeTransformExecutor?.prewarm();
   }
-
-  const closeRouteTopologyWatcher = async (): Promise<void> => {
-    routeTopologyWatcherClosed = true;
-    await runPluginEffect(routeTopologyWatcherTask.cancelEffect());
-    await closeActiveRouteTopologyWatcher?.();
-    closeActiveRouteTopologyWatcher = undefined;
-  };
-
-  const closeLazyCompilationPrewarm = async (): Promise<void> => {
-    await runPluginEffect(
-      lazyCompilationPrewarmController?.cancelEffect() ?? Effect.void
-    );
-  };
-
-  const closeRouteTransformExecutor = (): Promise<void> =>
-    routeTransformExecutor.close();
-
-  api.onCloseDevServer(() =>
-    closeAll(
-      '[rsbuild-plugin-react-router] Failed to close dev server resources.',
-      [
-        closeRouteTopologyWatcher,
-        closeLazyCompilationPrewarm,
-        closeRouteTransformExecutor,
-      ]
-    )
-  );
-  api.onCloseBuild(closeRouteTransformExecutor);
 
   return {
     setManifest(manifest) {

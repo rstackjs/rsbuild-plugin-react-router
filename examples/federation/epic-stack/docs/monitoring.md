@@ -20,7 +20,7 @@ You can sign up for Sentry and create a Remix project from visiting
 [this url](https://sentry.io/signup/?project_platform=javascript-remix) and
 filling out the signup form.
 
-## Setting up the sentry-vite plugin
+## Setting up Sentry releases
 
 Once you see the onboarding page which has the DSN, copy that somewhere (this
 becomes `SENTRY_DSN`). Now, set the sentry dsn secret in Fly.io to be used as an
@@ -49,7 +49,7 @@ for your project under `Organization > Projects > Project > Name`
 (`SENTRY_PROJECT`).
 
 In the 'build' section of the [Dockerfile](../other/Dockerfile), there is an
-example of how to pass `SENTRY_AUTH_TOKEN` secret, so it is available to Vite
+example of how to pass `SENTRY_AUTH_TOKEN` secret, so it is available to Rsbuild
 when `npm run build` is run. You may also uncomment and hard code your
 `SENTRY_ORG` and `SENTRY_PROJECT` values. Setup up your secrets in
 [GitHub Actions secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions).
@@ -60,8 +60,4 @@ workflow. Note that these do not need to be added to the
 [`env.server`](../app/utils/env.server.ts) env vars schema, as they are only
 used during the build and not the runtime.
 
-The Sentry Vite plugin in [`vite.config.ts`](../vite.config.ts) will create
-sentry releases for you and automatically associate commits during the vite
-build once the `SENTRY_AUTH_TOKEN` is set. In this setup we have utilized a
-simple strategy for naming releases of using the commit sha, passed in as a
-build arg via the GitHub action workflow.
+Use your deployment workflow to create Sentry releases and associate commits once `SENTRY_AUTH_TOKEN` is set. A common release name is the commit sha passed through the GitHub action workflow.

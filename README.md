@@ -111,10 +111,11 @@ export default {
 ```
 
 Use `ReactRouterRsbuildConfig` for Rsbuild projects so plugin-supported
-configuration such as `splitRouteModules` stays typed. The underlying route
-and config types come from `@react-router/dev`, which framework-mode apps
-already install for `routes.ts` helpers and typegen; it is declared as an
-optional peer dependency.
+configuration such as `splitRouteModules` stays typed across React Router 7
+and 8 releases. The underlying route and config types come from
+`@react-router/dev`, which framework-mode apps already install for
+`routes.ts` helpers and typegen; it is declared as an optional peer
+dependency.
 
 Commonly used options:
 
@@ -168,7 +169,7 @@ a better fit.
 
 ### SPA Mode (`ssr: false`)
 
-React Router's SPA Mode still requires a build-time server render of the root route to generate a hydratable `index.html` (this is how the official React Router Vite plugin works).
+React Router's SPA Mode still requires a build-time server render of the root route to generate a hydratable `index.html` (this is how this Rsbuild integration mirrors React Router framework behavior).
 
 When `ssr: false`:
 
@@ -688,14 +689,13 @@ inconclusive comparison before treating it as a performance result.
 ## React Router Framework Mode
 
 React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild
-plugin aims to match the important behaviors without depending on Vite:
+plugin aims to match the important framework behaviors on Rsbuild:
 
 - Typegen + Route Module API types (`./+types/*`)
 - Route module splitting (`splitRouteModules`)
 - SPA mode (`ssr: false`), SSR mode, and static prerendering (`prerender`)
 
-Some Vite-specific integrations (for example Vite's environment API + critical
-CSS endpoint) are not supported 1:1.
+Some upstream framework integrations are not supported 1:1.
 
 ## Examples
 
@@ -709,6 +709,7 @@ The repository includes several examples demonstrating different use cases:
 | [custom-node-server](./examples/custom-node-server)                     | Custom Express server with SSR          | 3003 | `pnpm dev` |
 | [cloudflare](./examples/cloudflare)                                     | Cloudflare Workers deployment           | 3004 | `pnpm dev` |
 | [client-only](./examples/client-only)                                   | `.client` modules with SSR hydration    | 3010 | `pnpm dev` |
+| [react-router-8](./examples/react-router-8)                             | React Router 8 framework-mode SSR       | 3020 | `pnpm dev` |
 | [epic-stack](./examples/epic-stack)                                     | Full-featured Epic Stack example        | 3005 | `pnpm dev` |
 | [federation/epic-stack](./examples/federation/epic-stack)               | Module Federation host                  | 3006 | `pnpm dev` |
 | [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote                | 3007 | `pnpm dev` |

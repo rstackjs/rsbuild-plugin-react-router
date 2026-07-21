@@ -1,5 +1,6 @@
 import { describe, expect, it, rstest } from '@rstest/core';
 import type { ResultPromise } from 'execa';
+import { createPluginEffectRuntime } from '../src/effect-runtime';
 import {
   createReactRouterTypegenRunner,
   registerReactRouterTypegen,
@@ -16,6 +17,52 @@ const createProcess = () => {
     return true;
   });
   return { process, rejectProcess };
+};
+
+const createDefaultTypegenRunner = () => ({
+  startWatch: rstest.fn().mockResolvedValue(undefined),
+  closeWatch: rstest.fn().mockResolvedValue(undefined),
+  runBuild: rstest.fn().mockResolvedValue(undefined),
+});
+
+type TypegenRunnerSpies = ReturnType<typeof createDefaultTypegenRunner>;
+
+const createTypegenRegistrationHarness = (
+  {
+    action = 'dev',
+    runner: runnerOverrides,
+  }: {
+    action?: 'dev' | 'build';
+    runner?: Partial<TypegenRunnerSpies>;
+  } = {}
+) => {
+  let afterDevCompile: (() => void) | undefined;
+  const runnerSpies = { ...createDefaultTypegenRunner(), ...runnerOverrides };
+  const runner: ReactRouterTypegenRunner = runnerSpies;
+  const runtime = createPluginEffectRuntime();
+  const api = {
+    context: { action },
+    logger: { warn: rstest.fn() },
+    onAfterDevCompile: rstest.fn((callback: () => void) => {
+      afterDevCompile = callback;
+    }),
+    onBeforeStartDevServer: rstest.fn(),
+    onCloseDevServer: rstest.fn(),
+    onBeforeBuild: rstest.fn(),
+  };
+
+  return {
+    runtime,
+    api,
+    runner,
+    ...runnerSpies,
+    get afterDevCompile(): () => void {
+      if (!afterDevCompile) {
+        throw new Error('expected onAfterDevCompile to be registered');
+      }
+      return afterDevCompile;
+    },
+  };
 };
 
 describe('React Router typegen runner', () => {
@@ -54,6 +101,23 @@ describe('React Router typegen runner', () => {
 
     await runner.startWatch();
     expect(execa).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not launch a watch after close finishes during execa loading', async () => {
+    let resolveExeca!: (execa: ReturnType<typeof rstest.fn>) => void;
+    const execaLoaded = new Promise<ReturnType<typeof rstest.fn>>(resolve => {
+      resolveExeca = resolve;
+    });
+    const process = createProcess();
+    const execa = rstest.fn().mockReturnValue(process.process);
+    const runner = createReactRouterTypegenRunner(async () => execaLoaded);
+
+    const startWatch = runner.startWatch();
+    await runner.closeWatch();
+    resolveExeca(execa);
+    await startWatch;
+
+    expect(execa).not.toHaveBeenCalled();
   });
 
   it('runs one-shot build typegen through npx when no app directory is given', async () => {
@@ -104,126 +168,82 @@ describe('React Router typegen runner', () => {
   });
 
   it('starts dev watch after the first dev compile without blocking startup', async () => {
-    let afterDevCompile!: () => void;
-    const startWatch = rstest.fn().mockResolvedValue(undefined);
-    const runner: ReactRouterTypegenRunner = {
-      startWatch,
-      closeWatch: rstest.fn().mockResolvedValue(undefined),
-      runBuild: rstest.fn().mockResolvedValue(undefined),
-    };
-    const api = {
-      context: { action: 'dev' },
-      logger: { warn: rstest.fn() },
-      onAfterDevCompile: rstest.fn(callback => {
-        afterDevCompile = callback;
-      }),
-      onBeforeStartDevServer: rstest.fn(),
-      onCloseDevServer: rstest.fn(),
-      onBeforeBuild: rstest.fn(),
-    };
+    const harness = createTypegenRegistrationHarness();
 
-    registerReactRouterTypegen(api as never, { runner, devWatchDelayMs: 0 });
+    await registerReactRouterTypegen(harness.api as never, {
+      runtime: harness.runtime,
+      runner: harness.runner,
+      devWatchDelayMs: 0,
+    });
 
-    expect(api.onBeforeStartDevServer).not.toHaveBeenCalled();
-    const result = afterDevCompile();
+    expect(harness.api.onBeforeStartDevServer).not.toHaveBeenCalled();
+    const result = harness.afterDevCompile();
     expect(result).toBeUndefined();
-    afterDevCompile();
-    expect(startWatch).not.toHaveBeenCalled();
-    await expect.poll(() => startWatch.mock.calls.length).toBe(1);
+    harness.afterDevCompile();
+    expect(harness.startWatch).not.toHaveBeenCalled();
+    await expect.poll(() => harness.startWatch.mock.calls.length).toBe(1);
+    await harness.runtime.dispose();
   });
 
   it('defers the dev watch while compiles keep happening', async () => {
-    let afterDevCompile!: () => void;
-    const startWatch = rstest.fn().mockResolvedValue(undefined);
-    const runner: ReactRouterTypegenRunner = {
-      startWatch,
-      closeWatch: rstest.fn().mockResolvedValue(undefined),
-      runBuild: rstest.fn().mockResolvedValue(undefined),
-    };
-    const api = {
-      context: { action: 'dev' },
-      logger: { warn: rstest.fn() },
-      onAfterDevCompile: rstest.fn(callback => {
-        afterDevCompile = callback;
-      }),
-      onBeforeStartDevServer: rstest.fn(),
-      onCloseDevServer: rstest.fn(),
-      onBeforeBuild: rstest.fn(),
-    };
+    const harness = createTypegenRegistrationHarness();
 
-    registerReactRouterTypegen(api as never, { runner, devWatchDelayMs: 200 });
+    await registerReactRouterTypegen(harness.api as never, {
+      runtime: harness.runtime,
+      runner: harness.runner,
+      devWatchDelayMs: 200,
+    });
 
     // Compiles arriving faster than the idle delay keep pushing the start out.
     for (let i = 0; i < 4; i += 1) {
-      afterDevCompile();
+      harness.afterDevCompile();
       await new Promise(resolve => setTimeout(resolve, 50));
-      expect(startWatch).not.toHaveBeenCalled();
+      expect(harness.startWatch).not.toHaveBeenCalled();
     }
 
     await expect
-      .poll(() => startWatch.mock.calls.length, { timeout: 1000 })
+      .poll(() => harness.startWatch.mock.calls.length, { timeout: 1000 })
       .toBe(1);
 
     // Once started, later compiles do not restart or duplicate the watch.
-    afterDevCompile();
+    harness.afterDevCompile();
     await new Promise(resolve => setTimeout(resolve, 100));
-    expect(startWatch).toHaveBeenCalledTimes(1);
+    expect(harness.startWatch).toHaveBeenCalledTimes(1);
+    await harness.runtime.dispose();
   });
 
-  it('cancels delayed dev watch startup on close', async () => {
-    let afterDevCompile!: () => void;
-    let closeDevServer!: () => Promise<void>;
-    const startWatch = rstest.fn().mockResolvedValue(undefined);
-    const closeWatch = rstest.fn().mockResolvedValue(undefined);
-    const runner: ReactRouterTypegenRunner = {
-      startWatch,
-      closeWatch,
-      runBuild: rstest.fn().mockResolvedValue(undefined),
-    };
-    const api = {
-      context: { action: 'dev' },
-      logger: { warn: rstest.fn() },
-      onAfterDevCompile: rstest.fn(callback => {
-        afterDevCompile = callback;
-      }),
-      onBeforeStartDevServer: rstest.fn(),
-      onCloseDevServer: rstest.fn(callback => {
-        closeDevServer = callback;
-      }),
-      onBeforeBuild: rstest.fn(),
-    };
-
-    registerReactRouterTypegen(api as never, {
-      runner,
-      devWatchDelayMs: 1000,
+  it('cancels delayed startup and surfaces close failures during disposal', async () => {
+    const closeWatch = rstest
+      .fn()
+      .mockRejectedValue(new Error('typegen close failed'));
+    const harness = createTypegenRegistrationHarness({
+      runner: { closeWatch },
     });
 
-    afterDevCompile();
-    await closeDevServer();
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await registerReactRouterTypegen(harness.api as never, {
+      runtime: harness.runtime,
+      runner: harness.runner,
+      devWatchDelayMs: 25,
+    });
 
-    expect(startWatch).not.toHaveBeenCalled();
+    harness.afterDevCompile();
+    await expect(harness.runtime.dispose()).rejects.toThrow('typegen close failed');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(harness.startWatch).not.toHaveBeenCalled();
     expect(closeWatch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not register the dev watch hook during production builds', () => {
-    const runner: ReactRouterTypegenRunner = {
-      startWatch: rstest.fn().mockResolvedValue(undefined),
-      closeWatch: rstest.fn().mockResolvedValue(undefined),
-      runBuild: rstest.fn().mockResolvedValue(undefined),
-    };
-    const api = {
-      context: { action: 'build' },
-      logger: { warn: rstest.fn() },
-      onAfterDevCompile: rstest.fn(),
-      onBeforeStartDevServer: rstest.fn(),
-      onCloseDevServer: rstest.fn(),
-      onBeforeBuild: rstest.fn(),
-    };
+  it('does not register the dev watch hook during production builds', async () => {
+    const harness = createTypegenRegistrationHarness({ action: 'build' });
 
-    registerReactRouterTypegen(api as never, { runner });
+    await registerReactRouterTypegen(harness.api as never, {
+      runtime: harness.runtime,
+      runner: harness.runner,
+    });
 
-    expect(api.onAfterDevCompile).not.toHaveBeenCalled();
-    expect(api.onBeforeBuild).toHaveBeenCalled();
+    expect(harness.api.onAfterDevCompile).not.toHaveBeenCalled();
+    expect(harness.api.onBeforeBuild).toHaveBeenCalled();
+    await harness.runtime.dispose();
   });
 });

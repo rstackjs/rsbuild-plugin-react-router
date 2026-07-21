@@ -1,101 +1,104 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
-import {
-  rspack,
-  type RsbuildEntryDescription,
-  type RsbuildPlugin,
-  type Rspack,
-} from '@rsbuild/core';
-import { createJiti } from 'jiti';
+import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
 import {
-  BUILD_CLIENT_ROUTE_QUERY_STRING,
+  DEFAULT_JS_DIST_PATH,
   JS_EXTENSIONS,
   PLUGIN_NAME,
 } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
-import { createReactRouterDevServerSetup } from './dev-server.js';
 import {
-  generateWithProps,
   findEntryFile,
-  normalizeAssetPrefix,
+  resolveAppPackagePath,
+  resolveEffectiveAssetPrefix,
 } from './plugin-utils.js';
-import type { PluginOptions } from './types.js';
-import {
-  generateServerBuild,
-  resolveReactRouterServerBuild,
-} from './server-utils.js';
-import { resolvePrerenderPaths, validatePrerenderConfig } from './prerender.js';
+import { resolveReactRouterEntryPaths } from './entry-paths.js';
+import { registerReactRouterEnvironmentOutput } from './environment-output.js';
+import type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
+import { resolveReactRouterServerBuild } from './server-utils.js';
+import { validatePrerenderConfig } from './prerender.js';
 import { runReactRouterPrerenderBuild } from './prerender-build.js';
+import { runReactRouterRscPrerenderBuild } from './rsc-prerender.js';
 import {
-  resolveReactRouterConfig,
+  resolveReactRouterConfigEffect,
+  resolveRouteDiscoveryConfig,
   type ResolvedReactRouterConfig,
 } from './react-router-config.js';
 import {
-  getReactRouterManifestForDev,
   configRoutesToRouteManifest,
   createReactRouterManifestStats,
+  type ReactRouterManifestForDev as ReactRouterManifest,
   type ReactRouterManifestStats,
   type RouteManifestModuleExports,
 } from './manifest.js';
+import type { RouteModuleAnalysis } from './export-utils.js';
 import { registerModifyBrowserManifestAssets } from './modify-browser-manifest.js';
-import { registerBuildOutputTransforms } from './build-output-transforms.js';
 import {
-  getRouteChunkEntryName,
-  getRouteChunkModuleId,
-  routeChunkExportNames,
-  type RouteChunkCache,
-  type RouteChunkConfig,
-} from './route-chunks.js';
-import {
-  createRouteTransformExecutor,
-  shouldParallelizeRouteTransforms,
-} from './parallel-route-transforms.js';
+  registerBuildOutputTransforms,
+  registerSsrAssetRelocation,
+} from './build-output-transforms.js';
+import { type RouteChunkCache } from './route-chunks.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
-import {
-  getBuildManifest,
-  getRoutesByServerBundleId,
-} from './build-manifest.js';
-import {
-  createReactRouterNodeEntries,
-  createReactRouterServerBuildPlan,
-} from './server-build-plan.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
-import { getSsrExternals } from './ssr-externals.js';
 import {
   createReactRouterPerformanceProfiler,
   roundMs,
 } from './performance.js';
 import { mapVirtualModules } from './virtual-modules.js';
-import { createReactRouterDevRuntimeController } from './dev-runtime-controller.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-import { registerReactRouterTypegen } from './typegen.js';
-import { importConfigWithWatchPaths } from './config-imports.js';
-import {
-  createReactRouterRouteTopology,
-  createReactRouterRouteWatchFiles,
-  registerReactRouterDevBackgroundResources,
-} from './dev-background-resources.js';
 import {
   createDevHdrRevisionSignal,
   generateDevHmrRuntimeModule,
   getDevHdrRevisionFilePath,
   isRspackSwcReactRefreshEnabled,
   resolveReactRefreshRuntimePath,
-  DEV_HMR_RUNTIME_MODULE_ID,
 } from './dev-hmr.js';
+import {
+  createPluginEffectRuntime,
+  tryPluginPromise,
+} from './effect-runtime.js';
+import { registerReactRouterTypegen } from './typegen.js';
+import {
+  createConfigImporter,
+  type ConfigImporter,
+  importConfigWithWatchPaths,
+} from './config-imports.js';
+import {
+  createReactRouterRouteTopology,
+  createReactRouterRouteWatchFiles,
+  registerReactRouterDevBackgroundResources,
+} from './dev-background-resources.js';
+import {
+  assertReactRouterRscConfigSupport,
+  assertReactRouterRscSupport,
+  registerReactRouterRscRouteTransforms,
+  setupReactRouterRscPlugin,
+} from './rsc-support.js';
+import { createReactRouterModePlan } from './mode-plan.js';
+import {
+  acquireRouteTransformExecutor,
+  shouldParallelizeRouteTransforms,
+} from './parallel-route-transforms.js';
+import { createQuerylessRouteImportPlugin } from './route-imports.js';
 
 export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
 export { loadReactRouterServerBuild } from './dev-generation.js';
 export { resolveReactRouterServerBuild };
+export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';
 
 const MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES = 4;
+
+type ReactRouterPresetResolvedConfig = Parameters<
+  NonNullable<
+    NonNullable<Config['presets']>[number]['reactRouterConfigResolved']
+  >
+>[0]['reactRouterConfig'];
 
 export const shouldParallelizeEnvironmentBuilds = ({
   isBuild,
@@ -105,42 +108,6 @@ export const shouldParallelizeEnvironmentBuilds = ({
   spareCoreCount?: number;
 }): boolean =>
   !isBuild && spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES;
-
-type ModuleFederationPluginLike = {
-  name?: string;
-  _options?: { experiments?: { asyncStartup?: boolean } };
-  options?: { experiments?: { asyncStartup?: boolean } };
-};
-
-const ensureFederationAsyncStartup = (
-  rspackConfig: Rspack.Configuration | undefined
-): void => {
-  if (!rspackConfig?.plugins?.length) {
-    return;
-  }
-
-  for (const plugin of rspackConfig.plugins) {
-    if (!plugin || typeof plugin !== 'object') {
-      continue;
-    }
-    const pluginName = (plugin as ModuleFederationPluginLike).name;
-    if (pluginName !== 'ModuleFederationPlugin') {
-      continue;
-    }
-
-    const pluginOptions =
-      (plugin as ModuleFederationPluginLike)._options ??
-      (plugin as ModuleFederationPluginLike).options;
-    if (!pluginOptions) {
-      continue;
-    }
-
-    pluginOptions.experiments = {
-      ...pluginOptions.experiments,
-      asyncStartup: true,
-    };
-  }
-};
 
 const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
@@ -153,9 +120,15 @@ export const pluginReactRouter = (
   name: PLUGIN_NAME,
 
   async setup(api) {
+    const effectRuntime = createPluginEffectRuntime();
+    api.onCloseBuild(effectRuntime.dispose);
+    api.onCloseDevServer(effectRuntime.dispose);
+    api.onExit(effectRuntime.dispose);
+
     const defaultOptions = {
       customServer: false,
       lazyCompilation: true,
+      rsc: false,
       serverOutput: 'module' as const,
     };
 
@@ -163,16 +136,13 @@ export const pluginReactRouter = (
       ...defaultOptions,
       ...options,
     };
+    const isRscMode = Boolean(pluginOptions.rsc);
     const logPerformance = pluginOptions.logPerformance === true;
     const setupStartMs = logPerformance ? performance.now() : 0;
     const performanceProfiler = createReactRouterPerformanceProfiler({
       enabled: logPerformance,
       log: message => api.logger.info(message),
     });
-    const nodeExternals = Array.from(
-      new Set(['express', ...getSsrExternals(process.cwd())])
-    );
-
     let assetPrefix = '/';
 
     // Best-effort configuration validation (upstream: validate-plugin-order).
@@ -188,7 +158,6 @@ export const pluginReactRouter = (
           }
           api.logger.warn(issue.message);
         }
-        assetPrefix = normalizeAssetPrefix(config.output?.assetPrefix);
         return config;
       },
     });
@@ -196,6 +165,15 @@ export const pluginReactRouter = (
     api.onBeforeBuild(() => {
       const normalized = api.getNormalizedConfig();
       warnOnClientSourceMaps(normalized, msg => api.logger.warn(msg), 'web');
+    });
+
+    api.onBeforeCreateCompiler(() => {
+      const normalized = api.getNormalizedConfig();
+      assetPrefix = resolveEffectiveAssetPrefix({
+        dev: normalized.dev,
+        output: normalized.output,
+        isBuild: api.context.action === 'build',
+      });
     });
 
     const configPath = findEntryFile(resolve('react-router.config'));
@@ -230,9 +208,12 @@ export const pluginReactRouter = (
 
     const {
       resolved: resolvedConfig,
+      userAndPresetConfig,
       presets: configPresets,
       hasConfiguredServerModuleFormat,
-    } = await resolveReactRouterConfig(reactRouterUserConfig);
+    } = await effectRuntime.runPromise(
+      resolveReactRouterConfigEffect(reactRouterUserConfig)
+    );
 
     const {
       appDirectory,
@@ -244,12 +225,17 @@ export const pluginReactRouter = (
       ssr,
       prerender: prerenderConfig,
       serverBuildFile,
+      serverBundles,
       serverModuleFormat,
       splitRouteModules,
+      subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
 
-    registerReactRouterTypegen(api, { appDirectory });
+    await registerReactRouterTypegen(api, {
+      runtime: effectRuntime,
+      appDirectory,
+    });
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
       options,
@@ -290,57 +276,57 @@ export const pluginReactRouter = (
       throw new Error(prerenderConfigError);
     }
 
-    // React Router defaults to "lazy" route discovery, but "ssr:false" builds
-    // have no runtime server to serve manifest patch requests, so we force
-    // `mode:"initial"` in SPA mode to avoid any `/__manifest` fetches.
-    let routeDiscovery: Config['routeDiscovery'];
-    if (!userRouteDiscovery) {
-      routeDiscovery = ssr
-        ? ({ mode: 'lazy', manifestPath: '/__manifest' } as const)
-        : ({ mode: 'initial' } as const);
-    } else if (userRouteDiscovery.mode === 'initial') {
-      routeDiscovery = userRouteDiscovery;
-    } else if (userRouteDiscovery.mode === 'lazy') {
-      if (!ssr) {
-        throw new Error(
-          'The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`'
-        );
-      }
-      const manifestPath = userRouteDiscovery.manifestPath;
-      if (manifestPath && !manifestPath.startsWith('/')) {
-        throw new Error(
-          'The `routeDiscovery.manifestPath` config must be a root-relative pathname beginning with a slash (i.e., "/__manifest")'
-        );
-      }
-      routeDiscovery = userRouteDiscovery;
-    }
+    const routeDiscovery = resolveRouteDiscoveryConfig({
+      ssr,
+      userRouteDiscovery,
+    });
 
     (globalThis as any).__reactRouterAppDirectory = resolve(appDirectory);
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
     if (!existsSync(routesPath)) {
-      throw new Error(
-        `Route config file not found at "${relative(
-          process.cwd(),
-          routesPath
-        )}".`
+      const missingRoutesPath = relative(
+        process.cwd(),
+        resolve(appDirectory, 'routes.ts')
       );
+      throw new Error(`Route config file not found at "${missingRoutesPath}".`);
     }
 
-    const jiti = createJiti(process.cwd(), {
+    const routeConfigDefine =
+      typeof api.getRsbuildConfig === 'function'
+        ? api.getRsbuildConfig().source?.define
+        : undefined;
+    const jiti = createConfigImporter({
+      define: routeConfigDefine,
       moduleCache: false,
     });
     const importRouteConfig = async (
-      importer: Pick<typeof jiti, 'import'>
+      importer: ConfigImporter
     ): Promise<RouteConfigEntry[]> => {
-      const routeConfigExport = await importer.import<RouteConfigEntry[]>(
-        routesPath,
-        {
-          default: true,
-        }
-      );
-      const routeConfigValue = await routeConfigExport;
+      const routeConfigFile = relative(resolve(appDirectory), routesPath);
+      let routeConfigValue: RouteConfigEntry[];
+      try {
+        const routeConfigExport = await importer.import<RouteConfigEntry[]>(
+          routesPath,
+          {
+            default: true,
+          }
+        );
+        routeConfigValue = await routeConfigExport;
+      } catch (error) {
+        // Match upstream: import/evaluation failures (e.g. syntax errors) are
+        // reported as an invalid route config rather than a raw loader error.
+        throw new Error(
+          [
+            `Route config in "${routeConfigFile}" is invalid.`,
+            '',
+            error instanceof Error
+              ? (error.stack ?? error.message)
+              : String(error),
+          ].join('\n')
+        );
+      }
       const validation = validateRouteConfig({
-        routeConfigFile: relative(process.cwd(), routesPath),
+        routeConfigFile,
         routeConfig: routeConfigValue,
       });
       if (!validation.valid) {
@@ -350,33 +336,41 @@ export const pluginReactRouter = (
     };
     const loadRouteConfig = () => importRouteConfig(jiti);
     const { value: routeConfig, watchPaths: routeConfigWatchPaths } =
-      await importConfigWithWatchPaths(routesPath, importRouteConfig);
+      await importConfigWithWatchPaths(routesPath, importRouteConfig, {
+        define: routeConfigDefine,
+      });
 
-    const entryClientPath = findEntryFile(
-      resolve(appDirectory, 'entry.client')
-    );
-    const entryServerPath = findEntryFile(
-      resolve(appDirectory, 'entry.server')
-    );
+    const {
+      devServerBuildEntryName,
+      finalEntryClientPath,
+      finalEntryRscClientPath,
+      finalEntryRscPath,
+      finalEntryRscSsrPath,
+      finalEntryServerPath,
+      hasServerApp,
+      serverAppPath,
+    } = resolveReactRouterEntryPaths({
+      appDirectory,
+      templatesDirectory: resolve(__dirname, 'templates'),
+    });
 
-    const serverAppPath = findEntryFile(
-      resolve(appDirectory, '../server/index')
-    );
-    const hasServerApp = existsSync(serverAppPath);
-    const devServerBuildEntryName = hasServerApp
-      ? 'static/js/react-router-server-build'
-      : 'static/js/app';
-
-    const templateDir = resolve(__dirname, 'templates');
-    const templateClientPath = resolve(templateDir, 'entry.client.js');
-    const templateServerPath = resolve(templateDir, 'entry.server.js');
-
-    const finalEntryClientPath = existsSync(entryClientPath)
-      ? entryClientPath
-      : templateClientPath;
-    const finalEntryServerPath = existsSync(entryServerPath)
-      ? entryServerPath
-      : templateServerPath;
+    if (isRscMode) {
+      assertReactRouterRscSupport({
+        pluginName: PLUGIN_NAME,
+        resolvePackagePath: resolveAppPackagePath,
+      });
+      assertReactRouterRscConfigSupport({
+        pluginName: PLUGIN_NAME,
+        userConfig: resolvedConfig,
+      });
+      await setupReactRouterRscPlugin({
+        api,
+        entryRscPath: finalEntryRscPath,
+        entrySsrPath: finalEntryRscSsrPath,
+        pluginName: PLUGIN_NAME,
+        rsc: typeof pluginOptions.rsc === 'object' ? pluginOptions.rsc : {},
+      });
+    }
 
     const getRootRoutePath = () => findEntryFile(resolve(appDirectory, 'root'));
     const rootRoutePath = getRootRoutePath();
@@ -397,23 +391,36 @@ export const pluginReactRouter = (
     };
 
     const resolvedConfigWithRoutes: ResolvedReactRouterConfig = {
-      ...resolvedConfig,
       appDirectory: resolve(appDirectory),
+      basename,
       buildDirectory: resolve(buildDirectory),
-      routeDiscovery,
+      buildEnd,
+      future,
       prerender: prerenderConfig,
       routes,
-      unstable_routeConfig: routeConfig,
+      routeDiscovery,
+      serverBuildFile,
+      serverBundles,
+      serverModuleFormat,
+      ssr,
+      splitRouteModules,
+      subResourceIntegrity,
       allowedActionOrigins: allowedActionOrigins ?? false,
+      unstable_routeConfig: routeConfig,
     };
 
     const { buildEnd: _buildEnd, ...resolvedConfigForPreset } =
       resolvedConfigWithRoutes;
     for (const preset of configPresets) {
       await preset.reactRouterConfigResolved?.({
-        reactRouterConfig: resolvedConfigForPreset,
+        reactRouterConfig:
+          resolvedConfigForPreset as ReactRouterPresetResolvedConfig,
       });
     }
+    const buildEndReactRouterConfig: ResolvedReactRouterConfig = {
+      ...resolvedConfigWithRoutes,
+      future: userAndPresetConfig.future ?? {},
+    } as ResolvedReactRouterConfig;
 
     const isBuild = api.context.action === 'build';
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
@@ -423,56 +430,201 @@ export const pluginReactRouter = (
       prerenderConfig !== undefined && prerenderConfig !== false;
     const isSpaMode = !ssr && !isPrerenderEnabled;
     const routeCount = Object.keys(routes).length;
-    const routeChunkConfig: RouteChunkConfig = {
-      splitRouteModules,
-      appDirectory,
-      rootRouteFile,
-    };
     const routeChunkCache: RouteChunkCache = new Map();
-    const routeTransformExecutor = createRouteTransformExecutor({
-      parallelRouteTransform:
-        pluginOptions.parallelRouteTransform ??
-        shouldParallelizeRouteTransforms(routeCount),
-      routeChunkCache,
-      splitRouteModules: Boolean(splitRouteModules),
-      isBuild,
-    });
-    const routeChunkOptions = {
-      splitRouteModules,
-      rootRouteFile,
-      isBuild,
-      cache: routeChunkCache,
+    const transformedRouteModuleAnalyses = new Map<
+      string,
+      RouteModuleAnalysis
+    >();
+    const rememberRouteModuleAnalysis = (
+      resourcePath: string,
+      analysis: RouteModuleAnalysis
+    ) => {
+      transformedRouteModuleAnalyses.set(resolve(resourcePath), analysis);
     };
+    const routeModuleAnalysis = async (routeFilePath: string) =>
+      transformedRouteModuleAnalyses.get(resolve(routeFilePath));
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
     const watchDirectory = resolve(appDirectory);
-    const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
+    const routeRestartMarkerPath = getRouteRestartMarkerPath(appDirectory);
     const routeWatchFiles = createReactRouterRouteWatchFiles({
       configWatchPaths,
       routeConfigWatchPaths,
       routeRestartMarkerPath,
       onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
     });
-    const devBackgroundResources = registerReactRouterDevBackgroundResources({
-      api,
-      isBuild,
-      lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor,
-      routeRestartMarkerPath,
-      watchDirectory,
-      getRouteTopology: routeTopology.getRouteTopology,
-      initialRouteTopology: routeTopology.initialRouteTopology,
-      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-    });
-
-    type ReactRouterManifest = Awaited<
-      ReturnType<typeof getReactRouterManifestForDev>
-    >;
     let latestBrowserManifest: ReactRouterManifest | null = null;
     let latestBrowserManifestModuleExports: RouteManifestModuleExports = {};
     let latestServerManifest: ReactRouterManifest | null = null;
     const latestServerManifestsByBundleId: Record<string, ReactRouterManifest> =
       {};
+
+    const routeByFilePath = new Map(
+      Object.values(routes).map(route => [
+        resolve(appDirectory, route.file),
+        route,
+      ])
+    );
+    const allowedActionOriginsForBuild =
+      allowedActionOrigins === false ? undefined : allowedActionOrigins;
+
+    const devHmrRefreshRuntimePath =
+      isBuild || isRscMode
+        ? undefined
+        : resolveReactRefreshRuntimePath(api.context.rootPath);
+    const devHdrSignal = devHmrRefreshRuntimePath
+      ? createDevHdrRevisionSignal({
+          filePath: getDevHdrRevisionFilePath(api.context.rootPath),
+          onError: error =>
+            api.logger.debug(
+              `[${PLUGIN_NAME}] Failed to signal hot data revalidation: ${error.message}`
+            ),
+        })
+      : undefined;
+    let devHmrEnabled = false;
+    if (devHmrRefreshRuntimePath && devHdrSignal) {
+      api.modifyEnvironmentConfig(
+        async (environmentConfig, { name, mergeEnvironmentConfig }) => {
+          if (name !== 'web') return environmentConfig;
+          return mergeEnvironmentConfig(environmentConfig, {
+            tools: {
+              rspack: rspackConfig => {
+                devHmrEnabled = isRspackSwcReactRefreshEnabled(rspackConfig);
+                if (devHmrEnabled) devHdrSignal.ensure();
+                return rspackConfig;
+              },
+            },
+          });
+        }
+      );
+    }
+
+    const commonModeOptions = {
+      api,
+      allowedActionOriginsForBuild,
+      appDirectory,
+      basename,
+      customServer: pluginOptions.customServer,
+      isBuild,
+      isSpaMode,
+      prerenderConfig,
+      routeConfig,
+      routeDiscovery,
+      routes,
+      rootRouteFile,
+      splitRouteModules,
+      ssr,
+    };
+    const modePlan = await (isRscMode
+      ? createReactRouterModePlan({
+          ...commonModeOptions,
+          isRscMode: true,
+          buildDirectory,
+          finalEntryRscClientPath,
+          finalEntryRscPath,
+          outputClientPath,
+          pluginName: PLUGIN_NAME,
+          serverBuildFile,
+        })
+      : createReactRouterModePlan({
+          ...commonModeOptions,
+          isRscMode: false,
+          assetsBuildDirectory,
+          defaultEntryName: devServerBuildEntryName,
+          entryServerPath: finalEntryServerPath,
+          finalEntryClientPath,
+          future,
+          hasServerApp,
+          reactRouterConfig: resolvedConfigWithRoutes,
+          routeChunkCache,
+          serverAppPath,
+          shouldDependOnWebCompiler,
+          devHmr:
+            devHmrRefreshRuntimePath && devHdrSignal
+              ? {
+                  isEnabled: () => devHmrEnabled,
+                  runtimeModule: generateDevHmrRuntimeModule({
+                    reactRefreshRuntimePath: devHmrRefreshRuntimePath,
+                    hdrRevisionFilePath: devHdrSignal.filePath,
+                  }),
+                  onNodeRebuildCommitted: () => {
+                    if (devHmrEnabled) devHdrSignal.bump();
+                  },
+                }
+              : undefined,
+        }));
+
+    const routeTransformExecutor =
+      modePlan.kind === 'classic'
+        ? await effectRuntime.runPromise(
+            acquireRouteTransformExecutor({
+              parallelRouteTransform:
+                pluginOptions.parallelRouteTransform ??
+                shouldParallelizeRouteTransforms(routeCount),
+              routeChunkCache,
+              splitRouteModules: Boolean(splitRouteModules),
+              isBuild,
+            })
+          )
+        : undefined;
+
+    const { manifestChunkNames } = modePlan;
+
+    let sendRscDevUpdate: (() => void) | undefined;
+    let scheduledRscDevUpdate: ReturnType<typeof setTimeout> | undefined;
+    let hasPendingRscNodeUpdate = false;
+    if (isRscMode && !isBuild) {
+      api.onBeforeStartDevServer(({ server }) => {
+        sendRscDevUpdate = () =>
+          server.sockWrite('custom', {
+            event: 'rsc:update',
+          });
+      });
+      api.onCloseDevServer(() => {
+        if (scheduledRscDevUpdate) {
+          clearTimeout(scheduledRscDevUpdate);
+          scheduledRscDevUpdate = undefined;
+        }
+        hasPendingRscNodeUpdate = false;
+        sendRscDevUpdate = undefined;
+      });
+      api.onAfterEnvironmentCompile(({ environment, stats }) => {
+        if (
+          (environment.name !== 'node' && environment.name !== 'web') ||
+          stats?.hasErrors()
+        ) {
+          return;
+        }
+        if (environment.name === 'node') {
+          hasPendingRscNodeUpdate = true;
+        }
+        if (!hasPendingRscNodeUpdate) {
+          return;
+        }
+        if (scheduledRscDevUpdate) {
+          clearTimeout(scheduledRscDevUpdate);
+        }
+        scheduledRscDevUpdate = setTimeout(() => {
+          scheduledRscDevUpdate = undefined;
+          hasPendingRscNodeUpdate = false;
+          sendRscDevUpdate?.();
+        }, 1000);
+      });
+    }
+
+    const devBackgroundResources =
+      await registerReactRouterDevBackgroundResources({
+        api,
+        runtime: effectRuntime,
+        isBuild,
+        lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
+        routeTransformExecutor,
+        routeRestartMarkerPath,
+        watchDirectory,
+        getRouteTopology: routeTopology.getRouteTopology,
+        initialRouteTopology: routeTopology.initialRouteTopology,
+        onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
+      });
 
     const stageLatestManifests = (
       manifest: ReactRouterManifest,
@@ -497,8 +649,14 @@ export const pluginReactRouter = (
             [devServerBuildEntryName]: baseServerManifest,
           };
 
-          for (const { bundleId, entryName } of serverBundleEntries) {
-            const bundleRoutes = routesByServerBundleId[bundleId];
+          if (modePlan.kind !== 'classic') {
+            return;
+          }
+
+          for (const { bundleId, entryName } of modePlan.artifacts
+            .serverBundleEntries) {
+            const bundleRoutes =
+              modePlan.artifacts.routesByServerBundleId[bundleId];
             if (!bundleRoutes) {
               continue;
             }
@@ -518,93 +676,14 @@ export const pluginReactRouter = (
           }
 
           if (!isBuild) {
-            devRuntime.captureWeb(compilation, manifestsByEntryName);
+            modePlan.artifacts.devRuntime.captureWeb(
+              compilation,
+              manifestsByEntryName
+            );
           }
         }
       );
     };
-
-    const routeByFilePath = new Map(
-      Object.values(routes).map(route => [
-        resolve(appDirectory, route.file),
-        route,
-      ])
-    );
-
-    const manifestChunkNames = new Set<string>(['entry.client']);
-    const webRouteEntries = Object.values(routes).reduce(
-      (acc, route) => {
-        const entryName = route.file.slice(0, route.file.lastIndexOf('.'));
-        const routeFilePath = resolve(appDirectory, route.file);
-        manifestChunkNames.add(entryName);
-        acc[entryName] = {
-          import: `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`,
-          html: false,
-        };
-
-        if (isBuild && splitRouteModules && route.id !== 'root') {
-          let source: string;
-          try {
-            source = readFileSync(routeFilePath, 'utf8');
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-              return acc;
-            }
-            throw error;
-          }
-          for (const exportName of routeChunkExportNames) {
-            if (!source.includes(exportName)) {
-              continue;
-            }
-            const chunkEntryName = getRouteChunkEntryName(route.id, exportName);
-            manifestChunkNames.add(chunkEntryName);
-            acc[chunkEntryName] = {
-              import: getRouteChunkModuleId(routeFilePath, exportName),
-              html: false,
-            };
-          }
-        }
-
-        return acc;
-      },
-      {} as Record<string, RsbuildEntryDescription>
-    );
-    const buildManifest = await getBuildManifest({
-      reactRouterConfig: resolvedConfigWithRoutes,
-      routes,
-      rootDirectory: process.cwd(),
-    });
-    const routesByServerBundleId = getRoutesByServerBundleId(
-      buildManifest,
-      routes
-    );
-    const serverBuildPlan = createReactRouterServerBuildPlan({
-      routesByServerBundleId,
-      serverBuildFile,
-      defaultEntryName: devServerBuildEntryName,
-    });
-    const { serverBundleEntries } = serverBuildPlan;
-
-    const devHmrRefreshRuntimePath = isBuild
-      ? undefined
-      : resolveReactRefreshRuntimePath(api.context.rootPath);
-    const devHdrSignal = devHmrRefreshRuntimePath
-      ? createDevHdrRevisionSignal({
-          filePath: getDevHdrRevisionFilePath(api.context.rootPath),
-          onError: error =>
-            api.logger.debug(
-              `[${PLUGIN_NAME}] Failed to signal hot data revalidation: ${error.message}`
-            ),
-        })
-      : undefined;
-    let devHmrEnabled = false;
-
-    const devRuntime = createReactRouterDevRuntimeController({
-      api,
-      isBuild,
-      buildPlan: serverBuildPlan,
-      onNodeRebuildCommitted: () => devHdrSignal?.bump(),
-    });
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
@@ -629,121 +708,82 @@ export const pluginReactRouter = (
       }
     });
 
-    const prerenderPaths = await resolvePrerenderPaths(
-      prerenderConfig,
-      ssr,
-      routeConfig,
-      {
-        logWarning: true,
-        warn: message => api.logger.warn(message),
-      }
-    );
-
-    api.onAfterBuild(({ environments }) =>
-      runPluginEffect(
-        tryPluginPromise(() =>
-          runReactRouterPrerenderBuild({
-            api,
-            hasWebEnvironment: Boolean(environments.web),
-            buildDirectory,
-            serverBuildFile,
-            ssr,
-            isPrerenderEnabled,
-            prerenderConfig,
-            prerenderPaths,
-            basename,
-            future,
-            routes,
-            latestBrowserManifest,
-            latestBrowserManifestModuleExports,
-            clientStats,
-            pluginOptions,
-            appDirectory,
-            assetPrefix,
-            routeChunkOptions,
-            buildManifest,
-            resolvedConfigWithRoutes,
-            buildEnd,
-          })
+    if (modePlan.kind === 'classic') {
+      api.onAfterBuild(({ environments }) =>
+        effectRuntime.runPromise(
+          tryPluginPromise(() =>
+            runReactRouterPrerenderBuild({
+              api,
+              hasWebEnvironment: Boolean(environments.web),
+              buildDirectory,
+              serverBuildFile,
+              ssr,
+              isPrerenderEnabled,
+              prerenderConfig,
+              prerenderPaths: modePlan.artifacts.prerenderPaths,
+              basename,
+              future,
+              routes,
+              latestBrowserManifest,
+              latestBrowserManifestModuleExports,
+              clientStats,
+              pluginOptions,
+              appDirectory,
+              assetPrefix,
+              routeChunkOptions: modePlan.routeChunkOptions,
+              routeModuleAnalysis,
+              buildManifest: modePlan.artifacts.buildManifest,
+              buildEndReactRouterConfig,
+              buildEnd,
+            })
+          )
         )
-      )
-    );
-
-    const allowedActionOriginsForBuild =
-      allowedActionOrigins === false ? undefined : allowedActionOrigins;
+      );
+    } else {
+      api.onAfterBuild(({ environments }) =>
+        effectRuntime.runPromise(
+          tryPluginPromise(() =>
+            runReactRouterRscPrerenderBuild({
+              api,
+              hasWebEnvironment: Boolean(environments.web),
+              buildDirectory,
+              serverBuildFile,
+              ssr,
+              prerenderConfig,
+              prerenderPaths: modePlan.prerenderPaths,
+              basename,
+            })
+          )
+        )
+      );
+    }
 
     // Public requests stay bare while Rspack resolves seeded virtual files.
-    const createVirtualModulePlugin = (publicPath: string) => {
-      const bundleVirtualModules = Object.fromEntries(
-        Object.entries(routesByServerBundleId).map(
-          ([bundleId, bundleRoutes]) => [
-            `virtual/react-router/server-build-${bundleId}`,
-            generateServerBuild(bundleRoutes, {
-              entryServerPath: finalEntryServerPath,
-              assetsBuildDirectory,
-              basename,
-              appDirectory,
-              ssr,
-              federation: options.federation,
-              future,
-              allowedActionOrigins: allowedActionOriginsForBuild,
-              prerender: prerenderPaths,
-              routeDiscovery,
-              publicPath,
-              serverManifestId: `virtual/react-router/server-manifest-${bundleId}`,
-            }),
-          ]
-        )
-      );
-      const bundleManifestModules = Object.fromEntries(
-        Object.entries(routesByServerBundleId)
-          .filter(
-            ([, bundleRoutes]) =>
-              bundleRoutes && Object.keys(bundleRoutes).length > 0
-          )
-          .map(([bundleId]) => [
-            `virtual/react-router/server-manifest-${bundleId}`,
-            'export default {};',
-          ])
-      );
-
+    const createVirtualModulePlugin = (
+      publicPath: string,
+      jsDistPath: string
+    ) => {
       return new rspack.experiments.VirtualModulesPlugin(
-        mapVirtualModules({
-          'virtual/react-router/browser-manifest': 'export default {};',
-          'virtual/react-router/server-manifest': 'export default {};',
-          'virtual/react-router/server-build': generateServerBuild(routes, {
-            entryServerPath: finalEntryServerPath,
-            assetsBuildDirectory,
-            basename,
-            appDirectory,
-            ssr,
-            federation: options.federation,
-            future,
-            allowedActionOrigins: allowedActionOriginsForBuild,
-            prerender: prerenderPaths,
-            routeDiscovery,
-            publicPath,
-          }),
-          ...bundleVirtualModules,
-          ...bundleManifestModules,
-          'virtual/react-router/with-props': generateWithProps(),
-          ...(devHmrRefreshRuntimePath
-            ? {
-                [DEV_HMR_RUNTIME_MODULE_ID]: generateDevHmrRuntimeModule({
-                  reactRefreshRuntimePath: devHmrRefreshRuntimePath,
-                  hdrRevisionFilePath: getDevHdrRevisionFilePath(
-                    api.context.rootPath
-                  ),
-                }),
-              }
-            : {}),
-        })
+        mapVirtualModules(modePlan.createVirtualModules(publicPath, jsDistPath))
       );
     };
 
     api.modifyRsbuildConfig(async (config, { mergeRsbuildConfig }) => {
-      assetPrefix = normalizeAssetPrefix(config.output?.assetPrefix);
-      const vmodPlugin = createVirtualModulePlugin(assetPrefix);
+      // The RSC bootstrap script URL must reflect the user's web js distPath;
+      // the entry filename itself is deterministic because the plugin forces
+      // web `output.filename.js` to '[name].js' below.
+      const webDistPath = config.environments?.web?.output?.distPath;
+      const rootDistPath = config.output?.distPath;
+      const jsDistPath =
+        (typeof webDistPath === 'object' ? webDistPath.js : undefined) ??
+        (typeof rootDistPath === 'object' ? rootDistPath.js : undefined) ??
+        DEFAULT_JS_DIST_PATH;
+      const assetPrefix = resolveEffectiveAssetPrefix({
+        dev: config.dev,
+        output: config.output,
+        isBuild,
+      });
+      const vmodPlugin = createVirtualModulePlugin(assetPrefix, jsDistPath);
       const useAsyncNodeChunkLoading =
         options.federation && resolvedServerOutput === 'commonjs';
       let nodeChunkLoading: 'import' | 'async-node' | 'require' = 'require';
@@ -752,15 +792,6 @@ export const pluginReactRouter = (
       } else if (useAsyncNodeChunkLoading) {
         nodeChunkLoading = 'async-node';
       }
-      const nodeEntries = createReactRouterNodeEntries({
-        hasServerApp,
-        isBuild,
-        serverAppPath,
-        entryServerPath: finalEntryServerPath,
-        defaultEntryName: devServerBuildEntryName,
-        serverBundleEntries,
-      });
-
       const configuredLazyCompilation = Object.prototype.hasOwnProperty.call(
         options,
         'lazyCompilation'
@@ -769,7 +800,9 @@ export const pluginReactRouter = (
         : (config.dev?.lazyCompilation ?? pluginOptions.lazyCompilation);
       const guardedLazyCompilation = guardReactRouterLazyCompilation({
         lazyCompilation: configuredLazyCompilation,
-        entryClientPath: finalEntryClientPath,
+        entryClientPath: isRscMode
+          ? finalEntryRscClientPath
+          : finalEntryClientPath,
         prewarmReactRouterModules: Boolean(
           pluginOptions.unstableLazyCompilationPrewarm
         ),
@@ -783,6 +816,27 @@ export const pluginReactRouter = (
         routeCount >= 256 &&
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
+      const resolveConfig = modePlan.createResolveConfig(api.context.rootPath);
+
+      // Browser code (React itself) reads `process.env.NODE_ENV`. Rsbuild only
+      // emits the define for its recognized modes; an unrecognized NODE_ENV
+      // (e.g. the string "undefined" leaking from a misconfigured shell)
+      // resolves mode 'none' and leaves the bare reference in the web bundle,
+      // which throws `process is not defined` at runtime. Always define it for
+      // the web environment — mirroring the Vite plugin — unless the user
+      // supplies their own define.
+      const userDefinesNodeEnv =
+        config.source?.define?.['process.env.NODE_ENV'] !== undefined ||
+        config.environments?.web?.source?.define?.['process.env.NODE_ENV'] !==
+          undefined;
+      const webNodeEnv =
+        process.env.NODE_ENV === 'production' ||
+        process.env.NODE_ENV === 'development' ||
+        process.env.NODE_ENV === 'test'
+          ? process.env.NODE_ENV
+          : isBuild
+            ? 'production'
+            : 'development';
 
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
@@ -799,30 +853,21 @@ export const pluginReactRouter = (
         output: {
           assetPrefix: config.output?.assetPrefix || '/',
         },
+        server: modePlan.server,
         dev: {
           writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
         },
-        // React Router's request handler natively supports `ssr:false`
-        // builds (it renders the SPA shell for document requests), so the
-        // middleware is registered for SPA mode too — without it, dev
-        // requests would 404 because no HTML entry exists.
-        ...(pluginOptions.customServer
-          ? {}
-          : {
-              server: {
-                setup: [
-                  createReactRouterDevServerSetup({
-                    // Lazy: the dev runtime binding does not exist yet here.
-                    loadBuild: () => devRuntime.createBuildLoader()(),
-                  }),
-                ],
-              },
-            }),
         tools: {
           rspack: {
-            plugins: [vmodPlugin],
+            resolve: resolveConfig,
+            plugins: [
+              vmodPlugin,
+              createQuerylessRouteImportPlugin(routeByFilePath, {
+                rsc: isRscMode,
+              }),
+            ],
           },
         },
         environments: {
@@ -837,15 +882,14 @@ export const pluginReactRouter = (
                 }
               : {}),
             source: {
-              entry: {
-                // no query needed when federation is disabled
-                'entry.client': finalEntryClientPath,
-                'virtual/react-router/browser-manifest': {
-                  import: 'virtual/react-router/browser-manifest',
-                  html: false,
-                },
-                ...webRouteEntries,
-              },
+              entry: modePlan.webEntries,
+              ...(userDefinesNodeEnv
+                ? {}
+                : {
+                    define: {
+                      'process.env.NODE_ENV': JSON.stringify(webNodeEnv),
+                    },
+                  }),
             },
             output: {
               filename: {
@@ -857,6 +901,7 @@ export const pluginReactRouter = (
             },
             tools: {
               rspack: {
+                resolve: resolveConfig,
                 name: 'web',
                 module: {
                   rules: [
@@ -867,26 +912,17 @@ export const pluginReactRouter = (
                     },
                   ],
                 },
-                ...(options.federation
-                  ? {
-                      output: {
-                        chunkLoading: 'import',
-                      },
-                    }
-                  : {}),
-                externalsType: 'module',
+                externalsType: modePlan.webExternalsType,
                 output: {
-                  chunkFormat: 'module',
-                  chunkLoading: 'import',
-                  workerChunkLoading: 'import',
-                  wasmLoading: 'fetch',
-                  library: { type: 'module' },
-                  module: true,
+                  ...modePlan.webOutput,
+                  publicPath: assetPrefix,
+                  ...(options.federation
+                    ? {
+                        chunkLoading: 'import',
+                      }
+                    : {}),
                 },
-                optimization: {
-                  avoidEntryIife: true,
-                  runtimeChunk: 'single',
-                },
+                optimization: modePlan.webOptimization,
               },
             },
           },
@@ -895,7 +931,7 @@ export const pluginReactRouter = (
           // root route into a hydratable `index.html` at build time.
           node: {
             source: {
-              entry: nodeEntries,
+              entry: modePlan.nodeEntries,
             },
             output: {
               distPath: {
@@ -904,6 +940,15 @@ export const pluginReactRouter = (
               target: config.environments?.node?.output?.target || 'node',
               filename: {
                 js: '[name].js',
+                css: (pathData: Rspack.PathData) => {
+                  const sourceName = pathData.chunk?.name ?? '[name]';
+                  if (!isBuild) {
+                    return `${sourceName}.css`;
+                  }
+                  const baseName =
+                    sourceName.split(/[\\/]/).pop() || sourceName;
+                  return `../assets/${baseName}.[contenthash:10].css`;
+                },
               },
             },
             tools: {
@@ -918,15 +963,19 @@ export const pluginReactRouter = (
                     },
                   ],
                 },
-                externals: nodeExternals,
-                ...(shouldDependOnWebCompiler ? { dependencies: ['web'] } : {}),
+                externals: modePlan.nodeExternals,
+                ...modePlan.nodeDependencies,
                 externalsType: resolvedServerOutput,
                 output: {
                   chunkFormat: resolvedServerOutput,
                   chunkLoading: nodeChunkLoading,
+                  devtoolModuleFilenameTemplate: '[absolute-resource-path]',
+                  devtoolFallbackModuleFilenameTemplate:
+                    '[absolute-resource-path]?[hash]',
                   workerChunkLoading: nodeChunkLoading,
                   wasmLoading: 'fetch',
                   module: resolvedServerOutput === 'module',
+                  chunkFilename: 'static/js/async/[name].js',
                 },
               },
             },
@@ -935,104 +984,92 @@ export const pluginReactRouter = (
       });
     });
 
-    api.modifyEnvironmentConfig(
-      async (config, { name, mergeEnvironmentConfig }) => {
-        if (name !== 'web' && name !== 'node') {
-          return config;
-        }
-
-        return mergeEnvironmentConfig(config, {
-          tools: {
-            rspack: rspackConfig => {
-              if (pluginOptions.federation) {
-                ensureFederationAsyncStartup(rspackConfig);
-              }
-
-              if (name === 'web') {
-                devHmrEnabled =
-                  !isBuild &&
-                  devHmrRefreshRuntimePath !== undefined &&
-                  config.mode === 'development' &&
-                  config.dev?.hmr !== false &&
-                  isRspackSwcReactRefreshEnabled(rspackConfig);
-                if (devHmrEnabled) {
-                  devHdrSignal?.ensure();
-                }
-              }
-
-              if (name === 'node') {
-                const output = rspackConfig.output;
-                if (output) {
-                  const library = output.library;
-                  const libraryOptions =
-                    library &&
-                    typeof library === 'object' &&
-                    !Array.isArray(library)
-                      ? library
-                      : {};
-                  rspackConfig.output = {
-                    ...output,
-                    library: {
-                      ...libraryOptions,
-                      type:
-                        resolvedServerOutput === 'module'
-                          ? 'module'
-                          : 'commonjs2',
-                    },
-                  };
-                }
-              }
-
-              return rspackConfig;
-            },
-          },
-        });
-      }
-    );
-
-    registerModifyBrowserManifestAssets(
+    registerReactRouterEnvironmentOutput({
       api,
-      routes,
-      pluginOptions,
-      appDirectory,
-      () => assetPrefix,
-      routeChunkOptions,
-      {
-        subResourceIntegrity: resolvedConfigWithRoutes.subResourceIntegrity,
-        future,
-        manifestChunkNames,
-        onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
-          stageLatestManifests(
-            manifest,
-            sri,
-            moduleExportsByRouteId,
-            context.compilation
-          ),
-      }
-    );
-
-    registerBuildOutputTransforms({
-      api,
+      federation: pluginOptions.federation,
       resolvedServerOutput,
-      performanceProfiler,
-      getLatestServerManifest: () => latestServerManifest,
-      getLatestServerManifestByBundleId: bundleId =>
-        latestServerManifestsByBundleId[bundleId],
-      routes,
-      pluginOptions,
-      getClientStats: () => clientStats,
-      appDirectory,
-      getAssetPrefix: () => assetPrefix,
-      routeChunkOptions,
-      routeTransformExecutor,
-      routeByFilePath,
-      routeChunkConfig,
-      isBuild,
-      splitRouteModules: Boolean(splitRouteModules),
-      ssr,
-      isSpaMode,
-      rootRoutePath,
-      isDevHmrEnabled: () => devHmrEnabled,
     });
+
+    if (modePlan.kind === 'rsc') {
+      registerReactRouterRscRouteTransforms({
+        api,
+        isBuild,
+        performanceProfiler,
+        routeByFilePath,
+        routeChunkCache,
+        routeChunkConfig: modePlan.routeChunkConfig,
+      });
+
+      // RSC mode has no `registerBuildOutputTransforms` pass, so relocate the
+      // node-emitted `?url`/`.css?url` static assets into the client build here.
+      // Without this the href baked into `links()` (resolved in the node env)
+      // 404s in the browser because the file only exists under `build/server`.
+      registerSsrAssetRelocation({
+        api,
+        outputClientPath,
+        performanceProfiler,
+      });
+    } else {
+      if (!routeTransformExecutor) {
+        throw new Error('Route transform executor was not initialized.');
+      }
+
+      registerModifyBrowserManifestAssets(
+        api,
+        routes,
+        pluginOptions,
+        appDirectory,
+        () => assetPrefix,
+        modePlan.routeChunkOptions,
+        {
+          subResourceIntegrity: resolvedConfigWithRoutes.subResourceIntegrity,
+          future,
+          manifestChunkNames,
+          routeModuleAnalysis,
+          onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
+            stageLatestManifests(
+              manifest,
+              sri,
+              moduleExportsByRouteId,
+              context.compilation
+            ),
+        }
+      );
+
+      registerBuildOutputTransforms({
+        api,
+        resolvedServerOutput,
+        performanceProfiler,
+        getLatestServerManifest: () => latestServerManifest,
+        getLatestServerManifestByBundleId: bundleId =>
+          latestServerManifestsByBundleId[bundleId],
+        routes,
+        pluginOptions,
+        getClientStats: () => clientStats,
+        appDirectory,
+        getAssetPrefix: () => assetPrefix,
+        routeChunkOptions: modePlan.routeChunkOptions,
+        routeModuleAnalysis,
+        routeTransformExecutor,
+        routeByFilePath,
+        routeChunkConfig: modePlan.routeChunkConfig,
+        isBuild,
+        splitRouteModules: Boolean(modePlan.routeChunkConfig.splitRouteModules),
+        ssr,
+        isSpaMode,
+        rootRoutePath,
+        outputClientPath,
+        isDevHmrEnabled: () => devHmrEnabled,
+        onRouteModuleAnalysis: rememberRouteModuleAnalysis,
+      });
+    }
   },
 });
+
+export const pluginReactRouterRSC = (
+  options: ReactRouterRSCPluginOptions = {}
+): RsbuildPlugin =>
+  pluginReactRouter({
+    ...options,
+    rsc: options.rsc ?? true,
+  });

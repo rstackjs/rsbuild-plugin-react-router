@@ -62,7 +62,7 @@
 
 ### Minor Changes
 
-- 3c6d368: Bring Rsbuild plugin behavior closer to React Router's official Vite plugin.
+- 3c6d368: Bring Rsbuild plugin behavior closer to React Router framework behavior.
   - Add React Router config resolution + validations/warnings for closer framework parity
   - Add split route modules (route chunk entrypoints) including enforce mode validation
   - Improve `.client` module stubbing on the server (including `export *` re-exports)

@@ -3,7 +3,11 @@ import { dirname, resolve } from 'node:path';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import type { ResultPromise } from 'execa';
 import * as Effect from 'effect/Effect';
-import { createDelayedPluginTask, tryPluginPromise } from './effect-runtime.js';
+import {
+  createDelayedPluginTask,
+  type PluginEffectRuntime,
+  tryPluginPromise,
+} from './effect-runtime.js';
 import { resolvePackageJson } from './ssr-externals.js';
 
 // Quiet period with no dev compiles before the typegen watch starts. Long
@@ -69,6 +73,7 @@ export const createReactRouterTypegenRunner = (
 ): ReactRouterTypegenRunner => {
   let typegenProcess: ResultPromise | undefined;
   let typegenCommand: TypegenCommand | undefined;
+  let watchGeneration = 0;
 
   const getTypegenCommand = (): TypegenCommand => {
     typegenCommand ??= (appDirectory
@@ -96,7 +101,11 @@ export const createReactRouterTypegenRunner = (
         return;
       }
 
+      const generation = watchGeneration;
       const execa = await loadExeca();
+      if (typegenProcess || generation !== watchGeneration) {
+        return;
+      }
       const { command, args } = getTypegenCommand();
       const process = execa(command, [...args, 'typegen', '--watch'], {
         stdio: 'inherit',
@@ -108,6 +117,7 @@ export const createReactRouterTypegenRunner = (
     },
 
     async closeWatch(): Promise<void> {
+      watchGeneration += 1;
       const process = typegenProcess;
       typegenProcess = undefined;
       if (!process) {
@@ -128,36 +138,48 @@ export const createReactRouterTypegenRunner = (
   };
 };
 
-export const registerReactRouterTypegen = (
+export const registerReactRouterTypegen = async (
   api: RsbuildPluginAPI,
   {
+    runtime,
     runner,
     devWatchDelayMs = TYPEGEN_IDLE_DELAY_MS,
     appDirectory,
   }: {
+    runtime: PluginEffectRuntime;
     runner?: ReactRouterTypegenRunner;
     devWatchDelayMs?: number;
     appDirectory?: string;
-  } = {}
-): void => {
+  }
+): Promise<void> => {
   const resolvedRunner =
     runner ?? createReactRouterTypegenRunner(loadDefaultExeca, appDirectory);
-  let devWatchStarted = false;
-  const devWatchTask = createDelayedPluginTask({
-    delayMs: devWatchDelayMs,
-    run: () =>
-      tryPluginPromise(() => {
-        devWatchStarted = true;
-        return resolvedRunner.startWatch();
-      }).pipe(Effect.asVoid),
-    onError(error) {
-      api.logger.warn(
-        `[react-router] Failed to start React Router typegen watch: ${error}`
-      );
-    },
-  });
 
   if (api.context.action !== 'build') {
+    let devWatchStarted = false;
+    const devWatchTask = createDelayedPluginTask({
+      runtime,
+      delayMs: devWatchDelayMs,
+      run: () =>
+        tryPluginPromise(() => {
+          devWatchStarted = true;
+          return resolvedRunner.startWatch();
+        }).pipe(Effect.asVoid),
+      onError(error) {
+        api.logger.warn(
+          `[react-router] Failed to start React Router typegen watch: ${error}`
+        );
+      },
+    });
+    const closeWatchEffect = () =>
+      devWatchTask
+        .cancelEffect()
+        .pipe(
+          Effect.zipRight(
+            Effect.orDie(tryPluginPromise(() => resolvedRunner.closeWatch()))
+          )
+        );
+    await runtime.runPromise(Effect.addFinalizer(closeWatchEffect));
     // Reschedule on every compile so the typegen watch only starts after a
     // quiet period with no compiles. Starting it during the initial compile
     // burst competes with HMR rebuilds for CPU on small machines.
@@ -168,11 +190,6 @@ export const registerReactRouterTypegen = (
       devWatchTask.reschedule();
     });
   }
-
-  api.onCloseDevServer(async () => {
-    await devWatchTask.cancel();
-    await resolvedRunner.closeWatch();
-  });
 
   api.onBeforeBuild(() => resolvedRunner.runBuild());
 };

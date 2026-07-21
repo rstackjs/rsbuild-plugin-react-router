@@ -126,7 +126,7 @@ describe('route chunk cache', () => {
       'routes/demo.tsx::getChunkedExport::clientLoader',
       'routes/demo.tsx::getChunkedExport::clientMiddleware',
       'routes/demo.tsx::getExportDependencies',
-      'routes/demo.tsx::omitChunkedExports::clientAction,clientLoader,clientMiddleware,HydrateFallback',
+      'routes/demo.tsx::omitChunkedExports::clientAction,clientLoader,clientMiddleware,HydrateFallback,action',
     ]);
   });
 
