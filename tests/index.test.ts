@@ -72,6 +72,19 @@ describe('pluginReactRouter', () => {
     ).toBe(false);
   });
 
+  it('preserves an explicit writeToDisk override', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: { writeToDisk: true },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.writeToDisk).toBe(true);
+  });
+
   it('adds the committed custom-server build entry only in development', async () => {
     const devRsbuild = await createStubRsbuild({ rsbuildConfig: {} });
     devRsbuild.addPlugins([pluginReactRouter({ customServer: true })]);
