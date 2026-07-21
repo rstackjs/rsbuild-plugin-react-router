@@ -1,15 +1,17 @@
 import { describe, expect, it } from '@rstest/core';
 import {
   getDefaultTrailingSlashAwareDataRequests,
-  resolveReactRouterConfig,
   resolveReactRouterConfigEffect,
 } from '../src/react-router-config';
 import { runPluginEffect } from '../src/effect-runtime';
 import type { Config } from '../src/react-router-config';
 
+const resolveReactRouterConfig = (config: Config) =>
+  runPluginEffect(resolveReactRouterConfigEffect(config));
+
 describe('resolveReactRouterConfig', () => {
   it('merges presets and combines buildEnd hooks', async () => {
-    let buildEndCalls = 0;
+    const buildEndCalls: string[] = [];
     const result = await resolveReactRouterConfig({
       presets: [
         {
@@ -18,13 +20,13 @@ describe('resolveReactRouterConfig', () => {
             basename: '/preset',
             future: { v8_middleware: true },
             buildEnd: async () => {
-              buildEndCalls += 1;
+              buildEndCalls.push('preset');
             },
           }),
         },
       ],
       buildEnd: async () => {
-        buildEndCalls += 1;
+        buildEndCalls.push('user');
       },
     });
 
@@ -34,37 +36,7 @@ describe('resolveReactRouterConfig', () => {
       reactRouterConfig: result.resolved,
       rsbuildConfig: {} as any,
     });
-    expect(buildEndCalls).toBe(2);
-  });
-
-  it('resolves presets through the Effect config path', async () => {
-    let buildEndCalls = 0;
-    const result = await runPluginEffect(
-      resolveReactRouterConfigEffect({
-        presets: [
-          {
-            name: 'preset-a',
-            reactRouterConfig: async () => ({
-              basename: '/effect-preset',
-              buildEnd: async () => {
-                buildEndCalls += 1;
-              },
-            }),
-          },
-        ],
-        buildEnd: async () => {
-          buildEndCalls += 1;
-        },
-      })
-    );
-
-    expect(result.resolved.basename).toBe('/effect-preset');
-    await result.resolved.buildEnd?.({
-      buildManifest: { routes: {} },
-      reactRouterConfig: result.resolved,
-      rsbuildConfig: {} as any,
-    });
-    expect(buildEndCalls).toBe(2);
+    expect(buildEndCalls).toEqual(['preset', 'user']);
   });
 
   it('preserves server bundle selection in SSR mode', async () => {

@@ -3,15 +3,16 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
 import { dirname, relative, resolve } from 'pathe';
+import * as Effect from 'effect/Effect';
 import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import {
+  createBuildRequestEffect,
   createBoundedPrerenderTasksEffect,
-  withBuildRequest,
 } from './prerender-build.js';
 import { normalizeAssetPrefix } from './plugin-utils.js';
 import { getPrerenderConcurrency } from './prerender.js';
 import type { Config } from './react-router-config.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import { runPluginEffect } from './effect-runtime.js';
 
 /**
  * RSC-mode prerendering.
@@ -205,7 +206,7 @@ const assertPrerenderableResponse = (
   );
 };
 
-const prerenderRscUrl = async ({
+const prerenderRscUrlEffect = ({
   api,
   artifactPath,
   clientBuildDir,
@@ -217,8 +218,8 @@ const prerenderRscUrl = async ({
   clientBuildDir: string;
   handler: RscRequestHandler;
   url: URL;
-}): Promise<void> =>
-  withBuildRequest(url, undefined, async request => {
+}): Effect.Effect<void, Error, never> =>
+  createBuildRequestEffect(url, undefined, async request => {
     const response = await handler(request);
     const pathname = url.pathname;
     const outputPathname = artifactPath ?? pathname;
@@ -236,7 +237,7 @@ const prerenderRscUrl = async ({
           status: response.status,
         }),
       });
-      return;
+      return Effect.void;
     }
 
     const isHtml = Boolean(
@@ -260,7 +261,7 @@ const prerenderRscUrl = async ({
           contents: flightData,
         });
       }
-      return;
+      return Effect.void;
     }
 
     // Non-HTML response (e.g. a resource route): emit the raw payload at the
@@ -275,7 +276,7 @@ const prerenderRscUrl = async ({
     if (!pathname.endsWith('.rsc')) {
       const dataUrl = new URL(url);
       dataUrl.pathname += '.rsc';
-      await prerenderRscUrl({
+      return prerenderRscUrlEffect({
         api,
         artifactPath: `${outputPathname}.rsc`,
         clientBuildDir,
@@ -283,7 +284,8 @@ const prerenderRscUrl = async ({
         url: dataUrl,
       });
     }
-  });
+    return Effect.void;
+  }).pipe(Effect.flatten);
 
 export const runReactRouterRscPrerenderBuild = async (
   options: RunReactRouterRscPrerenderBuildOptions
@@ -341,15 +343,13 @@ export const runReactRouterRscPrerenderBuild = async (
         prerenderRequests,
         getPrerenderConcurrency(prerenderConfig),
         prerenderRequest =>
-          tryPluginPromise(() =>
-            prerenderRscUrl({
-              api,
-              artifactPath: prerenderRequest.artifactPath,
-              clientBuildDir,
-              handler,
-              url: new URL(`http://localhost${prerenderRequest.requestPath}`),
-            })
-          )
+          prerenderRscUrlEffect({
+            api,
+            artifactPath: prerenderRequest.artifactPath,
+            clientBuildDir,
+            handler,
+            url: new URL(`http://localhost${prerenderRequest.requestPath}`),
+          })
       )
     );
   } finally {

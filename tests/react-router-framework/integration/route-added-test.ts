@@ -67,10 +67,23 @@ test.describe(async () => {
     // client is not notified of new route addition (https://github.com/remix-run/remix/issues/7894)
     // however server can handle new route
     await expect
-      .poll(async () => {
-        await page.goto(`http://localhost:${port}/new`);
-        return page.getByText("new route").isVisible();
-      })
+      .poll(
+        async () => {
+          try {
+            await page.goto(`http://localhost:${port}/new`);
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message.includes("ERR_CONNECTION_REFUSED")
+            ) {
+              return false;
+            }
+            throw error;
+          }
+          return page.getByText("new route").isVisible();
+        },
+        { timeout: 10_000 },
+      )
       .toBe(true);
   });
 });

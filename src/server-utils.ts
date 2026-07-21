@@ -1,7 +1,6 @@
 import { resolve } from 'pathe';
 import type { ServerBuild } from 'react-router';
-import { runPluginEffect } from './effect-runtime.js';
-import { resolveServerBuildModuleEffect } from './server-build-resolution.js';
+import { resolveServerBuildModule } from './server-build-resolution.js';
 import type { Route } from './types.js';
 
 /**
@@ -34,7 +33,13 @@ interface ServerBuildOptions {
     | undefined;
 }
 
-function generateStaticTemplate(
+/**
+ * Generates the server build module content
+ * @param routes The route manifest
+ * @param options Build options
+ * @returns The generated module content as a string
+ */
+export function generateServerBuild(
   routes: Record<string, Route>,
   options: ServerBuildOptions
 ): string {
@@ -83,32 +88,10 @@ function generateStaticTemplate(
   `;
 }
 
-/**
- * Generates the server build module content
- * @param routes The route manifest
- * @param options Build options
- * @returns The generated module content as a string
- */
-function generateServerBuild(
-  routes: Record<string, Route>,
-  options: ServerBuildOptions
-): string {
-  return generateStaticTemplate(routes, options);
-}
-
-export function resolveServerBuildModule(
-  buildModule: unknown,
-  source: string
-): Promise<ServerBuild> {
-  return runPluginEffect(resolveServerBuildModuleEffect(buildModule, source));
-}
+export { resolveServerBuildModule };
 
 export function resolveReactRouterServerBuild(
   buildModule: unknown
 ): Promise<ServerBuild> {
-  return runPluginEffect(
-    resolveServerBuildModuleEffect(buildModule, 'Imported module')
-  );
+  return resolveServerBuildModule(buildModule, 'Imported module');
 }
-
-export { generateServerBuild };

@@ -2,7 +2,6 @@ import { describe, expect, it } from '@rstest/core';
 import { generate, parse } from '../src/yuku';
 import {
   combineURLs,
-  stripFileExtension,
   createRouteId,
   generateWithProps,
   normalizeAssetPrefix,
@@ -43,35 +42,9 @@ describe('plugin-utils', () => {
     });
   });
 
-  describe('stripFileExtension', () => {
-    it('should strip .tsx extension', () => {
-      expect(stripFileExtension('file.tsx')).toBe('file');
-    });
-
-    it('should strip .ts extension', () => {
-      expect(stripFileExtension('file.ts')).toBe('file');
-    });
-
-    it('should strip .jsx extension', () => {
-      expect(stripFileExtension('file.jsx')).toBe('file');
-    });
-
-    it('should strip .js extension', () => {
-      expect(stripFileExtension('file.js')).toBe('file');
-    });
-
-    it('should handle files with multiple dots', () => {
-      expect(stripFileExtension('file.test.tsx')).toBe('file.test');
-    });
-
-    it('should handle paths with directories', () => {
-      expect(stripFileExtension('routes/home.tsx')).toBe('routes/home');
-    });
-  });
-
   describe('createRouteId', () => {
     it('should create route ID from file path', () => {
-      expect(createRouteId('routes/home.tsx')).toBe('routes/home');
+      expect(createRouteId('routes/home.test.tsx')).toBe('routes/home.test');
     });
 
     it('should normalize path separators', () => {

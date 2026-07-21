@@ -25,7 +25,7 @@ import { validatePrerenderConfig } from './prerender.js';
 import { runReactRouterPrerenderBuild } from './prerender-build.js';
 import { runReactRouterRscPrerenderBuild } from './rsc-prerender.js';
 import {
-  resolveReactRouterConfig,
+  resolveReactRouterConfigEffect,
   resolveRouteDiscoveryConfig,
   type ResolvedReactRouterConfig,
 } from './react-router-config.js';
@@ -59,7 +59,10 @@ import {
   isRspackSwcReactRefreshEnabled,
   resolveReactRefreshRuntimePath,
 } from './dev-hmr.js';
-import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import {
+  createPluginEffectRuntime,
+  tryPluginPromise,
+} from './effect-runtime.js';
 import { registerReactRouterTypegen } from './typegen.js';
 import {
   createConfigImporter,
@@ -78,6 +81,10 @@ import {
   setupReactRouterRscPlugin,
 } from './rsc-support.js';
 import { createReactRouterModePlan } from './mode-plan.js';
+import {
+  acquireRouteTransformExecutor,
+  shouldParallelizeRouteTransforms,
+} from './parallel-route-transforms.js';
 import { createQuerylessRouteImportPlugin } from './route-imports.js';
 
 export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
@@ -113,6 +120,11 @@ export const pluginReactRouter = (
   name: PLUGIN_NAME,
 
   async setup(api) {
+    const effectRuntime = createPluginEffectRuntime();
+    api.onCloseBuild(effectRuntime.dispose);
+    api.onCloseDevServer(effectRuntime.dispose);
+    api.onExit(effectRuntime.dispose);
+
     const defaultOptions = {
       customServer: false,
       lazyCompilation: true,
@@ -199,7 +211,9 @@ export const pluginReactRouter = (
       userAndPresetConfig,
       presets: configPresets,
       hasConfiguredServerModuleFormat,
-    } = await resolveReactRouterConfig(reactRouterUserConfig);
+    } = await effectRuntime.runPromise(
+      resolveReactRouterConfigEffect(reactRouterUserConfig)
+    );
 
     const {
       appDirectory,
@@ -218,7 +232,10 @@ export const pluginReactRouter = (
       buildEnd,
     } = resolvedConfig;
 
-    registerReactRouterTypegen(api, { appDirectory });
+    await registerReactRouterTypegen(api, {
+      runtime: effectRuntime,
+      appDirectory,
+    });
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
       options,
@@ -518,10 +535,8 @@ export const pluginReactRouter = (
           finalEntryClientPath,
           future,
           hasServerApp,
-          parallelRouteTransform: pluginOptions.parallelRouteTransform,
           reactRouterConfig: resolvedConfigWithRoutes,
           routeChunkCache,
-          routeCount,
           serverAppPath,
           shouldDependOnWebCompiler,
           devHmr:
@@ -538,6 +553,20 @@ export const pluginReactRouter = (
                 }
               : undefined,
         }));
+
+    const routeTransformExecutor =
+      modePlan.kind === 'classic'
+        ? await effectRuntime.runPromise(
+            acquireRouteTransformExecutor({
+              parallelRouteTransform:
+                pluginOptions.parallelRouteTransform ??
+                shouldParallelizeRouteTransforms(routeCount),
+              routeChunkCache,
+              splitRouteModules: Boolean(splitRouteModules),
+              isBuild,
+            })
+          )
+        : undefined;
 
     const { manifestChunkNames } = modePlan;
 
@@ -583,20 +612,19 @@ export const pluginReactRouter = (
       });
     }
 
-    const devBackgroundResources = registerReactRouterDevBackgroundResources({
-      api,
-      isBuild,
-      lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor:
-        modePlan.kind === 'classic'
-          ? modePlan.routeTransformExecutor
-          : undefined,
-      routeRestartMarkerPath,
-      watchDirectory,
-      getRouteTopology: routeTopology.getRouteTopology,
-      initialRouteTopology: routeTopology.initialRouteTopology,
-      onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
-    });
+    const devBackgroundResources =
+      await registerReactRouterDevBackgroundResources({
+        api,
+        runtime: effectRuntime,
+        isBuild,
+        lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
+        routeTransformExecutor,
+        routeRestartMarkerPath,
+        watchDirectory,
+        getRouteTopology: routeTopology.getRouteTopology,
+        initialRouteTopology: routeTopology.initialRouteTopology,
+        onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
+      });
 
     const stageLatestManifests = (
       manifest: ReactRouterManifest,
@@ -682,7 +710,7 @@ export const pluginReactRouter = (
 
     if (modePlan.kind === 'classic') {
       api.onAfterBuild(({ environments }) =>
-        runPluginEffect(
+        effectRuntime.runPromise(
           tryPluginPromise(() =>
             runReactRouterPrerenderBuild({
               api,
@@ -713,7 +741,7 @@ export const pluginReactRouter = (
       );
     } else {
       api.onAfterBuild(({ environments }) =>
-        runPluginEffect(
+        effectRuntime.runPromise(
           tryPluginPromise(() =>
             runReactRouterRscPrerenderBuild({
               api,
@@ -982,6 +1010,10 @@ export const pluginReactRouter = (
         performanceProfiler,
       });
     } else {
+      if (!routeTransformExecutor) {
+        throw new Error('Route transform executor was not initialized.');
+      }
+
       registerModifyBrowserManifestAssets(
         api,
         routes,
@@ -1018,7 +1050,7 @@ export const pluginReactRouter = (
         getAssetPrefix: () => assetPrefix,
         routeChunkOptions: modePlan.routeChunkOptions,
         routeModuleAnalysis,
-        routeTransformExecutor: modePlan.routeTransformExecutor,
+        routeTransformExecutor,
         routeByFilePath,
         routeChunkConfig: modePlan.routeChunkConfig,
         isBuild,

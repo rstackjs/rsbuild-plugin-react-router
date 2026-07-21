@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import { getExportNames } from '../src/export-utils';
 import {
@@ -8,10 +10,12 @@ import {
   type RouteModuleTransformTask,
 } from '../src/route-transform-tasks';
 import {
+  acquireRouteTransformExecutorForTesting,
   createRouteTransformExecutorForTesting,
   createRouteTransformExecutor,
   getDefaultWorkerCount,
 } from '../src/parallel-route-transforms';
+import { createPluginEffectRuntime } from '../src/effect-runtime';
 import type {
   WorkerRequest,
   WorkerResponse,
@@ -131,6 +135,33 @@ const resolveWorkerMessage = (
 };
 
 describe('parallel route transforms', () => {
+  it('keeps the worker entrypoint Effect-free', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/parallel-route-transform-worker.ts'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/from ['"]effect(?:\/|['"])/);
+    expect(source).not.toContain("import('effect");
+  });
+
+  it('terminates parent-owned workers when the plugin runtime is disposed', async () => {
+    const worker = new FakeRouteTransformWorker();
+    const runtime = createPluginEffectRuntime();
+
+    const executor = await runtime.runPromise(
+      acquireRouteTransformExecutorForTesting(
+        { parallelRouteTransform: 1 },
+        () => worker
+      )
+    );
+
+    executor.prewarm();
+    await runtime.dispose();
+
+    expect(worker.terminateCalls).toBe(1);
+  });
+
   it('keeps route chunk tasks limited to chunk extraction', async () => {
     const result = await executeRouteTransformTask(createMainRouteChunkTask());
 

@@ -13,13 +13,9 @@ import type {
 } from './react-router-config.js';
 import type { RouteChunkCache, RouteChunkConfig } from './route-chunks.js';
 import type { DevHmrPlanOptions } from './dev-hmr.js';
-import type { PluginOptions, Route } from './types.js';
+import type { Route } from './types.js';
 import { createReactRouterDevServerSetup } from './dev-server.js';
 import { resolveAppPackagePath } from './plugin-utils.js';
-import {
-  createRouteTransformExecutor,
-  shouldParallelizeRouteTransforms,
-} from './parallel-route-transforms.js';
 import { resolvePrerenderPaths } from './prerender.js';
 import { createReactRouterNodeEntries } from './server-build-plan.js';
 import { getSsrExternals } from './ssr-externals.js';
@@ -56,7 +52,6 @@ type CommonModePlan = {
 export type ClassicModePlan = CommonModePlan & {
   kind: 'classic';
   artifacts: ClassicBuildArtifacts;
-  routeTransformExecutor: ReturnType<typeof createRouteTransformExecutor>;
   routeChunkOptions: {
     splitRouteModules: Config['splitRouteModules'];
     rootRouteFile: string;
@@ -99,10 +94,8 @@ type CreateClassicModePlanOptions = ModePlanContext & {
   finalEntryClientPath: string;
   future: Config['future'];
   hasServerApp: boolean;
-  parallelRouteTransform?: PluginOptions['parallelRouteTransform'];
   reactRouterConfig: ResolvedReactRouterConfig;
   routeChunkCache: RouteChunkCache;
-  routeCount: number;
   serverAppPath: string;
   shouldDependOnWebCompiler: boolean;
 };
@@ -248,12 +241,10 @@ const createClassicModePlan = async ({
   hasServerApp,
   isBuild,
   isSpaMode,
-  parallelRouteTransform,
   prerenderConfig,
   reactRouterConfig,
   routeChunkCache,
   routeConfig,
-  routeCount,
   routeDiscovery,
   routes,
   rootRouteFile,
@@ -267,13 +258,6 @@ const createClassicModePlan = async ({
     appDirectory,
     rootRouteFile,
   };
-  const routeTransformExecutor = createRouteTransformExecutor({
-    parallelRouteTransform:
-      parallelRouteTransform ?? shouldParallelizeRouteTransforms(routeCount),
-    routeChunkCache,
-    splitRouteModules: Boolean(splitRouteModules),
-    isBuild,
-  });
   const routeChunkOptions = {
     splitRouteModules,
     rootRouteFile,
@@ -303,7 +287,6 @@ const createClassicModePlan = async ({
     kind: 'classic',
     artifacts,
     routeChunkConfig,
-    routeTransformExecutor,
     routeChunkOptions,
     manifestChunkNames,
     webEntries: {

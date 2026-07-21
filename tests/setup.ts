@@ -149,7 +149,6 @@ rstest.mock('@scripts/test-helper', () => ({
 
     const mergeRsbuildConfig = (a: any, b: any) => deepMerge(a, b);
     const pending: Promise<unknown>[] = [];
-
     const stub: any = {
       addPlugins: rstest.fn(),
       unwrapConfig: rstest.fn(),
@@ -158,6 +157,7 @@ rstest.mock('@scripts/test-helper', () => ({
       onAfterStartDevServer: rstest.fn(),
       onCloseDevServer: rstest.fn(),
       onCloseBuild: rstest.fn(),
+      onExit: rstest.fn(),
       onBeforeBuild: rstest.fn(),
       onAfterBuild: rstest.fn(),
       onBeforeDevCompile: rstest.fn(),

@@ -109,12 +109,8 @@ export function resolveEffectiveAssetPrefix(config: {
   return normalizeAssetPrefix(devPrefix ?? outputPrefix);
 }
 
-export function stripFileExtension(file: string): string {
-  return file.replace(/\.[^/.]+$/, '');
-}
-
 export function createRouteId(file: string): string {
-  return normalize(stripFileExtension(file));
+  return normalize(file.replace(/\.[^/.]+$/, ''));
 }
 
 export function findEntryFile(basePath: string): string {

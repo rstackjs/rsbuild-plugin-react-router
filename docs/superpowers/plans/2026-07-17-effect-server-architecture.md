@@ -6,7 +6,7 @@
 
 **Architecture:** Create one `ManagedRuntime` per plugin instance. Rsbuild hooks and exported Promise APIs are the only runtime boundaries; internal Node-side workflows return `Effect`. A runtime-owned `PluginScope` service owns dynamically created workers, watchers, timers, background fibers, and dev-server resources. Pure transforms, generated/browser runtime code, and worker entrypoints remain ordinary TypeScript.
 
-**Tech Stack:** TypeScript 5.9, Effect 3.21, Rsbuild/Rspack, Rstest, Playwright, Node `worker_threads`, existing benchmark harness.
+**Tech Stack:** TypeScript 5.9, Effect 3.22, Rsbuild/Rspack, Rstest, Playwright, Node `worker_threads`, existing benchmark harness.
 
 ## Global Constraints
 
@@ -145,7 +145,7 @@ git commit -m "test: protect worker runtime boundary"
 **Interfaces:**
 
 - Produces: `PluginScope`, `PluginEffectRuntime`, and `createPluginEffectRuntime()`.
-- Preserves temporarily: `runPluginEffect`, `tryPluginSync`, `tryPluginPromise`, `createDelayedPluginTask` while callers migrate.
+- Preserves temporarily: `runPluginEffect`, `tryPluginPromise`, `createDelayedPluginTask` while callers migrate.
 - Later tasks consume: `runtime.runPromise`, `runtime.runFork`, `runtime.dispose`, and `PluginScope.acquire`.
 
 - [ ] **Step 1: Write failing lifecycle tests**
@@ -944,7 +944,7 @@ git commit -m "refactor: compose server workflows with effect"
 **Interfaces:**
 
 - Deletes: `runPluginEffect` if no public compatibility adapter requires it.
-- Retains: `tryPluginSync`, `tryPluginPromise`, `normalizeEffectError` only if they eliminate repeated boundary code.
+- Retains: `tryPluginPromise`, `normalizeEffectError` only if they eliminate repeated boundary code.
 - Produces: one error policy at Promise/Rsbuild boundaries and typed recovery only where behavior differs.
 
 - [ ] **Step 1: Inventory remaining runtime crossings**
