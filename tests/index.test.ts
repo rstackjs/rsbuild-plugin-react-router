@@ -60,7 +60,7 @@ describe('pluginReactRouter', () => {
     // The plugin should not override Rsbuild's HMR defaults.
     expect(config.dev.hmr).toBe(true);
     expect(config.dev.liveReload).toBe(true);
-    expect(config.dev.writeToDisk).toBe(true);
+    expect(config.dev.writeToDisk).toBe(false);
     expect(config.dev.lazyCompilation).toMatchObject({
       entries: true,
       imports: true,
@@ -328,6 +328,34 @@ describe('pluginReactRouter', () => {
     expect(
       config.environments?.web?.tools?.rspack?.optimization?.avoidEntryIife
     ).toBe(true);
+  });
+
+  it('preserves user web splitChunks overrides', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        environments: {
+          web: {
+            tools: {
+              rspack: {
+                optimization: {
+                  splitChunks: { chunks: 'all' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.splitChunks
+    ).toEqual({ chunks: 'all' });
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.runtimeChunk
+    ).toBe('single');
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {

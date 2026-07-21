@@ -57,6 +57,10 @@ export type ReactRouterPerformanceReport = {
   operations: Record<string, OperationTiming>;
 };
 
+export const formatReactRouterPerformanceReport = (
+  report: ReactRouterPerformanceReport
+): string => `[react-router:performance] ${JSON.stringify(report)}`;
+
 export type ReactRouterPerformanceProfiler = {
   record<T>(
     environment: string | undefined,
@@ -247,7 +251,7 @@ export const createReactRouterPerformanceProfiler = ({
         ...details,
         operations,
       };
-      log(`[react-router:performance] ${JSON.stringify(report)}`);
+      log(formatReactRouterPerformanceReport(report));
       timingsByEnvironment.delete(resolvedEnvironment);
     },
   };

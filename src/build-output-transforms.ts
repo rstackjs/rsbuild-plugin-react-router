@@ -6,7 +6,7 @@ import {
   getReactRouterManifestForDev,
   type ReactRouterManifestStats,
 } from './manifest.js';
-import type { RouteTransformExecutor } from './parallel-route-transforms.js';
+import type { RouteTransformRunner } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
 import { createBundlerRouteExportResolver } from './route-export-resolution.js';
 import type { RouteChunkConfig } from './route-chunks.js';
@@ -31,11 +31,12 @@ type RegisterBuildOutputTransformsOptions = {
   appDirectory: string;
   getAssetPrefix: () => string;
   routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
-  routeTransformExecutor: RouteTransformExecutor;
+  routeTransformRunner: RouteTransformRunner;
   routeByFilePath: Map<string, Route>;
   routeChunkConfig: RouteChunkConfig;
   isBuild: boolean;
   splitRouteModules: boolean;
+  useApiRouteModuleTransforms: boolean;
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
@@ -54,11 +55,12 @@ export const registerBuildOutputTransforms = ({
   appDirectory,
   getAssetPrefix,
   routeChunkOptions,
-  routeTransformExecutor,
+  routeTransformRunner,
   routeByFilePath,
   routeChunkConfig,
   isBuild,
   splitRouteModules,
+  useApiRouteModuleTransforms,
   ssr,
   isSpaMode,
   rootRoutePath,
@@ -70,7 +72,7 @@ export const registerBuildOutputTransforms = ({
       'route:module',
       args.resource,
       async () =>
-        routeTransformExecutor.run({
+        routeTransformRunner({
           kind: 'routeModule',
           code: args.code,
           resource: args.resource,
@@ -154,7 +156,7 @@ export const registerBuildOutputTransforms = ({
         'route:client-entry',
         args.resource,
         async () =>
-          routeTransformExecutor.run({
+          routeTransformRunner({
             kind: 'routeClientEntry',
             code: args.code,
             resourcePath: args.resourcePath,
@@ -178,7 +180,7 @@ export const registerBuildOutputTransforms = ({
         'route:chunk',
         args.resource,
         async () =>
-          routeTransformExecutor.run({
+          routeTransformRunner({
             kind: 'routeChunk',
             code: args.code,
             resource: args.resource,
@@ -204,7 +206,7 @@ export const registerBuildOutputTransforms = ({
           'route:split-exports',
           args.resource,
           async () =>
-            routeTransformExecutor.run({
+            routeTransformRunner({
               kind: 'splitRouteExports',
               code: args.code,
               resourcePath: args.resourcePath,
@@ -244,7 +246,7 @@ export const registerBuildOutputTransforms = ({
         'module:client-only-stub',
         args.resource,
         async () => {
-          return routeTransformExecutor.run({
+          return routeTransformRunner({
             kind: 'clientOnlyStub',
             code: args.code,
             resourcePath: args.resourcePath,
@@ -257,22 +259,24 @@ export const registerBuildOutputTransforms = ({
       )
   );
 
-  api.transform(
-    {
-      resourceQuery: /\?react-router-route/,
-      order: 'post',
-    },
-    transformRouteModule
-  );
-
-  api.transform(
-    {
-      test: path => routeByFilePath.has(path),
-      resourceQuery: {
-        not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+  if (useApiRouteModuleTransforms) {
+    api.transform(
+      {
+        resourceQuery: /\?react-router-route/,
+        order: 'post',
       },
-      order: 'post',
-    },
-    transformRouteModule
-  );
+      transformRouteModule
+    );
+
+    api.transform(
+      {
+        test: path => routeByFilePath.has(path),
+        resourceQuery: {
+          not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+        },
+        order: 'post',
+      },
+      transformRouteModule
+    );
+  }
 };

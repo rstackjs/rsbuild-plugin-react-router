@@ -1,4 +1,3 @@
-import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createServer, type Server as HttpServer } from 'node:http';
@@ -87,18 +86,6 @@ const getBuildMarker = (build: ServerBuild): string | undefined => {
     }
   }
   return undefined;
-};
-
-const createNoopWatcher = (): fs.FSWatcher => {
-  const watcher = new EventEmitter() as EventEmitter & {
-    close: () => void;
-    ref: () => fs.FSWatcher;
-    unref: () => fs.FSWatcher;
-  };
-  watcher.close = () => undefined;
-  watcher.ref = () => watcher as fs.FSWatcher;
-  watcher.unref = () => watcher as fs.FSWatcher;
-  return watcher as fs.FSWatcher;
 };
 
 const runEsmIntegrationSubprocess = (repositoryRoot: string): Promise<void> =>
@@ -193,9 +180,6 @@ const createDevRuntimeHarness = async (esm: boolean) => {
     mockRestore?: () => void;
   };
   existsSyncMock.mockRestore?.();
-  const watchMock = rstest
-    .spyOn(fs, 'watch')
-    .mockImplementation((() => createNoopWatcher()) as typeof fs.watch);
   const logger = createLogger({ level: 'silent' });
   const loggerError = rstest.spyOn(logger, 'error');
   const consoleError = rstest
@@ -241,7 +225,6 @@ const createDevRuntimeHarness = async (esm: boolean) => {
       }
       loggerError.mockRestore();
       consoleError.mockRestore();
-      watchMock.mockRestore();
       rmSync(fixtureRoot, { force: true, recursive: true });
     }
   };
@@ -399,6 +382,8 @@ const createDevRuntimeHarness = async (esm: boolean) => {
         ),
       loadBuild,
       loadRawEntry,
+      hasDiskOutput: (relativePath: string) =>
+        fs.existsSync(join(fixtureRoot, relativePath)),
       rebuildRoute: (source: string) => invalidate(source, false),
       rebuildWebFirst: (source: string) => invalidate(source, true),
       requestBuiltInDocument,
@@ -438,13 +423,15 @@ const expectFirstCommittedGeneration = async (
       timeout: 20_000,
     })
     .toBeGreaterThan(completedBeforeRecovery);
+  await new Promise(resolve => setTimeout(resolve, 250));
 
-  const build = await withTimeout(
-    harness.loadBuild(),
-    5_000,
-    `the first valid generation after ${harness.compileAttempts} attempts and ${harness.completedCompiles} completions`
-  );
-  expect(getBuildMarker(build)).toBe('v1');
+  await expect
+    .poll(async () => getBuildMarker(await harness.loadBuild()), {
+      intervals: [50, 100, 250],
+      timeout: 20_000,
+    })
+    .toBe('v1');
+  const build = await harness.loadBuild();
   expect(build.assets).toBeTypeOf('object');
   expect(build.entry).toBeTypeOf('object');
   expect(build.routes).toBeTypeOf('object');
@@ -470,6 +457,14 @@ const expectFirstCommittedGeneration = async (
   await expect(harness.loadRawEntry('static/js/app')).resolves.toMatchObject({
     customServerMarker: 'custom-server-entry',
   });
+  expect(
+    harness.hasDiskOutput('build/server/static/js/react-router-server-build.js')
+  ).toBe(false);
+  expect(
+    harness.hasDiskOutput(
+      'build/client/static/js/virtual/react-router/browser-manifest.js'
+    )
+  ).toBe(false);
   await expect(harness.requestDocument()).resolves.toContain('v1');
   await harness.startBuiltInServer();
   await expect(harness.requestBuiltInDocument()).resolves.toContain('v1');

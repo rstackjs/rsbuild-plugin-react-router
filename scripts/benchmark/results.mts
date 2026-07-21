@@ -174,7 +174,7 @@ const formatParallelRouteTransform = parallelRouteTransform => {
   if (parallelRouteTransform === true) {
     return 'true';
   }
-  return `workers=${parallelRouteTransform}`;
+  return `maxWorkers=${parallelRouteTransform}`;
 };
 
 const appendDevRequestSummary = (lines, benchmark, key, title) => {

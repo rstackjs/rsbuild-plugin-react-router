@@ -18,6 +18,7 @@ import {
   PLUGIN_NAME,
 } from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
+import { ensureFederationAsyncStartup } from './federation.js';
 import { createReactRouterDevServerSetup } from './dev-server.js';
 import {
   generateWithProps,
@@ -52,9 +53,14 @@ import {
   type RouteChunkConfig,
 } from './route-chunks.js';
 import {
-  createRouteTransformExecutor,
+  createRouteTransformRunner,
   shouldParallelizeRouteTransforms,
 } from './parallel-route-transforms.js';
+import {
+  registerRouteModuleTransformRules,
+  shouldUseApiRouteModuleTransforms,
+  shouldUseApiRouteModuleTransformsForAction,
+} from './route-module-transform-rules.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
@@ -106,46 +112,11 @@ export const shouldParallelizeEnvironmentBuilds = ({
 }): boolean =>
   !isBuild && spareCoreCount >= MIN_PARALLEL_ENVIRONMENT_BUILD_SPARE_CORES;
 
-type ModuleFederationPluginLike = {
-  name?: string;
-  _options?: { experiments?: { asyncStartup?: boolean } };
-  options?: { experiments?: { asyncStartup?: boolean } };
-};
-
-const ensureFederationAsyncStartup = (
-  rspackConfig: Rspack.Configuration | undefined
-): void => {
-  if (!rspackConfig?.plugins?.length) {
-    return;
-  }
-
-  for (const plugin of rspackConfig.plugins) {
-    if (!plugin || typeof plugin !== 'object') {
-      continue;
-    }
-    const pluginName = (plugin as ModuleFederationPluginLike).name;
-    if (pluginName !== 'ModuleFederationPlugin') {
-      continue;
-    }
-
-    const pluginOptions =
-      (plugin as ModuleFederationPluginLike)._options ??
-      (plugin as ModuleFederationPluginLike).options;
-    if (!pluginOptions) {
-      continue;
-    }
-
-    pluginOptions.experiments = {
-      ...pluginOptions.experiments,
-      asyncStartup: true,
-    };
-  }
-};
-
 const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
+const supportsApiRouteModuleTransforms = shouldUseApiRouteModuleTransforms();
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -416,6 +387,11 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
+    const useApiRouteModuleTransforms =
+      shouldUseApiRouteModuleTransformsForAction({
+        isBuild,
+        supportsApiRouteModuleTransforms,
+      });
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
       isBuild,
     });
@@ -429,13 +405,11 @@ export const pluginReactRouter = (
       rootRouteFile,
     };
     const routeChunkCache: RouteChunkCache = new Map();
-    const routeTransformExecutor = createRouteTransformExecutor({
-      parallelRouteTransform:
-        pluginOptions.parallelRouteTransform ??
-        shouldParallelizeRouteTransforms(routeCount),
+    const parallelRouteTransform =
+      pluginOptions.parallelRouteTransform ??
+      shouldParallelizeRouteTransforms(routeCount);
+    const routeTransformRunner = createRouteTransformRunner({
       routeChunkCache,
-      splitRouteModules: Boolean(splitRouteModules),
-      isBuild,
     });
     const routeChunkOptions = {
       splitRouteModules,
@@ -457,7 +431,6 @@ export const pluginReactRouter = (
       api,
       isBuild,
       lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor,
       routeRestartMarkerPath,
       watchDirectory,
       getRouteTopology: routeTopology.getRouteTopology,
@@ -783,7 +756,6 @@ export const pluginReactRouter = (
         routeCount >= 256 &&
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
-
       return mergeRsbuildConfig(config, {
         ...(shouldCompactFileSizeReport
           ? {
@@ -800,7 +772,6 @@ export const pluginReactRouter = (
           assetPrefix: config.output?.assetPrefix || '/',
         },
         dev: {
-          writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
         },
@@ -944,6 +915,19 @@ export const pluginReactRouter = (
         return mergeEnvironmentConfig(config, {
           tools: {
             rspack: rspackConfig => {
+              if (!useApiRouteModuleTransforms) {
+                registerRouteModuleTransformRules(rspackConfig, {
+                  environmentName: name,
+                  ssr,
+                  isBuild,
+                  isSpaMode,
+                  rootRoutePath,
+                  logPerformance,
+                  routeByFilePath,
+                  parallelRouteTransform,
+                });
+              }
+
               if (pluginOptions.federation) {
                 ensureFederationAsyncStartup(rspackConfig);
               }
@@ -1024,11 +1008,12 @@ export const pluginReactRouter = (
       appDirectory,
       getAssetPrefix: () => assetPrefix,
       routeChunkOptions,
-      routeTransformExecutor,
+      routeTransformRunner,
       routeByFilePath,
       routeChunkConfig,
       isBuild,
       splitRouteModules: Boolean(splitRouteModules),
+      useApiRouteModuleTransforms,
       ssr,
       isSpaMode,
       rootRoutePath,
