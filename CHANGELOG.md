@@ -1,5 +1,11 @@
 # rsbuild-plugin-react-router
 
+## 0.4.1
+
+### Patch Changes
+
+- dde2a2d: Stop forcing development output to disk so `dev.writeToDisk: false` and Rsbuild's in-memory default are preserved.
+
 ## 0.4.0
 
 ### Minor Changes
