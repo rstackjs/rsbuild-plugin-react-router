@@ -32,6 +32,55 @@ const createRouteTopologyWatcher = async (
 afterAll(() => routeWatchRuntime.dispose());
 
 describe('route watch restart marker', () => {
+  it('settles runtime disposal triggered by a topology change', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
+    const markerPath = join(root, 'build/.react-router-route-watch');
+    const watchedDirectory = join(root, 'app');
+    mkdirSync(watchedDirectory, { recursive: true });
+    let topology = new Set(['initial']);
+    const errors: unknown[] = [];
+    let triggerChange!: () => void;
+    let disposePromise: Promise<void> | undefined;
+    const runtime = createPluginEffectRuntime();
+
+    try {
+      await runtime.runPromise(
+        acquireRouteTopologyWatcher({
+          runtime,
+          watchDirectory: watchedDirectory,
+          restartMarkerPath: markerPath,
+          getRouteTopology: async () => topology,
+          onRouteTopologyChange: () => {
+            disposePromise = runtime.dispose();
+          },
+          onError: error => errors.push(error),
+          watchDirectoryEntry: (_directory, onChange) => {
+            triggerChange = onChange;
+            return { close: () => {} };
+          },
+        })
+      );
+
+      topology = new Set(['changed']);
+      triggerChange();
+
+      await expect.poll(() => disposePromise !== undefined).toBe(true);
+      expect(errors).toEqual([]);
+      if (!disposePromise) throw new Error('Expected runtime disposal.');
+      await expect(
+        Promise.race([
+          disposePromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('dispose timed out')), 1_000)
+          ),
+        ])
+      ).resolves.toBeUndefined();
+    } finally {
+      await runtime.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('allows a topology callback to await watcher shutdown', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-route-watch-'));
     const markerPath = join(root, 'build/.react-router-route-watch');

@@ -14,16 +14,25 @@ import * as Scope from 'effect/Scope';
 const PluginFibers = Context.GenericTag<FiberSet.FiberSet>(
   'rsbuild-plugin-react-router/PluginFibers'
 );
+type PluginResources = { readonly scope: Scope.CloseableScope };
+const PluginResources: Context.Tag<PluginResources, PluginResources> =
+  Context.GenericTag<PluginResources>(
+    'rsbuild-plugin-react-router/PluginResources'
+  );
 
-type PluginRuntimeContext = Scope.Scope | FiberSet.FiberSet;
+type PluginRuntimeContext = Scope.Scope | FiberSet.FiberSet | PluginResources;
 
 const PluginRuntimeLive = Layer.scopedContext(
   Effect.gen(function* () {
     const scope = yield* Effect.scope;
     const resources = yield* Scope.fork(scope, ExecutionStrategy.sequential);
-    const fibers = yield* FiberSet.make();
+    const fiberScope = yield* Scope.fork(scope, ExecutionStrategy.sequential);
+    const fibers = yield* FiberSet.make().pipe(
+      Effect.provideService(Scope.Scope, fiberScope)
+    );
     return Context.make(Scope.Scope, resources).pipe(
-      Context.add(PluginFibers, fibers)
+      Context.add(PluginFibers, fibers),
+      Context.add(PluginResources, { scope: resources })
     );
   })
 );
@@ -43,13 +52,27 @@ export const createPluginEffectRuntime = (): PluginEffectRuntime => {
 
   return {
     runPromise: runtime.runPromise,
-    runFork: (effect, options) =>
-      (fiberRunFork ??= runtime.runSync(
+    runFork: (effect, options) => {
+      if (disposePromise) return Effect.runFork(Effect.interrupt);
+      return (fiberRunFork ??= runtime.runSync(
         Effect.flatMap(PluginFibers, fibers =>
           FiberSet.runtime(fibers)<PluginRuntimeContext>()
         )
-      ))(effect, options),
-    dispose: (): Promise<void> => (disposePromise ??= runtime.dispose()),
+      ))(effect, options);
+    },
+    // Resource finalizers cancel their owned fibers before runtime disposal
+    // closes the fiber scope and interrupts any stragglers. Deferring by one
+    // microtask also lets a managed fiber request its own shutdown safely.
+    dispose: (): Promise<void> =>
+      (disposePromise ??= Promise.resolve()
+        .then(() =>
+          runtime.runPromise(
+            Effect.flatMap(PluginResources, ({ scope }) =>
+              Scope.close(scope, Exit.void)
+            )
+          )
+        )
+        .finally(() => runtime.dispose())),
   };
 };
 
