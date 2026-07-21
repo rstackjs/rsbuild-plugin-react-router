@@ -1,5 +1,28 @@
 # rsbuild-plugin-react-router
 
+## 0.4.0
+
+### Minor Changes
+
+- 2c155f2: Add state-preserving Hot Module Replacement for route modules in development: route updates now apply React Refresh registration and in-place route patching instead of triggering a full page reload. Server code changes also trigger hot data revalidation, so loader data refreshes without a reload. This degrades gracefully to the previous full-reload behavior when `@rsbuild/plugin-react` isn't present or Fast Refresh is disabled.
+
+### Patch Changes
+
+- 2c155f2: Align the Fast Refresh registration backfill with react-refresh's own
+  component-detection rules so `memo`/`forwardRef` components in pre-lowered
+  (MDX) routes register for HMR. Multi-declarator lists, curried arrows, and
+  require/import interop callees no longer produce false registrations.
+- 96ed301: Export `ReactRouterRsbuildConfig`, the plugin's typed `react-router.config.*`
+  shape (React Router's `Config` plus plugin-supported options such as
+  `splitRouteModules`), so projects no longer need to import types from
+  `@react-router/dev/config` or hand-roll intersections. `@react-router/dev`
+  is declared as an optional peer dependency since the exported config and
+  route types resolve from it; this is not a breaking change — nothing new is
+  required at install or runtime.
+- 35a2036: Prerender fixes: root route data now flows through the legacy handler path,
+  and the dynamic/splat prerender warning strips the leading slash only for
+  top-level dynamic segments so nested paths are reported correctly.
+
 ## 0.3.1
 
 ### Patch Changes
