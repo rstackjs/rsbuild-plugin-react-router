@@ -10,12 +10,15 @@ import {
   type ServerBuild,
 } from 'react-router';
 import { dirname, relative, resolve } from 'pathe';
-import { PLUGIN_NAME } from './constants.js';
+import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import { getBuildManifest } from './build-manifest.js';
 import {
+  createReactRouterManifestOptions,
   generateReactRouterManifestForDev,
-  getReactRouterManifestForDev,
+  type ReactRouterManifestForDev as ReactRouterManifest,
   type ReactRouterManifestStats,
+  type RouteChunkManifestOptions,
+  type RouteModuleAnalysisProvider,
   type RouteManifestModuleExports,
 } from './manifest.js';
 import {
@@ -31,10 +34,6 @@ import type {
 import { resolveServerBuildModule } from './server-utils.js';
 import type { PluginOptions, Route } from './types.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
-
-type ReactRouterManifest = Awaited<
-  ReturnType<typeof getReactRouterManifestForDev>
->;
 
 type BuildRouteModule = {
   loader?: unknown;
@@ -73,9 +72,10 @@ type RunReactRouterPrerenderBuildOptions = {
   pluginOptions: PluginOptions;
   appDirectory: string;
   assetPrefix: string;
-  routeChunkOptions: Parameters<typeof getReactRouterManifestForDev>[5];
+  routeChunkOptions: RouteChunkManifestOptions | undefined;
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
   buildManifest: Awaited<ReturnType<typeof getBuildManifest>>;
-  resolvedConfigWithRoutes: ResolvedReactRouterConfig;
+  buildEndReactRouterConfig: ResolvedReactRouterConfig;
   buildEnd: Config['buildEnd'];
 };
 
@@ -361,7 +361,7 @@ const handleSpaMode = async ({
       const html = await response.text();
       const isPrerenderSpaFallback = build.prerender?.includes('/');
       const filename = isPrerenderSpaFallback
-        ? '__spa-fallback.html'
+        ? SPA_FALLBACK_HTML_FILE
         : 'index.html';
 
       if (response.status !== 200) {
@@ -374,7 +374,7 @@ const handleSpaMode = async ({
         }
         throw new Error(
           `SPA Mode: Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering your \`${filename}\` file.\n` +
+            '`entry.server.tsx` while prerendering your SPA Fallback HTML file.\n' +
             html
         );
       }
@@ -443,10 +443,10 @@ const validatePrerenderPathMatches = (
   }
 };
 
-export const createBoundedPrerenderTasksEffect = (
-  prerenderPaths: string[],
+export const createBoundedPrerenderTasksEffect = <T>(
+  prerenderPaths: T[],
   concurrency: number,
-  renderPath: (path: string) => Effect.Effect<void, Error, never>
+  renderPath: (path: T) => Effect.Effect<void, Error, never>
 ): Effect.Effect<void, Error, never> =>
   Effect.forEach(prerenderPaths, renderPath, { concurrency, discard: true });
 
@@ -609,8 +609,9 @@ export const runReactRouterPrerenderBuild = async (
     appDirectory,
     assetPrefix,
     routeChunkOptions,
+    routeModuleAnalysis,
     buildManifest,
-    resolvedConfigWithRoutes,
+    buildEndReactRouterConfig,
     buildEnd,
     basename,
   } = options;
@@ -652,7 +653,10 @@ export const runReactRouterPrerenderBuild = async (
               clientStats,
               appDirectory,
               assetPrefix,
-              routeChunkOptions
+              createReactRouterManifestOptions({
+                routeChunks: routeChunkOptions,
+                routeModuleAnalysis,
+              })
             );
         assertValidSsrFalsePrerenderExports({
           routes,
@@ -700,8 +704,8 @@ export const runReactRouterPrerenderBuild = async (
   if (buildEnd) {
     await buildEnd({
       buildManifest,
-      reactRouterConfig: resolvedConfigWithRoutes,
-      viteConfig: api.getNormalizedConfig(),
+      reactRouterConfig: buildEndReactRouterConfig,
+      rsbuildConfig: api.getNormalizedConfig(),
     });
   }
 };

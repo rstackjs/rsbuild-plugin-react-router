@@ -1,6 +1,6 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
-import { rspack } from '@rsbuild/core';
+import { rspack, type Rspack } from '@rsbuild/core';
 import * as fs from 'node:fs';
 import path from 'node:path';
 import { pluginReactRouter } from '../src';
@@ -309,6 +309,62 @@ describe('pluginReactRouter', () => {
 
       expect(getRules('web').some(hasUrlAssetRule)).toBe(true);
       expect(getRules('node').some(hasUrlAssetRule)).toBe(true);
+    });
+
+    it('aligns server CSS url imports with web dev CSS urls', async () => {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+      const cssFilename = config.environments?.node?.output?.filename?.css as (
+        pathData: Rspack.PathData
+      ) => string;
+
+      expect(
+        cssFilename({
+          chunk: {
+            name: 'app/routes/css-with-links-export/styles-postcss-linked',
+          },
+        })
+      ).toBe(
+        'app/routes/css-with-links-export/styles-postcss-linked.css'
+      );
+    });
+
+    it('keeps server CSS url imports in static assets for build', async () => {
+      const rsbuild = await createStubRsbuild({
+        action: 'build',
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+      const cssFilename = config.environments?.node?.output?.filename?.css as (
+        pathData: Rspack.PathData
+      ) => string;
+
+      expect(
+        cssFilename({
+          chunk: {
+            name: 'app/routes/css-with-links-export/styles-postcss-linked',
+          },
+        })
+      ).toBe('../assets/styles-postcss-linked.[contenthash:10].css');
+    });
+
+    it('routes server code-split chunks to static/js/async so they stay under the server build', async () => {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+      const config = await rsbuild.unwrapConfig();
+
+      expect(
+        config.environments?.node?.tools?.rspack?.output?.chunkFilename
+      ).toBe('static/js/async/[name].js');
     });
 
     it('should emit package.json for node environment', async () => {

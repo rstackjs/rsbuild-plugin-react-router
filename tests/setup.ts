@@ -162,9 +162,12 @@ rstest.mock('@scripts/test-helper', () => ({
       onAfterBuild: rstest.fn(),
       onBeforeDevCompile: rstest.fn(),
       onAfterDevCompile: rstest.fn(),
+      onBeforeCreateCompiler: rstest.fn(),
       onAfterCreateCompiler: rstest.fn(),
       getNormalizedConfig: rstest.fn().mockImplementation(() => mergedConfig),
+      isPluginExists: rstest.fn().mockReturnValue(false),
       modifyRsbuildConfig: rstest.fn(),
+      modifyBundlerChain: rstest.fn(),
       onAfterEnvironmentCompile: rstest.fn(),
       // Keep as a spy-only hook; tests in this repo assert against the merged
       // Rsbuild config (modifyRsbuildConfig), not post-normalization environment
@@ -207,8 +210,11 @@ rstest.mock('@scripts/test-helper', () => ({
     });
 
     // In Rsbuild, `addPlugins()` triggers plugin setup before config is read.
+    const flattenPlugins = (plugins: any[]): any[] =>
+      plugins.flatMap(plugin => (Array.isArray(plugin) ? flattenPlugins(plugin) : plugin));
+
     stub.addPlugins.mockImplementation((next: any[]) => {
-      for (const plugin of next) {
+      for (const plugin of flattenPlugins(next)) {
         if (typeof plugin?.setup === 'function') {
           // Tests do not await `addPlugins`, so ensure `unwrapConfig` waits for setup.
           pending.push(Promise.resolve(plugin.setup(stub)));

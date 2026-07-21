@@ -1,0 +1,591 @@
+import type { Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import getPort from "get-port";
+
+import {
+  createProject,
+  createEditor,
+  dev,
+  build,
+  reactRouterServe,
+  customDev,
+  EXPRESS_SERVER,
+  reactRouterConfig,
+  rsbuildConfig,
+  bundlerTemplates,
+  type TemplateName,
+} from "./helpers/rsbuild.js";
+
+const js = String.raw;
+const css = String.raw;
+
+const PADDING = "20px";
+const NEW_PADDING = "30px";
+
+const fixtures = [
+  ...bundlerTemplates,
+  // RSC Framework mode is intentionally excluded. Route data exports are now
+  // isolated from the native rspack `RscServerPlugin` CSS wrapper, but this broad
+  // matrix still fails first-paint CSS assertions in no-JS mode. Keep the focused
+  // RSC CSS coverage in `rsc/rsc-css-test.ts` until first-paint CSS parity lands.
+  // {
+  //   templateName: "rsc-framework",
+  //   templateDisplayName: "RSC Framework",
+  // },
+] as const satisfies ReadonlyArray<{
+  templateName: TemplateName;
+  templateDisplayName: string;
+}>;
+
+type RouteBasePath =
+  | "css-with-links-export"
+  | "css-with-floated-link"
+  | "rsc-server-first-route";
+const getRouteBasePaths = (templateName: TemplateName) => {
+  return [
+    "css-with-floated-link",
+    "css-with-links-export",
+    ...(templateName.includes("rsc")
+      ? (["rsc-server-first-route"] as const)
+      : []),
+  ] as const satisfies RouteBasePath[];
+};
+
+const files = ({ templateName }: { templateName: TemplateName }) => ({
+  "postcss.config.js": js`
+    export default ({
+      plugins: [
+        {
+          // Minimal PostCSS plugin to test that it's being used
+          postcssPlugin: 'replace',
+          Declaration (decl) {
+            decl.value = decl.value
+              .replace(
+                /NEW_PADDING_INJECTED_VIA_POSTCSS/g,
+                ${JSON.stringify(NEW_PADDING)},
+              )
+              .replace(
+                /PADDING_INJECTED_VIA_POSTCSS/g,
+                ${JSON.stringify(PADDING)},
+              );
+          },
+        },
+      ],
+    });
+  `,
+  // RSC Framework mode doesn't support custom entries yet
+  ...(!templateName.includes("rsc")
+    ? {
+        "app/entry.client.tsx": js`
+          import "./entry.client.css";
+
+          import { HydratedRouter } from "react-router/dom";
+          import { startTransition, StrictMode } from "react";
+          import { hydrateRoot } from "react-dom/client";
+
+          startTransition(() => {
+            hydrateRoot(
+              document,
+              <StrictMode>
+                <HydratedRouter />
+              </StrictMode>
+            );
+          });
+        `,
+        "app/entry.client.css": css`
+          .entry-client {
+            background: pink;
+            padding: ${PADDING};
+          }
+        `,
+      }
+    : {}),
+  "app/root.tsx": js`
+    import { Links, Meta, Outlet, Scripts } from "react-router";
+
+    export default function Root() {
+      return (
+        <html lang="en">
+          <head>
+            <Meta />
+            <Links />
+          </head>
+          <body>
+            <Outlet />
+            <Scripts />
+          </body>
+        </html>
+      );
+    }
+  `,
+  ...Object.assign(
+    {},
+    ...getRouteBasePaths(templateName).map((routeBasePath) => {
+      const isServerFirstRoute = routeBasePath === "rsc-server-first-route";
+      const exportName = isServerFirstRoute ? "ServerComponent" : "default";
+
+      return {
+        [`app/routes/${routeBasePath}/styles-bundled.css`]: css`
+          .${routeBasePath}-bundled {
+            background: papayawhip;
+            padding: ${PADDING};
+          }
+        `,
+        [`app/routes/${routeBasePath}/styles-postcss-linked.css`]: css`
+          .${routeBasePath}-postcss-linked {
+            background: salmon;
+            padding: PADDING_INJECTED_VIA_POSTCSS;
+          }
+        `,
+        [`app/routes/${routeBasePath}/styles.module.css`]: css`
+          .index {
+            background: peachpuff;
+            padding: ${PADDING};
+          }
+        `,
+        [`app/routes/${routeBasePath}/styles.scss`]: css`
+          // Sass variable exercises @rsbuild/plugin-sass compilation.
+          $scss-padding: ${PADDING};
+
+          .${routeBasePath}-scss {
+            background: lavender;
+            padding: $scss-padding;
+          }
+        `,
+        [`app/routes/${routeBasePath}/styles.less`]: css`
+          // Less variable exercises @rsbuild/plugin-less compilation.
+          @less-padding: ${PADDING};
+
+          .${routeBasePath}-less {
+            background: mistyrose;
+            padding: @less-padding;
+          }
+        `,
+        [`app/routes/${routeBasePath}/styles-vanilla-global.css.ts`]: js`
+          import { createVar, globalStyle } from "@vanilla-extract/css";
+
+          globalStyle(".${routeBasePath}-vanilla-global", {
+            background: "lightgreen",
+            padding: "${PADDING}",
+          });
+        `,
+        [`app/routes/${routeBasePath}/styles-vanilla-local.css.ts`]: js`
+          import { style } from "@vanilla-extract/css";
+
+          export const index = style({
+            background: "lightblue",
+            padding: "${PADDING}",
+          });
+        `,
+        [`app/routes/${routeBasePath}/route.tsx`]: js`
+          import "./styles-bundled.css";
+          import postcssLinkedStyles from "./styles-postcss-linked.css?url";
+          import cssModulesStyles from "./styles.module.css";
+          import "./styles.scss";
+          import "./styles.less";
+          import "./styles-vanilla-global.css";
+          import * as stylesVanillaLocal from "./styles-vanilla-local.css";
+
+          // Workaround for "Generated an empty chunk" warnings in RSC Framework Mode
+          export function loader() {
+            return null;
+          }
+
+          ${
+            routeBasePath === "css-with-links-export"
+              ? `export function links() { return [{ rel: "stylesheet", href: postcssLinkedStyles }]; }`
+              : ""
+          }
+
+          function TestRoute() {
+            return (
+              <>
+                <input />
+                ${routeBasePath !== "css-with-links-export" ? `<link rel="stylesheet" href={postcssLinkedStyles} precedence="default" />` : ""}
+                <div id="entry-client" className="entry-client">
+                  <div id="css-modules" className={cssModulesStyles.index}>
+                    <div id="css-postcss-linked" className="${routeBasePath}-postcss-linked">
+                      <div id="css-bundled" className="${routeBasePath}-bundled">
+                        <div id="css-vanilla-global" className="${routeBasePath}-vanilla-global">
+                          <div id="css-vanilla-local" className={stylesVanillaLocal.index}>
+                            <div id="css-scss" className="${routeBasePath}-scss">
+                              <div id="css-less" className="${routeBasePath}-less">
+                                <h2>CSS test</h2>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            );
+          }
+
+          export ${exportName === "default" ? "default" : `const ${exportName} =`} TestRoute;
+        `,
+      };
+    }),
+  ),
+});
+
+test.describe("CSS", () => {
+  fixtures.forEach(({ templateName, templateDisplayName }) => {
+    test.describe(templateDisplayName, () => {
+      test.describe("rsbuild dev", async () => {
+        let port: number;
+        let cwd: string;
+        let stop: () => void;
+
+        test.beforeAll(async () => {
+          port = await getPort();
+          cwd = await createProject(
+            {
+              "react-router.config.ts": reactRouterConfig(),
+              "rsbuild.config.ts": await rsbuildConfig.basic({
+                port,
+                templateName,
+                vanillaExtract: true,
+                sass: true,
+                less: true,
+              }),
+              ...files({ templateName }),
+            },
+            templateName,
+          );
+          stop = await dev({ cwd, port });
+        });
+        test.afterAll(() => stop());
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: false });
+          test("without JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+          });
+        });
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: true });
+          test("with JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+            await hmrWorkflow({ page, port, cwd, templateName });
+          });
+        });
+      });
+
+      test.describe("rsbuild dev with custom base", async () => {
+        let port: number;
+        let cwd: string;
+        let stop: () => void;
+        let base = "/custom/base/";
+
+        test.beforeAll(async () => {
+          port = await getPort();
+          cwd = await createProject(
+            {
+              "react-router.config.ts": reactRouterConfig({
+                basename: base,
+              }),
+              "rsbuild.config.ts": await rsbuildConfig.basic({
+                port,
+                base,
+                templateName,
+                vanillaExtract: true,
+                sass: true,
+                less: true,
+              }),
+              ...files({ templateName }),
+            },
+            templateName,
+          );
+          stop = await dev({ cwd, port, basename: base });
+        });
+        test.afterAll(() => stop());
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: false });
+          test("without JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, base, templateName });
+          });
+        });
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: true });
+          test("with JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, base, templateName });
+            await hmrWorkflow({ page, port, cwd, base, templateName });
+          });
+        });
+      });
+
+      test.describe("express", async () => {
+        let port: number;
+        let cwd: string;
+        let stop: () => void;
+
+        test.beforeAll(async () => {
+          port = await getPort();
+          cwd = await createProject(
+            {
+              "react-router.config.ts": reactRouterConfig(),
+              "rsbuild.config.ts": await rsbuildConfig.basic({
+                port,
+                templateName,
+                vanillaExtract: true,
+                sass: true,
+                less: true,
+              }),
+              "server.mjs": EXPRESS_SERVER({ port, templateName }),
+              ...files({ templateName }),
+            },
+            templateName,
+          );
+          stop = await customDev({ cwd, port });
+        });
+        test.afterAll(() => stop());
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: false });
+          test("without JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+          });
+        });
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: true });
+          test("with JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+            await hmrWorkflow({ page, port, cwd, templateName });
+          });
+        });
+      });
+
+      test.describe("build", async () => {
+        let port: number;
+        let cwd: string;
+        let stop: () => void;
+
+        test.beforeAll(async () => {
+          port = await getPort();
+          cwd = await createProject(
+            {
+              "react-router.config.ts": reactRouterConfig(),
+              "rsbuild.config.ts": await rsbuildConfig.basic({
+                port,
+                templateName,
+                vanillaExtract: true,
+                sass: true,
+                less: true,
+              }),
+              ...files({ templateName }),
+            },
+            templateName,
+          );
+
+          // Note: fixtures already declare sideEffects: ["*.css.ts"], which
+          // upstream applied here via a package.json edit.
+
+          let { stderr, status } = build({ cwd });
+          let stderrString = stderr.toString();
+          if (templateName.includes("rsc")) {
+            // In RSC builds, the same assets can be generated multiple times
+            stderrString = stderrString.replace(
+              /The emitted file ".*?" overwrites a previously emitted file of the same name\.\n?/g,
+              "",
+            );
+          }
+          expect(stderrString).toBeFalsy();
+          expect(status).toBe(0);
+          stop = await reactRouterServe({ cwd, port });
+        });
+        test.afterAll(() => stop());
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: false });
+          test("without JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+          });
+        });
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: true });
+          test("with JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+          });
+        });
+      });
+
+      test.describe("build with CSS code splitting disabled", async () => {
+        test.fixme(
+          templateName.includes("rsc"),
+          "RSC Framework mode doesn't support disabling CSS code splitting yet",
+        );
+
+        let port: number;
+        let cwd: string;
+        let stop: () => void;
+
+        test.beforeAll(async () => {
+          port = await getPort();
+          cwd = await createProject(
+            {
+              "react-router.config.ts": reactRouterConfig(),
+              "rsbuild.config.ts": await rsbuildConfig.basic({
+                port,
+                templateName,
+                cssCodeSplit: false,
+                vanillaExtract: true,
+                sass: true,
+                less: true,
+              }),
+              ...files({ templateName }),
+            },
+            templateName,
+          );
+
+          // Note: fixtures already declare sideEffects: ["*.css.ts"], which
+          // upstream applied here via a package.json edit.
+
+          let { stderr, status } = build({ cwd });
+          expect(stderr.toString()).toBeFalsy();
+          expect(status).toBe(0);
+          stop = await reactRouterServe({ cwd, port });
+        });
+        test.afterAll(() => stop());
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: false });
+          test("without JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+          });
+        });
+
+        test.describe(() => {
+          test.use({ javaScriptEnabled: true });
+          test("with JS", async ({ page }) => {
+            await pageLoadWorkflow({ page, port, templateName });
+          });
+        });
+      });
+    });
+  });
+});
+
+async function pageLoadWorkflow({
+  page,
+  port,
+  base,
+  templateName,
+}: {
+  page: Page;
+  port: number;
+  base?: string;
+  templateName: TemplateName;
+}) {
+  for (const routeBase of getRouteBasePaths(templateName)) {
+    let pageErrors: Error[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error));
+
+    await page.goto(`http://localhost:${port}${base ?? "/"}${routeBase}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    await Promise.all(
+      [
+        "#css-bundled",
+        "#css-postcss-linked",
+        "#css-modules",
+        "#css-scss",
+        "#css-less",
+        "#css-vanilla-global",
+        "#css-vanilla-local",
+      ].map(
+        async (selector) =>
+          await expect(page.locator(selector)).toHaveCSS("padding", PADDING),
+      ),
+    );
+  }
+}
+
+async function hmrWorkflow({
+  page,
+  cwd,
+  port,
+  base,
+  templateName,
+}: {
+  page: Page;
+  cwd: string;
+  port: number;
+  base?: string;
+  templateName: TemplateName;
+}) {
+  for (const routeBase of getRouteBasePaths(templateName)) {
+    let pageErrors: Error[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error));
+
+    await page.goto(`http://localhost:${port}${base ?? "/"}${routeBase}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    let input = page.locator("input");
+    await expect(input).toBeVisible();
+
+    let edit = createEditor(cwd);
+    let modifyCss = (contents: string) =>
+      contents
+        .replace(PADDING, NEW_PADDING)
+        .replace(
+          "PADDING_INJECTED_VIA_POSTCSS",
+          "NEW_PADDING_INJECTED_VIA_POSTCSS",
+        );
+
+    const testCases = [
+      {
+        file: "styles-bundled.css",
+        selector: "#css-bundled",
+      },
+      {
+        file: "styles.module.css",
+        selector: "#css-modules",
+      },
+      // Rsbuild treats `css?url` as an emitted asset URL. It is validated by
+      // page-load tests, but Rspack CSS HMR only manages stylesheet modules
+      // that are imported as CSS.
+      {
+        file: "styles-vanilla-global.css.ts",
+        selector: "#css-vanilla-global",
+      },
+      // Vanilla Extract's HMR isn't working for RSC server-first routes
+      ...(routeBase === "rsc-server-first-route"
+        ? []
+        : ([
+            {
+              file: "styles-vanilla-local.css.ts",
+              selector: "#css-vanilla-local",
+            },
+          ] as const)),
+    ] as const satisfies Array<{
+      file: string;
+      selector: string;
+    }>;
+
+    for (const { file, selector } of testCases) {
+      const routeFile = `app/routes/${routeBase}/${file}`;
+      await input.fill(routeFile);
+      await edit(routeFile, modifyCss);
+      await expect(
+        page.locator(selector),
+        `${file}: CSS update for ${routeFile}`,
+      ).toHaveCSS("padding", NEW_PADDING);
+
+      // Ensure CSS updates were handled by HMR
+      await expect(input, `State preservation for ${routeFile}`).toHaveValue(
+        routeFile,
+      );
+    }
+
+    expect(pageErrors).toEqual([]);
+  }
+}

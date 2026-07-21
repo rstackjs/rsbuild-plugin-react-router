@@ -3,7 +3,11 @@ import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import * as Effect from 'effect/Effect';
 import type { Route, PluginOptions, RouteManifestItem } from './types.js';
 import { combineURLs, createRouteId } from './plugin-utils.js';
-import { SERVER_EXPORTS, CLIENT_EXPORTS } from './constants.js';
+import {
+  CLIENT_EXPORTS,
+  DEFAULT_JS_DIST_PATH,
+  SERVER_EXPORTS,
+} from './constants.js';
 import {
   buildManifestChunkValidity,
   createEmptyRouteChunkByExportName,
@@ -13,8 +17,12 @@ import {
   validateRouteChunks,
   type RouteChunkCache,
   type RouteChunkConfig,
+  type RouteChunkExportName,
 } from './route-chunks.js';
-import { getRouteModuleAnalysis } from './export-utils.js';
+import {
+  getRouteModuleAnalysis,
+  type RouteModuleAnalysis,
+} from './export-utils.js';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
 
@@ -87,11 +95,36 @@ export function configRoutesToRouteManifestEntries(
   return routeManifestEntries;
 }
 
-type RouteChunkManifestOptions = {
+export type RouteChunkManifestOptions = {
   splitRouteModules?: boolean | 'enforce';
   rootRouteFile?: string;
   isBuild?: boolean;
   cache?: RouteChunkCache;
+};
+
+export type RouteModuleAnalysisProvider = (
+  routeFilePath: string,
+  route: Route
+) => Promise<RouteModuleAnalysis | undefined>;
+
+export type ReactRouterManifestOptions = RouteChunkManifestOptions & {
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
+};
+
+export const createReactRouterManifestOptions = ({
+  routeChunks,
+  routeModuleAnalysis,
+}: {
+  routeChunks?: RouteChunkManifestOptions;
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
+}): ReactRouterManifestOptions | undefined => {
+  if (!routeChunks && !routeModuleAnalysis) {
+    return undefined;
+  }
+  return {
+    ...routeChunks,
+    ...(routeModuleAnalysis ? { routeModuleAnalysis } : {}),
+  };
 };
 
 export type ReactRouterManifestForDev = {
@@ -122,8 +155,10 @@ type ReactRouterManifestStatsEntrypoint = {
   getFiles?: () => Iterable<string>;
 };
 
-type ReactRouterManifestStatsLookup<T> = Iterable<[string, T]> & {
-  get?: (name: string) => T | undefined;
+type ReactRouterManifestStatsLookup<T> = Iterable<
+  [string, T | null | undefined]
+> & {
+  get?: (name: string) => T | null | undefined;
 };
 
 type ReactRouterManifestStatsCompilation = {
@@ -153,6 +188,9 @@ const collectManifestFilesByName = <T>(
   const filesByName: Record<string, string[]> = {};
   if (!names) {
     for (const [name, item] of items) {
+      if (item == null) {
+        continue;
+      }
       filesByName[name] = getFiles(name, item);
     }
     return filesByName;
@@ -162,7 +200,7 @@ const collectManifestFilesByName = <T>(
   if (typeof items.get === 'function') {
     for (const name of names) {
       const item = items.get(name);
-      if (!item) {
+      if (item == null) {
         continue;
       }
       filesByName[name] = getFiles(name, item);
@@ -176,6 +214,9 @@ const collectManifestFilesByName = <T>(
 
   for (const [name, item] of items) {
     if (!missingNames.has(name)) {
+      continue;
+    }
+    if (item == null) {
       continue;
     }
     filesByName[name] = getFiles(name, item);
@@ -236,11 +277,12 @@ type RouteManifestAnalysis = {
   > | null;
 };
 
-const DEFAULT_MANIFEST_DIR = 'static/js';
+const DEFAULT_MANIFEST_DIR = DEFAULT_JS_DIST_PATH;
 const CSS_IMPORT_RE = /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/;
 
 const createChunkAssetResolver = (
-  clientStats: ReactRouterManifestStats | undefined
+  clientStats: ReactRouterManifestStats | undefined,
+  includeEntrypointJs: boolean
 ): ((chunkName: string) => ChunkAssets) => {
   const chunkAssetsByName = new Map<string, ChunkAssets>();
 
@@ -259,24 +301,26 @@ const createChunkAssetResolver = (
     }
 
     const cssAssets = new Set<string>();
-    const jsAssets: string[] = [];
+    const jsAssets = new Set<string>();
     for (const asset of assets) {
       if (asset.endsWith('.css')) {
         cssAssets.add(asset);
       } else if (asset.endsWith('.js')) {
-        jsAssets.push(asset);
+        jsAssets.add(asset);
       }
     }
     for (const asset of clientStats?.entrypointFilesByName?.[chunkName] ?? []) {
       if (asset.endsWith('.css')) {
         cssAssets.add(asset);
+      } else if (includeEntrypointJs && asset.endsWith('.js')) {
+        jsAssets.add(asset);
       }
     }
-    if (jsAssets.length === 0) {
-      jsAssets.push(`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`);
+    if (jsAssets.size === 0) {
+      jsAssets.add(`${DEFAULT_MANIFEST_DIR}/${chunkName}.js`);
     }
 
-    const result = { js: jsAssets, css: [...cssAssets] };
+    const result = { js: [...jsAssets], css: [...cssAssets] };
     chunkAssetsByName.set(chunkName, result);
     return result;
   };
@@ -289,6 +333,8 @@ const analyzeRouteForManifestEffect = ({
   routeChunkConfig,
   routeEntryName,
   routeFilePath,
+  route,
+  routeModuleAnalysis,
 }: {
   discoveredCssAssets: string[];
   isBuild: boolean;
@@ -296,10 +342,13 @@ const analyzeRouteForManifestEffect = ({
   routeChunkConfig: RouteChunkConfig | null;
   routeEntryName: string;
   routeFilePath: string;
+  route: Route;
+  routeModuleAnalysis?: RouteModuleAnalysisProvider;
 }): Effect.Effect<RouteManifestAnalysis, Error, never> =>
   tryPluginPromise(async () => {
     const { code, exports: exportNames } =
-      await getRouteModuleAnalysis(routeFilePath);
+      (await routeModuleAnalysis?.(routeFilePath, route)) ??
+      (await getRouteModuleAnalysis(routeFilePath));
     const cssAssets =
       !isBuild && discoveredCssAssets.length === 0 && CSS_IMPORT_RE.test(code)
         ? [
@@ -398,33 +447,94 @@ export const getReactRouterManifestChunkNames = (
   return chunkNames;
 };
 
+const createRouteManifestItem = ({
+  route,
+  assetPrefix,
+  jsAssets,
+  routeAnalysis,
+  getModulePathForChunk,
+  getCssAssetsForChunk,
+}: {
+  route: Route;
+  assetPrefix: string;
+  jsAssets: string[];
+  routeAnalysis: RouteManifestAnalysis;
+  getModulePathForChunk: (chunkName: string) => string | undefined;
+  getCssAssetsForChunk: (chunkName: string) => string[];
+}): RouteManifestItem => {
+  const routeChunkMap = routeAnalysis.hasRouteChunkByExportName;
+  const chunkModulePath = (exportName: RouteChunkExportName) =>
+    routeChunkMap?.[exportName]
+      ? getModulePathForChunk(getRouteChunkEntryName(route.id, exportName))
+      : undefined;
+  const cssAssets = [
+    ...routeAnalysis.cssAssets,
+    ...routeChunkExportNames.flatMap(exportName =>
+      routeChunkMap?.[exportName]
+        ? getCssAssetsForChunk(getRouteChunkEntryName(route.id, exportName))
+        : []
+    ),
+  ];
+
+  return {
+    id: route.id,
+    parentId: route.parentId,
+    path: route.path,
+    index: route.index,
+    caseSensitive: route.caseSensitive,
+    module: combineURLs(assetPrefix, jsAssets[0] || ''),
+    clientActionModule: chunkModulePath('clientAction'),
+    clientLoaderModule: chunkModulePath('clientLoader'),
+    clientMiddlewareModule: chunkModulePath('clientMiddleware'),
+    hydrateFallbackModule: chunkModulePath('HydrateFallback'),
+    hasAction: routeAnalysis.exports.has(SERVER_EXPORTS.action),
+    hasLoader: routeAnalysis.exports.has(SERVER_EXPORTS.loader),
+    hasClientAction: routeAnalysis.exports.has(CLIENT_EXPORTS.clientAction),
+    hasClientLoader: routeAnalysis.exports.has(CLIENT_EXPORTS.clientLoader),
+    hasClientMiddleware: routeAnalysis.exports.has(
+      CLIENT_EXPORTS.clientMiddleware
+    ),
+    hasDefaultExport: routeAnalysis.exports.has('default'),
+    hasErrorBoundary: routeAnalysis.exports.has(CLIENT_EXPORTS.ErrorBoundary),
+    // `module` is `jsAssets[0]`; exclude it from `imports` so the browser
+    // manifest does not list the route's own module twice (upstream excludes
+    // the entry chunk's own file from its imports list). Otherwise prefetch
+    // link computations produce duplicate modulepreload hrefs.
+    imports: jsAssets.slice(1).map(asset => combineURLs(assetPrefix, asset)),
+    css: Array.from(new Set(cssAssets)).map(asset =>
+      combineURLs(assetPrefix, asset)
+    ),
+  };
+};
+
 function generateReactRouterManifestForDevEffect(
   routes: Record<string, Route>,
-  _options: PluginOptions,
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix: string,
-  routeChunkOptions?: RouteChunkManifestOptions
+  manifestOptions?: ReactRouterManifestOptions
 ): Effect.Effect<ReactRouterManifestGenerationResult, Error, never> {
   return Effect.gen(function* () {
     const result: Record<string, RouteManifestItem> = {};
-    const splitRouteModules = routeChunkOptions?.splitRouteModules ?? false;
+    const splitRouteModules = manifestOptions?.splitRouteModules ?? false;
     const enforceSplitRouteModules = splitRouteModules === 'enforce';
-    const isBuild = routeChunkOptions?.isBuild ?? false;
+    const isBuild = manifestOptions?.isBuild ?? false;
     const routeChunkConfig: RouteChunkConfig | null =
-      splitRouteModules && routeChunkOptions?.rootRouteFile
+      splitRouteModules && manifestOptions?.rootRouteFile
         ? {
             splitRouteModules,
             appDirectory: context,
-            rootRouteFile: routeChunkOptions.rootRouteFile,
+            rootRouteFile: manifestOptions.rootRouteFile,
           }
         : null;
 
-    const getAssetsForChunk = createChunkAssetResolver(clientStats);
+    const getAssetsForChunk = createChunkAssetResolver(clientStats, isBuild);
     const getModulePathForChunk = (chunkName: string): string | undefined => {
       const { js: jsAssets } = getAssetsForChunk(chunkName);
       return jsAssets[0] ? combineURLs(assetPrefix, jsAssets[0]) : undefined;
     };
+    const getCssAssetsForChunk = (chunkName: string): string[] =>
+      getAssetsForChunk(chunkName).css;
 
     const manifestEntries = yield* Effect.forEach(
       Object.entries(routes),
@@ -437,23 +547,13 @@ function generateReactRouterManifestForDevEffect(
           const routeAnalysis = yield* analyzeRouteForManifestEffect({
             discoveredCssAssets,
             isBuild,
-            routeChunkCache: routeChunkOptions?.cache,
+            routeChunkCache: manifestOptions?.cache,
             routeChunkConfig,
             routeEntryName,
             routeFilePath,
+            route,
+            routeModuleAnalysis: manifestOptions?.routeModuleAnalysis,
           });
-
-          const hasClientAction = routeAnalysis.exports.has(
-            CLIENT_EXPORTS.clientAction
-          );
-          const hasClientLoader = routeAnalysis.exports.has(
-            CLIENT_EXPORTS.clientLoader
-          );
-          const hasClientMiddleware = routeAnalysis.exports.has(
-            CLIENT_EXPORTS.clientMiddleware
-          );
-          const hasDefaultExport = routeAnalysis.exports.has('default');
-          const routeChunkMap = routeAnalysis.hasRouteChunkByExportName;
 
           if (isBuild && enforceSplitRouteModules && routeChunkConfig) {
             validateRouteChunks({
@@ -461,54 +561,22 @@ function generateReactRouterManifestForDevEffect(
               id: routeFilePath,
               valid: buildManifestChunkValidity(
                 routeAnalysis.exports,
-                routeChunkMap ?? createEmptyRouteChunkByExportName()
+                routeAnalysis.hasRouteChunkByExportName ??
+                  createEmptyRouteChunkByExportName()
               ),
             });
           }
 
           return [
             key,
-            {
-              id: route.id,
-              parentId: route.parentId,
-              path: route.path,
-              index: route.index,
-              caseSensitive: route.caseSensitive,
-              module: combineURLs(assetPrefix, jsAssets[0] || ''),
-              clientActionModule: routeChunkMap?.clientAction
-                ? getModulePathForChunk(
-                    getRouteChunkEntryName(route.id, 'clientAction')
-                  )
-                : undefined,
-              clientLoaderModule: routeChunkMap?.clientLoader
-                ? getModulePathForChunk(
-                    getRouteChunkEntryName(route.id, 'clientLoader')
-                  )
-                : undefined,
-              clientMiddlewareModule: routeChunkMap?.clientMiddleware
-                ? getModulePathForChunk(
-                    getRouteChunkEntryName(route.id, 'clientMiddleware')
-                  )
-                : undefined,
-              hydrateFallbackModule: routeChunkMap?.HydrateFallback
-                ? getModulePathForChunk(
-                    getRouteChunkEntryName(route.id, 'HydrateFallback')
-                  )
-                : undefined,
-              hasAction: routeAnalysis.exports.has(SERVER_EXPORTS.action),
-              hasLoader: routeAnalysis.exports.has(SERVER_EXPORTS.loader),
-              hasClientAction,
-              hasClientLoader,
-              hasClientMiddleware,
-              hasDefaultExport,
-              hasErrorBoundary: routeAnalysis.exports.has(
-                CLIENT_EXPORTS.ErrorBoundary
-              ),
-              imports: jsAssets.map(asset => combineURLs(assetPrefix, asset)),
-              css: routeAnalysis.cssAssets.map(asset =>
-                combineURLs(assetPrefix, asset)
-              ),
-            },
+            createRouteManifestItem({
+              route,
+              assetPrefix,
+              jsAssets,
+              routeAnalysis,
+              getModulePathForChunk,
+              getCssAssetsForChunk,
+            }),
             routeAnalysis.routeModuleExports,
           ] as const;
         }),
@@ -536,7 +604,12 @@ function generateReactRouterManifestForDevEffect(
     const fingerprintedValues = {
       entry: {
         module: combineURLs(assetPrefix, entryJsAssets[0] || ''),
-        imports: entryJsAssets.map(asset => combineURLs(assetPrefix, asset)),
+        // Exclude the entry's own module (`entryJsAssets[0]`) from imports so it
+        // is not listed twice, matching upstream where `imports` holds only the
+        // chunk's dependency imports.
+        imports: entryJsAssets
+          .slice(1)
+          .map(asset => combineURLs(assetPrefix, asset)),
         css: entryCssAssets.map(asset => combineURLs(assetPrefix, asset)),
       },
       routes: result,
@@ -550,7 +623,10 @@ function generateReactRouterManifestForDevEffect(
 
     const manifest = {
       version,
-      url: combineURLs(assetPrefix, manifestPath),
+      url: combineURLs(
+        assetPrefix,
+        isBuild ? manifestPath : `${manifestPath}?v=${version}`
+      ),
       hmr: undefined,
       entry: fingerprintedValues.entry,
       sri: undefined,
@@ -566,20 +642,19 @@ function generateReactRouterManifestForDevEffect(
 
 export async function generateReactRouterManifestForDev(
   routes: Record<string, Route>,
-  options: PluginOptions,
+  _options: PluginOptions,
   clientStats: ReactRouterManifestStats | undefined,
   context: string,
   assetPrefix = '/',
-  routeChunkOptions?: RouteChunkManifestOptions
+  manifestOptions?: ReactRouterManifestOptions
 ): Promise<ReactRouterManifestGenerationResult> {
   return runPluginEffect(
     generateReactRouterManifestForDevEffect(
       routes,
-      options,
       clientStats,
       context,
       assetPrefix,
-      routeChunkOptions
+      manifestOptions
     )
   );
 }

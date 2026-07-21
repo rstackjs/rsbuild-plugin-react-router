@@ -17,6 +17,7 @@ interface ServerBuildOptions {
   basename: string;
   appDirectory: string;
   ssr: boolean;
+  isSpaMode: boolean;
   future?: unknown;
   allowedActionOrigins?: string[];
   prerender?: string[];
@@ -39,13 +40,16 @@ function generateStaticTemplate(
 ): string {
   const manifestId =
     options.serverManifestId ?? 'virtual/react-router/server-manifest';
+  const routeEntries = Object.entries(routes);
   return `
     import * as entryServer from ${JSON.stringify(options.entryServerPath)};
-    ${Object.keys(routes)
-      .map((key, index) => {
-        const route = routes[key];
+    ${routeEntries
+      .map(([, route], index) => {
+        if (options.isSpaMode && route.id !== 'root') {
+          return `const route${index} = { default: () => null };`;
+        }
         return `import * as route${index} from ${JSON.stringify(
-          `${resolve(options.appDirectory, route.file)}?react-router-route`
+          resolve(options.appDirectory, route.file)
         )};`;
       })
       .join('\n')}
@@ -56,7 +60,7 @@ function generateStaticTemplate(
     )};
     export const basename = ${JSON.stringify(options.basename)};
     export const future = ${JSON.stringify(options.future ?? {})};
-    export const isSpaMode = ${!options.ssr};
+    export const isSpaMode = ${options.isSpaMode};
     export const ssr = ${options.ssr};
     export const routeDiscovery = ${JSON.stringify(options.routeDiscovery)};
     export const prerender = ${JSON.stringify(options.prerender ?? [])};
@@ -64,9 +68,8 @@ function generateStaticTemplate(
     export const entry = { module: entryServer };
     export const allowedActionOrigins = ${JSON.stringify(options.allowedActionOrigins)};
     export var routes = {};
-    ${Object.keys(routes)
-      .map((key, index) => {
-        const route = routes[key];
+    ${routeEntries
+      .map(([key, route], index) => {
         return `routes[${JSON.stringify(key)}] = {
           id: ${JSON.stringify(route.id)},
           parentId: ${JSON.stringify(route.parentId)},
@@ -88,7 +91,7 @@ function generateStaticTemplate(
  */
 function generateServerBuild(
   routes: Record<string, Route>,
-  options: ServerBuildOptions & { federation?: boolean }
+  options: ServerBuildOptions
 ): string {
   return generateStaticTemplate(routes, options);
 }

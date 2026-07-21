@@ -1,0 +1,19 @@
+const templates = [
+  // Framework mode template. Collapsed from the upstream Vite 7/Vite 8 pair:
+  // the Vite major version split does not apply to Rsbuild.
+  { name: "rsbuild-template", displayName: "rsbuild" },
+
+  // RSC templates
+  { name: "rsc-preview", displayName: "RSC (rsbuild)" },
+  { name: "rsc-framework", displayName: "RSC Framework" },
+] as const;
+
+export type Template = (typeof templates)[number];
+export type TemplateName = Template["name"];
+
+export function getTemplates(names?: Array<Template["name"]>) {
+  if (names === undefined) return templates;
+  return templates.filter(({ name }) => names.includes(name));
+}
+
+export const bundlerTemplates = getTemplates(["rsbuild-template"]);

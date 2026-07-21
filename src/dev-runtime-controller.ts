@@ -2,6 +2,7 @@ import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
 import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
+import { escapeHtml } from './plugin-utils.js';
 import {
   beginDevCompilerAttempt,
   clearDevCompilerStart,
@@ -19,6 +20,7 @@ import {
   registerReactRouterDevRuntime,
   unregisterReactRouterDevRuntime,
 } from './dev-generation.js';
+import { DEV_MANIFEST_UPDATE_EVENT } from './dev-hmr.js';
 import {
   getEnvironmentStats,
   snapshotDevChangedFiles,
@@ -27,7 +29,6 @@ import {
   type ReactRouterDevBuildPlan,
   type ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
-import { DEV_HDR_REVISION_RELATIVE_PATH } from './dev-hmr.js';
 import {
   createDevRuntimeSessionManager,
   type RuntimeBinding,
@@ -57,42 +58,30 @@ type CreateControllerOptions = {
   isBuild: boolean;
   buildPlan: ReactRouterDevBuildPlan;
   /**
+   * The browser HMR runtime patches route manifest metadata (loader/action
+   * flags) in place, so metadata-only changes no longer need a full reload.
+   */
+  clientPatchesRouteMetadata?: boolean | (() => boolean);
+  /**
    * Invoked after a development attempt commits a re-evaluated node build for
    * changed server files. Used to signal hot data revalidation to the client.
    */
   onNodeRebuildCommitted?: () => void;
 };
 
-const escapeHtml = (value: string): string =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
 
 const isHdrRevisionFile = (file: string): boolean =>
-  file.includes(DEV_HDR_REVISION_RELATIVE_PATH);
+  file.includes('.react-router/hdr-revision.mjs');
 
 const isCssSourceFile = (file: string): boolean =>
   /\.css(?:\.[cm]?[jt]s)?$/.test(file);
-
-// A change that should bump the HDR revision: anything except the revision
-// file itself (the bump's own echo) and CSS sources (styling never changes
-// loader data).
-const hasHdrTriggeringChange = (files: Iterable<string>): boolean => {
-  for (const file of files) {
-    if (!isHdrRevisionFile(file) && !isCssSourceFile(file)) {
-      return true;
-    }
-  }
-  return false;
-};
 
 export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
   buildPlan,
+  clientPatchesRouteMetadata,
   onNodeRebuildCommitted,
 }: CreateControllerOptions): ReactRouterDevRuntimeController => {
   if (isBuild) {
@@ -189,7 +178,9 @@ export const createReactRouterDevRuntimeController = ({
             changes.node.known &&
             identity.node !== undefined &&
             hdrSignaledNodeIdentity.get(pair) !== identity.node &&
-            hasHdrTriggeringChange(changes.node.files)
+            Array.from(changes.node.files).some(
+              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
+            )
           ) {
             hdrSignaledNodeIdentity.set(pair, identity.node);
             onNodeRebuildCommitted?.();
@@ -306,11 +297,22 @@ export const createReactRouterDevRuntimeController = ({
           reloadAfterCssAssetOwnershipRemoval = change === 'removed';
           sendCssAssetOwnershipReload();
         },
-        onRouteManifestChanged() {
+        onRouteManifestChanged(manifest) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
           }
-          server.sockWrite('full-reload', { path: '*' });
+          const patchesRouteMetadata =
+            typeof clientPatchesRouteMetadata === 'function'
+              ? clientPatchesRouteMetadata()
+              : clientPatchesRouteMetadata;
+          if (patchesRouteMetadata) {
+            server.sockWrite('custom', {
+              event: DEV_MANIFEST_UPDATE_EVENT,
+              data: manifest.routes,
+            });
+          } else {
+            server.sockWrite('full-reload', { path: '*' });
+          }
         },
         onWarning: message => api.logger.warn(message),
       });
@@ -566,21 +568,29 @@ export const createReactRouterDevRuntimeController = ({
     },
 
     createBuildLoader(entryName?: string): () => Promise<ServerBuild> {
-      const server = sessions.getActiveBinding()?.server;
-      if (server) {
-        return () => loadReactRouterServerBuild(server, entryName);
-      }
-      const state = sessions.getState();
-      if (state.status === 'terminal') {
-        const { error } = state;
-        return () => Promise.reject(error);
-      }
-      return () =>
-        Promise.reject(
+      // Pin the loader to the dev-server session active at creation time. Once a
+      // loader is handed to React Router for session N it must keep serving N (or
+      // fail loudly with 'not registered' once N closes) and never silently migrate
+      // to a replacement session — this preserves SSR generation/session coherency.
+      // The live fallback below applies ONLY when no session exists yet at creation
+      // (boundServer === undefined), i.e. a loader built during config setup before
+      // the dev server has started; there is no session to stay coherent with yet.
+      const boundServer = sessions.getActiveBinding()?.server;
+      return () => {
+        const server = boundServer ?? sessions.getActiveBinding()?.server;
+        if (server) {
+          return loadReactRouterServerBuild(server, entryName);
+        }
+        const state = sessions.getState();
+        if (state.status === 'terminal') {
+          return Promise.reject(state.error);
+        }
+        return Promise.reject(
           new Error(
             `[${PLUGIN_NAME}] The development server runtime is not ready.`
           )
         );
+      };
     },
   };
 };

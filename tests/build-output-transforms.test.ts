@@ -87,28 +87,40 @@ describe('build output transforms', () => {
 
     registerBuildOutputTransforms(options);
 
-    const routeModuleTransforms = harness.transforms.filter(
-      transform => transform.descriptor.order === 'post'
+    const explicitRouteModuleTransform = harness.transforms.find(
+      transform =>
+        String(transform.descriptor.resourceQuery) ===
+        String(/\?react-router-route/)
+    );
+    const querylessRouteModuleTransform = harness.transforms.find(
+      transform =>
+        transform.descriptor.order === 'post' &&
+        transform.descriptor.environments?.includes('node') &&
+        typeof transform.descriptor.test === 'function' &&
+        (transform.descriptor.test as (path: string) => boolean)(
+          options.routePath
+        )
     );
 
-    expect(routeModuleTransforms).toHaveLength(2);
-    expect(routeModuleTransforms[0].descriptor).toMatchObject({
+    expect(explicitRouteModuleTransform?.descriptor).toMatchObject({
       resourceQuery: /\?react-router-route/,
       order: 'post',
     });
-    expect(routeModuleTransforms[1].descriptor).toMatchObject({
+    expect(querylessRouteModuleTransform?.descriptor).toMatchObject({
       order: 'post',
     });
     expect(
-      (routeModuleTransforms[1].descriptor.test as (path: string) => boolean)(
-        options.routePath
-      )
+      (
+        querylessRouteModuleTransform!.descriptor.test as (
+          path: string
+        ) => boolean
+      )(options.routePath)
     ).toBe(true);
 
-    await routeModuleTransforms[0].handler(
+    await explicitRouteModuleTransform!.handler(
       createTransformArgs(options.routePath, '?react-router-route')
     );
-    await routeModuleTransforms[1].handler(
+    await querylessRouteModuleTransform!.handler(
       createTransformArgs(options.routePath)
     );
 
@@ -119,23 +131,63 @@ describe('build output transforms', () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
+  it('captures post-loader route exports for manifest generation', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness);
+    const onRouteModuleAnalysis = rstest.fn();
+
+    registerBuildOutputTransforms({
+      ...options,
+      onRouteModuleAnalysis,
+    });
+
+    const clientRouteTransform = harness.transforms.find(
+      transform =>
+        String(transform.descriptor.resourceQuery) ===
+        String(/__react-router-build-client-route/)
+    );
+    expect(clientRouteTransform?.descriptor).toMatchObject({
+      order: 'post',
+    });
+
+    await clientRouteTransform!.handler(
+      createTransformArgs(
+        options.routePath,
+        '?__react-router-build-client-route',
+        `
+          export const loader = () => null;
+          export default function MDXContent() { return null; }
+        `
+      )
+    );
+
+    expect(onRouteModuleAnalysis).toHaveBeenCalledWith(
+      options.routePath,
+      expect.objectContaining({
+        exports: expect.arrayContaining(['loader', 'default']),
+      })
+    );
+  });
+
   it('reads dev HMR enablement when route transforms run', async () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);
-    let devHmrEnabled = false;
+    let enabled = false;
 
     registerBuildOutputTransforms({
       ...options,
       isBuild: false,
-      isDevHmrEnabled: () => devHmrEnabled,
+      isDevHmrEnabled: () => enabled,
     });
 
     const routeModuleTransform = harness.transforms.find(
-      transform => transform.descriptor.order === 'post'
+      transform =>
+        String(transform.descriptor.resourceQuery) ===
+        String(/\?react-router-route/)
     );
 
     await routeModuleTransform!.handler(createTransformArgs(options.routePath));
-    devHmrEnabled = true;
+    enabled = true;
     await routeModuleTransform!.handler(createTransformArgs(options.routePath));
 
     expect(options.routeTransformExecutor.run).toHaveBeenNthCalledWith(
@@ -157,6 +209,7 @@ describe('build output transforms', () => {
     const querylessRouteModuleTransform = harness.transforms.find(
       transform =>
         transform.descriptor.order === 'post' &&
+        transform.descriptor.environments?.includes('node') &&
         typeof transform.descriptor.test === 'function'
     );
 
@@ -177,5 +230,33 @@ describe('build output transforms', () => {
     expect(resourceQuery.not.test('?react-router-route')).toBe(true);
     expect(resourceQuery.not.test('?route-chunk=clientLoader')).toBe(true);
     expect(resourceQuery.not.test('')).toBe(false);
+  });
+
+  it('composes main route chunk extraction with route module transformation explicitly', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness);
+
+    registerBuildOutputTransforms(options);
+
+    const routeChunkTransform = harness.transforms.find(
+      transform => String(transform.descriptor.resourceQuery) === String(/route-chunk=/)
+    );
+
+    await routeChunkTransform!.handler(
+      createTransformArgs(options.routePath, '?route-chunk=main')
+    );
+
+    const run = options.routeTransformExecutor.run;
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ kind: 'routeChunk' })
+    );
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        kind: 'routeModule',
+        code: 'routeChunk:export async function loader() {}',
+      })
+    );
   });
 });

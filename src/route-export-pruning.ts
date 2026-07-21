@@ -198,7 +198,7 @@ const isNonReferenceIdentifier = (node: AnyNode, parent: AnyNode | null) => {
 
 const isUppercaseName = (name: string): boolean => /^[A-Z]/.test(name);
 
-const collectReferencedNames = (node: AnyNode): Set<string> => {
+export const collectReferencedNames = (node: AnyNode): Set<string> => {
   const referenced = new Set<string>();
   walk(node as never, {
     Identifier(node, ctx) {
@@ -489,7 +489,8 @@ const hasRemovableExport = (
 export const removeExports = (
   ast: ParseResult | AnyNode,
   exportsToRemove: readonly string[],
-  exportsToRemoveSet: ReadonlySet<string> = new Set(exportsToRemove)
+  exportsToRemoveSet: ReadonlySet<string> = new Set(exportsToRemove),
+  options: { pruneDeadDeclarations?: boolean } = {}
 ): boolean => {
   const program = getProgram(ast);
   if (!hasRemovableExport(program, exportsToRemoveSet)) {
@@ -631,7 +632,7 @@ export const removeExports = (
     }
   }
 
-  if (exportsChanged) {
+  if (exportsChanged && options.pruneDeadDeclarations !== false) {
     removeNewlyDeadTopLevelDeclarations(
       program,
       declarationGraph,

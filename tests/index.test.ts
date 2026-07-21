@@ -1,7 +1,15 @@
 import { createStubRsbuild } from '@scripts/test-helper';
 import { describe, expect, it, rstest } from '@rstest/core';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import { pluginReactRouter, shouldParallelizeEnvironmentBuilds } from '../src';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  pluginReactRouter,
+  pluginReactRouterRSC,
+  shouldParallelizeEnvironmentBuilds,
+} from '../src';
 
 type ReactRouterTestGlobal = typeof globalThis & {
   __reactRouterTestConfig?: unknown;
@@ -32,6 +40,8 @@ const getLazyCompilationTest = (
   }
   return lazyCompilation.test;
 };
+
+const requireFromHere = createRequire(import.meta.url);
 
 const captureEnv = (keys: string[]) => {
   const previousValues = new Map(
@@ -70,6 +80,20 @@ describe('pluginReactRouter', () => {
         resource: `${process.cwd()}/app/entry.client.tsx`,
       })
     ).toBe(false);
+  });
+
+  it('aliases React Router packages to the app install', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.tools.rspack.resolve.alias).toMatchObject({
+      'react-router$': requireFromHere.resolve('react-router'),
+      'react-router/dom$': requireFromHere.resolve('react-router/dom'),
+    });
   });
 
   it('adds the committed custom-server build entry only in development', async () => {
@@ -129,11 +153,11 @@ describe('pluginReactRouter', () => {
         },
         {
           paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
-          type: 'reload-server',
+          type: 'reload-page',
         },
         {
           paths: expect.stringMatching(
-            /build\/client\/\.react-router\/route-watch$/
+            /\.react-router\/route-watch$/
           ),
           type: 'reload-server',
         },
@@ -209,6 +233,31 @@ describe('pluginReactRouter', () => {
       });
     } finally {
       existsSyncMock.mockReturnValue(true);
+    }
+  });
+
+  it('reports the canonical routes.ts path when the route config is missing', async () => {
+    const existsSync = rstest.spyOn(fs, 'existsSync').mockImplementation(path => {
+      const filePath = String(path);
+      // Route config file is absent for every probed extension.
+      if (/app[\\/]routes\.[cm]?[jt]sx?$/.test(filePath)) {
+        return false;
+      }
+      return true;
+    });
+
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+
+      rsbuild.addPlugins([pluginReactRouter()]);
+
+      await expect(rsbuild.unwrapConfig()).rejects.toThrow(
+        /Route config file not found at ".*app[\\/]routes\.ts"\./
+      );
+    } finally {
+      existsSync.mockReturnValue(true);
     }
   });
 
@@ -295,7 +344,7 @@ describe('pluginReactRouter', () => {
       expect.arrayContaining([
         {
           paths: expect.stringMatching(
-            /build\/client\/\.react-router\/route-watch$/
+            /\.react-router\/route-watch$/
           ),
           type: 'reload-server',
         },
@@ -328,6 +377,119 @@ describe('pluginReactRouter', () => {
     expect(
       config.environments?.web?.tools?.rspack?.optimization?.avoidEntryIife
     ).toBe(true);
+  });
+
+  it('composes RSC bundler plumbing with the React Router environments', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.tools.swc.rspackExperiments.reactServerComponents).toBe(
+      true
+    );
+    expect(config.environments.node.source.include).toEqual([
+      {
+        not: /[\\/]core-js[\\/]/,
+      },
+    ]);
+    expect(config.environments.node.tools.rspack.dependencies).toBeUndefined();
+    expect(config.environments.web.output.target).toBe('web');
+    expect(
+      config.environments.web.tools.rspack.output.workerChunkLoading
+    ).toBe('import-scripts');
+    expect(config.environments.web.tools.rspack.optimization.usedExports).toBe(
+      false
+    );
+    expect(
+      config.environments.web.tools.rspack.optimization.mangleExports
+    ).toBe(false);
+  });
+
+  it('installs the RSC dev request handler for SPA mode', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true, ssr: false })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.server.setup).toBeDefined();
+  });
+
+  it('rejects RSC mode when legacy future SRI normalizes to unsupported SRI', async () => {
+    testGlobal.__reactRouterTestConfig = {
+      future: { unstable_subResourceIntegrity: true },
+    };
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+
+    await expect(rsbuild.unwrapConfig()).rejects.toThrow(
+      /subResourceIntegrity/
+    );
+  });
+
+  it('exposes an explicit RSC plugin helper', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouterRSC()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.environments.web.source.entry).toEqual({
+      index: {
+        import: expect.stringMatching(/entry\.rsc\.client/),
+        html: false,
+      },
+    });
+    expect(config.environments.node.source.entry.index).toMatchObject({
+      import: expect.stringMatching(/entry\.rsc/),
+      layer: 'react-server-components',
+    });
+  });
+
+  it('publishes option types from the package root declarations', () => {
+    const outDir = fs.mkdtempSync(join(tmpdir(), 'rr-plugin-dts-'));
+
+    try {
+      execFileSync(
+        'pnpm',
+        [
+          'exec',
+          'tsc',
+          '-p',
+          'tsconfig.json',
+          '--emitDeclarationOnly',
+          '--outDir',
+          outDir,
+          '--tsBuildInfoFile',
+          join(outDir, 'tsconfig.tsbuildinfo'),
+          '--isolatedDeclarations',
+          'false',
+        ],
+        { cwd: process.cwd(), stdio: 'pipe' }
+      );
+
+      const rootDeclarations = fs.readFileSync(
+        join(outDir, 'index.d.ts'),
+        'utf8'
+      );
+
+      expect(rootDeclarations).toContain(
+        "export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';"
+      );
+      expect(rootDeclarations).toContain(
+        "export type { PluginOptions, ReactRouterRSCPluginOptions } from './types.js';"
+      );
+    } finally {
+      fs.rmSync(outDir, { force: true, recursive: true });
+    }
   });
 
   it('reduces file size reporting overhead for medium split route builds by default', async () => {
@@ -556,6 +718,32 @@ describe('pluginReactRouter', () => {
     ).toBe(false);
   });
 
+  it('guards the RSC client hydration entry from lazy compilation in RSC mode', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: {
+          lazyCompilation: {
+            entries: true,
+            imports: true,
+            test: /entry\.rsc\.client/,
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+    const config = await rsbuild.unwrapConfig();
+    const test = getLazyCompilationTest(config.dev.lazyCompilation);
+    const rscClientEntry = config.environments.web.source.entry.index.import;
+
+    expect(
+      test({
+        resource: rscClientEntry,
+        nameForCondition: () => rscClientEntry,
+      })
+    ).toBe(false);
+  });
+
   it('should allow lazy compilation to be disabled', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
@@ -582,9 +770,12 @@ describe('pluginReactRouter', () => {
     expect(webConfig.output.module).toBe(true);
 
     const webEntries = config.environments?.web?.source?.entry;
-    expect(webEntries['entry.client']).toEqual(
-      expect.stringMatching(/entry\.client/)
-    );
+    // entry.client must set `html: false` so rsbuild does not emit a stray
+    // entry.client.html into build/client.
+    expect(webEntries['entry.client']).toMatchObject({
+      import: expect.stringMatching(/entry\.client/),
+      html: false,
+    });
     expect(webEntries['virtual/react-router/browser-manifest']).toEqual({
       import: 'virtual/react-router/browser-manifest',
       html: false,
@@ -620,6 +811,12 @@ describe('pluginReactRouter', () => {
     const nodeConfig = config.environments?.node?.tools?.rspack;
     expect(nodeConfig.externals).toContain('express');
     expect(nodeConfig.experiments.outputModule).toBe(true);
+    expect(nodeConfig.output.devtoolModuleFilenameTemplate).toBe(
+      '[absolute-resource-path]'
+    );
+    expect(nodeConfig.output.devtoolFallbackModuleFilenameTemplate).toBe(
+      '[absolute-resource-path]?[hash]'
+    );
   });
 
   it('should apply the resolved development compiler dependency policy', async () => {

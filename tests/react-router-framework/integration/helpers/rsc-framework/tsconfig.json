@@ -1,0 +1,15 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "include": ["**/*.ts", "**/*.tsx", "./.react-router/types/**/*"],
+  "compilerOptions": {
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "paths": {
+      "~/*": ["./app/*"]
+    },
+    "rootDirs": [".", "./.react-router/types"]
+  }
+}

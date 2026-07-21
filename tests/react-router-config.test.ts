@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
 import {
+  getDefaultTrailingSlashAwareDataRequests,
   resolveReactRouterConfig,
   resolveReactRouterConfigEffect,
 } from '../src/react-router-config';
@@ -31,7 +32,7 @@ describe('resolveReactRouterConfig', () => {
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,
-      viteConfig: {} as any,
+      rsbuildConfig: {} as any,
     });
     expect(buildEndCalls).toBe(2);
   });
@@ -61,7 +62,7 @@ describe('resolveReactRouterConfig', () => {
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,
-      viteConfig: {} as any,
+      rsbuildConfig: {} as any,
     });
     expect(buildEndCalls).toBe(2);
   });
@@ -91,10 +92,10 @@ describe('resolveReactRouterConfig', () => {
     const defaultResult = await resolveReactRouterConfig({});
     const disabledResult = await resolveReactRouterConfig({
       splitRouteModules: false,
-    } as any);
+    });
     const enforcedResult = await resolveReactRouterConfig({
       splitRouteModules: 'enforce',
-    } as any);
+    });
 
     expect(defaultResult.resolved.splitRouteModules).toBe(true);
     expect(disabledResult.resolved.splitRouteModules).toBe(false);
@@ -176,5 +177,56 @@ describe('resolveReactRouterConfig', () => {
     expect(
       disabledByTopLevel.resolved.future.unstable_subResourceIntegrity
     ).toBe(false);
+  });
+
+  it('keeps React Router 7 future aliases while exposing React Router 8 stable fields', async () => {
+    const result = await resolveReactRouterConfig({
+      subResourceIntegrity: true,
+      future: {
+        unstable_subResourceIntegrity: true,
+        unstable_trailingSlashAwareDataRequests: true,
+      },
+    } as any);
+
+    expect(result.resolved.subResourceIntegrity).toBe(true);
+    expect(result.resolved.future.unstable_subResourceIntegrity).toBe(true);
+    expect(
+      result.resolved.future.unstable_trailingSlashAwareDataRequests
+    ).toBe(true);
+  });
+
+  it('uses the legacy subresource integrity future flag when the stable field is absent', async () => {
+    const result = await resolveReactRouterConfig({
+      future: { unstable_subResourceIntegrity: true },
+    } as any);
+
+    expect(result.resolved.subResourceIntegrity).toBe(true);
+  });
+
+  it('types prerender object config with required paths', () => {
+    const validObjectConfig = {
+      prerender: { paths: ['/'], concurrency: 2 },
+    } satisfies Config;
+    const validFunctionConfig = {
+      prerender: () => ['/'],
+    } satisfies Config;
+
+    expect(validObjectConfig.prerender.concurrency).toBe(2);
+    expect(typeof validFunctionConfig.prerender).toBe('function');
+  });
+
+  it('rejects prerender object config without paths at type-check time', () => {
+    const invalidConfig = {
+      // @ts-expect-error prerender object config must include paths
+      prerender: { concurrency: 2 },
+    } satisfies Config;
+
+    expect(invalidConfig.prerender.concurrency).toBe(2);
+  });
+
+  it('defaults trailing slash-aware data requests for React Router 8 and newer', () => {
+    expect(getDefaultTrailingSlashAwareDataRequests('7.13.0')).toBe(false);
+    expect(getDefaultTrailingSlashAwareDataRequests('8.0.1')).toBe(true);
+    expect(getDefaultTrailingSlashAwareDataRequests('9.0.0')).toBe(true);
   });
 });

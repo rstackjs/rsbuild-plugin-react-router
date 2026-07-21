@@ -1,13 +1,21 @@
-import { Agent, Asset, Instructions, Program, Prompt, System, assetRef } from '@unpack/ai';
+import {
+  Agent,
+  Asset,
+  Instructions,
+  Program,
+  Prompt,
+  System,
+  assetRef,
+} from '@unpack/ai';
 
-import './fetch-upstream-react-router-vite.ai.tsx';
-import './migrate-vitest-to-rstest.ai.tsx';
-import './port-react-router-vite-features.ai.tsx';
+import './fetch-upstream-react-router-rsbuild.ai.tsx';
+import './migrate-rstest.ai.tsx';
+import './port-react-router-rsbuild-features.ai.tsx';
 import './validate.ai.tsx';
 
-import { upstreamPlugin } from './fetch-upstream-react-router-vite.ai.tsx';
-import { migrateConfig } from './migrate-vitest-to-rstest.ai.tsx';
-import { portMain } from './port-react-router-vite-features.ai.tsx';
+import { upstreamPlugin } from './fetch-upstream-react-router-rsbuild.ai.tsx';
+import { migrateConfig } from './migrate-rstest.ai.tsx';
+import { portMain } from './port-react-router-rsbuild-features.ai.tsx';
 import { validationTarget } from './validate.ai.tsx';
 
 export const orchestratorMarker = assetRef('orchestrator_marker');
@@ -18,7 +26,7 @@ export default (
     model={{ name: 'gpt-5.2-codex' }}
     workingDir=".."
     target={{ language: 'markdown' }}
-    description="Orchestrate fetching upstream React Router Vite plugin sources and porting missing features into rsbuild-plugin-react-router."
+    description="Orchestrate React Router Rsbuild plugin migration work in rsbuild-plugin-react-router."
   >
     <Asset id="orchestrator_marker" kind="code" path="src/index.ts" />
 

@@ -7,12 +7,14 @@ import type { RouteConfigEntry } from '@react-router/dev/routes';
 import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+import { getPackageVersion, parseVersionMajorMinor } from './plugin-utils.js';
+import type { PrerenderConfigObject, PrerenderPathsConfig } from './types.js';
 
 export type BuildEndHook = {
   bivarianceHack(args: {
     buildManifest: ReactRouterBuildManifest | undefined;
     reactRouterConfig: ResolvedReactRouterConfig;
-    viteConfig: NormalizedConfig;
+    rsbuildConfig: NormalizedConfig;
   }): void | Promise<void>;
 }['bivarianceHack'];
 
@@ -20,10 +22,15 @@ type SplitRouteModulesConfig = boolean | 'enforce';
 
 export type Config = Omit<
   ReactRouterConfig,
-  'buildEnd' | 'future' | 'splitRouteModules' | 'subResourceIntegrity'
+  | 'buildEnd'
+  | 'future'
+  | 'prerender'
+  | 'splitRouteModules'
+  | 'subResourceIntegrity'
 > & {
   buildEnd?: BuildEndHook;
   future?: Partial<FutureConfig>;
+  prerender?: PrerenderConfig;
   splitRouteModules?: SplitRouteModulesConfig;
   subResourceIntegrity?: boolean;
 };
@@ -36,6 +43,8 @@ type FutureConfig = {
   v8_splitRouteModules: boolean | 'enforce';
   v8_viteEnvironmentApi: boolean;
 };
+
+type PrerenderConfig = PrerenderPathsConfig | PrerenderConfigObject | undefined;
 
 type RouteManifestEntry = {
   id: string;
@@ -50,8 +59,43 @@ type RouteManifest = Record<string, RouteManifestEntry>;
 
 type ResolveReactRouterConfigResult = {
   resolved: ResolvedReactRouterConfig;
+  userAndPresetConfig: Config;
   presets: NonNullable<Config['presets']>;
   hasConfiguredServerModuleFormat: boolean;
+};
+
+export const getDefaultTrailingSlashAwareDataRequests = (
+  reactRouterVersion: string | undefined = getPackageVersion('react-router')
+): boolean => (parseVersionMajorMinor(reactRouterVersion)?.major ?? 0) >= 8;
+
+export const resolveRouteDiscoveryConfig = ({
+  ssr,
+  userRouteDiscovery,
+}: {
+  ssr: boolean;
+  userRouteDiscovery: Config['routeDiscovery'];
+}): Config['routeDiscovery'] => {
+  if (!userRouteDiscovery) {
+    return ssr
+      ? ({ mode: 'lazy', manifestPath: '/__manifest' } as const)
+      : ({ mode: 'initial' } as const);
+  }
+  if (userRouteDiscovery.mode === 'initial') {
+    return userRouteDiscovery;
+  }
+
+  if (!ssr) {
+    throw new Error(
+      'The `routeDiscovery.mode` config cannot be set to "lazy" when setting `ssr:false`'
+    );
+  }
+  const manifestPath = userRouteDiscovery.manifestPath;
+  if (manifestPath && !manifestPath.startsWith('/')) {
+    throw new Error(
+      'The `routeDiscovery.manifestPath` config must be a root-relative pathname beginning with a slash (i.e., "/__manifest")'
+    );
+  }
+  return userRouteDiscovery;
 };
 
 export type ResolvedReactRouterConfig = Readonly<{
@@ -73,6 +117,16 @@ export type ResolvedReactRouterConfig = Readonly<{
   unstable_routeConfig: RouteConfigEntry[];
 }>;
 
+const createDefaultFutureConfig = (): FutureConfig => ({
+  unstable_optimizeDeps: false,
+  unstable_subResourceIntegrity: false,
+  unstable_trailingSlashAwareDataRequests:
+    getDefaultTrailingSlashAwareDataRequests(),
+  v8_middleware: false,
+  v8_splitRouteModules: false,
+  v8_viteEnvironmentApi: false,
+});
+
 const DEFAULT_CONFIG = {
   appDirectory: 'app',
   basename: '/',
@@ -82,14 +136,7 @@ const DEFAULT_CONFIG = {
   splitRouteModules: true,
   subResourceIntegrity: false,
   ssr: true,
-  future: {
-    unstable_optimizeDeps: false,
-    unstable_subResourceIntegrity: false,
-    unstable_trailingSlashAwareDataRequests: false,
-    v8_middleware: false,
-    v8_splitRouteModules: false,
-    v8_viteEnvironmentApi: false,
-  } satisfies FutureConfig,
+  future: createDefaultFutureConfig(),
   routeDiscovery: undefined,
   prerender: undefined,
   serverBundles: undefined,
@@ -181,7 +228,8 @@ export const resolveReactRouterConfigEffect = (
             reactRouterUserConfig;
           const presetConfig = yield* tryPluginPromise(() =>
             preset.reactRouterConfig?.({
-              reactRouterUserConfig: reactRouterUserConfigForPreset,
+              reactRouterUserConfig:
+                reactRouterUserConfigForPreset as ReactRouterConfig,
             })
           );
           if (!presetConfig) return null;
@@ -233,6 +281,7 @@ export const resolveReactRouterConfigEffect = (
 
     return {
       resolved,
+      userAndPresetConfig: userAndPresetConfigs,
       presets: reactRouterUserConfig.presets ?? [],
       hasConfiguredServerModuleFormat:
         userAndPresetConfigs.serverModuleFormat !== undefined,

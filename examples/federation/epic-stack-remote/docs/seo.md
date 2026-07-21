@@ -17,24 +17,18 @@ from the `@nasa-gcn/remix-seo` docs:
 ```tsx
 // routes/blog/_layout.tsx
 import { type SEOHandle } from '@nasa-gcn/remix-seo'
-import { serverOnly$ } from 'vite-env-only/macros'
 
 export const handle: SEOHandle = {
-	getSitemapEntries: serverOnly$(async (request) => {
+	async getSitemapEntries(request) {
 		const blogs = await db.blog.findMany()
 		return blogs.map((blog) => {
 			return { route: `/blog/${blog.slug}`, priority: 0.7 }
 		})
-	}),
+	},
 }
 ```
 
-Note the use of
-[`vite-env-only/macros`](https://github.com/pcattori/vite-env-only). This is
-because `handle` is a route export object that goes in both the client as well
-as the server, but our sitemap function should only be run on the server. So we
-use `vite-env-only/macros` to make sure the function is removed for the client
-build. Support for this is pre-configured in the `vite.config.ts` file.
+Keep sitemap data server-only by loading it from server route modules or other server-only files.
 
 ```tsx
 // in your routes/url-that-doesnt-need-sitemap

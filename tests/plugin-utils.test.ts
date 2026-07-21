@@ -6,6 +6,7 @@ import {
   createRouteId,
   generateWithProps,
   normalizeAssetPrefix,
+  resolveEffectiveAssetPrefix,
   transformRoute,
 } from '../src/plugin-utils';
 
@@ -89,10 +90,7 @@ describe('plugin-utils', () => {
     it('should generate withComponentProps HOC', () => {
       const result = generateWithProps();
       expect(result).toContain('withComponentProps');
-      expect(result).toContain('useLoaderData');
-      expect(result).toContain('useActionData');
-      expect(result).toContain('useParams');
-      expect(result).toContain('useMatches');
+      expect(result).toContain('UNSAFE_withComponentProps');
     });
 
     it('should generate withHydrateFallbackProps HOC', () => {
@@ -103,7 +101,7 @@ describe('plugin-utils', () => {
     it('should generate withErrorBoundaryProps HOC', () => {
       const result = generateWithProps();
       expect(result).toContain('withErrorBoundaryProps');
-      expect(result).toContain('useRouteError');
+      expect(result).toContain('UNSAFE_withErrorBoundaryProps');
     });
 
     it('should import from react-router', () => {
@@ -127,6 +125,76 @@ describe('plugin-utils', () => {
 
     it('should keep trailing slash intact', () => {
       expect(normalizeAssetPrefix('/assets/')).toBe('/assets/');
+    });
+  });
+
+  describe('resolveEffectiveAssetPrefix', () => {
+    it('uses output.assetPrefix in build mode', () => {
+      expect(
+        resolveEffectiveAssetPrefix({
+          dev: { assetPrefix: '/dev' },
+          output: { assetPrefix: '/cdn' },
+          isBuild: true,
+        })
+      ).toBe('/cdn/');
+    });
+
+    it('ignores dev.assetPrefix in build mode', () => {
+      expect(
+        resolveEffectiveAssetPrefix({
+          dev: { assetPrefix: '/dev' },
+          output: {},
+          isBuild: true,
+        })
+      ).toBe('/');
+    });
+
+    it('uses dev.assetPrefix in dev mode', () => {
+      expect(
+        resolveEffectiveAssetPrefix({
+          dev: { assetPrefix: '/app' },
+          output: { assetPrefix: '/cdn' },
+          isBuild: false,
+        })
+      ).toBe('/app/');
+    });
+
+    it('falls back to output.assetPrefix in dev mode when dev.assetPrefix is unset', () => {
+      expect(
+        resolveEffectiveAssetPrefix({
+          dev: {},
+          output: { assetPrefix: '/cdn' },
+          isBuild: false,
+        })
+      ).toBe('/cdn/');
+    });
+
+    it('normalizes a boolean dev.assetPrefix to the root prefix', () => {
+      expect(
+        resolveEffectiveAssetPrefix({
+          dev: { assetPrefix: false },
+          output: {},
+          isBuild: false,
+        })
+      ).toBe('/');
+    });
+
+    it('mirrors Rsbuild server.base defaulting (dev.assetPrefix already resolved)', () => {
+      // Rsbuild copies `server.base` into `dev.assetPrefix` during config
+      // normalization, so the resolver only needs to read the resolved field.
+      expect(
+        resolveEffectiveAssetPrefix({
+          dev: { assetPrefix: '/base' },
+          output: { assetPrefix: '/base' },
+          isBuild: false,
+        })
+      ).toBe('/base/');
+    });
+
+    it('defaults to root prefix when nothing is configured', () => {
+      expect(
+        resolveEffectiveAssetPrefix({ dev: {}, output: {}, isBuild: false })
+      ).toBe('/');
     });
   });
 
@@ -221,8 +289,11 @@ describe('plugin-utils', () => {
         export { Route as default };
       `);
 
-      expect(result.indexOf("'use client'")).toBeLessThan(
-        result.indexOf('virtual/react-router/with-props')
+      expect(result.search(/['"]use client['"]/)).toBeLessThan(
+        result.search(/from ['"]react-router['"]/)
+      );
+      expect(result).toContain(
+        'UNSAFE_withComponentProps as _withComponentProps'
       );
       expect(result).toContain('withComponentProps');
       expect(result).not.toContain('withdefaultProps');

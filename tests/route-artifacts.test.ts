@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
 import {
-  buildRouteHmrFlags,
   createRouteChunkArtifact,
   createRouteClientEntryArtifact,
 } from '../src/route-artifacts';
@@ -31,6 +30,11 @@ const enforceRouteChunkConfig: RouteChunkConfig = {
 
 const resourcePath = '/app/routes/demo.tsx';
 const routeRequest = `${resourcePath}?react-router-route`;
+const mainRouteChunkRequest = getRouteChunkModuleId(resourcePath, 'main');
+const customExportChunkRequest = getRouteChunkModuleId(
+  resourcePath,
+  'customExport'
+);
 
 const createRouteChunk = async (
   source: string,
@@ -58,6 +62,7 @@ describe('route artifact helpers', () => {
           export async function loader() { return null; }
           export async function clientLoader() { return null; }
           export { meta as meta };
+          export const customExport = true;
           const meta = () => [];
           export default function Route() { return null; }
         `,
@@ -68,9 +73,7 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { clientLoader, default, meta } from ${JSON.stringify(
-          routeRequest
-        )};`,
+        code: `export { clientLoader, default, meta } from ${JSON.stringify(routeRequest)};`,
       });
     });
 
@@ -90,7 +93,7 @@ describe('route artifact helpers', () => {
 
       expect(result).toEqual({
         code: `export { action, clientLoader, default, loader } from ${JSON.stringify(
-          routeRequest
+          resourcePath
         )};`,
       });
     });
@@ -109,7 +112,53 @@ describe('route artifact helpers', () => {
       });
 
       expect(result).toEqual({
-        code: `export { default } from ${JSON.stringify(routeRequest)};`,
+        code: `export { default } from ${JSON.stringify(
+          mainRouteChunkRequest
+        )};`,
+      });
+    });
+
+    it('reexports independent custom exports from shared route chunks', async () => {
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export const clientLoader = async () => {};
+          export const customExport = true;
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        environmentName: 'web',
+        isBuild: true,
+        routeChunkConfig,
+      });
+
+      expect(result).toEqual({
+        code: [
+          `export { default } from ${JSON.stringify(mainRouteChunkRequest)};`,
+          `export { customExport } from ${JSON.stringify(
+            customExportChunkRequest
+          )};`,
+        ].join('\n'),
+      });
+    });
+
+    it('excludes custom exports from production route entries', async () => {
+      const result = await createRouteClientEntryArtifact({
+        code: `
+          export const clientLoader = async () => {};
+          clientLoader.hydrate = true;
+          export const customExport = true;
+          export default function Route() { return null; }
+        `,
+        resourcePath,
+        environmentName: 'web',
+        isBuild: true,
+        routeChunkConfig,
+      });
+
+      expect(result).toEqual({
+        code: `export { clientLoader, default } from ${JSON.stringify(
+          routeRequest
+        )};`,
       });
     });
 
@@ -153,36 +202,25 @@ describe('route artifact helpers', () => {
       });
     });
 
-    it('uses compact dev HMR route flag metadata', async () => {
-      expect(
-        buildRouteHmrFlags([
-          'action',
-          'clientLoader',
-          'default',
-          'ErrorBoundary',
-          'loader',
-        ])
-      ).toBe((1 << 0) | (1 << 2) | (1 << 4) | (1 << 5));
-
+    it('self-accepts dev HMR route entries so metadata is refreshed', async () => {
       const result = await createRouteClientEntryArtifact({
         code: `
           export async function loader() { return null; }
-          export async function clientLoader() { return null; }
           export default function Route() { return null; }
         `,
         resourcePath,
-        routeId: 'routes/demo',
         environmentName: 'web',
         isBuild: false,
-        devHmr: true,
         routeChunkConfig: disabledRouteChunkConfig,
+        routeId: 'routes/demo',
+        devHmr: true,
       });
 
-      expect(result.code).toContain('const __rrf = 36;');
-      expect(result.code).toContain(
-        'scheduleReactRouterRouteUpdate as __rru'
+      expect(result.code).toContain('import.meta.webpackHot.accept();');
+      expect(result.code).not.toContain(
+        'import.meta.webpackHot.accept("./demo.tsx?react-router-route"'
       );
-      expect(result.code).not.toContain('hasClientLoader');
+      expect(result.code).toContain('"hasLoader":true');
     });
   });
 
@@ -207,13 +245,13 @@ describe('route artifact helpers', () => {
       await expect(
         createRouteChunkArtifact({
           code: `export const clientLoader = async () => {};`,
-          resource: `${resourcePath}?route-chunk=invalid`,
+          resource: `${resourcePath}?route-chunk=invalid-name`,
           resourcePath,
           routeChunkConfig,
           isBuild: true,
         })
       ).rejects.toThrow(
-        `Invalid route chunk name in "${resourcePath}?route-chunk=invalid"`
+        `Invalid route chunk name in "${resourcePath}?route-chunk=invalid-name"`
       );
     });
 
@@ -234,6 +272,24 @@ describe('route artifact helpers', () => {
       const result = await createRouteChunk(source, 'clientAction', { cache });
 
       expect(result).toEqual({ code: expectedCode, map: null });
+    });
+
+    it('omits server-only exports and imports from main route chunks', async () => {
+      const result = await createRouteChunk(
+        `
+          import { clientValue } from '../client-data.client';
+          import { serverValue } from '../server-data.server';
+          export async function loader() { return serverValue; }
+          export async function clientLoader() { return clientValue; }
+          export default function Route() { return null; }
+        `,
+        'main'
+      );
+
+      expect(result.code).not.toContain('server-data.server');
+      expect(result.code).not.toContain('loader');
+      expect(result.code).not.toContain('clientLoader');
+      expect(result.code).toContain('function Route');
     });
 
     it('generates route chunks through the Effect API', async () => {

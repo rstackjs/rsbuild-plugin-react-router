@@ -107,6 +107,23 @@ describe('manifest', () => {
     });
   });
 
+  it('skips missing named chunks while creating manifest stats', () => {
+    const compilation = {
+      namedChunks: new Map([
+        ['runtime', { files: new Set(['static/js/runtime.js']) }],
+        ['missing', null],
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+      ]),
+    };
+
+    expect(createReactRouterManifestStats(compilation)).toEqual({
+      assetsByChunkName: {
+        runtime: ['static/js/runtime.js'],
+        'entry.client': ['static/js/entry.client.js'],
+      },
+    });
+  });
+
   it('uses direct named chunk lookup for filtered manifest stats when available', () => {
     const chunks = new Map([
       ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
@@ -179,6 +196,28 @@ describe('manifest', () => {
       entrypointFilesByName: {
         'entry.client': ['static/css/entry.client.css'],
         'routes/page': ['static/css/routes/page.css'],
+      },
+    });
+  });
+
+  it('skips null manifest stats lookup entries', () => {
+    const compilation = {
+      namedChunks: new Map([
+        ['entry.client', { files: new Set(['static/js/entry.client.js']) }],
+        ['routes/page', null],
+      ]),
+      entrypoints: new Map([
+        ['entry.client', { getFiles: () => ['static/css/entry.client.css'] }],
+        ['routes/page', null],
+      ]),
+    };
+
+    expect(createReactRouterManifestStats(compilation)).toEqual({
+      assetsByChunkName: {
+        'entry.client': ['static/js/entry.client.js'],
+      },
+      entrypointFilesByName: {
+        'entry.client': ['static/css/entry.client.css'],
       },
     });
   });
@@ -454,6 +493,106 @@ describe('manifest', () => {
       expect(moduleExportsByRouteId['routes/page']).toEqual(
         expect.arrayContaining(['loader', 'default'])
       );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes each module from its own imports list', async () => {
+    const { root, appDir } = createTempApp(`
+      export async function loader() { return null; }
+      export default function Page() { return null; }
+    `);
+    try {
+      // Each chunk lists its own file first, followed by shared dependency
+      // chunks. The route/entry `module` is that first file, so `imports`
+      // must not list it again (upstream excludes the entry chunk's own file).
+      const statsWithSharedImports = {
+        assetsByChunkName: {
+          'entry.client': [
+            'static/js/entry.client.js',
+            'static/js/shared.js',
+          ],
+          root: ['static/js/root.js'],
+          'routes/page': ['static/js/routes/page.js', 'static/js/shared.js'],
+        },
+      };
+
+      const { manifest } = await generateReactRouterManifestForDev(
+        routes,
+        {},
+        statsWithSharedImports,
+        appDir,
+        '/',
+        {
+          isBuild: true,
+          rootRouteFile: 'root.tsx',
+          splitRouteModules: false,
+        }
+      );
+
+      const routeItem = manifest.routes['routes/page'];
+      expect(routeItem.module).toBe('/static/js/routes/page.js');
+      expect(routeItem.imports).toEqual(['/static/js/shared.js']);
+      expect(routeItem.imports).not.toContain(routeItem.module);
+
+      expect(manifest.entry.module).toBe('/static/js/entry.client.js');
+      expect(manifest.entry.imports).toEqual(['/static/js/shared.js']);
+      expect(manifest.entry.imports).not.toContain(manifest.entry.module);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses transformed route analysis for non-JavaScript route modules', async () => {
+    const { root, appDir } = createTempApp(`
+      import { MdxComponent } from '../components/mdx';
+
+      export const loader = () => ({ content: 'from mdx' });
+
+      ## MDX Route
+      <MdxComponent />
+    `);
+    try {
+      const { manifest, moduleExportsByRouteId } =
+        await generateReactRouterManifestForDev(
+          {
+            ...routes,
+            'routes/page': {
+              ...routes['routes/page'],
+              file: 'routes/page.mdx',
+            },
+          },
+          {},
+          clientStats,
+          appDir,
+          '/',
+          {
+            isBuild: true,
+            rootRouteFile: 'root.tsx',
+            splitRouteModules: false,
+            routeModuleAnalysis: async routeFilePath =>
+              routeFilePath.endsWith('page.mdx')
+                ? {
+                    code: `
+                      export const loader = () => ({ content: 'from mdx' });
+                      export default function MDXContent() { return <h1>MDX</h1>; }
+                    `,
+                    exports: ['loader', 'default'],
+                    exportAllModules: [],
+                  }
+                : undefined,
+          }
+        );
+
+      expect(manifest.routes['routes/page']).toMatchObject({
+        hasLoader: true,
+        hasDefaultExport: true,
+      });
+      expect(moduleExportsByRouteId['routes/page']).toEqual([
+        'loader',
+        'default',
+      ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

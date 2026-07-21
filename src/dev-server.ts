@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RsbuildConfig } from '@rsbuild/core';
 import type { ServerBuild } from 'react-router';
+import { installDevServerSourceMapSupport } from './dev-source-maps.js';
 
 export type ServerSetup = Exclude<
   NonNullable<NonNullable<RsbuildConfig['server']>['setup']>,
@@ -83,6 +84,7 @@ export const createReactRouterDevServerSetup = ({
     // middlewares, so static assets are served before the React Router
     // request handler.
     return () => {
+      installDevServerSourceMapSupport();
       context.server.middlewares.use(createDevServerMiddleware({ loadBuild }));
     };
   };

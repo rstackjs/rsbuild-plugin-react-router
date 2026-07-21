@@ -1,0 +1,40 @@
+{
+  "name": "react-router-8-default-template",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_OPTIONS=\"--experimental-vm-modules --experimental-global-webcrypto\" rsbuild dev --port 3020 --host 127.0.0.1",
+    "build": "rsbuild build",
+    "start": "HOST=127.0.0.1 PORT=3020 react-router-serve ./build/server/static/js/app.js",
+    "test:e2e": "pnpm run test:e2e:dev && pnpm run build && pnpm run test:e2e:prod",
+    "test:e2e:dev": "playwright test",
+    "test:e2e:prod": "cross-env RR8_E2E_MODE=production playwright test",
+    "typecheck": "react-router typegen && tsc"
+  },
+  "dependencies": {
+    "@react-router/fs-routes": "^8.0.1",
+    "@react-router/node": "^8.0.1",
+    "@react-router/serve": "^8.0.1",
+    "@vanilla-extract/css": "^1.20.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router": "^8.0.1",
+    "serialize-javascript": "^6.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@react-router/dev": "^8.0.1",
+    "@rsbuild/core": "2.1.0",
+    "@rsbuild/plugin-react": "2.1.0",
+    "@types/node": "^25.0.10",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "cross-env": "^10.1.0",
+    "rsbuild-plugin-react-router": "workspace:*",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

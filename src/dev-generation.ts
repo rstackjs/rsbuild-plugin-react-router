@@ -2,6 +2,7 @@ import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import * as EffectDeferred from 'effect/Deferred';
 import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
+import { HMR_PATCHABLE_ROUTE_FLAGS } from './route-artifacts.js';
 import {
   evaluateServerBuilds,
   getEnvironmentStats,
@@ -20,14 +21,10 @@ import {
 } from './dev-runtime-artifacts.js';
 import { normalizeEffectError, runPluginEffect } from './effect-runtime.js';
 
-export { snapshotDevChangedFiles } from './dev-runtime-artifacts.js';
 export type {
-  DevChangedFiles,
   DevGraphChanges,
   DevGraphIdentity,
-  ReactRouterDevBuildPlan,
   ReactRouterDevManifest,
-  ReactRouterDevManifestSet,
 } from './dev-runtime-artifacts.js';
 
 type CommittedGeneration = {
@@ -73,7 +70,9 @@ type CreateReactRouterDevRuntimeOptions = {
   buildPlan: ReactRouterDevBuildPlan;
   onEvaluationError: (error: Error) => void;
   onCssAssetOwnershipChanged?: (change: 'removed' | 'restored') => void;
-  onRouteManifestChanged?: () => void;
+  onRouteManifestChanged?: (
+    manifest: ReactRouterDevManifestSet[string]
+  ) => void;
   onWarning?: (message: string) => void;
 };
 
@@ -199,28 +198,35 @@ type DevRouteManifestEntry = NonNullable<
 
 const hasSameRouteMetadata = (
   previous: DevRouteManifestEntry,
-  next: DevRouteManifestEntry
-): boolean =>
-  previous.caseSensitive === next.caseSensitive &&
-  previous.clientActionModule === next.clientActionModule &&
-  previous.clientLoaderModule === next.clientLoaderModule &&
-  previous.clientMiddlewareModule === next.clientMiddlewareModule &&
-  previous.hasErrorBoundary === next.hasErrorBoundary &&
-  previous.hasAction === next.hasAction &&
-  previous.hasClientAction === next.hasClientAction &&
-  previous.hasClientLoader === next.hasClientLoader &&
-  previous.hasClientMiddleware === next.hasClientMiddleware &&
-  previous.hasDefaultExport === next.hasDefaultExport &&
-  previous.hasLoader === next.hasLoader &&
-  previous.hydrateFallbackModule === next.hydrateFallbackModule &&
-  previous.id === next.id &&
-  previous.index === next.index &&
-  previous.parentId === next.parentId &&
-  previous.path === next.path;
+  next: DevRouteManifestEntry,
+  includeHmrPatchableFlags: boolean
+): boolean => {
+  const structuralEqual =
+    previous.caseSensitive === next.caseSensitive &&
+    previous.clientActionModule === next.clientActionModule &&
+    previous.clientLoaderModule === next.clientLoaderModule &&
+    previous.clientMiddlewareModule === next.clientMiddlewareModule &&
+    previous.hasDefaultExport === next.hasDefaultExport &&
+    previous.hydrateFallbackModule === next.hydrateFallbackModule &&
+    previous.id === next.id &&
+    previous.index === next.index &&
+    previous.parentId === next.parentId &&
+    previous.path === next.path;
+  if (!structuralEqual) {
+    return false;
+  }
+  if (!includeHmrPatchableFlags) {
+    return true;
+  }
+  // Without a client-side HMR runtime these flags can only reach the browser
+  // through a full reload.
+  return HMR_PATCHABLE_ROUTE_FLAGS.every(flag => previous[flag] === next[flag]);
+};
 
 const hasRouteManifestMetadataChanges = (
   previous: ReactRouterDevManifestSet,
-  next: ReactRouterDevManifestSet
+  next: ReactRouterDevManifestSet,
+  includeHmrPatchableFlags: boolean
 ): boolean => {
   const previousEntryNames = Object.keys(previous);
   if (previousEntryNames.length !== Object.keys(next).length) {
@@ -240,7 +246,14 @@ const hasRouteManifestMetadataChanges = (
     for (const routeId of previousRouteIds) {
       const previousRoute = previousRoutes[routeId];
       const nextRoute = nextRoutes[routeId];
-      if (!nextRoute || !hasSameRouteMetadata(previousRoute, nextRoute)) {
+      if (
+        !nextRoute ||
+        !hasSameRouteMetadata(
+          previousRoute,
+          nextRoute,
+          includeHmrPatchableFlags
+        )
+      ) {
         return true;
       }
     }
@@ -285,9 +298,11 @@ export const createReactRouterDevRuntime = ({
     }
   };
 
-  const notifyRouteManifestChanged = (): void => {
+  const notifyRouteManifestChanged = (
+    manifest: ReactRouterDevManifestSet[string]
+  ): void => {
     try {
-      onRouteManifestChanged();
+      onRouteManifestChanged(manifest);
     } catch (cause) {
       onWarning(
         `[rsbuild-plugin-react-router] Failed to notify the browser after route manifest metadata changed: ${normalizeEffectError(cause).message}`
@@ -513,7 +528,8 @@ export const createReactRouterDevRuntime = ({
         webChanged &&
         hasRouteManifestMetadataChanges(
           previous.web.manifestsByEntryName,
-          manifestsByEntryName
+          manifestsByEntryName,
+          true
         );
       const reusePreviousNodeBuild =
         !!previous &&
@@ -587,7 +603,9 @@ export const createReactRouterDevRuntime = ({
           reloadAfterCssRemoval = false;
         }
         if (routeManifestMetadataChanged) {
-          notifyRouteManifestChanged();
+          notifyRouteManifestChanged(
+            web.manifestsByEntryName[buildPlan.defaultEntryName]
+          );
         }
         return 'committed';
       } catch (cause) {

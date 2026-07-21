@@ -124,7 +124,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
 
   function getHocUid(hocName: string) {
     const uid = getUid(hocName);
-    hocs.push([hocName, uid]);
+    hocs.push([`UNSAFE_${hocName}`, uid]);
     return identifier(uid);
   }
 
@@ -301,7 +301,7 @@ export const transformRoute = (ast: ParseResult | AnyNode): void => {
       0,
       importDeclaration(
         hocs.map(([name, local]) => ({ imported: name, local })),
-        'virtual/react-router/with-props'
+        'react-router'
       )
     );
   }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -118,6 +119,11 @@ const createCompilation = (
       info: source.info,
     }));
   },
+  getStats() {
+    return {
+      toJson: () => ({ assets: [] }),
+    };
+  },
 });
 
 const rootRoute = { id: 'root', file: 'root.tsx', path: '' };
@@ -175,7 +181,6 @@ describe('modify browser manifest plugin', () => {
 
     expect(sri).toEqual({
       '/assets/static/js/entry.client.js': 'sha384-entry',
-      '/assets/static/css/entry.client.css': 'sha384-css',
       '/assets/static/js/route.js': 'sha384-route',
       '/static/js/already-prefixed.js': 'sha384-prefixed',
     });
@@ -203,6 +208,28 @@ describe('modify browser manifest plugin', () => {
     expect(sri).toBeUndefined();
   });
 
+  it('computes JS integrity from final compilation assets when metadata is missing', () => {
+    const source = 'console.log("entry");';
+    const sri = collectSubresourceIntegrity(undefined, {
+      getAssets: () => [
+        {
+          name: 'static/js/entry.client.js',
+          source: { source: () => source },
+        },
+        {
+          name: 'static/css/entry.client.css',
+          source: { source: () => '.root{}' },
+        },
+      ],
+    });
+
+    expect(sri).toEqual({
+      '/static/js/entry.client.js': `sha384-${createHash('sha384')
+        .update(source)
+        .digest('base64')}`,
+    });
+  });
+
   it('registers browser manifest mutation with Rsbuild processAssets', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
@@ -224,7 +251,7 @@ describe('modify browser manifest plugin', () => {
       );
 
       expect(harness.getDescriptor()).toEqual({
-        stage: 'additions',
+        stage: 'report',
         environments: ['web'],
       });
       await harness.run({ assets, compilation });
@@ -342,14 +369,13 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
-  it('collects build SRI after later asset stages attach integrity metadata', async () => {
+  it('hashes finalized build assets at the report stage', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
-    const originalEntrySource = 'console.log("before optimize");';
     const optimizedEntrySource = 'console.log("after optimize");';
     const assets = {
       ...createBrowserManifestAssets(),
-      'static/js/entry.client.js': createAsset(originalEntrySource),
+      'static/js/entry.client.js': createAsset(optimizedEntrySource),
       'static/js/root.js': createAsset('console.log("root");'),
     };
     const compilation = createCompilation(
@@ -377,23 +403,136 @@ describe('modify browser manifest plugin', () => {
         }
       );
 
+      // Build mode defers manifest generation to the `report` stage, which
+      // runs after Rspack's realContentHash rename and after integrity hashes
+      // are attached. Only a single `report` registration is expected.
       expect(harness.getDescriptors()).toEqual([
-        { stage: 'additions', environments: ['web'] },
         { stage: 'report', environments: ['web'] },
       ]);
 
-      await harness.runStage('additions', { assets, compilation });
-      expect(reportedSri).toBeUndefined();
-
       compilation.updateAsset(
         'static/js/entry.client.js',
-        createAsset(optimizedEntrySource, 'sha384-optimized-entry')
+        createAsset(optimizedEntrySource)
       );
       await harness.runStage('report', { assets, compilation });
 
       expect(reportedSri?.['/static/js/entry.client.js']).toBe(
-        'sha384-optimized-entry'
+        `sha384-${createHash('sha384')
+          .update(optimizedEntrySource)
+          .digest('base64')}`
       );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('enables SRI from the stable subResourceIntegrity config field', async () => {
+    const { root, appDir } = createTempApp();
+    const harness = createProcessAssetsHarness();
+    const optimizedEntrySource = 'console.log("stable sri");';
+    const assets = {
+      ...createBrowserManifestAssets(),
+      'static/js/entry.client.js': createAsset(optimizedEntrySource),
+    };
+    const compilation = createCompilation(
+      [['entry.client', { files: new Set(['static/js/entry.client.js']) }]],
+      assets
+    );
+    let reportedSri: Record<string, string> | undefined;
+
+    try {
+      registerModifyBrowserManifestAssets(
+        harness.api as never,
+        { root: rootRoute },
+        {},
+        appDir,
+        '/',
+        { isBuild: true },
+        {
+          subResourceIntegrity: true,
+          onManifest(_manifest, sri) {
+            reportedSri = sri;
+          },
+        }
+      );
+
+      expect(harness.getDescriptors()).toEqual([
+        { stage: 'report', environments: ['web'] },
+      ]);
+
+      await harness.runStage('report', { assets, compilation });
+
+      expect(reportedSri?.['/static/js/entry.client.js']).toMatch(/^sha384-/);
+      expect(assets[BROWSER_MANIFEST_PATH].source()).not.toContain("'sri'");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('builds the manifest at the report stage from post-realContentHash asset names', async () => {
+    const { root, appDir } = createTempApp();
+    const harness = createProcessAssetsHarness();
+    const assets = createBrowserManifestAssets();
+    // Emulate Rspack's realContentHash rename: the entry chunk exposes its final
+    // (post-rename) CSS/JS file names by the time PROCESS_ASSETS_STAGE_REPORT
+    // runs. Reading them earlier (at `additions`) would capture the pre-rename
+    // names that never appear in the output.
+    const entrypoint = {
+      getFiles: () => [
+        'static/js/entry.client.aaaaaaaa.js',
+        'static/css/entry.client.aaaaaaaa.css',
+      ],
+    };
+    const compilation = createCompilation(
+      [
+        [
+          'entry.client',
+          { files: new Set(['static/js/entry.client.aaaaaaaa.js']) },
+        ],
+      ],
+      assets,
+      [['entry.client', entrypoint]]
+    );
+    let manifest:
+      | { entry?: { css?: string[]; module?: string } }
+      | undefined;
+
+    try {
+      registerModifyBrowserManifestAssets(
+        harness.api as never,
+        { root: rootRoute },
+        {},
+        appDir,
+        '/',
+        { isBuild: true },
+        {
+          onManifest(nextManifest) {
+            manifest = nextManifest as typeof manifest;
+          },
+        }
+      );
+
+      // Build mode registers only the post-hash `report` stage.
+      expect(harness.getDescriptors()).toEqual([
+        { stage: 'report', environments: ['web'] },
+      ]);
+
+      await harness.runStage('report', { assets, compilation });
+
+      expect(manifest?.entry?.css).toContain(
+        '/static/css/entry.client.aaaaaaaa.css'
+      );
+      expect(manifest?.entry?.module).toBe(
+        '/static/js/entry.client.aaaaaaaa.js'
+      );
+
+      // The emitted build manifest asset also reflects the post-rename names.
+      const manifestAsset = Object.entries(assets).find(([name]) =>
+        /manifest-.*\.js$/.test(name)
+      );
+      expect(manifestAsset).toBeDefined();
+      const emitted = manifestAsset![1].source().toString();
+      expect(emitted).toContain('static/css/entry.client.aaaaaaaa.css');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -500,7 +639,7 @@ describe('modify browser manifest plugin', () => {
     }
   });
 
-  it('adds transitive entrypoint CSS without adding transitive JavaScript preloads', async () => {
+  it('adds transitive entrypoint assets to the manifest', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
     const assets = createBrowserManifestAssets();
@@ -547,12 +686,10 @@ describe('modify browser manifest plugin', () => {
 
       expect(manifest).toMatchObject({
         entry: {
-          imports: ['/static/js/entry.client.js'],
+          imports: ['/static/js/vendor.js'],
           css: ['/static/css/reset.css', '/static/css/route.css'],
         },
       });
-      expect((manifest as { entry: { imports: string[] } }).entry.imports).not
-        .toContain('/static/js/vendor.js');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

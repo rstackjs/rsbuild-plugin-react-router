@@ -3,9 +3,14 @@ import { createRequire } from 'node:module';
 import type { Rspack } from '@rsbuild/core';
 import { dirname, join } from 'pathe';
 
-import { HMR_PATCHABLE_ROUTE_FLAGS } from './route-artifacts.js';
-
 export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
+export const DEV_MANIFEST_UPDATE_EVENT = 'react-router:manifest-update';
+
+export type DevHmrPlanOptions = {
+  isEnabled: () => boolean;
+  runtimeModule: string;
+  onNodeRebuildCommitted: () => void;
+};
 
 type SwcLoaderOptions = {
   jsc?: { transform?: { react?: { refresh?: boolean } } };
@@ -17,30 +22,21 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const isSwcLoader = (loader: unknown): boolean =>
   typeof loader === 'string' && loader.includes('builtin:swc-loader');
 
-const hasReactRefresh = (options: unknown): boolean =>
-  (options as SwcLoaderOptions | undefined)?.jsc?.transform?.react?.refresh ===
-  true;
-
 const readSwcLoaderRefresh = (value: unknown): boolean => {
-  if (Array.isArray(value)) {
-    return value.some(readSwcLoaderRefresh);
-  }
-  if (!isObject(value)) {
-    return false;
-  }
+  if (Array.isArray(value)) return value.some(readSwcLoaderRefresh);
+  if (!isObject(value)) return false;
   if (isSwcLoader(value.loader)) {
-    return hasReactRefresh(value.options);
+    return (
+      (value.options as SwcLoaderOptions | undefined)?.jsc?.transform?.react
+        ?.refresh === true
+    );
   }
   return Object.values(value).some(readSwcLoaderRefresh);
 };
 
 const readRuleSwcRefresh = (rule: unknown): boolean => {
-  if (!isObject(rule)) {
-    return false;
-  }
-  if (isSwcLoader(rule.loader)) {
-    return hasReactRefresh(rule.options);
-  }
+  if (!isObject(rule)) return false;
+  if (isSwcLoader(rule.loader)) return readSwcLoaderRefresh(rule);
   return (
     readSwcLoaderRefresh(rule.use) ||
     readRuleSetSwcRefresh(rule.oneOf) ||
@@ -94,12 +90,11 @@ const hdrRevisionModuleContent = (revision: number): string =>
  * whenever server code changes, which the client answers by revalidating
  * React Router loader data.
  */
-export const DEV_HDR_REVISION_RELATIVE_PATH = '.react-router/hdr-revision.mjs';
-
 export const getDevHdrRevisionFilePath = (rootPath: string): string =>
-  join(rootPath, DEV_HDR_REVISION_RELATIVE_PATH);
+  join(rootPath, '.react-router', 'hdr-revision.mjs');
 
 export type DevHdrRevisionSignal = {
+  filePath: string;
   /** Writes the initial revision module so the first compile can resolve it. */
   ensure: () => void;
   /** Increments the revision, signaling hot data revalidation to the client. */
@@ -127,6 +122,7 @@ export const createDevHdrRevisionSignal = ({
     }
   };
   return {
+    filePath,
     ensure: write,
     bump() {
       revision += 1;
@@ -138,7 +134,7 @@ export const createDevHdrRevisionSignal = ({
 /**
  * Browser-side HMR runtime shared by all route client entries in development.
  *
- * This mirrors React Router's Vite HMR contract (see `refresh-utils.mjs` in
+ * This mirrors React Router framework HMR contract (see `refresh-utils.mjs` in
  * `@react-router/dev`): route module updates are applied by patching
  * `window.__reactRouterRouteModules` while preserving the previous component
  * identities (React Fast Refresh swaps their implementations in place),
@@ -156,7 +152,11 @@ import * as __refreshRuntimeModule from ${JSON.stringify(reactRefreshRuntimePath
 // Read revision so the import survives sideEffects: false tree-shaking.
 import __hdrRevision from ${JSON.stringify(hdrRevisionFilePath)};
 
-void __hdrRevision;
+let latestHdrRevision = __hdrRevision;
+
+export function getReactRouterHdrRevision() {
+  return latestHdrRevision;
+}
 
 const RefreshRuntime =
   __refreshRuntimeModule && __refreshRuntimeModule.performReactRefresh
@@ -166,6 +166,7 @@ const RefreshRuntime =
 const pendingRouteUpdates = new Map();
 let flushTimeout;
 let pendingRevalidation = false;
+let pendingComponentRouteRevalidation = false;
 
 function getCurrentRouterPath(router) {
   const basename = router.basename || '/';
@@ -199,10 +200,10 @@ export function registerReactRouterRouteExports(routeId, moduleExports) {
 
 export function scheduleReactRouterRouteUpdate(
   routeId,
-  routeFlags,
+  routeMetadata,
   getRouteModuleExports
 ) {
-  pendingRouteUpdates.set(routeId, { routeFlags, getRouteModuleExports });
+  pendingRouteUpdates.set(routeId, { routeMetadata, getRouteModuleExports });
   scheduleFlush();
 }
 
@@ -228,16 +229,8 @@ function takePendingRouteUpdates() {
   return updates;
 }
 
-function getRouteMetadata(routeFlags) {
-  return {
-${HMR_PATCHABLE_ROUTE_FLAGS.map(
-  (flag, index) => `    ${flag}: Boolean(routeFlags & ${1 << index}),`
-).join('\n')}
-  };
-}
-
 function applyRouteModuleUpdate(routeId, update, routeEntry, routeModules) {
-  Object.assign(routeEntry, getRouteMetadata(update.routeFlags));
+  Object.assign(routeEntry, update.routeMetadata);
   const imported = update.getRouteModuleExports();
   registerReactRouterRouteExports(routeId, imported);
   const current = routeModules[routeId];
@@ -294,11 +287,7 @@ function patchCurrentRouteMatches(router, routes) {
 
 function applyPendingRouteUpdates(router, routeModules, manifest, context) {
   if (pendingRouteUpdates.size === 0) {
-    return {
-      nextManifest: undefined,
-      shouldRefreshRouteState: false,
-      routesToRevalidate: new Set(),
-    };
+    return { nextManifest: undefined, hmrRoutes: undefined };
   }
 
   // Clone only entries mutated before the manifest is committed in flush().
@@ -309,8 +298,7 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     const existingEntry = nextManifest.routes[routeId];
     if (!existingEntry) continue;
 
-    // Shallow clone is enough: only top-level flags are mutated below.
-    const routeEntry = { ...existingEntry };
+    const routeEntry = JSON.parse(JSON.stringify(existingEntry));
     nextManifest.routes[routeId] = routeEntry;
     applyRouteModuleUpdate(routeId, update, routeEntry, routeModules);
     if (
@@ -332,54 +320,52 @@ function applyPendingRouteUpdates(router, routeModules, manifest, context) {
     }
   }
 
+  let hmrRoutes;
   if (
     typeof router.createRoutesForHMR === 'function' &&
     typeof router._internalSetRoutes === 'function'
   ) {
-    const routes = router.createRoutesForHMR(
+    hmrRoutes = router.createRoutesForHMR(
       routesToRevalidate,
       nextManifest.routes,
       routeModules,
       context.ssr,
       context.isSpaMode
     );
-    router._internalSetRoutes(routes);
-    patchCurrentRouteMatches(router, routes);
+    router._internalSetRoutes(hmrRoutes);
   }
 
-  return { nextManifest, shouldRefreshRouteState, routesToRevalidate };
+  return { nextManifest, hmrRoutes, shouldRefreshRouteState };
 }
 
-async function withHdrActive(fn) {
+async function revalidateRouter(router) {
   try {
     window.__reactRouterHdrActive = true;
-    await fn();
+    if (typeof router.revalidate === 'function') {
+      await router.revalidate();
+      return;
+    }
+    if (typeof router.navigate === 'function') {
+      await router.navigate(getCurrentRouterPath(router), {
+        replace: true,
+        preventScrollReset: true,
+      });
+    }
   } finally {
     window.__reactRouterHdrActive = false;
   }
 }
 
-async function revalidateRouter(router) {
-  if (typeof router.revalidate === 'function') {
-    await withHdrActive(() => router.revalidate());
+async function refreshRouteState(router) {
+  if (typeof router.revalidate !== 'function') {
     return;
   }
-  if (typeof router.navigate === 'function') {
-    await withHdrActive(() =>
-      router.navigate(getCurrentRouterPath(router), {
-        replace: true,
-        preventScrollReset: true,
-      })
-    );
+  try {
+    window.__reactRouterHdrActive = true;
+    await router.revalidate();
+  } finally {
+    window.__reactRouterHdrActive = false;
   }
-}
-
-async function refreshRouteState(router) {
-  if (typeof router.revalidate === 'function') {
-    await withHdrActive(() => router.revalidate());
-    return true;
-  }
-  return false;
 }
 
 function performReactRefresh() {
@@ -389,6 +375,34 @@ function performReactRefresh() {
   ) {
     RefreshRuntime.performReactRefresh();
   }
+}
+
+function applyManifestUpdate(nextRoutes) {
+  const router = window.__reactRouterDataRouter;
+  const routeModules = window.__reactRouterRouteModules;
+  const manifest = window.__reactRouterManifest;
+  const context = window.__reactRouterContext;
+  if (
+    !router ||
+    !routeModules ||
+    !manifest ||
+    !context ||
+    !nextRoutes ||
+    typeof router.createRoutesForHMR !== 'function' ||
+    typeof router._internalSetRoutes !== 'function'
+  ) {
+    return;
+  }
+  const routes = router.createRoutesForHMR(
+    new Set(Object.keys(nextRoutes)),
+    nextRoutes,
+    routeModules,
+    context.ssr,
+    context.isSpaMode
+  );
+  manifest.routes = nextRoutes;
+  router._internalSetRoutes(routes);
+  patchCurrentRouteMatches(router, routes);
 }
 
 async function flush() {
@@ -402,30 +416,48 @@ async function flush() {
 
   let shouldRevalidate = pendingRevalidation;
   pendingRevalidation = false;
-  const { nextManifest, shouldRefreshRouteState, routesToRevalidate } =
+  const { nextManifest, hmrRoutes, shouldRefreshRouteState } =
     applyPendingRouteUpdates(router, routeModules, manifest, context);
-  if (nextManifest) {
-    Object.assign(manifest, nextManifest);
-  }
-  // Component-only updates do not need a full loader revalidation.
-  if (
-    shouldRefreshRouteState &&
-    (routesToRevalidate.size > 0 || shouldRevalidate)
-  ) {
-    if (await refreshRouteState(router)) {
-      shouldRevalidate = false;
+  // Loader updates must be visible during revalidation. Component-only routes
+  // stay staged until revalidation completes, matching React Router's HMR flow.
+  if (nextManifest && shouldRefreshRouteState) {
+    pendingComponentRouteRevalidation = false;
+    if (hmrRoutes) {
+      patchCurrentRouteMatches(router, hmrRoutes);
     }
-  }
-  if (shouldRevalidate) {
-    await revalidateRouter(router);
+    Object.assign(manifest, nextManifest);
+    await refreshRouteState(router);
+    shouldRevalidate = false;
+  } else if (nextManifest) {
+    if (hmrRoutes) {
+      patchCurrentRouteMatches(router, hmrRoutes);
+    }
+    Object.assign(manifest, nextManifest);
+    // The node compiler also emits an HDR revision for this route edit. If it
+    // did not arrive in this flush, consume that redundant revalidation later.
+    pendingComponentRouteRevalidation = !shouldRevalidate;
+    shouldRevalidate = false;
+  } else if (shouldRevalidate) {
+    if (pendingComponentRouteRevalidation) {
+      pendingComponentRouteRevalidation = false;
+    } else {
+      await revalidateRouter(router);
+    }
   }
   performReactRefresh();
 }
 
 if (typeof window !== 'undefined' && import.meta.webpackHot) {
+  import.meta.webpackHot.on(
+    ${JSON.stringify(DEV_MANIFEST_UPDATE_EVENT)},
+    applyManifestUpdate
+  );
   import.meta.webpackHot.accept(
     ${JSON.stringify(hdrRevisionFilePath)},
-    scheduleReactRouterRevalidation
+    () => {
+      latestHdrRevision = __hdrRevision;
+      scheduleReactRouterRevalidation();
+    }
   );
 }
 `;

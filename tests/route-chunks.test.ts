@@ -37,6 +37,7 @@ const rootRouteId = '/app/root.tsx';
 const emptyChunkInfo: RouteChunkInfo = {
   exportNames: [],
   chunkedExports: [],
+  sharedChunkedExports: [],
   hasRouteChunks: false,
   hasRouteChunkByExportName: {
     clientAction: false,
@@ -68,6 +69,26 @@ const codeWithActionAndDefault = `
   import { json } from 'react-router';
   export async function action() { return json({}); }
   export default function Route() { return null; }
+`;
+
+const codeWithHydratedClientLoaderGlobals = `
+  export const customExport = (() => {
+    globalThis.custom_export_count = (globalThis.custom_export_count || 0) + 1;
+    return () => true;
+  })();
+
+  export const clientLoader = (() => {
+    globalThis.client_loader_count = (globalThis.client_loader_count || 0) + 1;
+    return async () => globalThis.client_loader_count;
+  })();
+  clientLoader.hydrate = true;
+
+  const Route = (() => {
+    globalThis.component_count = (globalThis.component_count || 0) + 1;
+    return () => null;
+  })();
+
+  export default Route;
 `;
 
 const detect = (code: string, id = routeId) =>
@@ -145,6 +166,126 @@ describe('route chunks', () => {
         HydrateFallback: true,
       });
       expect(result.chunkedExports).toEqual(routeChunkExportNames);
+    });
+
+    it('splits a HydrateFallback initialized by an independent IIFE', async () => {
+      const code = `
+        import { jsx as _jsx } from 'react/jsx-runtime';
+        export const inSplittableMainChunk = () => console.log() || true;
+        export const HydrateFallback = function() {
+          globalThis.hydrateFallbackDownloaded = true;
+          return () => _jsx('div', {});
+        }();
+        export default function Route() {
+          inSplittableMainChunk();
+          return _jsx('div', {});
+        }
+      `;
+
+      const result = await detect(code);
+
+      expect(result.hasRouteChunkByExportName).toEqual({
+        clientAction: false,
+        clientLoader: false,
+        clientMiddleware: false,
+        HydrateFallback: true,
+      });
+    });
+
+    it('does not treat undeclared globals as shared export dependencies', async () => {
+      const code = codeWithHydratedClientLoaderGlobals;
+
+      const result = await detect(code);
+
+      expect(result.hasRouteChunks).toBe(false);
+      expect(result.chunkedExports).toEqual([]);
+      expect(result.sharedChunkedExports).toEqual([]);
+      expect(result.hasRouteChunkByExportName.clientLoader).toBe(false);
+
+      const mainChunk = await getRouteChunkIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        'main',
+        code
+      );
+      expect(mainChunk).toContain('custom_export_count');
+    });
+
+    it('keeps client loaders that import entry.client in the main route chunk', async () => {
+      const code = `
+        import { myContext } from "../entry.client";
+
+        export function clientLoader({ context }) {
+          return context.get(myContext);
+        }
+
+        export default function Route() {
+          return null;
+        }
+      `;
+
+      const result = await detect(code, '/app/routes/_index.tsx');
+
+      expectNoRouteChunks(result, ['clientLoader', 'default']);
+    });
+
+    it('keeps hydrated client loaders in main JSX route chunks', async () => {
+      const code = `
+        import { Link } from "react-router";
+
+        export const customExport = (() => {
+          globalThis.custom_export_count = (globalThis.custom_export_count || 0) + 1;
+          return () => true;
+        })();
+
+        export const loader = (() => {
+          globalThis.loader_count = (globalThis.loader_count || 0) + 1;
+          return () => ({
+            customExportCount: globalThis.custom_export_count,
+            loaderCount: globalThis.loader_count,
+            componentCount: globalThis.component_count,
+          });
+        })();
+
+        export const clientLoader = (() => {
+          globalThis.client_loader_count = (globalThis.client_loader_count || 0) + 1;
+          return async ({ serverLoader }) => {
+            const loaderData = await serverLoader();
+            return {
+              loaderCount: loaderData.loaderCount,
+              clientLoaderCount: globalThis.client_loader_count,
+              serverCustomExportCount: loaderData.customExportCount,
+              clientCustomExportCount: globalThis.custom_export_count,
+              serverComponentCount: loaderData.componentCount,
+              clientComponentCount: globalThis.component_count,
+            };
+          };
+        })();
+        clientLoader.hydrate = true;
+
+        const RouteA = (() => {
+          globalThis.component_count = (globalThis.component_count || 0) + 1;
+          return ({ loaderData }: Route.ComponentProps) => {
+            return (
+              <>
+                <h1>Module Count</h1>
+                <p>Loader count: <span data-loader-count>{loaderData.loaderCount}</span></p>
+                <p><Link to="/client-first/b">Go to Route B</Link></p>
+              </>
+            );
+          };
+        })();
+
+        export default RouteA;
+      `;
+
+      const result = await detect(code);
+
+      expect(result.hasRouteChunks).toBe(false);
+      expect(result.chunkedExports).toEqual([]);
+      expect(result.sharedChunkedExports).toEqual([]);
+      expect(result.hasRouteChunkByExportName.clientLoader).toBe(false);
     });
 
     it('returns runtime export names from route chunk analysis', async () => {
@@ -298,7 +439,7 @@ describe('route chunks', () => {
   });
 
   describe('generate route chunk code', () => {
-    it('omits chunkable client exports from the main chunk while retaining default and server exports', async () => {
+    it('omits chunkable client and server-only exports from the main chunk', async () => {
       const code = `
         import { json } from 'react-router';
         export async function action() { return json({}); }
@@ -314,7 +455,7 @@ describe('route chunks', () => {
         code
       );
 
-      await expectExports(chunk, ['default', 'action'], ['clientAction']);
+      await expectExports(chunk, ['default'], ['action', 'clientAction']);
     });
 
     it('returns main chunk code without analysis when no route chunk exports exist', async () => {
@@ -370,6 +511,52 @@ describe('route chunks', () => {
       expect(chunk).toMatch(/import\s*\{\s*json\s*\}\s*from/);
       expect(chunk).not.toContain('useFetcher');
       await expectExports(chunk, ['clientLoader'], ['default']);
+    });
+
+    it('keeps hydrated client loaders out of individual route chunks', async () => {
+      const code = codeWithHydratedClientLoaderGlobals;
+
+      const chunk = await getRouteChunkIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        'clientLoader',
+        code
+      );
+
+      expect(chunk).toBeNull();
+    });
+
+    it('keeps shared custom export initializers when no route exports split', async () => {
+      const code = `
+        export const customExport = (() => {
+          globalThis.custom_export_count = (globalThis.custom_export_count || 0) + 1;
+          return () => true;
+        })();
+
+        export const clientLoader = (() => {
+          globalThis.client_loader_count = (globalThis.client_loader_count || 0) + 1;
+          return async () => globalThis.client_loader_count;
+        })();
+        clientLoader.hydrate = true;
+
+        export default function Route() { return null; }
+      `;
+
+      const result = await detect(code);
+      expect(result.exportNames).toContain('customExport');
+      expect(result.sharedChunkedExports).toEqual([]);
+
+      const chunk = await getRouteChunkIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        'main',
+        code
+      );
+
+      expect(chunk).toContain('custom_export_count');
+      await expectExports(chunk, ['clientLoader', 'customExport', 'default']);
     });
 
     it('keeps side-effect imports in the main chunk and omits them from individual client chunks', async () => {
@@ -483,6 +670,9 @@ describe('route chunks', () => {
       expect(getRouteChunkNameFromModuleId('/app/routes/r.tsx')).toBeNull();
       expect(
         getRouteChunkNameFromModuleId('/app/routes/r.tsx?route-chunk=bogus')
+      ).toBe('bogus');
+      expect(
+        getRouteChunkNameFromModuleId('/app/routes/r.tsx?route-chunk=not-valid')
       ).toBeNull();
       expect(getRouteChunkEntryName('routes/clients', 'clientAction')).toBe(
         'routes/clients-client-action'
