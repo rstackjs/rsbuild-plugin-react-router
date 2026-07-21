@@ -33,7 +33,7 @@ describe('pluginReactRouter', () => {
       // The plugin should not override Rsbuild's HMR defaults.
       expect(config.dev.hmr).toBe(true);
       expect(config.dev.liveReload).toBe(true);
-      expect(config.dev.writeToDisk).toBe(true);
+      expect(config.dev.writeToDisk).toBe(false);
     });
 
     it('should register the dev server middleware via server.setup', async () => {
