@@ -50,14 +50,9 @@
   },
   "scripts": {
     "build": "rslib build",
-    "bench": "node scripts/bench-builds.mts",
-    "bench:ci-report": "node scripts/report-benchmark-ci.mts",
-    "bench:compare": "node scripts/compare-benchmarks.mts",
-    "bench:smoke": "node scripts/bench-builds.mts --profile smoke --iterations 1 --warmup 0 --format both --out .benchmark/results/smoke",
-    "bench:baseline": "node scripts/bench-builds.mts --profile default --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/baseline",
-    "bench:full": "node scripts/bench-builds.mts --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",
-    "bench:large": "node scripts/bench-builds.mts --profile large --iterations 1 --warmup 0 --clean cold --format both --out .benchmark/results/large",
-    "bench:synthetic-app": "node scripts/bench-synthetic-app.mjs",
+    "bench": "pnpm build && node benchmarks/run.mts",
+    "bench:smoke": "pnpm build && node benchmarks/run.mts --iterations 1 --warmup 0",
+    "bench:codspeed": "pnpm build && vitest bench --run --config vitest.benchmark.config.mts",
     "e2e": "pnpm build && pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only}' test:e2e",
     "dev": "rslib build --watch",
     "test": "rstest run",
@@ -90,6 +85,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
+    "@codspeed/vitest-plugin": "^5.7.1",
     "@react-router/dev": "^8.0.1",
     "@rsbuild/config": "workspace:*",
     "@rsbuild/core": "2.1.0",
@@ -114,7 +110,8 @@
     "react-dom": "^19.2.4",
     "react-router": "^7.13.0",
     "react-router-dom": "^7.13.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "@react-router/dev": "^7.13.0 || ^8.0.0",
