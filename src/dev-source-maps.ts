@@ -2,10 +2,16 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { SourceMap, type SourceMapPayload } from 'node:module';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Rspack } from '@rsbuild/core';
 
 type CachedSourceMap = {
   cacheKey: string;
   sourceMap: SourceMap | null;
+};
+
+type InMemorySourceMap = {
+  load: () => SourceMapPayload | null;
+  sourceMap?: SourceMap | null;
 };
 
 const SOURCE_MAPPING_URL_MARKER = '//# sourceMappingURL=';
@@ -15,6 +21,8 @@ const GENERATED_JS_FRAME_RE =
 let installed = false;
 let previousPrepareStackTrace: typeof Error.prepareStackTrace;
 const sourceMapCache = new Map<string, CachedSourceMap>();
+const inMemorySourceMaps = new Map<string, InMemorySourceMap>();
+const generatedFilesByOutputPath = new Map<string, Set<string>>();
 
 const getGeneratedFilePath = (fileName: string): string => {
   if (fileName.startsWith('file://')) {
@@ -41,6 +49,22 @@ const getCacheKey = (filePath: string): string | null => {
 
 const parseSourceMapPayload = (sourceMapJson: string): SourceMapPayload => {
   const payload = JSON.parse(sourceMapJson) as Partial<SourceMapPayload>;
+  return {
+    file: payload.file ?? '',
+    version: payload.version ?? 3,
+    sources: payload.sources ?? [],
+    sourcesContent: payload.sourcesContent ?? [],
+    names: payload.names ?? [],
+    mappings: payload.mappings ?? '',
+    sourceRoot: payload.sourceRoot ?? '',
+  };
+};
+
+const toSourceMapPayload = (value: unknown): SourceMapPayload | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const payload = value as Partial<SourceMapPayload>;
   return {
     file: payload.file ?? '',
     version: payload.version ?? 3,
@@ -95,6 +119,20 @@ const readSourceMapPayload = (filePath: string): SourceMapPayload | null => {
 };
 
 const getSourceMap = (filePath: string): SourceMap | null => {
+  const inMemory = inMemorySourceMaps.get(filePath);
+  if (inMemory) {
+    if (inMemory.sourceMap !== undefined) {
+      return inMemory.sourceMap;
+    }
+    try {
+      const payload = inMemory.load();
+      inMemory.sourceMap = payload ? new SourceMap(payload) : null;
+    } catch {
+      inMemory.sourceMap = null;
+    }
+    return inMemory.sourceMap;
+  }
+
   const cacheKey = getCacheKey(filePath);
   if (!cacheKey) {
     return null;
@@ -117,6 +155,43 @@ const getSourceMap = (filePath: string): SourceMap | null => {
   return sourceMap;
 };
 
+export const registerDevServerSourceMaps = (
+  compilation: Pick<Rspack.Compilation, 'getAssets' | 'outputOptions'>
+): void => {
+  const outputPath = compilation.outputOptions.path;
+  if (!outputPath) {
+    return;
+  }
+  const previousFiles = generatedFilesByOutputPath.get(outputPath);
+  if (previousFiles) {
+    for (const filePath of previousFiles) {
+      inMemorySourceMaps.delete(filePath);
+    }
+  }
+
+  const assets = compilation.getAssets();
+  const assetsByName = new Map(assets.map(asset => [asset.name, asset]));
+  const generatedFiles = new Set<string>();
+
+  for (const asset of assets) {
+    if (!/\.m?js$/.test(asset.name)) {
+      continue;
+    }
+
+    const generatedFilePath = resolve(outputPath, asset.name);
+    const externalMap = assetsByName.get(`${asset.name}.map`);
+    const load = externalMap
+      ? () =>
+          parseSourceMapPayload(externalMap.source.buffer().toString('utf8'))
+      : () => toSourceMapPayload(asset.source.map());
+
+    generatedFiles.add(generatedFilePath);
+    inMemorySourceMaps.set(generatedFilePath, { load });
+  }
+
+  generatedFilesByOutputPath.set(outputPath, generatedFiles);
+};
+
 const resolveOriginalFileName = (
   generatedFilePath: string,
   originalFileName: string
@@ -131,7 +206,7 @@ const resolveOriginalFileName = (
   return resolve(dirname(generatedFilePath), originalFileName);
 };
 
-const remapDevServerStack = (stack: string): string =>
+export const remapDevServerStack = (stack: string): string =>
   stack.replace(GENERATED_JS_FRAME_RE, (match, fileName, line, column) => {
     const generatedFilePath = getGeneratedFilePath(fileName);
     const sourceMap = getSourceMap(generatedFilePath);
