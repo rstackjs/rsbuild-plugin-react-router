@@ -2,13 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make Effect the orchestration and lifecycle spine for all Node-side plugin and server code while reducing handwritten LOC and preserving build, dev-startup, worker, and runtime performance.
+**Goal:** Make Effect the orchestration and lifecycle spine for Node-side plugin and server resources where it materially simplifies ownership and composition, while preserving build, dev-startup, worker, and runtime performance.
 
-**Architecture:** Create one `ManagedRuntime` per plugin instance. Rsbuild hooks and exported Promise APIs are the only runtime boundaries; internal Node-side workflows return `Effect`. A runtime-owned `PluginScope` service owns dynamically created workers, watchers, timers, background fibers, and dev-server resources. Pure transforms, generated/browser runtime code, and worker entrypoints remain ordinary TypeScript.
+**Architecture:** Create one `ManagedRuntime` per plugin instance. Rsbuild hooks and exported Promise APIs are runtime boundaries; effectful internal workflows compose as `Effect`, while synchronous callback-driven state transitions remain ordinary TypeScript. The runtime's native `Scope` owns dynamically created workers, watchers, delayed work, and background fibers. Pure transforms, generated/browser runtime code, and worker entrypoints remain ordinary TypeScript.
 
 **Tech Stack:** TypeScript 5.9, Effect 3.22, Rsbuild/Rspack, Rstest, Playwright, Node `worker_threads`, existing benchmark harness.
 
 ## Global Constraints
+
+> **Execution refinement:** Early task examples name a custom `PluginScope` service and propose Effect-based dev-session state. The accepted implementation uses the runtime-provided native `Scope` plus a supervised `FiberSet`, and keeps Rsbuild's synchronous dev-session transitions plain. These choices remove a forwarding abstraction and avoid runtime crossings in synchronous callbacks while preserving the ownership model described here.
 
 - Scope is Node-side plugin/server code only. Do not add Effect to browser runtime, generated browser modules, templates shipped to applications, or worker entrypoints.
 - `src/parallel-route-transform-worker.ts` and its transitive worker-only hot path remain Effect-free unless a separate benchmark-backed design is approved.
@@ -16,13 +18,14 @@
 - Use direct Effect subpath imports such as `effect/Effect` and `effect/ManagedRuntime`; do not import the `effect` barrel from production source.
 - Create one `ManagedRuntime` per `pluginReactRouter(...).setup(api)` invocation. Do not create a runtime per hook, route, transform, request, compiler, or worker.
 - Keep pure synchronous helpers pure. Do not wrap string transforms, AST transforms, manifest shaping, cache access, predicates, or object construction in `Effect.sync` unless they cross a lifecycle/error boundary.
-- Use `Effect.fn` for reusable Node-side workflows. Do not use `Effect.fnUntraced` unless a benchmark identifies tracing overhead in that exact function.
+- Use `Effect.fn` for reusable orchestration boundaries when the named span materially improves ownership or diagnostics. Do not add it to per-route, per-module, per-request, or other measured hot paths without benchmark evidence.
+- Keep synchronous Rsbuild callback state machines in plain TypeScript when converting them would introduce repeated Promise/Effect crossings or runtime calls. Effect should remove manual asynchronous ownership, not wrap every mutation.
 - Add tagged errors only where callers recover differently. Continue using `Error` for opaque third-party failures when a new error class would only add ceremony.
 - Preserve public exports and Promise-returning APIs unless a separate breaking-change decision is approved.
 - Production behavior and error messages remain unchanged unless a task explicitly names the intended change.
-- Every migration tranche must end with fewer Node-side production LOC than it started with. The complete branch must reduce total tracked handwritten TypeScript/JavaScript LOC, including tests and benchmark support.
+- Treat LOC as a diagnostic, not an acceptance gate. Prefer less production code when clarity is equal, but accept additional tests, benchmarks, or narrowly justified runtime code when the result is easier to understand and maintain.
 - Performance acceptance: no benchmark median may regress by more than 2%; no p95/tail metric, dev readiness, HMR update, worker-enabled build, CPU time, or maximum RSS metric may regress by more than 5%.
-- If a tranche misses either LOC or performance gates, revert or redesign that tranche before continuing. Do not defer the regression to final cleanup.
+- If a tranche misses the performance gate or adds abstraction without removing equivalent manual coordination, revert or redesign it before continuing.
 - Keep commits tranche-local and independently green. Never mix browser-runtime changes, dependency upgrades, formatting sweeps, or unrelated refactors into this branch.
 
 ---
@@ -31,12 +34,12 @@
 
 Keep the repository's flat `src/` layout. Do not create an `effect/` directory or split every service into its own file.
 
-- `src/effect-runtime.ts`: error normalization, foreign sync/Promise constructors, `PluginScope`, and the single plugin `ManagedRuntime` factory.
+- `src/effect-runtime.ts`: error normalization, foreign Promise constructors, native scoped resource/fiber ownership, and the single plugin `ManagedRuntime` factory.
 - `src/index.ts`: constructs the plugin runtime, adapts Rsbuild hooks to `runtime.runPromise`, and disposes the runtime from close hooks.
 - `src/dev-background-resources.ts`: scoped acquisition of route watchers, lazy-compilation prewarm, and the parent-side transform executor.
 - `src/route-watch.ts`: Effect-native watcher lifecycle and serialized rescan workflow.
-- `src/dev-runtime-session.ts`: session ownership and close sequencing using Effect primitives.
-- `src/dev-runtime-controller.ts`: compiler/runtime orchestration, interruptible delayed work, and cleanup.
+- `src/dev-runtime-session.ts`: synchronous session state and close observation required by Rsbuild's callback API.
+- `src/dev-runtime-controller.ts`: compiler/runtime orchestration; asynchronous delayed work and plugin-owned cleanup use the plugin runtime where they simplify ownership.
 - `src/dev-generation.ts`: readiness and generation state transitions using `Deferred` plus an Effect workflow boundary.
 - `src/lazy-compilation-prewarm.ts`: interruptible prewarm scheduling owned by the plugin scope.
 - `src/parallel-route-transforms.ts`: Promise-based worker dispatch remains; acquisition/close becomes a parent-side scoped resource.
@@ -262,13 +265,13 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Check the tranche LOC direction**
+- [ ] **Step 5: Review tranche size and maintainability**
 
 ```bash
 git diff --numstat -- src/effect-runtime.ts tests/effect-runtime.test.ts
 ```
 
-This foundation may be temporarily positive. Task 3 must make Tasks 2–3 net-negative in production `src/` LOC before the tranche is accepted.
+This foundation may be positive. Review Tasks 2–3 together and confirm the added runtime code replaces duplicated lifecycle ownership; LOC alone does not determine acceptance.
 
 - [ ] **Step 6: Commit the runtime foundation**
 
@@ -378,13 +381,13 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Enforce the first LOC gate**
+- [ ] **Step 6: Review the first runtime tranche**
 
 ```bash
 git diff HEAD~1 --numstat -- src/effect-runtime.ts src/index.ts
 ```
 
-Tasks 2–3 together must be net-negative in production lines after removing redundant runner/normalization code. If they are positive, keep `PluginScope` but defer the `index.ts` boundary commit until Task 4 removes more lifecycle code.
+Tasks 2–3 together must centralize runtime creation, disposal, and failure normalization without adding a second ownership path. Use the line diff to identify accidental duplication, not as a hard gate.
 
 - [ ] **Step 7: Commit the boundary**
 
@@ -492,7 +495,7 @@ node scripts/compare-benchmarks.mts --before=.benchmark/effect-server-architectu
 
 Expected: worker-enabled production build remains faster than inline; all acceptance thresholds pass.
 
-- [ ] **Step 7: Enforce LOC and commit**
+- [ ] **Step 7: Review maintainability and commit**
 
 ```bash
 git diff --numstat -- src/parallel-route-transforms.ts src/dev-background-resources.ts src/index.ts
@@ -664,7 +667,7 @@ pnpm typecheck
 
 Expected: PASS. Explicitly verify double close, close during rescan, failed watcher startup, reschedule, and callback-triggered close cases.
 
-- [ ] **Step 6: Run dev startup/HMR benchmarks and enforce LOC**
+- [ ] **Step 6: Run dev startup/HMR benchmarks and review maintainability**
 
 Repeat both large dev benchmark commands with `after-task-5` output paths. Reject the tranche if readiness or update time exceeds the global thresholds.
 
@@ -766,7 +769,7 @@ pnpm rstest run tests/dev-runtime-controller.test.ts tests/dev-generation.test.t
 pnpm typecheck
 ```
 
-- [ ] **Step 7: Run dev performance and LOC gates**
+- [ ] **Step 7: Run dev performance and maintainability checks**
 
 Run large dev inline and worker benchmarks plus the existing HMR/HDR fail-fast suite:
 
@@ -775,7 +778,7 @@ pnpm test:react-router-framework:failfast
 git diff --numstat -- src/dev-runtime-session.ts src/dev-runtime-controller.ts src/dev-generation.ts src/dev-runtime-compilation.ts src/dev-runtime-artifacts.ts
 ```
 
-Expected: no gate regression; production LOC is net-negative.
+Expected: no performance regression; Effect removes manual ownership or state coordination wherever it is introduced.
 
 - [ ] **Step 8: Commit**
 
@@ -913,7 +916,7 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Run full build benchmarks and LOC gate**
+- [ ] **Step 7: Run full build benchmarks and review maintainability**
 
 Repeat `full-build`, `1024-inline`, and `1024-workers` benchmarks with `after-task-7` output paths. Verify route analysis and prerender concurrency did not regress.
 
@@ -921,7 +924,7 @@ Repeat `full-build`, `1024-inline`, and `1024-workers` benchmarks with `after-ta
 git diff --numstat -- src/react-router-config.ts src/build-manifest.ts src/manifest.ts src/prerender-build.ts src/rsc-prerender.ts src/server-build-resolution.ts src/server-utils.ts src/typegen.ts
 ```
 
-Expected: production LOC is net-negative.
+Expected: no performance regression and no redundant Promise/Effect boundary remains.
 
 - [ ] **Step 8: Commit**
 
@@ -998,14 +1001,14 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Enforce crossing and LOC gates**
+- [ ] **Step 6: Enforce crossing policy and review source size**
 
 ```bash
 rg -n "Effect\.run(?:Promise|PromiseExit|Fork|Sync)|ManagedRuntime\.make" src --glob '*.ts'
 git diff --numstat $(cat .benchmark/effect-server-architecture/base-commit.txt)..HEAD -- src
 ```
 
-Expected: runner search is limited to `src/effect-runtime.ts`; cumulative production LOC is lower than baseline.
+Expected: runner search is limited to `src/effect-runtime.ts`; source-size changes are understood and justified by simpler ownership or stronger coverage.
 
 - [ ] **Step 7: Commit**
 
@@ -1096,7 +1099,7 @@ Skip unchanged paths in `git add`; do not create an empty commit.
 
 ---
 
-### Task 10: Final Performance, LOC, Health, and Compatibility Gate
+### Task 10: Final Performance, Health, Maintainability, and Compatibility Gate
 
 **Files:**
 
@@ -1106,7 +1109,7 @@ Skip unchanged paths in `git add`; do not create an empty commit.
 
 **Interfaces:**
 
-- Delivers: behavior-compatible Node-side architecture with one managed runtime, scoped resources, Effect-free workers/browser code, lower LOC, and accepted performance.
+- Delivers: behavior-compatible Node-side architecture with one managed runtime, scoped resources, Effect-free workers/browser code, clearer ownership, and accepted performance.
 
 - [ ] **Step 1: Run final source-policy searches**
 
@@ -1143,7 +1146,7 @@ pnpm bench:synthetic-app -- --plugin-root "$PWD" --profile=all --runs=5
 
 Expected: every metric satisfies the 2% median/5% tail gates; worker-enabled 1024-route build retains its benefit; constrained dev startup does not absorb additional Effect worker cost.
 
-- [ ] **Step 4: Enforce final LOC gates**
+- [ ] **Step 4: Record final LOC as a diagnostic**
 
 ```bash
 git ls-files -z '*.ts' '*.tsx' '*.js' '*.mjs' '*.mts' \
@@ -1156,7 +1159,7 @@ diff -u .benchmark/effect-server-architecture/base-total-loc.txt .benchmark/effe
 diff -u .benchmark/effect-server-architecture/base-src-loc.txt .benchmark/effect-server-architecture/final-src-loc.txt || true
 ```
 
-Manually compare the final `total` rows. Both tracked handwritten total LOC and `src/` LOC must be lower. Test deletion is allowed only when it removes obsolete adapter-specific coverage and the same behavior remains covered through public APIs.
+Manually compare the final `total` rows. Explain material growth and confirm it comes from useful tests, benchmark support, or code that replaces more complex ownership. Test deletion is allowed only when it removes obsolete adapter-specific coverage and the same behavior remains covered through public APIs.
 
 - [ ] **Step 5: Re-run TraceDecay health and affected-test analysis**
 
@@ -1182,7 +1185,7 @@ Confirm all of these are true in the final diff:
 - no Promise-to-Effect-to-Promise bounce inside internal workflows;
 - public Promise APIs preserved;
 - fewer manual timer handles, `closed` flags, close promises, and `Promise.allSettled` cleanup aggregators;
-- fewer production lines overall.
+- production ownership and boundary code is easier to follow even where line count is unchanged.
 
 - [ ] **Step 7: Confirm release documentation remains unchanged**
 
@@ -1208,7 +1211,7 @@ Stop and redesign the current tranche when any condition occurs:
 - Effect is imported by `src/parallel-route-transform-worker.ts` or an emitted worker chunk.
 - A runtime is created inside a hook callback, route loop, request handler, worker, or transform.
 - Worker-enabled dev readiness, worker-enabled 1024-route build, HMR update latency, CPU, or RSS exceeds the performance thresholds.
-- A tranche adds production LOC after removing its superseded implementation.
+- A tranche adds another abstraction or ownership path without simplifying the superseded implementation.
 - Resource cleanup requires both a runtime finalizer and the old manual close-hook path.
 - An internal workflow repeatedly crosses Promise/Effect boundaries.
 - Browser/template output contains Effect runtime code.
