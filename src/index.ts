@@ -855,7 +855,6 @@ export const pluginReactRouter = (
         },
         server: modePlan.server,
         dev: {
-          writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
         },

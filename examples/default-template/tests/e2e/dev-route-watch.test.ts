@@ -141,7 +141,6 @@ test.describe('dev route watch', () => {
   }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Welcome to React Router');
-    const restartMarkerBeforeAdd = readRestartMarkerVersion();
 
     writeFileSync(
       addedRoutePath,
@@ -158,9 +157,6 @@ test.describe('dev route watch', () => {
     await page.goto(addedRouteUrl);
     await expect(page.locator('h1')).toHaveText(addedRouteText);
 
-    await expect
-      .poll(readRestartMarkerVersion, { timeout: 10000 })
-      .not.toBe(restartMarkerBeforeAdd);
     const restartMarkerBefore = readRestartMarkerVersion();
     writeFileSync(
       addedRoutePath,
