@@ -79,6 +79,7 @@ import {
 } from './rsc-support.js';
 import { createReactRouterModePlan } from './mode-plan.js';
 import { createQuerylessRouteImportPlugin } from './route-imports.js';
+import { registerDevServerSourceMaps } from './dev-source-maps.js';
 
 export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
 export { loadReactRouterServerBuild } from './dev-generation.js';
@@ -406,6 +407,13 @@ export const pluginReactRouter = (
     } as ResolvedReactRouterConfig;
 
     const isBuild = api.context.action === 'build';
+    if (!isBuild) {
+      api.onAfterEnvironmentCompile(({ environment, stats }) => {
+        if (environment.name === 'node' && stats && !stats.hasErrors()) {
+          registerDevServerSourceMaps(stats.compilation);
+        }
+      });
+    }
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
       isBuild,
     });
