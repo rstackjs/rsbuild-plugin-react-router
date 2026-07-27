@@ -64,6 +64,12 @@ jobs:
         working-directory: base
         run: pnpm build
 
+      - name: Stage plugin builds under the benchmark dependency tree
+        run: |
+          mkdir -p head/.benchmark/candidates/base head/.benchmark/candidates/head
+          cp -R base/dist head/.benchmark/candidates/base/dist
+          cp -R head/dist head/.benchmark/candidates/head/dist
+
       - name: Run local benchmark comparisons
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -76,7 +82,7 @@ jobs:
           fi
           for side in "${order[@]}"; do
             node "$GITHUB_WORKSPACE/head/benchmarks/run.mts" \
-              --plugin-root "$GITHUB_WORKSPACE/$side" \
+              --plugin-root "$GITHUB_WORKSPACE/head/.benchmark/candidates/$side" \
               --out "$GITHUB_WORKSPACE/benchmark-output/$side.json"
           done
 
@@ -141,7 +147,7 @@ jobs:
         run: pnpm build
 
       - name: Upload CodSpeed walltime result
-        uses: CodSpeedHQ/action@v4
+        uses: CodSpeedHQ/action@f22792bfac16f3e14eb9fbea76f4a48e9cc22b93 # v4
         continue-on-error: true
         with:
           mode: walltime
