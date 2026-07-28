@@ -8,18 +8,13 @@ const routeModuleTransformLoaderPath = fileURLToPath(
   new URL('./route-module-transform-loader.js', import.meta.url)
 );
 
-export const shouldUseApiRouteModuleTransforms = (): boolean =>
+// Source checkouts do not have the emitted loader; Rstest exercises this path.
+export const shouldUseRouteModuleTransformApi = (): boolean =>
   existsSync(
     fileURLToPath(
       new URL('./route-module-transform-loader.ts', import.meta.url)
     )
   ) || process.env.RSTEST === 'true';
-
-export const shouldUseApiRouteModuleTransformsForAction = ({
-  supportsApiRouteModuleTransforms,
-}: {
-  supportsApiRouteModuleTransforms: boolean;
-}): boolean => supportsApiRouteModuleTransforms;
 
 const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
 

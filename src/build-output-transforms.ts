@@ -36,7 +36,7 @@ type RegisterBuildOutputTransformsOptions = {
   routeChunkConfig: RouteChunkConfig;
   isBuild: boolean;
   splitRouteModules: boolean;
-  useApiRouteModuleTransforms: boolean;
+  useRouteModuleTransformApi: boolean;
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
@@ -60,7 +60,7 @@ export const registerBuildOutputTransforms = ({
   routeChunkConfig,
   isBuild,
   splitRouteModules,
-  useApiRouteModuleTransforms,
+  useRouteModuleTransformApi,
   ssr,
   isSpaMode,
   rootRoutePath,
@@ -259,7 +259,7 @@ export const registerBuildOutputTransforms = ({
       )
   );
 
-  if (useApiRouteModuleTransforms) {
+  if (useRouteModuleTransformApi) {
     api.transform(
       {
         resourceQuery: /\?react-router-route/,

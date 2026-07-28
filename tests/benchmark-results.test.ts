@@ -43,6 +43,7 @@ describe('benchmark plugin result summaries', () => {
       reports: 2,
       partialReports: 2,
       workers: 2,
+      wallMs: null,
     });
   });
 });

@@ -423,7 +423,6 @@ const expectFirstCommittedGeneration = async (
       timeout: 20_000,
     })
     .toBeGreaterThan(completedBeforeRecovery);
-  await new Promise(resolve => setTimeout(resolve, 250));
 
   await expect
     .poll(async () => getBuildMarker(await harness.loadBuild()), {

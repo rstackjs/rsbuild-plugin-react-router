@@ -8,6 +8,8 @@ import routeModuleTransformLoader, {
   type RouteModuleTransformLoaderOptions,
 } from '../src/route-module-transform-loader';
 
+type LoaderInputSourceMap = Parameters<typeof routeModuleTransformLoader>[1];
+
 const defaultOptions: RouteModuleTransformLoaderOptions = {
   environmentName: 'web',
   performanceScopeId: 'web:dev:ssr:/project/app/root.tsx',
@@ -28,28 +30,34 @@ const runLoader = (
   }: {
     options?: RouteModuleTransformLoaderOptions;
     sourceMap?: boolean;
-    inputSourceMap?: Record<string, unknown>;
+    inputSourceMap?: LoaderInputSourceMap;
   } = {}
 ) =>
-  new Promise<{ code: string; map: unknown }>((resolve, reject) => {
+  new Promise<{ code: string; map: LoaderInputSourceMap }>((resolve, reject) => {
     const context = {
       resource: '/project/app/routes/page.tsx?react-router-route',
       resourcePath: '/project/app/routes/page.tsx',
       sourceMap,
-      async: () => (error: Error | null, result?: string, map?: unknown) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve({ code: result ?? '', map });
-      },
+      async:
+        () =>
+        (
+          error: Error | null,
+          result?: string,
+          map?: LoaderInputSourceMap
+        ) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve({ code: result ?? '', map });
+        },
       getOptions: () => options,
     };
 
     void routeModuleTransformLoader.call(
       context as never,
       code,
-      inputSourceMap as never
+      inputSourceMap
     );
   });
 
@@ -84,6 +92,7 @@ describe('route module transform loader', () => {
       sourceMap: true,
       inputSourceMap: {
         version: 3,
+        file: 'compiled-route.js',
         names: [],
         sources: ['original-route.tsx'],
         sourcesContent: [source],
@@ -100,7 +109,7 @@ describe('route module transform loader', () => {
         .split('\n')
         .findIndex(line => line.startsWith('export default')) + 1;
     expect(
-      originalPositionFor(new TraceMap(result.map as never), {
+      originalPositionFor(new TraceMap(result.map!), {
         line: transformedExportLine,
         column: 0,
       })

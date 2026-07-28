@@ -159,6 +159,7 @@ export const summarizePluginOperations = runs => {
   return [...operations.values()]
     .map(({ workerIds, ...operation }) => ({
       ...operation,
+      wallMs: operation.partialReports > 0 ? null : operation.wallMs,
       workers: workerIds.size,
     }))
     .sort((a, b) => {

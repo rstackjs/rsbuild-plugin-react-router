@@ -24,7 +24,7 @@ const createTransformHarness = () => {
 
 const createBaseOptions = (
   transforms: ReturnType<typeof createTransformHarness>,
-  useApiRouteModuleTransforms = false
+  useRouteModuleTransformApi = false
 ) => {
   const appDirectory = resolve('/project/app');
   const routePath = resolve(appDirectory, 'routes/page.tsx');
@@ -57,7 +57,7 @@ const createBaseOptions = (
     },
     isBuild: true,
     splitRouteModules: true,
-    useApiRouteModuleTransforms,
+    useRouteModuleTransformApi,
     ssr: true,
     isSpaMode: false,
     rootRoutePath: resolve(appDirectory, 'root.tsx'),

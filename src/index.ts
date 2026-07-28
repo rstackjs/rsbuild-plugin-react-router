@@ -55,8 +55,7 @@ import {
 import {
   registerRouteModuleTransformRules,
   shouldParallelizeRouteTransforms,
-  shouldUseApiRouteModuleTransforms,
-  shouldUseApiRouteModuleTransformsForAction,
+  shouldUseRouteModuleTransformApi,
 } from './route-module-transform-rules.js';
 import {
   executeRouteTransformTask,
@@ -117,7 +116,7 @@ const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
-const supportsApiRouteModuleTransforms = shouldUseApiRouteModuleTransforms();
+const useRouteModuleTransformApi = shouldUseRouteModuleTransformApi();
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -388,10 +387,6 @@ export const pluginReactRouter = (
     }
 
     const isBuild = api.context.action === 'build';
-    const useApiRouteModuleTransforms =
-      shouldUseApiRouteModuleTransformsForAction({
-        supportsApiRouteModuleTransforms,
-      });
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
       isBuild,
     });
@@ -922,7 +917,7 @@ export const pluginReactRouter = (
                 config.dev?.hmr !== false &&
                 isRspackSwcReactRefreshEnabled(rspackConfig);
 
-              if (!useApiRouteModuleTransforms) {
+              if (!useRouteModuleTransformApi) {
                 registerRouteModuleTransformRules(rspackConfig, {
                   environmentName: name,
                   ssr,
@@ -1016,7 +1011,7 @@ export const pluginReactRouter = (
       routeChunkConfig,
       isBuild,
       splitRouteModules: Boolean(splitRouteModules),
-      useApiRouteModuleTransforms,
+      useRouteModuleTransformApi,
       ssr,
       isSpaMode,
       rootRoutePath,

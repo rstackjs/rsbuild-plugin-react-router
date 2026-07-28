@@ -17,14 +17,12 @@ export const ensureFederationAsyncStartup = (
     if (!plugin || typeof plugin !== 'object') {
       continue;
     }
-    const pluginName = (plugin as ModuleFederationPluginLike).name;
-    if (pluginName !== 'ModuleFederationPlugin') {
+    const federationPlugin = plugin as ModuleFederationPluginLike;
+    if (federationPlugin.name !== 'ModuleFederationPlugin') {
       continue;
     }
 
-    const pluginOptions =
-      (plugin as ModuleFederationPluginLike)._options ??
-      (plugin as ModuleFederationPluginLike).options;
+    const pluginOptions = federationPlugin._options ?? federationPlugin.options;
     if (!pluginOptions) {
       continue;
     }

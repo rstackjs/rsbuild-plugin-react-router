@@ -1,8 +1,9 @@
-import { describe, expect, it } from '@rstest/core';
+import * as fs from 'node:fs';
+import { describe, expect, it, rstest } from '@rstest/core';
 import {
   registerRouteModuleTransformRules,
   shouldParallelizeRouteTransforms,
-  shouldUseApiRouteModuleTransformsForAction,
+  shouldUseRouteModuleTransformApi,
 } from '../src/route-module-transform-rules';
 
 const createRuleConfig = (
@@ -44,22 +45,21 @@ describe('route module transform rules', () => {
     expect(shouldParallelizeRouteTransforms(256)).toBe(true);
   });
 
-  it('uses loader route-module transforms from the published package', () => {
-    expect(
-      shouldUseApiRouteModuleTransformsForAction({
-        supportsApiRouteModuleTransforms: false,
-      })
-    ).toBe(false);
-    expect(
-      shouldUseApiRouteModuleTransformsForAction({
-        supportsApiRouteModuleTransforms: false,
-      })
-    ).toBe(false);
-    expect(
-      shouldUseApiRouteModuleTransformsForAction({
-        supportsApiRouteModuleTransforms: true,
-      })
-    ).toBe(true);
+  it('uses the emitted loader outside source checkouts and tests', () => {
+    const existsSync = rstest.spyOn(fs, 'existsSync').mockReturnValue(false);
+    const rstestEnvironment = process.env.RSTEST;
+    delete process.env.RSTEST;
+
+    try {
+      expect(shouldUseRouteModuleTransformApi()).toBe(false);
+    } finally {
+      if (rstestEnvironment === undefined) {
+        delete process.env.RSTEST;
+      } else {
+        process.env.RSTEST = rstestEnvironment;
+      }
+      existsSync.mockRestore();
+    }
   });
 
   it('registers route module loader rules with loader options', () => {

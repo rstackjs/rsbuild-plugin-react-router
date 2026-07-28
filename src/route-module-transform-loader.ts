@@ -20,30 +20,45 @@ type LoaderContextWithSourceMap = ThisParameterType<
 > & {
   sourceMap?: boolean;
 };
+type LoaderInputSourceMap = Parameters<
+  LoaderDefinition<RouteModuleTransformLoaderOptions>
+>[1];
+type RawLoaderSourceMap = Exclude<LoaderInputSourceMap, string | undefined>;
 
 const LOADER_PERFORMANCE_FLUSH_DELAY_MS = 50;
 const performanceWorkerId = `process-${process.pid}:thread-${threadId}`;
 
-const routeModuleTransformLoaderPerformanceProfilers = new Map<
+const composeSourceMaps = (
+  generatedMap: SourceMapInput,
+  inputSourceMap: SourceMapInput
+): RawLoaderSourceMap =>
+  JSON.parse(
+    remapping([generatedMap, inputSourceMap], () => null).toString()
+  ) as RawLoaderSourceMap;
+
+const performanceProfilersByScope = new Map<
   string,
-  ReturnType<typeof createReactRouterPerformanceProfiler>
+  Map<string, ReturnType<typeof createReactRouterPerformanceProfiler>>
 >();
-const pendingPerformanceFlushKeys = new Set<string>();
 let performanceFlushTimer: ReturnType<typeof setTimeout> | undefined;
 
-const getPerformanceFlushKey = (
+const getPerformanceProfiler = (
   scopeId: string,
   environment: string | undefined
-): string => `${scopeId}\0${environment ?? 'unknown'}`;
-
-const getRouteModuleTransformLoaderPerformanceProfiler = (scopeId: string) => {
-  let profiler = routeModuleTransformLoaderPerformanceProfilers.get(scopeId);
+): ReturnType<typeof createReactRouterPerformanceProfiler> => {
+  let profilers = performanceProfilersByScope.get(scopeId);
+  if (!profilers) {
+    profilers = new Map();
+    performanceProfilersByScope.set(scopeId, profilers);
+  }
+  const environmentKey = environment ?? 'unknown';
+  let profiler = profilers.get(environmentKey);
   if (!profiler) {
     profiler = createReactRouterPerformanceProfiler({
       enabled: true,
       log: message => console.info(message),
     });
-    routeModuleTransformLoaderPerformanceProfilers.set(scopeId, profiler);
+    profilers.set(environmentKey, profiler);
   }
   return profiler;
 };
@@ -54,24 +69,18 @@ export const flushRouteModuleTransformLoaderPerformance = (): void => {
     performanceFlushTimer = undefined;
   }
 
-  for (const key of pendingPerformanceFlushKeys) {
-    const [scopeId, environment] = key.split('\0');
-    const profiler =
-      routeModuleTransformLoaderPerformanceProfilers.get(scopeId);
-    profiler?.flush(environment === 'unknown' ? undefined : environment, {
-      partial: true,
-      workerId: performanceWorkerId,
-    });
-    routeModuleTransformLoaderPerformanceProfilers.delete(scopeId);
+  for (const profilers of performanceProfilersByScope.values()) {
+    for (const [environment, profiler] of profilers) {
+      profiler.flush(environment === 'unknown' ? undefined : environment, {
+        partial: true,
+        workerId: performanceWorkerId,
+      });
+    }
   }
-  pendingPerformanceFlushKeys.clear();
+  performanceProfilersByScope.clear();
 };
 
-const scheduleRouteModuleTransformLoaderPerformanceFlush = (
-  scopeId: string,
-  environment: string | undefined
-): void => {
-  pendingPerformanceFlushKeys.add(getPerformanceFlushKey(scopeId, environment));
+const schedulePerformanceFlush = (): void => {
   if (performanceFlushTimer) {
     clearTimeout(performanceFlushTimer);
   }
@@ -109,8 +118,9 @@ const routeModuleTransformLoader: LoaderDefinition<RouteModuleTransformLoaderOpt
 
     try {
       const result = options.logPerformance
-        ? await getRouteModuleTransformLoaderPerformanceProfiler(
-            options.performanceScopeId
+        ? await getPerformanceProfiler(
+            options.performanceScopeId,
+            options.environmentName
           ).record(
             options.environmentName,
             'route:module',
@@ -121,16 +131,9 @@ const routeModuleTransformLoader: LoaderDefinition<RouteModuleTransformLoaderOpt
 
       const outputSourceMap =
         result.map && inputSourceMap
-          ? JSON.parse(
-              remapping(
-                [
-                  result.map as SourceMapInput,
-                  (typeof inputSourceMap === 'string'
-                    ? JSON.parse(inputSourceMap)
-                    : inputSourceMap) as SourceMapInput,
-                ],
-                () => null
-              ).toString()
+          ? composeSourceMaps(
+              result.map as SourceMapInput,
+              inputSourceMap as SourceMapInput
             )
           : result.map;
       callback(null, result.code, outputSourceMap ?? undefined);
@@ -138,10 +141,7 @@ const routeModuleTransformLoader: LoaderDefinition<RouteModuleTransformLoaderOpt
       callback(error instanceof Error ? error : new Error(String(error)));
     } finally {
       if (options.logPerformance) {
-        scheduleRouteModuleTransformLoaderPerformanceFlush(
-          options.performanceScopeId,
-          options.environmentName
-        );
+        schedulePerformanceFlush();
       }
     }
   };
