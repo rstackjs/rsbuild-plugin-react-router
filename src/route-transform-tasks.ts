@@ -24,10 +24,7 @@ import {
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
-import {
-  getProgram,
-  type AnyNode,
-} from './route-ast.js';
+import { getProgram, type AnyNode } from './route-ast.js';
 
 export type RouteTransformResult = {
   code: string;
@@ -87,6 +84,10 @@ export type RouteTransformTask =
 export type RouteTransformTaskOptions = {
   routeChunkCache?: RouteChunkCache;
 };
+
+export type RouteTransformRunner = (
+  task: RouteTransformTask
+) => Promise<RouteTransformResult>;
 
 const defaultRouteChunkCache: RouteChunkCache = new Map();
 

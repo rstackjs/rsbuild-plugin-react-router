@@ -1,3 +1,7 @@
+import {
+  originalPositionFor,
+  TraceMap,
+} from '@jridgewell/trace-mapping';
 import { describe, expect, it, rstest } from '@rstest/core';
 import routeModuleTransformLoader, {
   flushRouteModuleTransformLoaderPerformance,
@@ -12,6 +16,7 @@ const defaultOptions: RouteModuleTransformLoaderOptions = {
   isBuild: false,
   isSpaMode: false,
   rootRoutePath: '/project/app/root.tsx',
+  devHmr: false,
 };
 
 const runLoader = (
@@ -19,9 +24,11 @@ const runLoader = (
   {
     options = defaultOptions,
     sourceMap = false,
+    inputSourceMap,
   }: {
     options?: RouteModuleTransformLoaderOptions;
     sourceMap?: boolean;
+    inputSourceMap?: Record<string, unknown>;
   } = {}
 ) =>
   new Promise<{ code: string; map: unknown }>((resolve, reject) => {
@@ -39,7 +46,11 @@ const runLoader = (
       getOptions: () => options,
     };
 
-    void routeModuleTransformLoader.call(context as never, code);
+    void routeModuleTransformLoader.call(
+      context as never,
+      code,
+      inputSourceMap as never
+    );
   });
 
 describe('route module transform loader', () => {
@@ -63,6 +74,52 @@ describe('route module transform loader', () => {
     );
 
     expect(result.map).toBeDefined();
+  });
+
+  it('composes its source map with the map from the preceding loader', async () => {
+    const source = `
+      export default function Route() { return null; }
+    `;
+    const result = await runLoader(source, {
+      sourceMap: true,
+      inputSourceMap: {
+        version: 3,
+        names: [],
+        sources: ['original-route.tsx'],
+        sourcesContent: [source],
+        mappings: 'AAAA;AACA;AACA',
+      },
+    });
+
+    expect(result.map).toMatchObject({
+      sources: ['original-route.tsx'],
+      sourcesContent: [source],
+    });
+    const transformedExportLine =
+      result.code
+        .split('\n')
+        .findIndex(line => line.startsWith('export default')) + 1;
+    expect(
+      originalPositionFor(new TraceMap(result.map as never), {
+        line: transformedExportLine,
+        column: 0,
+      })
+    ).toMatchObject({
+      source: 'original-route.tsx',
+      line: 2,
+    });
+  });
+
+  it('registers lowered route components for dev HMR', async () => {
+    const result = await runLoader(
+      `
+        const Route = () => React.createElement('h1', null, 'Hello');
+        export default Route;
+      `,
+      { options: { ...defaultOptions, devHmr: true } }
+    );
+
+    expect(result.code).toContain('$RefreshReg$(Route, "Route")');
   });
 
   it('aggregates route-module performance reports when enabled', async () => {
@@ -91,6 +148,8 @@ describe('route module transform loader', () => {
 
       const report = JSON.parse(message.slice(prefix.length));
       expect(report.environment).toBe('web');
+      expect(report.partial).toBe(true);
+      expect(report.workerId).toMatch(/^process-\d+:thread-\d+$/);
       expect(report.operations['route:module']).toMatchObject({
         count: 2,
       });

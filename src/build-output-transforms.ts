@@ -6,10 +6,10 @@ import {
   getReactRouterManifestForDev,
   type ReactRouterManifestStats,
 } from './manifest.js';
-import type { RouteTransformRunner } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
 import { createBundlerRouteExportResolver } from './route-export-resolution.js';
 import type { RouteChunkConfig } from './route-chunks.js';
+import type { RouteTransformRunner } from './route-transform-tasks.js';
 import type { PluginOptions, Route } from './types.js';
 import { isSourceMapEnabled } from './warnings/warn-on-client-source-maps.js';
 

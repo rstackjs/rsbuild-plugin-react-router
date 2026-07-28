@@ -16,12 +16,15 @@ export const shouldUseApiRouteModuleTransforms = (): boolean =>
   ) || process.env.RSTEST === 'true';
 
 export const shouldUseApiRouteModuleTransformsForAction = ({
-  isBuild,
   supportsApiRouteModuleTransforms,
 }: {
-  isBuild: boolean;
   supportsApiRouteModuleTransforms: boolean;
-}): boolean => isBuild || supportsApiRouteModuleTransforms;
+}): boolean => supportsApiRouteModuleTransforms;
+
+const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
+
+export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
+  routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
 
 const getRouteModuleTransformParallel = (
   parallelRouteTransform: PluginOptions['parallelRouteTransform']
@@ -63,6 +66,7 @@ export const registerRouteModuleTransformRules = (
     isBuild,
     isSpaMode,
     rootRoutePath,
+    devHmr,
     logPerformance,
     routeByFilePath,
     parallelRouteTransform,
@@ -72,6 +76,7 @@ export const registerRouteModuleTransformRules = (
     isBuild: boolean;
     isSpaMode: boolean;
     rootRoutePath: string | null;
+    devHmr: boolean;
     logPerformance: boolean;
     routeByFilePath: Map<string, Route>;
     parallelRouteTransform: PluginOptions['parallelRouteTransform'];
@@ -91,6 +96,7 @@ export const registerRouteModuleTransformRules = (
       isBuild,
       isSpaMode,
       rootRoutePath,
+      devHmr,
     },
     parallelRouteTransform
   );

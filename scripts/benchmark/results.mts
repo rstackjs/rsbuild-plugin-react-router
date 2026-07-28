@@ -135,6 +135,8 @@ export const summarizePluginOperations = runs => {
           wallMs: null,
           maxMs: 0,
           reports: 0,
+          partialReports: 0,
+          workerIds: new Set(),
         };
         current.count += count;
         current.totalMs += totalMs;
@@ -143,19 +145,30 @@ export const summarizePluginOperations = runs => {
         }
         current.maxMs = Math.max(current.maxMs, maxMs);
         current.reports += 1;
+        if (report.partial === true) {
+          current.partialReports += 1;
+        }
+        if (typeof report.workerId === 'string') {
+          current.workerIds.add(report.workerId);
+        }
         operations.set(key, current);
       }
     }
   }
 
-  return [...operations.values()].sort((a, b) => {
-    if (b.totalMs !== a.totalMs) {
-      return b.totalMs - a.totalMs;
-    }
-    return `${a.environment}:${a.operation}`.localeCompare(
-      `${b.environment}:${b.operation}`
-    );
-  });
+  return [...operations.values()]
+    .map(({ workerIds, ...operation }) => ({
+      ...operation,
+      workers: workerIds.size,
+    }))
+    .sort((a, b) => {
+      if (b.totalMs !== a.totalMs) {
+        return b.totalMs - a.totalMs;
+      }
+      return `${a.environment}:${a.operation}`.localeCompare(
+        `${b.environment}:${b.operation}`
+      );
+    });
 };
 
 const formatMs = value =>

@@ -74,6 +74,7 @@
     "release:local": "pnpm build && changeset version && changeset publish && git add . && git commit -m \"chore: version packages\" && git push && git push --tags"
   },
   "dependencies": {
+    "@jridgewell/remapping": "^2.3.5",
     "@react-router/node": "^7.13.0",
     "@remix-run/node-fetch-server": "^0.13.0",
     "@rspack/plugin-react-refresh": "^2.0.2",
@@ -90,6 +91,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@react-router/dev": "^8.0.1",
     "@rsbuild/config": "workspace:*",
     "@rsbuild/core": "2.1.5",

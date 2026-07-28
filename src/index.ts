@@ -53,14 +53,15 @@ import {
   type RouteChunkConfig,
 } from './route-chunks.js';
 import {
-  createRouteTransformRunner,
-  shouldParallelizeRouteTransforms,
-} from './parallel-route-transforms.js';
-import {
   registerRouteModuleTransformRules,
+  shouldParallelizeRouteTransforms,
   shouldUseApiRouteModuleTransforms,
   shouldUseApiRouteModuleTransformsForAction,
 } from './route-module-transform-rules.js';
+import {
+  executeRouteTransformTask,
+  type RouteTransformRunner,
+} from './route-transform-tasks.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import {
@@ -389,7 +390,6 @@ export const pluginReactRouter = (
     const isBuild = api.context.action === 'build';
     const useApiRouteModuleTransforms =
       shouldUseApiRouteModuleTransformsForAction({
-        isBuild,
         supportsApiRouteModuleTransforms,
       });
     const shouldDependOnWebCompiler = !shouldParallelizeEnvironmentBuilds({
@@ -408,9 +408,8 @@ export const pluginReactRouter = (
     const parallelRouteTransform =
       pluginOptions.parallelRouteTransform ??
       shouldParallelizeRouteTransforms(routeCount);
-    const routeTransformRunner = createRouteTransformRunner({
-      routeChunkCache,
-    });
+    const routeTransformRunner: RouteTransformRunner = task =>
+      executeRouteTransformTask(task, { routeChunkCache });
     const routeChunkOptions = {
       splitRouteModules,
       rootRouteFile,
@@ -915,6 +914,14 @@ export const pluginReactRouter = (
         return mergeEnvironmentConfig(config, {
           tools: {
             rspack: rspackConfig => {
+              const environmentDevHmrEnabled =
+                name === 'web' &&
+                !isBuild &&
+                devHmrRefreshRuntimePath !== undefined &&
+                config.mode === 'development' &&
+                config.dev?.hmr !== false &&
+                isRspackSwcReactRefreshEnabled(rspackConfig);
+
               if (!useApiRouteModuleTransforms) {
                 registerRouteModuleTransformRules(rspackConfig, {
                   environmentName: name,
@@ -922,6 +929,7 @@ export const pluginReactRouter = (
                   isBuild,
                   isSpaMode,
                   rootRoutePath,
+                  devHmr: environmentDevHmrEnabled,
                   logPerformance,
                   routeByFilePath,
                   parallelRouteTransform,
@@ -933,12 +941,7 @@ export const pluginReactRouter = (
               }
 
               if (name === 'web') {
-                devHmrEnabled =
-                  !isBuild &&
-                  devHmrRefreshRuntimePath !== undefined &&
-                  config.mode === 'development' &&
-                  config.dev?.hmr !== false &&
-                  isRspackSwcReactRefreshEnabled(rspackConfig);
+                devHmrEnabled = environmentDevHmrEnabled;
                 if (devHmrEnabled) {
                   devHdrSignal?.ensure();
                 }

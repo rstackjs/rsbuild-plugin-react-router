@@ -1,3 +1,5 @@
+import { threadId } from 'node:worker_threads';
+import remapping, { type SourceMapInput } from '@jridgewell/remapping';
 import type { LoaderDefinition } from '@rspack/core';
 import { createReactRouterPerformanceProfiler } from './performance.js';
 import { executeRouteTransformTask } from './route-transform-tasks.js';
@@ -10,6 +12,7 @@ export type RouteModuleTransformLoaderOptions = {
   isBuild: boolean;
   isSpaMode: boolean;
   rootRoutePath: string | null;
+  devHmr: boolean;
 };
 
 type LoaderContextWithSourceMap = ThisParameterType<
@@ -19,6 +22,7 @@ type LoaderContextWithSourceMap = ThisParameterType<
 };
 
 const LOADER_PERFORMANCE_FLUSH_DELAY_MS = 50;
+const performanceWorkerId = `process-${process.pid}:thread-${threadId}`;
 
 const routeModuleTransformLoaderPerformanceProfilers = new Map<
   string,
@@ -54,7 +58,10 @@ export const flushRouteModuleTransformLoaderPerformance = (): void => {
     const [scopeId, environment] = key.split('\0');
     const profiler =
       routeModuleTransformLoaderPerformanceProfilers.get(scopeId);
-    profiler?.flush(environment === 'unknown' ? undefined : environment);
+    profiler?.flush(environment === 'unknown' ? undefined : environment, {
+      partial: true,
+      workerId: performanceWorkerId,
+    });
     routeModuleTransformLoaderPerformanceProfilers.delete(scopeId);
   }
   pendingPerformanceFlushKeys.clear();
@@ -79,7 +86,8 @@ process.once('beforeExit', flushRouteModuleTransformLoaderPerformance);
 const routeModuleTransformLoader: LoaderDefinition<RouteModuleTransformLoaderOptions> =
   async function routeModuleTransformLoader(
     this: LoaderContextWithSourceMap,
-    source
+    source,
+    inputSourceMap
   ) {
     const callback = this.async();
     const options = this.getOptions();
@@ -96,6 +104,7 @@ const routeModuleTransformLoader: LoaderDefinition<RouteModuleTransformLoaderOpt
         isBuild: options.isBuild,
         isSpaMode: options.isSpaMode,
         rootRoutePath: options.rootRoutePath,
+        devHmr: options.devHmr,
       });
 
     try {
@@ -110,7 +119,21 @@ const routeModuleTransformLoader: LoaderDefinition<RouteModuleTransformLoaderOpt
           )
         : await transform();
 
-      callback(null, result.code, result.map ?? undefined);
+      const outputSourceMap =
+        result.map && inputSourceMap
+          ? JSON.parse(
+              remapping(
+                [
+                  result.map as SourceMapInput,
+                  (typeof inputSourceMap === 'string'
+                    ? JSON.parse(inputSourceMap)
+                    : inputSourceMap) as SourceMapInput,
+                ],
+                () => null
+              ).toString()
+            )
+          : result.map;
+      callback(null, result.code, outputSourceMap ?? undefined);
     } catch (error) {
       callback(error instanceof Error ? error : new Error(String(error)));
     } finally {
