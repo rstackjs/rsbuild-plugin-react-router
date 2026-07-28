@@ -60,7 +60,7 @@ describe('pluginReactRouter', () => {
     // The plugin should not override Rsbuild's HMR defaults.
     expect(config.dev.hmr).toBe(true);
     expect(config.dev.liveReload).toBe(true);
-    expect(config.dev.writeToDisk).toBe(true);
+    expect(config.dev.writeToDisk).toBe(false);
     expect(config.dev.lazyCompilation).toMatchObject({
       entries: true,
       imports: true,
@@ -70,6 +70,19 @@ describe('pluginReactRouter', () => {
         resource: `${process.cwd()}/app/entry.client.tsx`,
       })
     ).toBe(false);
+  });
+
+  it('preserves an explicit writeToDisk override', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        dev: { writeToDisk: true },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.dev.writeToDisk).toBe(true);
   });
 
   it('adds the committed custom-server build entry only in development', async () => {

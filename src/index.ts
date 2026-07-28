@@ -800,7 +800,6 @@ export const pluginReactRouter = (
           assetPrefix: config.output?.assetPrefix || '/',
         },
         dev: {
-          writeToDisk: true,
           ...lazyCompilation,
           watchFiles: mergeWatchFiles(config.dev?.watchFiles, routeWatchFiles),
         },
