@@ -60,7 +60,7 @@ export type PluginOptions = {
    * Run route module transforms with Rspack's parallel loader workers.
    * Pass `true` to use Rspack's default worker count, a positive integer to set
    * the maximum worker count, or `false` to disable.
-   * @default Automatically enabled for 256+ resolved routes.
+   * @default false
    */
   parallelRouteTransform?: boolean | number;
 

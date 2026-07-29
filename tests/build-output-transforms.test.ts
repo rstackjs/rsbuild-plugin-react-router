@@ -24,7 +24,7 @@ const createTransformHarness = () => {
 
 const createBaseOptions = (
   transforms: ReturnType<typeof createTransformHarness>,
-  useRouteModuleTransformApi = false
+  useRouteModuleTransformApi = true
 ) => {
   const appDirectory = resolve('/project/app');
   const routePath = resolve(appDirectory, 'routes/page.tsx');
@@ -82,9 +82,9 @@ const createTransformArgs = (
   }) as never;
 
 describe('build output transforms', () => {
-  it('does not register route-module transforms through api.transform', () => {
+  it('does not register route-module transforms through api.transform when the loader is enabled', () => {
     const harness = createTransformHarness();
-    const options = createBaseOptions(harness);
+    const options = createBaseOptions(harness, false);
 
     registerBuildOutputTransforms(options);
 
@@ -103,9 +103,9 @@ describe('build output transforms', () => {
     );
   });
 
-  it('registers route-module transforms through api.transform in source mode', async () => {
+  it('registers route-module transforms through api.transform by default', async () => {
     const harness = createTransformHarness();
-    const options = createBaseOptions(harness, true);
+    const options = createBaseOptions(harness);
 
     registerBuildOutputTransforms(options);
 

@@ -1,9 +1,7 @@
-import * as fs from 'node:fs';
-import { describe, expect, it, rstest } from '@rstest/core';
+import { describe, expect, it } from '@rstest/core';
 import {
   registerRouteModuleTransformRules,
-  shouldParallelizeRouteTransforms,
-  shouldUseRouteModuleTransformApi,
+  shouldUseRouteModuleTransformLoader,
 } from '../src/route-module-transform-rules';
 
 const createRuleConfig = (
@@ -40,26 +38,12 @@ const createRuleConfig = (
 };
 
 describe('route module transform rules', () => {
-  it('enables loader parallelism for large route graphs', () => {
-    expect(shouldParallelizeRouteTransforms(255)).toBe(false);
-    expect(shouldParallelizeRouteTransforms(256)).toBe(true);
-  });
-
-  it('uses the emitted loader outside source checkouts and tests', () => {
-    const existsSync = rstest.spyOn(fs, 'existsSync').mockReturnValue(false);
-    const rstestEnvironment = process.env.RSTEST;
-    delete process.env.RSTEST;
-
-    try {
-      expect(shouldUseRouteModuleTransformApi()).toBe(false);
-    } finally {
-      if (rstestEnvironment === undefined) {
-        delete process.env.RSTEST;
-      } else {
-        process.env.RSTEST = rstestEnvironment;
-      }
-      existsSync.mockRestore();
-    }
+  it('uses the loader only when parallel route transforms are opted into', () => {
+    expect(shouldUseRouteModuleTransformLoader(undefined)).toBe(false);
+    expect(shouldUseRouteModuleTransformLoader(false)).toBe(false);
+    expect(shouldUseRouteModuleTransformLoader(true)).toBe(true);
+    expect(shouldUseRouteModuleTransformLoader(3)).toBe(true);
+    expect(shouldUseRouteModuleTransformLoader(0)).toBe(true);
   });
 
   it('registers route module loader rules with loader options', () => {

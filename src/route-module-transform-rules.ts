@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Rspack } from '@rsbuild/core';
 import type { RouteModuleTransformLoaderOptions } from './route-module-transform-loader.js';
@@ -8,18 +7,10 @@ const routeModuleTransformLoaderPath = fileURLToPath(
   new URL('./route-module-transform-loader.js', import.meta.url)
 );
 
-// Source checkouts do not have the emitted loader; Rstest exercises this path.
-export const shouldUseRouteModuleTransformApi = (): boolean =>
-  existsSync(
-    fileURLToPath(
-      new URL('./route-module-transform-loader.ts', import.meta.url)
-    )
-  ) || process.env.RSTEST === 'true';
-
-const AUTO_PARALLEL_ROUTE_THRESHOLD = 256;
-
-export const shouldParallelizeRouteTransforms = (routeCount: number): boolean =>
-  routeCount >= AUTO_PARALLEL_ROUTE_THRESHOLD;
+export const shouldUseRouteModuleTransformLoader = (
+  parallelRouteTransform: PluginOptions['parallelRouteTransform']
+): boolean =>
+  parallelRouteTransform === true || typeof parallelRouteTransform === 'number';
 
 const getRouteModuleTransformParallel = (
   parallelRouteTransform: PluginOptions['parallelRouteTransform']

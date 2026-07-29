@@ -54,8 +54,7 @@ import {
 } from './route-chunks.js';
 import {
   registerRouteModuleTransformRules,
-  shouldParallelizeRouteTransforms,
-  shouldUseRouteModuleTransformApi,
+  shouldUseRouteModuleTransformLoader,
 } from './route-module-transform-rules.js';
 import {
   executeRouteTransformTask,
@@ -116,7 +115,6 @@ const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
-const useRouteModuleTransformApi = shouldUseRouteModuleTransformApi();
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -400,9 +398,9 @@ export const pluginReactRouter = (
       rootRouteFile,
     };
     const routeChunkCache: RouteChunkCache = new Map();
-    const parallelRouteTransform =
-      pluginOptions.parallelRouteTransform ??
-      shouldParallelizeRouteTransforms(routeCount);
+    const useRouteModuleTransformLoader = shouldUseRouteModuleTransformLoader(
+      pluginOptions.parallelRouteTransform
+    );
     const routeTransformRunner: RouteTransformRunner = task =>
       executeRouteTransformTask(task, { routeChunkCache });
     const routeChunkOptions = {
@@ -917,7 +915,7 @@ export const pluginReactRouter = (
                 config.dev?.hmr !== false &&
                 isRspackSwcReactRefreshEnabled(rspackConfig);
 
-              if (!useRouteModuleTransformApi) {
+              if (useRouteModuleTransformLoader) {
                 registerRouteModuleTransformRules(rspackConfig, {
                   environmentName: name,
                   ssr,
@@ -927,7 +925,7 @@ export const pluginReactRouter = (
                   devHmr: environmentDevHmrEnabled,
                   logPerformance,
                   routeByFilePath,
-                  parallelRouteTransform,
+                  parallelRouteTransform: pluginOptions.parallelRouteTransform,
                 });
               }
 
@@ -1011,7 +1009,7 @@ export const pluginReactRouter = (
       routeChunkConfig,
       isBuild,
       splitRouteModules: Boolean(splitRouteModules),
-      useRouteModuleTransformApi,
+      useRouteModuleTransformApi: !useRouteModuleTransformLoader,
       ssr,
       isSpaMode,
       rootRoutePath,
