@@ -43,7 +43,9 @@ describe('route module transform rules', () => {
     expect(shouldUseRouteModuleTransformLoader(false)).toBe(false);
     expect(shouldUseRouteModuleTransformLoader(true)).toBe(true);
     expect(shouldUseRouteModuleTransformLoader(3)).toBe(true);
-    expect(shouldUseRouteModuleTransformLoader(0)).toBe(true);
+    expect(() => shouldUseRouteModuleTransformLoader(0)).toThrow(
+      '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
+    );
   });
 
   it('registers route module loader rules with loader options', () => {
@@ -78,6 +80,14 @@ describe('route module transform rules', () => {
 
   it('rejects invalid worker counts', () => {
     expect(() => createRuleConfig(0)).toThrow(
+      '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
+    );
+    expect(() =>
+      shouldUseRouteModuleTransformLoader('workers' as never)
+    ).toThrow(
+      '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
+    );
+    expect(() => shouldUseRouteModuleTransformLoader(null as never)).toThrow(
       '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
     );
   });

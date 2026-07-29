@@ -7,14 +7,15 @@ const routeModuleTransformLoaderPath = fileURLToPath(
   new URL('./route-module-transform-loader.js', import.meta.url)
 );
 
-export const shouldUseRouteModuleTransformLoader = (
-  parallelRouteTransform: PluginOptions['parallelRouteTransform']
-): boolean =>
-  parallelRouteTransform === true || typeof parallelRouteTransform === 'number';
-
 const getRouteModuleTransformParallel = (
   parallelRouteTransform: PluginOptions['parallelRouteTransform']
 ): Rspack.RuleSetLoaderWithOptions['parallel'] => {
+  if (
+    parallelRouteTransform === undefined ||
+    parallelRouteTransform === false
+  ) {
+    return undefined;
+  }
   if (parallelRouteTransform === true) {
     return true;
   }
@@ -29,8 +30,15 @@ const getRouteModuleTransformParallel = (
     }
     return { maxWorkers: parallelRouteTransform };
   }
-  return undefined;
+  throw new Error(
+    '[react-router] parallelRouteTransform must be true, false, or a positive integer.'
+  );
 };
+
+export const shouldUseRouteModuleTransformLoader = (
+  parallelRouteTransform: PluginOptions['parallelRouteTransform']
+): boolean =>
+  getRouteModuleTransformParallel(parallelRouteTransform) !== undefined;
 
 const createRouteModuleTransformUse = (
   options: RouteModuleTransformLoaderOptions,
