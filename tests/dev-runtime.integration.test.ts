@@ -192,6 +192,7 @@ const createDevRuntimeHarness = async (esm: boolean) => {
   let compiler: Rspack.MultiCompiler | undefined;
   let compileAttempts = 0;
   let completedCompiles = 0;
+  let latestWebAssets = new Set<string>();
   let cleaned = false;
 
   const closeBuiltInServer = async (): Promise<void> => {
@@ -243,6 +244,13 @@ const createDevRuntimeHarness = async (esm: boolean) => {
         });
         api.onAfterDevCompile(() => {
           completedCompiles += 1;
+        });
+        api.onAfterEnvironmentCompile(({ environment, stats }) => {
+          if (environment.name === 'web') {
+            latestWebAssets = new Set(
+              stats?.compilation.getAssets().map(asset => asset.name)
+            );
+          }
         });
         api.onAfterCreateCompiler(({ compiler: createdCompiler }) => {
           if (!('compilers' in createdCompiler)) {
@@ -380,6 +388,8 @@ const createDevRuntimeHarness = async (esm: boolean) => {
         loggerError.mock.calls.some(args =>
           args.some(arg => String(arg).includes(marker))
         ),
+      hasEmittedWebAsset: (relativePath: string) =>
+        latestWebAssets.has(relativePath),
       loadBuild,
       loadRawEntry,
       hasDiskOutput: (relativePath: string) =>
@@ -459,10 +469,11 @@ const expectFirstCommittedGeneration = async (
   expect(
     harness.hasDiskOutput('build/server/static/js/react-router-server-build.js')
   ).toBe(false);
+  const browserManifestAsset =
+    'static/js/virtual/react-router/browser-manifest.js';
+  expect(harness.hasEmittedWebAsset(browserManifestAsset)).toBe(true);
   expect(
-    harness.hasDiskOutput(
-      'build/client/static/js/virtual/react-router/browser-manifest.js'
-    )
+    harness.hasDiskOutput(`build/client/${browserManifestAsset}`)
   ).toBe(false);
   await expect(harness.requestDocument()).resolves.toContain('v1');
   await harness.startBuiltInServer();
