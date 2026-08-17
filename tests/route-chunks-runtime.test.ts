@@ -48,7 +48,8 @@ describe('route chunk runtime dependencies', () => {
     const main = getRouteChunkCode(code, 'main', undefined, routeId);
 
     expect(runExport(client, 'clientLoader')).toEqual({ value: 'client' });
-    expect(runExport(main, 'loader')).toEqual({ value: 'server' });
+    expect(main).not.toContain('export function loader');
+    expect(runExport(code, 'loader')).toEqual({ value: 'server' });
   });
 
   it.each([
@@ -102,6 +103,7 @@ describe('route chunk runtime dependencies', () => {
       record(helper());
       export const clientLoader: () => Data = () => helpers.run();
       export function loader(): Data { return 'server'; }
+      export default function Route() { return null; }
     `;
     const recorded: unknown[] = [];
     const globals = { record: (value: unknown) => recorded.push(value) };
@@ -110,7 +112,7 @@ describe('route chunk runtime dependencies', () => {
 
     expect(runExport(client, 'clientLoader', globals)).toBe('value');
     expect(recorded).toEqual(['value']);
-    expect(runExport(main, 'loader', globals)).toBe('server');
+    expect(runExport(main, 'default', globals)).toBeNull();
     expect(recorded).toEqual(['value']);
   });
 
@@ -123,6 +125,7 @@ describe('route chunk runtime dependencies', () => {
       record(sibling);
       export const clientLoader: () => Data = () => helper();
       export function loader(): Data { return 'server'; }
+      export default function Route() { return null; }
     `;
     const recorded: unknown[] = [];
     const globals = { record: (value: unknown) => recorded.push(value) };
@@ -131,7 +134,7 @@ describe('route chunk runtime dependencies', () => {
 
     expect(runExport(client, 'clientLoader', globals)).toBe('value');
     expect(recorded).toEqual(['side effect']);
-    expect(runExport(main, 'loader', globals)).toBe('server');
+    expect(runExport(main, 'default', globals)).toBeNull();
     expect(recorded).toEqual(['side effect']);
   });
 
@@ -286,7 +289,7 @@ describe('route chunk runtime dependencies', () => {
       )
     ).toBe('client');
     expect(
-      runExport(getRouteChunkCode(code, 'main', undefined, routeId), 'loader')
+      runExport(code, 'loader')
     ).toBe('server');
   });
 
@@ -306,7 +309,7 @@ describe('route chunk runtime dependencies', () => {
       )
     ).toBe('client');
     expect(
-      runExport(getRouteChunkCode(code, 'main', undefined, routeId), 'loader')
+      runExport(code, 'loader')
     ).toBe('server');
   });
 

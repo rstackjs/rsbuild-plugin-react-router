@@ -62,30 +62,17 @@ describe('manifest entrypoint imports', () => {
     expect(manifest.entry).toEqual({
       module: assetUrl('bundles/entry.client-a1.js'),
       imports: [
-        assetUrl('bundles/entry.client-a1.js'),
         assetUrl('bundles/entry-extra-b2.js'),
-        assetUrl('bundles/entry.client-a1.js'),
       ],
       css: [assetUrl('styles/shared-f6.css')],
     });
   });
 
   it('does not select a dependency as the module when its own JavaScript is absent', async () => {
-    const { manifest } = await generateEntryManifest(
-      {
-        assetsByChunkName: { 'entry.client': ['styles/entry.css'] },
-        entrypointFilesByName: {
-          'entry.client': ['bundles/runtime-d4.js'],
-        },
-      },
-      true
-    );
-
-    expect(manifest.entry).toEqual({
-      module: assetUrl('static/js/entry.client.js'),
-      imports: [assetUrl('bundles/runtime-d4.js')],
-      css: [assetUrl('styles/entry.css')],
-    });
+    await expect(generateEntryManifest(
+      { assetsByChunkName: { 'entry.client': ['styles/entry.css'] },
+        entrypointFilesByName: { 'entry.client': ['bundles/runtime-d4.js'] } }, true
+    )).rejects.toThrow('emitted no JavaScript asset');
   });
 
   it('does not preload its fallback module when compilation stats are unavailable', async () => {

@@ -417,7 +417,9 @@ const getExportDependencies = (
               if (typeof statement.source?.value === 'string') {
                 dependencies.importSources.add(statement.source.value);
               }
-              return;
+              // Ordinary imports are shareable; a directly exported import
+              // also owns setup statements such as `load.hydrate = true`.
+              if (symbol !== localSymbol) return;
             }
             const declarator =
               getCachedExportedVariableDeclaratorForNode(declaration);

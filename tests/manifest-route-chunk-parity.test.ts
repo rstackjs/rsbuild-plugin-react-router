@@ -128,7 +128,7 @@ const expectChunkParity = async (
     shouldSplit ? clientLoaderUrl : undefined
   );
   const mainExports = await getExportNames(artifacts.main, artifacts.routeFile);
-  expect(mainExports).toContain('loader');
+  expect(mainExports.includes('loader')).toBe(!shouldSplit);
   expect(mainExports.includes('clientLoader')).toBe(!shouldSplit);
 };
 
@@ -172,7 +172,7 @@ describe('manifest and route-chunk parity', () => {
           await callExport(evaluateModule(artifacts.named), 'clientLoader')
         ).toEqual({ value: 'client' });
         expect(
-          await callExport(evaluateModule(artifacts.main), 'loader')
+          await callExport(evaluateModule(code), 'loader')
         ).toEqual({
           value: 'server',
         });

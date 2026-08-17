@@ -1,3 +1,5 @@
+import { BROWSER_MANIFEST_ENTRY_NAME } from './constants.js';
+import { getManifestAssetType, stripAssetQuery } from './manifest-assets.js';
 import { createHash } from 'node:crypto';
 import type { Route, PluginOptions } from './types.js';
 import type { RsbuildPluginAPI, Rspack } from '@rsbuild/core';
@@ -144,13 +146,15 @@ export function registerModifyBrowserManifestAssets(
 ): void {
   const getAssetPrefix =
     typeof assetPrefix === 'function' ? assetPrefix : () => assetPrefix;
-  const manifestChunkNames =
+  const manifestChunkNames = new Set(
     options?.manifestChunkNames ??
-    getReactRouterManifestChunkNames(
-      routes,
-      appDirectory,
-      routeChunkOptions?.splitRouteModules
-    );
+      getReactRouterManifestChunkNames(
+        routes,
+        appDirectory,
+        routeChunkOptions?.splitRouteModules
+      )
+  );
+  manifestChunkNames.add(BROWSER_MANIFEST_ENTRY_NAME);
   const isBuild = Boolean(routeChunkOptions?.isBuild);
   const finalizeSri = Boolean(
     isBuild &&
@@ -165,6 +169,7 @@ export function registerModifyBrowserManifestAssets(
     { assets, sources, compilation }: ManifestProcessAssetsContext,
     { withSri }: { withSri: boolean }
   ): Promise<void> => {
+    if (compilation.errors?.length) return;
     const currentAssetPrefix = getAssetPrefix();
     const stats = createReactRouterManifestStats(
       compilation,
@@ -185,8 +190,15 @@ export function registerModifyBrowserManifestAssets(
     const browserManifest = { ...manifest };
     delete browserManifest.sri;
 
-    const browserManifestAsset = assets[BROWSER_MANIFEST_ASSET];
-    if (browserManifestAsset) {
+    const browserManifestPaths = stats?.assetsByChunkName?.[
+      BROWSER_MANIFEST_ENTRY_NAME
+    ]?.filter(
+      name =>
+        getManifestAssetType(name, stats.assetTypesByName) === 'javascript'
+    ) ?? [BROWSER_MANIFEST_ASSET];
+    for (const browserManifestPath of browserManifestPaths) {
+      const browserManifestAsset = assets[browserManifestPath];
+      if (!browserManifestAsset) continue;
       const originalSource = browserManifestAsset.source().toString();
       const serializedManifest = jsesc(browserManifest, { es6: true });
       const newSource = originalSource.replace(
@@ -194,18 +206,22 @@ export function registerModifyBrowserManifestAssets(
         () => serializedManifest
       );
       compilation.updateAsset(
-        BROWSER_MANIFEST_ASSET,
+        browserManifestPath,
         new sources.RawSource(newSource)
       );
     }
 
     if (isBuild) {
       const entryAssets = stats?.assetsByChunkName?.['entry.client'];
-      const entryJsAssets = entryAssets?.filter(isManifestJsAsset) || [];
+      const entryJsAssets =
+        entryAssets?.filter(
+          name =>
+            getManifestAssetType(name, stats?.assetTypesByName) === 'javascript'
+        ) || [];
       const manifestPath = getReactRouterManifestPath({
         version: manifest.version,
         isBuild: true,
-        entryModulePath: entryJsAssets[0],
+        entryModulePath: stripAssetQuery(entryJsAssets[0] ?? ''),
       });
       const manifestSource = `window.__reactRouterManifest=${jsesc(
         browserManifest,
