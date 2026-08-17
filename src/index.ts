@@ -295,10 +295,12 @@ export const pluginReactRouter = (
       buildEnd,
     } = resolvedConfig;
 
-    await registerReactRouterTypegen(api, {
-      runtime: effectRuntime,
-      appDirectory,
-    });
+    if (pluginOptions.typegen !== false) {
+      await registerReactRouterTypegen(api, {
+        runtime: effectRuntime,
+        appDirectory,
+      });
+    }
 
     const hasExplicitServerOutput = Object.prototype.hasOwnProperty.call(
       options,

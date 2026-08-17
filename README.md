@@ -83,6 +83,7 @@ plugin only needs options for Rsbuild-specific behavior.
 
 ```ts
 pluginReactRouter({
+  typegen: true,
   customServer: false,
   lazyCompilation: true,
   unstableLazyCompilationPrewarm: false,
@@ -93,6 +94,7 @@ pluginReactRouter({
 
 | Option                           | Default     | Description                                                                                                                                                                                                                      |
 | -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typegen` | `true` | Generates React Router route types during development and builds. Set to `false` when type generation is managed separately. |
 | `customServer`                   | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
 | `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
 | `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
