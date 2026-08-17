@@ -196,12 +196,26 @@ describe('route chunk runtime dependencies', () => {
   });
 
   it.each([
-    ['function', 'export function helper(): Data { return "value"; }', 'helper()'],
-    ['class', 'export class Helper { value: Data = "value"; }', 'new Helper().value'],
+    [
+      'function',
+      'export function helper(): Data { return "value"; }',
+      'helper()',
+    ],
+    [
+      'class',
+      'export class Helper { value: Data = "value"; }',
+      'new Helper().value',
+    ],
     ['enum', 'export enum Value { Current = "value" }', 'Value.Current'],
-    ['namespace', 'export namespace Helpers { export const value: Data = "value"; }', 'Helpers.value'],
-  ])('does not split a shared exported %s binding', (_kind, declaration, value) => {
-    const code = `
+    [
+      'namespace',
+      'export namespace Helpers { export const value: Data = "value"; }',
+      'Helpers.value',
+    ],
+  ])(
+    'does not split a shared exported %s binding',
+    (_kind, declaration, value) => {
+      const code = `
       type Data = string;
       ${declaration}
       export const clientLoader: () => Data = () => ${value};
@@ -209,13 +223,17 @@ describe('route chunk runtime dependencies', () => {
       export default function Route() { return null; }
     `;
 
-    expect(detectRouteChunks(code, undefined, routeId).chunkedExports).toEqual(
-      []
-    );
-    expect(
-      runExport(getRouteChunkCode(code, 'main', undefined, routeId), 'clientLoader')
-    ).toBe('value');
-  });
+      expect(
+        detectRouteChunks(code, undefined, routeId).chunkedExports
+      ).toEqual([]);
+      expect(
+        runExport(
+          getRouteChunkCode(code, 'main', undefined, routeId),
+          'clientLoader'
+        )
+      ).toBe('value');
+    }
+  );
 
   it.each([
     'export default function Route(): Data { return clientLoader(); }',
@@ -247,7 +265,10 @@ describe('route chunk runtime dependencies', () => {
       []
     );
     expect(
-      runExport(getRouteChunkCode(code, 'main', undefined, routeId), 'clientLoader')
+      runExport(
+        getRouteChunkCode(code, 'main', undefined, routeId),
+        'clientLoader'
+      )
     ).toBe('value');
   });
 
