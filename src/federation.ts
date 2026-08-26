@@ -18,7 +18,10 @@ export const ensureFederationAsyncStartup = (
       continue;
     }
     const federationPlugin = plugin as ModuleFederationPluginLike;
-    if (federationPlugin.name !== 'ModuleFederationPlugin') {
+    if (
+      federationPlugin.name !== 'ModuleFederationPlugin' &&
+      federationPlugin.name !== 'RspackModuleFederationPlugin'
+    ) {
       continue;
     }
 

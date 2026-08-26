@@ -14,4 +14,19 @@ describe('federation helpers', () => {
 
     expect(moduleFederationPlugin.options.experiments.asyncStartup).toBe(true);
   });
+
+  it('enables async startup on enhanced Rspack federation plugins', () => {
+    const rspackModuleFederationPlugin = {
+      name: 'RspackModuleFederationPlugin',
+      _options: { experiments: { asyncStartup: false } },
+    };
+
+    ensureFederationAsyncStartup({
+      plugins: [rspackModuleFederationPlugin],
+    });
+
+    expect(
+      rspackModuleFederationPlugin._options.experiments.asyncStartup
+    ).toBe(true);
+  });
 });
