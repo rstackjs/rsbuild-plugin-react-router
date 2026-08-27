@@ -61,6 +61,9 @@ describe('RSC support helpers', () => {
       modules['virtual/react-router/unstable_rsc/allowed-action-origins']
     ).toBe('export default ["https://app.example.com"];');
     expect(
+      modules['virtual/react-router/unstable_rsc/client-version']
+    ).toBe('export default "development";');
+    expect(
       modules['virtual/react-router/unstable_rsc/server-manifest']
     ).toContain('__webpack_require__.rscM?.serverManifest');
   });
@@ -96,6 +99,26 @@ describe('RSC support helpers', () => {
         'virtual/react-router/unstable_rsc/route-discovery'
       ]
     ).toBe('export default {"mode":"initial"};');
+  });
+
+  it('derives the production RSC client version from the compilation hash', () => {
+    const modules = createReactRouterRscVirtualModules({
+      allowedActionOrigins: undefined,
+      appDirectory: '/repo/app',
+      basename: '/',
+      buildDirectory: '/repo/build',
+      isBuild: true,
+      jsDistPath: 'static/js',
+      outputClientPath: '/repo/build/client',
+      publicPath: '/',
+      routeDiscovery: { mode: 'initial' },
+      routes: {},
+      ssr: true,
+    });
+
+    expect(
+      modules['virtual/react-router/unstable_rsc/client-version']
+    ).toBe('export default __webpack_hash__;');
   });
 
   it('rejects config options RSC framework mode does not support', () => {

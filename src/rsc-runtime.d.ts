@@ -84,6 +84,11 @@ declare module 'virtual/react-router/unstable_rsc/allowed-action-origins' {
   export default allowedActionOrigins;
 }
 
+declare module 'virtual/react-router/unstable_rsc/client-version' {
+  const clientVersion: string;
+  export default clientVersion;
+}
+
 declare module 'virtual/react-router/unstable_rsc/react-router-serve-config' {
   const config: {
     assetsBuildDirectory: string;
@@ -117,6 +122,10 @@ declare module 'virtual:react-router/unstable_rsc/basename' {
 
 declare module 'virtual:react-router/unstable_rsc/allowed-action-origins' {
   export { default } from 'virtual/react-router/unstable_rsc/allowed-action-origins';
+}
+
+declare module 'virtual:react-router/unstable_rsc/client-version' {
+  export { default } from 'virtual/react-router/unstable_rsc/client-version';
 }
 
 declare module 'virtual:react-router/unstable_rsc/react-router-serve-config' {

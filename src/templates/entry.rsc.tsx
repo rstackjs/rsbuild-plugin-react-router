@@ -15,6 +15,7 @@ import routes from 'virtual/react-router/unstable_rsc/routes';
 import routeDiscovery from 'virtual/react-router/unstable_rsc/route-discovery';
 import basename from 'virtual/react-router/unstable_rsc/basename';
 import allowedActionOrigins from 'virtual/react-router/unstable_rsc/allowed-action-origins';
+import clientVersion from 'virtual/react-router/unstable_rsc/client-version';
 import unstable_reactRouterServeConfig from 'virtual/react-router/unstable_rsc/react-router-serve-config';
 import bootstrapScripts from 'virtual/react-router/unstable_rsc/bootstrap-scripts';
 import getServerManifest from 'virtual/react-router/unstable_rsc/server-manifest';
@@ -36,6 +37,9 @@ export function fetchServer(
   return matchRSCServerRequest({
     allowedActionOrigins,
     basename,
+    // @ts-expect-error Supported React Router 7.x types predate the 8.3 RSC
+    // client-version option; those runtimes safely ignore the extra field.
+    clientVersion,
     createTemporaryReferenceSet,
     decodeAction: body => decodeAction(body, getServerManifest()),
     decodeFormState: async (actionResult, body) =>

@@ -17,6 +17,7 @@ const RSC_VIRTUAL_ALIAS_IDS = [
   'inject-hmr-runtime',
   'basename',
   'allowed-action-origins',
+  'client-version',
   'react-router-serve-config',
   'bootstrap-scripts',
   'server-manifest',
@@ -92,6 +93,9 @@ export const createReactRouterRscVirtualModules = ({
     'virtual/react-router/unstable_rsc/basename': defaultExport(basename),
     'virtual/react-router/unstable_rsc/allowed-action-origins':
       defaultExport(allowedActionOrigins),
+    'virtual/react-router/unstable_rsc/client-version': isBuild
+      ? 'export default __webpack_hash__;'
+      : defaultExport('development'),
     'virtual/react-router/unstable_rsc/react-router-serve-config':
       defaultExport({
         assetsBuildDirectory: rscAssetsBuildDirectory,

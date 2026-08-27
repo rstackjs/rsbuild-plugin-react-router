@@ -7,5 +7,7 @@ The plugin now supports stable React Router 8 config fields, resolves
 prerender data requests for the installed React Router major version, supports
 React Router RSC mode, analyzes transformed MDX route modules for manifest
 generation, preserves Flight client references under production tree-shaking,
-restarts the development server reliably when route topology changes, and
-includes React Router 8/RSC examples plus framework integration coverage.
+supports React Router 8.3 stale-client detection, coalesces client and server
+RSC hot updates while keeping client-only state mounted, restarts the
+development server reliably when route topology changes, and includes React
+Router 8/RSC examples plus framework integration coverage.

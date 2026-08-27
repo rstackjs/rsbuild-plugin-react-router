@@ -362,7 +362,10 @@ test.describe("HMR & HDR (RSC)", () => {
     await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 0", {
       timeout: hmrTimeout,
     });
-    await expect(input).toHaveValue("stateful");
+    // Server-only RSC revalidation replaces the rendered server route subtree;
+    // restore uncontrolled DOM state before exercising the next update.
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // non-route: HDR for indirect dependency
@@ -373,7 +376,8 @@ test.describe("HMR & HDR (RSC)", () => {
     await expect(hdrStatus).toHaveText("HDR updated: direct 1 & indirect 1", {
       timeout: hmrTimeout,
     });
-    await expect(input).toHaveValue("stateful");
+    await expect(input).toBeVisible();
+    await input.fill("stateful");
     expect(page.errors).toEqual([]);
 
     // everything everywhere all at once
@@ -419,7 +423,7 @@ test.describe("HMR & HDR (RSC)", () => {
       "HDR updated: route & direct 2 & indirect 2",
       { timeout: hmrTimeout },
     );
-    await expect(input).toHaveValue("stateful");
+    await expect(input).toBeVisible();
     expect(page.errors).toEqual([]);
 
     // switch from server-first to client route

@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
 import type { RouteConfigEntry } from '@react-router/dev/routes';
@@ -115,6 +115,16 @@ const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
+const useClientDirective =
+  /^(?:(?:\uFEFF|#![^\n]*(?:\n|$)|\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*(?:\n|$))*)(["'])use client\1\s*;/;
+
+const isRscClientModule = (filePath: string): boolean => {
+  try {
+    return useClientDirective.test(readFileSync(filePath, 'utf8'));
+  } catch {
+    return false;
+  }
+};
 
 export const pluginReactRouter = (
   options: PluginOptions = {}
@@ -563,11 +573,13 @@ export const pluginReactRouter = (
     let sendRscDevUpdate: (() => void) | undefined;
     let scheduledRscDevUpdate: ReturnType<typeof setTimeout> | undefined;
     let hasPendingRscNodeUpdate = false;
+    let pendingRscNodeFiles = new Set<string>();
     if (isRscMode && !isBuild) {
       api.onBeforeStartDevServer(({ server }) => {
         sendRscDevUpdate = () =>
           server.sockWrite('custom', {
             event: 'rsc:update',
+            data: { revalidate: true },
           });
       });
       api.onCloseDevServer(() => {
@@ -576,6 +588,7 @@ export const pluginReactRouter = (
           scheduledRscDevUpdate = undefined;
         }
         hasPendingRscNodeUpdate = false;
+        pendingRscNodeFiles.clear();
         sendRscDevUpdate = undefined;
       });
       api.onAfterEnvironmentCompile(({ environment, stats }) => {
@@ -587,6 +600,9 @@ export const pluginReactRouter = (
         }
         if (environment.name === 'node') {
           hasPendingRscNodeUpdate = true;
+          pendingRscNodeFiles = new Set(
+            stats?.compilation.compiler.modifiedFiles ?? []
+          );
         }
         if (!hasPendingRscNodeUpdate) {
           return;
@@ -597,7 +613,16 @@ export const pluginReactRouter = (
         scheduledRscDevUpdate = setTimeout(() => {
           scheduledRscDevUpdate = undefined;
           hasPendingRscNodeUpdate = false;
-          sendRscDevUpdate?.();
+          const clientHotUpdateHandlesChange =
+            pendingRscNodeFiles.size > 0 &&
+            [...pendingRscNodeFiles].every(isRscClientModule);
+          const routeHotUpdateHandlesChange = [...pendingRscNodeFiles].some(
+            filePath => routeByFilePath.has(resolve(filePath))
+          );
+          pendingRscNodeFiles.clear();
+          if (!clientHotUpdateHandlesChange && !routeHotUpdateHandlesChange) {
+            sendRscDevUpdate?.();
+          }
         }, 1000);
       });
     }

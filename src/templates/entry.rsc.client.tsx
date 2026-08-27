@@ -4,7 +4,6 @@ import * as React from 'react';
 import { startTransition } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import type { DataRouter } from 'react-router';
-import * as rscReactRouterClientReferences from 'react-router/internal/react-server-client';
 import {
   unstable_createCallServer as createCallServer,
   unstable_getRSCStream as getRSCStream,
@@ -18,15 +17,17 @@ import {
   setServerCallback,
 } from 'react-server-dom-rspack/client.browser';
 
-// This client-reference boundary is addressed dynamically by export name in
-// the Flight manifest. Observe its namespace so production tree-shaking keeps
-// the boundary's explicit RSC-safe allowlist available to the decoder.
-if (
-  Object.values(rscReactRouterClientReferences).some(
-    reference => reference === undefined
-  )
-) {
-  throw new Error('React Router RSC client references are unavailable');
+if (process.env.NODE_ENV === 'production') {
+  // This client-reference boundary is addressed dynamically by export name in
+  // the Flight manifest. Observe its namespace so production tree-shaking
+  // keeps the explicit RSC-safe allowlist available to the decoder. Keeping
+  // this import out of the development graph preserves route component state
+  // across RSC hot updates.
+  void import('react-router/internal/react-server-client').then(references => {
+    if (Object.values(references).some(reference => reference === undefined)) {
+      throw new Error('React Router RSC client references are unavailable');
+    }
+  });
 }
 
 setServerCallback(
@@ -75,36 +76,38 @@ if (document.readyState === 'loading') {
   hydrate();
 }
 
-// The single `rsc:update` navigate handler for RSC dev HMR. This is the
-// hand-written mirror of the generated route-chunk snippet
-// (`RSC_HMR_NAVIGATE_SNIPPET` in `src/rsc-route-transforms.ts`); keep the two in
-// lockstep. The `inject-hmr-runtime` virtual module only self-accepts and no
-// longer registers a second, racing handler here.
+// The RSC plugin emits an unqualified update for server-component changes; in
+// that case navigate to refresh the route tree. The framework integration emits
+// `{ revalidate: true }` for server-only data dependency changes, which can
+// refresh loader data without remounting client or browser state.
 //
-// The dev server emits `rsc:update` with no payload; there is no `reload` flag
-// (full reloads travel through the HMR runtime's own `full-reload` message), so
-// this handler always navigates.
+// The RSC plugin's message has no payload; there is no `reload` flag (full
+// reloads travel through the HMR runtime's own `full-reload` message).
 const hot = (
   import.meta as unknown as {
     webpackHot?: {
-      on(event: string, handler: () => void): void;
+      on(
+        event: string,
+        handler: (data?: { revalidate?: boolean }) => void
+      ): void;
     };
   }
 ).webpackHot;
 
-hot?.on('rsc:update', () => {
+hot?.on('rsc:update', data => {
   requestAnimationFrame(() => {
     const router = (
       window as typeof window & { __reactRouterDataRouter?: DataRouter }
     ).__reactRouterDataRouter;
+    if (data?.revalidate) {
+      router?.revalidate();
+      return;
+    }
     if (router?.navigate) {
       const basename = router.basename || '/';
       let pathname = window.location.pathname;
       if (basename !== '/' && pathname.startsWith(basename)) {
         pathname = pathname.slice(basename.length) || '/';
-        // A trailing-slash basename (e.g. "/mybase/") consumes the leading
-        // slash, yielding a relative path that react-router resolves against
-        // the current location and doubles. Force it back to absolute.
         if (pathname[0] !== '/') pathname = '/' + pathname;
       }
       void router.navigate(

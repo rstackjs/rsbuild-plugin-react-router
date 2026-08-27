@@ -39,9 +39,7 @@ import type { Route } from './types.js';
 // Canonical client HMR navigate snippet for generated route chunks: read the
 // live data router, strip the configured basename from the current URL, and
 // perform a scroll-preserving `replace` navigation so a hot update re-renders
-// the route tree in place. The RSC client entry's runtime `rsc:update` handler
-// (`src/templates/entry.rsc.client.tsx`) is the hand-written mirror of this
-// shape; keep the two in lockstep.
+// the route tree in place.
 const RSC_HMR_NAVIGATE_SNIPPET = `const router = globalThis.__reactRouterDataRouter;
                 if (router?.navigate) {
                   const basename = router.basename || "/";
