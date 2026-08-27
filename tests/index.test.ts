@@ -445,7 +445,7 @@ describe('pluginReactRouter', () => {
     ).toBeUndefined();
   });
 
-  it('keeps production export optimization enabled for RSC builds', async () => {
+  it('preserves production export names for RSC builds', async () => {
     const rsbuild = await createStubRsbuild({
       action: 'build',
       rsbuildConfig: {},
@@ -455,8 +455,8 @@ describe('pluginReactRouter', () => {
     const config = await rsbuild.unwrapConfig();
 
     expect(config.environments.web.tools.rspack.optimization).toMatchObject({
-      mangleExports: 'size',
-      usedExports: 'global',
+      mangleExports: false,
+      usedExports: false,
     });
   });
 
