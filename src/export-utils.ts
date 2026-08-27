@@ -94,10 +94,7 @@ const parseProgram = (code: string, resourcePath?: string): ProgramNode => {
   return getProgram(normalizedResult);
 };
 
-const getExportInfoCacheKey = (
-  code: string,
-  resourcePath?: string
-): string => {
+const getExportInfoCacheKey = (code: string, resourcePath?: string): string => {
   const lang = resourcePath
     ? langFromPath(stripResourcePathQuery(resourcePath))
     : 'inline';

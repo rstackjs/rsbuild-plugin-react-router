@@ -166,11 +166,11 @@ describe('pluginReactRouter', () => {
         },
         {
           paths: expect.stringMatching(/app\/routes\.[cm]?[jt]sx?$/),
-          type: 'reload-page',
+          type: 'reload-server',
         },
         {
           paths: expect.stringMatching(
-            /\.react-router\/route-watch$/
+            /build\/client\/\.react-router\/route-watch$/
           ),
           type: 'reload-server',
         },
@@ -357,7 +357,7 @@ describe('pluginReactRouter', () => {
       expect.arrayContaining([
         {
           paths: expect.stringMatching(
-            /\.react-router\/route-watch$/
+            /build\/client\/\.react-router\/route-watch$/
           ),
           type: 'reload-server',
         },
@@ -392,6 +392,34 @@ describe('pluginReactRouter', () => {
     ).toBe(true);
   });
 
+  it('preserves user web splitChunks overrides', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {
+        environments: {
+          web: {
+            tools: {
+              rspack: {
+                optimization: {
+                  splitChunks: { chunks: 'all' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.splitChunks
+    ).toEqual({ chunks: 'all' });
+    expect(
+      config.environments?.web?.tools?.rspack?.optimization?.runtimeChunk
+    ).toBe('single');
+  });
+
   it('composes RSC bundler plumbing with the React Router environments', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
@@ -413,12 +441,27 @@ describe('pluginReactRouter', () => {
     expect(
       config.environments.web.tools.rspack.output.workerChunkLoading
     ).toBe('import-scripts');
-    expect(config.environments.web.tools.rspack.optimization.usedExports).toBe(
-      false
-    );
+    expect(
+      config.environments.web.tools.rspack.optimization.usedExports
+    ).toBeUndefined();
     expect(
       config.environments.web.tools.rspack.optimization.mangleExports
-    ).toBe(false);
+    ).toBeUndefined();
+  });
+
+  it('keeps production export optimization enabled for RSC builds', async () => {
+    const rsbuild = await createStubRsbuild({
+      action: 'build',
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.environments.web.tools.rspack.optimization).toMatchObject({
+      mangleExports: 'size',
+      usedExports: 'global',
+    });
   });
 
   it('installs the RSC dev request handler for SPA mode', async () => {

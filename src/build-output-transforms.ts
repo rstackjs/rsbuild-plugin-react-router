@@ -10,9 +10,11 @@ import {
   type RouteModuleAnalysisProvider,
   type ReactRouterManifestStats,
 } from './manifest.js';
-import type { RouteTransformExecutor } from './parallel-route-transforms.js';
 import type { ReactRouterPerformanceProfiler } from './performance.js';
-import { validateSpaModeRouteExports } from './route-transform-tasks.js';
+import {
+  validateSpaModeRouteExports,
+  type RouteTransformRunner,
+} from './route-transform-tasks.js';
 import { createBundlerRouteExportResolver } from './route-export-resolution.js';
 import {
   getRouteChunkNameFromModuleId,
@@ -88,11 +90,12 @@ type RegisterBuildOutputTransformsOptions = {
   getAssetPrefix: () => string;
   routeChunkOptions: RouteChunkManifestOptions | undefined;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
-  routeTransformExecutor: RouteTransformExecutor;
+  routeTransformRunner: RouteTransformRunner;
   routeByFilePath: Map<string, Route>;
   routeChunkConfig: RouteChunkConfig;
   isBuild: boolean;
   splitRouteModules: boolean;
+  useRouteModuleTransformApi: boolean;
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
@@ -117,11 +120,12 @@ export const registerBuildOutputTransforms = ({
   getAssetPrefix,
   routeChunkOptions,
   routeModuleAnalysis,
-  routeTransformExecutor,
+  routeTransformRunner,
   routeByFilePath,
   routeChunkConfig,
   isBuild,
   splitRouteModules,
+  useRouteModuleTransformApi,
   ssr,
   isSpaMode,
   rootRoutePath,
@@ -149,7 +153,7 @@ export const registerBuildOutputTransforms = ({
       'route:module',
       args.resource,
       async () =>
-        routeTransformExecutor.run({
+        routeTransformRunner({
           kind: 'routeModule',
           code: args.code,
           resource: args.resource,
@@ -241,7 +245,7 @@ export const registerBuildOutputTransforms = ({
         'route:client-entry',
         args.resource,
         async () =>
-          routeTransformExecutor.run({
+          routeTransformRunner({
             kind: 'routeClientEntry',
             code: args.code,
             resourcePath: args.resourcePath,
@@ -277,7 +281,7 @@ export const registerBuildOutputTransforms = ({
             });
           }
 
-          const routeChunkArtifact = await routeTransformExecutor.run({
+          const routeChunkArtifact = await routeTransformRunner({
             kind: 'routeChunk',
             code: args.code,
             resource: args.resource,
@@ -295,7 +299,7 @@ export const registerBuildOutputTransforms = ({
             return routeChunkArtifact;
           }
 
-          return routeTransformExecutor.run({
+          return routeTransformRunner({
             kind: 'routeModule',
             code: routeChunkArtifact.code,
             resource: args.resource,
@@ -330,7 +334,7 @@ export const registerBuildOutputTransforms = ({
           'route:split-exports',
           args.resource,
           async () =>
-            routeTransformExecutor.run({
+            routeTransformRunner({
               kind: 'splitRouteExports',
               code: args.code,
               resourcePath: args.resourcePath,
@@ -371,7 +375,7 @@ export const registerBuildOutputTransforms = ({
         'module:client-only-stub',
         args.resource,
         async () => {
-          return routeTransformExecutor.run({
+          return routeTransformRunner({
             kind: 'clientOnlyStub',
             code: args.code,
             resourcePath: args.resourcePath,
@@ -384,27 +388,29 @@ export const registerBuildOutputTransforms = ({
       )
   );
 
-  api.transform(
-    {
-      resourceQuery: /\?react-router-route/,
-      order: 'post',
-    },
-    transformRouteModule
-  );
-
-  api.transform(
-    {
-      test: path => routeByFilePath.has(path),
-      resourceQuery: {
-        not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+  if (useRouteModuleTransformApi) {
+    api.transform(
+      {
+        resourceQuery: /\?react-router-route/,
+        order: 'post',
       },
-      // Invariant with the route-chunk= handler above: when split-chunk
-      // production builds transform web modules on the main chunk, this
-      // registration must stay scoped to ['node'] so web modules are not
-      // transformed twice.
-      environments: isBuild && splitRouteModules ? ['node'] : undefined,
-      order: 'post',
-    },
-    transformRouteModule
-  );
+      transformRouteModule
+    );
+
+    api.transform(
+      {
+        test: path => routeByFilePath.has(path),
+        resourceQuery: {
+          not: /__react-router-build-client-route|react-router-route|route-chunk=/,
+        },
+        // Invariant with the route-chunk= handler above: when split-chunk
+        // production builds transform web modules on the main chunk, this
+        // registration must stay scoped to ['node'] so web modules are not
+        // transformed twice.
+        environments: isBuild && splitRouteModules ? ['node'] : undefined,
+        order: 'post',
+      },
+      transformRouteModule
+    );
+  }
 };

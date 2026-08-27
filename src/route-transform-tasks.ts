@@ -24,7 +24,7 @@ import {
   type RouteChunkCache,
   type RouteChunkConfig,
 } from './route-chunks.js';
-import { getProgram } from './route-ast.js';
+import { getProgram, type AnyNode } from './route-ast.js';
 
 export type RouteTransformResult = {
   code: string;
@@ -84,6 +84,10 @@ export type RouteTransformTask =
 export type RouteTransformTaskOptions = {
   routeChunkCache?: RouteChunkCache;
 };
+
+export type RouteTransformRunner = (
+  task: RouteTransformTask
+) => Promise<RouteTransformResult>;
 
 const defaultRouteChunkCache: RouteChunkCache = new Map();
 
@@ -156,14 +160,6 @@ const createClientOnlyStub = async (
 
 const isComponentishName = (name: string): boolean => /^[A-Z]/.test(name);
 
-type AnyNode = {
-  type?: string;
-  name?: string;
-  body?: { type?: string };
-  callee?: { type?: string; name?: string };
-  arguments?: Array<AnyNode>;
-};
-
 /**
  * Whether an expression that appears as the first argument of a wrapping call
  * resolves to a component, mirroring react-refresh/babel's
@@ -231,14 +227,7 @@ const initResolvesToComponent = (init: AnyNode): boolean => {
 };
 
 const collectDeclaredComponentNames = (
-  declaration: {
-    type?: string;
-    id?: { name?: string };
-    declarations?: Array<{
-      id?: { type?: string; name?: string };
-      init?: AnyNode;
-    }>;
-  },
+  declaration: AnyNode,
   names: Set<string>
 ): void => {
   if (
@@ -281,15 +270,7 @@ const collectDeclaredComponentNames = (
  * subtree instead of updating it in place.
  */
 const collectUnregisteredComponentNames = (program: {
-  body?: Array<{
-    type?: string;
-    declaration?: Parameters<typeof collectDeclaredComponentNames>[0];
-    expression?: {
-      type?: string;
-      callee?: { type?: string; name?: string };
-      arguments?: Array<{ type?: string; value?: unknown }>;
-    };
-  }>;
+  body?: AnyNode[];
 }): string[] => {
   const declared = new Set<string>();
   const registered = new Set<string>();
@@ -310,10 +291,7 @@ const collectUnregisteredComponentNames = (program: {
       }
       continue;
     }
-    collectDeclaredComponentNames(
-      statement as Parameters<typeof collectDeclaredComponentNames>[0],
-      declared
-    );
+    collectDeclaredComponentNames(statement, declared);
   }
   return [...declared].filter(name => !registered.has(name));
 };

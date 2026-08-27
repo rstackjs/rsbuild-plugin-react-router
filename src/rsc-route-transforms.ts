@@ -118,7 +118,7 @@ const removeSideEffectStyleImports = (program: ProgramNode): void => {
   // (e.g. a `?url` asset import used by `links()`) must survive, as must
   // non-style side-effect imports.
   program.body = program.body.filter(
-    (statement: AnyNode) => !isSideEffectStyleImport(statement),
+    (statement: AnyNode) => !isSideEffectStyleImport(statement)
   );
 };
 
@@ -681,7 +681,9 @@ const createServerRouteEntry = async (
           plan.clientTargetFor('default')
         )};`
       );
-      lines.push('export default function RscClientRouteWithStyles___(props) {');
+      lines.push(
+        'export default function RscClientRouteWithStyles___(props) {'
+      );
       lines.push('  return React.createElement(React.Fragment, null,');
       lines.push(
         `    ...(${RSC_ROUTE_STYLE_ENTRY_EXPORT}.entryCssFiles ?? []).map(href =>`

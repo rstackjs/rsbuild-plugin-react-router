@@ -43,6 +43,14 @@ import {
   registerSsrAssetRelocation,
 } from './build-output-transforms.js';
 import { type RouteChunkCache } from './route-chunks.js';
+import {
+  registerRouteModuleTransformRules,
+  shouldUseRouteModuleTransformLoader,
+} from './route-module-transform-rules.js';
+import {
+  executeRouteTransformTask,
+  type RouteTransformRunner,
+} from './route-transform-tasks.js';
 import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
@@ -422,6 +430,11 @@ export const pluginReactRouter = (
     const isSpaMode = !ssr && !isPrerenderEnabled;
     const routeCount = Object.keys(routes).length;
     const routeChunkCache: RouteChunkCache = new Map();
+    const useRouteModuleTransformLoader =
+      !isRscMode &&
+      shouldUseRouteModuleTransformLoader(pluginOptions.parallelRouteTransform);
+    const routeTransformRunner: RouteTransformRunner = task =>
+      executeRouteTransformTask(task, { routeChunkCache });
     const transformedRouteModuleAnalyses = new Map<
       string,
       RouteModuleAnalysis
@@ -437,7 +450,7 @@ export const pluginReactRouter = (
     const outputClientPath = resolve(buildDirectory, 'client');
     const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
     const watchDirectory = resolve(appDirectory);
-    const routeRestartMarkerPath = getRouteRestartMarkerPath(appDirectory);
+    const routeRestartMarkerPath = getRouteRestartMarkerPath(outputClientPath);
     const routeWatchFiles = createReactRouterRouteWatchFiles({
       configWatchPaths,
       routeConfigWatchPaths,
@@ -526,10 +539,8 @@ export const pluginReactRouter = (
           finalEntryClientPath,
           future,
           hasServerApp,
-          parallelRouteTransform: pluginOptions.parallelRouteTransform,
           reactRouterConfig: resolvedConfigWithRoutes,
           routeChunkCache,
-          routeCount,
           serverAppPath,
           shouldDependOnWebCompiler,
           devHmr:
@@ -595,10 +606,6 @@ export const pluginReactRouter = (
       api,
       isBuild,
       lazyCompilationPrewarm: pluginOptions.unstableLazyCompilationPrewarm,
-      routeTransformExecutor:
-        modePlan.kind === 'classic'
-          ? modePlan.routeTransformExecutor
-          : undefined,
       routeRestartMarkerPath,
       watchDirectory,
       getRouteTopology: routeTopology.getRouteTopology,
@@ -969,6 +976,43 @@ export const pluginReactRouter = (
       resolvedServerOutput,
     });
 
+    if (modePlan.kind === 'classic' && useRouteModuleTransformLoader) {
+      api.modifyEnvironmentConfig(
+        async (config, { name, mergeEnvironmentConfig }) => {
+          if (name !== 'web' && name !== 'node') {
+            return config;
+          }
+
+          return mergeEnvironmentConfig(config, {
+            tools: {
+              rspack: rspackConfig => {
+                const environmentDevHmrEnabled =
+                  name === 'web' &&
+                  !isBuild &&
+                  devHmrRefreshRuntimePath !== undefined &&
+                  config.mode === 'development' &&
+                  config.dev?.hmr !== false &&
+                  isRspackSwcReactRefreshEnabled(rspackConfig);
+
+                registerRouteModuleTransformRules(rspackConfig, {
+                  environmentName: name,
+                  ssr,
+                  isBuild,
+                  isSpaMode,
+                  rootRoutePath,
+                  devHmr: environmentDevHmrEnabled,
+                  logPerformance,
+                  routeByFilePath,
+                  parallelRouteTransform: pluginOptions.parallelRouteTransform,
+                });
+                return rspackConfig;
+              },
+            },
+          });
+        }
+      );
+    }
+
     if (modePlan.kind === 'rsc') {
       registerReactRouterRscRouteTransforms({
         api,
@@ -1025,11 +1069,12 @@ export const pluginReactRouter = (
         getAssetPrefix: () => assetPrefix,
         routeChunkOptions: modePlan.routeChunkOptions,
         routeModuleAnalysis,
-        routeTransformExecutor: modePlan.routeTransformExecutor,
+        routeTransformRunner,
         routeByFilePath,
         routeChunkConfig: modePlan.routeChunkConfig,
         isBuild,
         splitRouteModules: Boolean(modePlan.routeChunkConfig.splitRouteModules),
+        useRouteModuleTransformApi: !useRouteModuleTransformLoader,
         ssr,
         isSpaMode,
         rootRoutePath,

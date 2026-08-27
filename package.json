@@ -1,6 +1,6 @@
 {
   "name": "rsbuild-plugin-react-router",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "React Router plugin for Rsbuild",
   "repository": {
     "type": "git",
@@ -62,14 +62,9 @@
   },
   "scripts": {
     "build": "rslib build",
-    "bench": "node scripts/bench-builds.mts",
-    "bench:ci-report": "node scripts/report-benchmark-ci.mts",
-    "bench:compare": "node scripts/compare-benchmarks.mts",
-    "bench:smoke": "node scripts/bench-builds.mts --profile smoke --iterations 1 --warmup 0 --format both --out .benchmark/results/smoke",
-    "bench:baseline": "node scripts/bench-builds.mts --profile default --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/baseline",
-    "bench:full": "node scripts/bench-builds.mts --profile full --iterations 5 --warmup 1 --clean build --format both --out .benchmark/results/full",
-    "bench:large": "node scripts/bench-builds.mts --profile large --iterations 1 --warmup 0 --clean cold --format both --out .benchmark/results/large",
-    "bench:synthetic-app": "node scripts/bench-synthetic-app.mjs",
+    "bench": "pnpm build && node benchmarks/run.mts",
+    "bench:smoke": "pnpm build && node benchmarks/run.mts --iterations 1 --warmup 0",
+    "bench:codspeed": "pnpm build && vitest bench --run --config vitest.benchmark.config.mts",
     "e2e": "pnpm build && pnpm e2e:no-build",
     "e2e:no-build": "pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only,react-router-8,rsc-mode}' test:e2e",
     "dev": "rslib build --watch",
@@ -93,6 +88,7 @@
     "release:local": "pnpm build && changeset version && changeset publish && git add . && git commit -m \"chore: version packages\" && git push && git push --tags"
   },
   "dependencies": {
+    "@jridgewell/remapping": "^2.3.5",
     "@react-router/node": "^7.13.0 || ^8.0.0",
     "@remix-run/node-fetch-server": "^0.13.3",
     "@rspack/plugin-react-refresh": "^2.0.2",
@@ -109,6 +105,8 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
+    "@codspeed/vitest-plugin": "^5.7.1",
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@playwright/test": "^1.61.1",
     "@react-router/dev": "^8.0.1",
     "@react-router/express": "^8.0.1",
@@ -116,17 +114,17 @@
     "@react-router/remix-routes-option-adapter": "^8.0.1",
     "@react-router/serve": "^8.0.1",
     "@rsbuild/config": "workspace:*",
-    "@rsbuild/core": "2.1.0",
+    "@rsbuild/core": "2.1.5",
     "@rsbuild/plugin-less": "1.6.4",
     "@rsbuild/plugin-mdx": "^1.1.3",
     "@rsbuild/plugin-react": "2.1.0",
     "@rsbuild/plugin-sass": "1.5.3",
     "@rsbuild/plugin-svgr": "2.0.4",
     "@rsbuild/plugin-tailwindcss": "2.0.3",
-    "@rslib/core": "^0.22.1",
-    "@rspack/core": "2.1.0",
-    "@rstest/core": "^0.8.1",
-    "@rstest/coverage-istanbul": "^0.2.0",
+    "@rslib/core": "^0.23.2",
+    "@rspack/core": "2.1.3",
+    "@rstest/core": "^0.11.0",
+    "@rstest/coverage-istanbul": "^0.11.0",
     "@swc/helpers": "^0.5.23",
     "@types/fs-extra": "11.0.4",
     "@types/jsesc": "^3.0.3",
@@ -160,6 +158,7 @@
     "tailwindcss": "4.3.2",
     "type-fest": "^5.7.0",
     "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
     "wait-on": "^9.0.10"
   },
   "peerDependencies": {

@@ -77,16 +77,16 @@ pluginReactRouter({
 });
 ```
 
-| Option                           | Default     | Description                                                                                                                                                                                                                                                                                                                                          |
-| -------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `customServer`                   | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                                                                                                                                    |
-| `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.                                                                                                                               |
-| `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies.                                                                                                                     |
-| `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted Rspack lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                                                                                                                                            |
-| `logPerformance`                 | `false`     | Logs structured React Router plugin timing information through the Rsbuild logger.                                                                                                                                                                                                                                                                   |
-| `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` auto-enables workers for 256+ routes, `true` forces the default worker count (in dev this is 0 on machines with 4 or fewer cores, where workers cost more than they save; production builds always use workers), a positive integer sets the worker count, and `false` keeps transforms inline. |
-| `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                                                                                                                                            |
-| `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                                                                                                                                     |
+| Option                           | Default     | Description                                                                                                                                                                                                                      |
+| -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `customServer`                   | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
+| `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
+| `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
+| `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted Rspack lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                        |
+| `logPerformance`                 | `false`     | Logs structured React Router plugin timing information.                                                                                                                                                                          |
+| `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses Rspack's default worker count, and a positive integer sets the maximum worker count.                                        |
+| `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
+| `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
 
 When `federation` is enabled, configure the Module Federation plugin with
 `experiments.asyncStartup: true`. The dev server resolves async server build
@@ -656,35 +656,17 @@ The plugin automatically:
 
 ### Benchmarking
 
-`pnpm bench:large` runs this repository's generated stress fixture for quick
-regression checks. `pnpm bench:synthetic-app` runs the embedded complex Rsbuild
-app under `benchmarks/synthetic-web-bundler-benchmark`, which adds heavier
-loader and transform contention for benchmark coverage closer to a large
-real-world application.
+Run the focused local suite for plugin regression checks:
 
 ```bash
-pnpm bench:large
-pnpm bench:synthetic-app -- --profile all --runs 2
+pnpm bench
+pnpm bench:smoke
+pnpm bench:codspeed
 ```
 
-The PR benchmark workflow reports production build, dev route-load, HMR/update,
-and embedded synthetic app timings in the same benchmark comment. It measures
-the PR and its base on the same runner instead of reusing cached timing data,
-counterbalances which side runs first, and excludes one warmup iteration. Small
-fixtures use five measured iterations; expensive large fixtures use three.
-
-Every raw median delta remains visible. The comment also reports each side's
-relative median absolute deviation (rMAD), a conservative noise band, and a
-signal label:
-
-- `regression` or `improvement` means the median delta exceeds the observed
-  run-to-run noise band.
-- `inconclusive` means the raw delta is not clearly separated from that noise.
-- `insufficient data` means either side has fewer than three finite samples.
-
-The labels are triage aids, not pass/fail gates. Use the uploaded diagnostics
-and raw per-run samples to investigate important changes, and rerun an
-inconclusive comparison before treating it as a performance result.
+See the [benchmark guide](./benchmarks/README.md) for JSON output, pull-request
+comparisons and comments, `BENCHMARK_PLUGIN_ROOT`, and optional CodSpeed
+publication.
 
 ## React Router Framework Mode
 

@@ -38,8 +38,9 @@ export function fetchServer(
     basename,
     createTemporaryReferenceSet,
     decodeAction: body => decodeAction(body, getServerManifest()),
-    decodeFormState: (actionResult, body) =>
-      decodeFormState(actionResult, body, getServerManifest()),
+    decodeFormState: async (actionResult, body) =>
+      (await decodeFormState(actionResult, body, getServerManifest())) ??
+      undefined,
     decodeReply,
     loadServerAction: (id: string) => Promise.resolve(loadServerActionSync(id)),
     request,

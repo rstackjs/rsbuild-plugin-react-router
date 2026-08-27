@@ -23,7 +23,8 @@ const createTransformHarness = () => {
 };
 
 const createBaseOptions = (
-  transforms: ReturnType<typeof createTransformHarness>
+  transforms: ReturnType<typeof createTransformHarness>,
+  useRouteModuleTransformApi = true
 ) => {
   const appDirectory = resolve('/project/app');
   const routePath = resolve(appDirectory, 'routes/page.tsx');
@@ -45,10 +46,9 @@ const createBaseOptions = (
     appDirectory,
     getAssetPrefix: () => '/',
     routeChunkOptions: { isBuild: true },
-    routeTransformExecutor: {
-      run: rstest.fn(async task => ({ code: `${task.kind}:${task.code}` })),
-      close: rstest.fn(async () => undefined),
-    },
+    routeTransformRunner: rstest.fn(async task => ({
+      code: `${task.kind}:${task.code}`,
+    })),
     routeByFilePath: new Map([[routePath, { id: 'page' }]]),
     routeChunkConfig: {
       splitRouteModules: true,
@@ -57,6 +57,7 @@ const createBaseOptions = (
     },
     isBuild: true,
     splitRouteModules: true,
+    useRouteModuleTransformApi,
     ssr: true,
     isSpaMode: false,
     rootRoutePath: resolve(appDirectory, 'root.tsx'),
@@ -81,6 +82,24 @@ const createTransformArgs = (
   }) as never;
 
 describe('build output transforms', () => {
+  it('does not register route-module API transforms when the loader is enabled', () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness, false);
+
+    registerBuildOutputTransforms(options);
+
+    expect(
+      harness.transforms.find(
+        transform =>
+          String(transform.descriptor.resourceQuery) ===
+          String(/\?react-router-route/)
+      )
+    ).toBeUndefined();
+    expect(options.routeTransformRunner).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'routeModule' })
+    );
+  });
+
   it('registers post-order route-module transforms for explicit and queryless route modules', async () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);
@@ -124,7 +143,7 @@ describe('build output transforms', () => {
       createTransformArgs(options.routePath)
     );
 
-    const run = options.routeTransformExecutor.run;
+    const run = options.routeTransformRunner;
     expect(run).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'routeModule' })
     );
@@ -190,11 +209,11 @@ describe('build output transforms', () => {
     enabled = true;
     await routeModuleTransform!.handler(createTransformArgs(options.routePath));
 
-    expect(options.routeTransformExecutor.run).toHaveBeenNthCalledWith(
+    expect(options.routeTransformRunner).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ devHmr: false })
     );
-    expect(options.routeTransformExecutor.run).toHaveBeenNthCalledWith(
+    expect(options.routeTransformRunner).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ devHmr: true })
     );
@@ -246,7 +265,7 @@ describe('build output transforms', () => {
       createTransformArgs(options.routePath, '?route-chunk=main')
     );
 
-    const run = options.routeTransformExecutor.run;
+    const run = options.routeTransformRunner;
     expect(run).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ kind: 'routeChunk' })

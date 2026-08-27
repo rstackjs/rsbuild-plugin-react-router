@@ -54,8 +54,14 @@ export const roundMs = (value: number): number => Math.round(value * 10) / 10;
 export type ReactRouterPerformanceReport = {
   environment: string;
   compilerLifecycleMs?: number;
+  partial?: boolean;
+  workerId?: string;
   operations: Record<string, OperationTiming>;
 };
+
+export const formatReactRouterPerformanceReport = (
+  report: ReactRouterPerformanceReport
+): string => `[react-router:performance] ${JSON.stringify(report)}`;
 
 export type ReactRouterPerformanceProfiler = {
   record<T>(
@@ -72,7 +78,10 @@ export type ReactRouterPerformanceProfiler = {
   ): T;
   flush(
     environment: string | undefined,
-    details?: Pick<ReactRouterPerformanceReport, 'compilerLifecycleMs'>
+    details?: Pick<
+      ReactRouterPerformanceReport,
+      'compilerLifecycleMs' | 'partial' | 'workerId'
+    >
   ): void;
 };
 
@@ -247,7 +256,7 @@ export const createReactRouterPerformanceProfiler = ({
         ...details,
         operations,
       };
-      log(`[react-router:performance] ${JSON.stringify(report)}`);
+      log(formatReactRouterPerformanceReport(report));
       timingsByEnvironment.delete(resolvedEnvironment);
     },
   };
