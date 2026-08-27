@@ -98,7 +98,10 @@ export const createReactRouterRouteWatchFiles = ({
     watchFiles.push(
       {
         paths: routeConfigWatchPaths,
-        type: 'reload-server',
+        // Keep the current compiler alive while a route config is temporarily
+        // invalid. The topology watcher touches the dedicated restart marker
+        // once a valid edit actually changes the route graph.
+        type: 'reload-page',
       },
       {
         paths: routeRestartMarkerPath,

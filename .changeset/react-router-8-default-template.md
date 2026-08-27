@@ -13,4 +13,5 @@ RSC hot updates while keeping client-only state mounted without revalidating
 ordinary lazy compilations, restarts the development server reliably when
 route topology changes, and includes React Router 8/RSC examples plus framework
 integration coverage. Route watcher startup no longer interrupts early
-development hot updates with a server restart.
+development hot updates with a server restart, and temporarily invalid route
+configs no longer tear down the active HMR compiler.
