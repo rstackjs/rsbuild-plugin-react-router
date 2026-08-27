@@ -1,10 +1,7 @@
-// Internal module: exposes the Effect-based ServerBuild resolution used by
-// dev-runtime code. Not re-exported from the package entry so the public
-// declaration graph stays free of `effect` types; external callers go through
-// the Promise wrappers in server-utils.ts.
-import * as Effect from 'effect/Effect';
+// Internal module: exposes ServerBuild resolution used by dev-runtime code.
+// External callers go through the Promise wrappers in server-utils.ts.
 import type { ServerBuild } from 'react-router';
-import { tryPluginPromise, tryPluginSync } from './effect-runtime.js';
+import { normalizeEffectError } from './effect-runtime.js';
 
 const RESOLVABLE_BUILD_EXPORTS = new Set([
   'allowedActionOrigins',
@@ -40,31 +37,25 @@ function isRouteDiscovery(value: unknown): boolean {
   );
 }
 
-function resolveBuildExportsEffect(
+async function resolveBuildExports(
   build: Record<string, unknown>
-): Effect.Effect<Record<string, unknown>, Error, never> {
+): Promise<Record<string, unknown>> {
   const resolved = { ...build };
-  return Effect.forEach(
-    Object.keys(build),
-    key =>
-      Effect.gen(function* () {
-        if (!RESOLVABLE_BUILD_EXPORTS.has(key)) {
-          return;
-        }
-        const value = build[key];
-        if (typeof value === 'function' && value.length === 0) {
-          const result = yield* tryPluginSync(() => value());
-          resolved[key] = isPromiseLike(result)
-            ? yield* tryPluginPromise(() => result)
-            : result;
-          return;
-        }
-        if (isPromiseLike(value)) {
-          resolved[key] = yield* tryPluginPromise(() => value);
-        }
-      }),
-    { discard: true }
-  ).pipe(Effect.as(resolved));
+  for (const key of Object.keys(build)) {
+    if (!RESOLVABLE_BUILD_EXPORTS.has(key)) {
+      continue;
+    }
+    const value = build[key];
+    if (typeof value === 'function' && value.length === 0) {
+      const result = value();
+      resolved[key] = isPromiseLike(result) ? await result : result;
+      continue;
+    }
+    if (isPromiseLike(value)) {
+      resolved[key] = await value;
+    }
+  }
+  return resolved;
 }
 
 function isServerBuild(value: unknown): value is ServerBuild {
@@ -86,26 +77,25 @@ function isServerBuild(value: unknown): value is ServerBuild {
   );
 }
 
-function resolveServerBuildCandidateEffect(
+async function resolveServerBuildCandidate(
   candidate: unknown
-): Effect.Effect<ServerBuild | undefined, Error, never> {
+): Promise<ServerBuild | undefined> {
   if (!isRecord(candidate)) {
-    return Effect.succeed(undefined);
+    return undefined;
   }
-  return resolveBuildExportsEffect(candidate).pipe(
-    Effect.map(resolved => (isServerBuild(resolved) ? resolved : undefined))
-  );
+  const resolved = await resolveBuildExports(candidate);
+  return isServerBuild(resolved) ? resolved : undefined;
 }
 
-export function resolveServerBuildModuleEffect(
+export async function resolveServerBuildModule(
   buildModule: unknown,
   source: string
-): Effect.Effect<ServerBuild, Error, never> {
-  return Effect.gen(function* () {
+): Promise<ServerBuild> {
+  try {
     const moduleValue = isPromiseLike(buildModule)
-      ? yield* tryPluginPromise(() => buildModule)
+      ? await buildModule
       : buildModule;
-    const candidates = [() => moduleValue];
+    const candidates: Array<() => unknown> = [() => moduleValue];
     if (isRecord(moduleValue)) {
       if ('default' in moduleValue) {
         candidates.push(() => moduleValue.default);
@@ -116,16 +106,16 @@ export function resolveServerBuildModuleEffect(
     }
 
     for (const getCandidate of candidates) {
-      const candidate = yield* tryPluginPromise(() => getCandidate());
-      const serverBuild = yield* resolveServerBuildCandidateEffect(candidate);
+      const candidate = await getCandidate();
+      const serverBuild = await resolveServerBuildCandidate(candidate);
       if (serverBuild) {
         return serverBuild;
       }
     }
-    return yield* Effect.fail(
-      new Error(
-        `[rsbuild-plugin-react-router] ${source} did not contain a valid React Router ServerBuild.`
-      )
+    throw new Error(
+      `[rsbuild-plugin-react-router] ${source} did not contain a valid React Router ServerBuild.`
     );
-  });
+  } catch (cause) {
+    throw normalizeEffectError(cause);
+  }
 }

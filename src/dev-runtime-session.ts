@@ -1,13 +1,8 @@
 import type { RsbuildDevServer } from '@rsbuild/core';
-import * as Effect from 'effect/Effect';
 import { PLUGIN_NAME } from './constants.js';
 import type { ReactRouterDevRuntime } from './dev-generation.js';
 import type { DevCompilerPair } from './dev-runtime-compilation.js';
-import {
-  runPluginEffect,
-  tryPluginPromise,
-  tryPluginSync,
-} from './effect-runtime.js';
+import { normalizeEffectError } from './effect-runtime.js';
 
 export type RuntimeBinding = {
   id: number;
@@ -115,18 +110,19 @@ export const createDevRuntimeSessionManager = (
       if (observation.promise) {
         return observation.promise;
       }
-      observation.promise = runPluginEffect(
-        tryPluginPromise(close).pipe(
-          Effect.tap(() =>
-            tryPluginSync(() => applyCloseOutcome(observation, { ok: true }))
-          ),
-          Effect.catchAll(cause =>
-            tryPluginSync(() =>
-              applyCloseOutcome(observation, { ok: false, cause })
-            ).pipe(Effect.zipRight(Effect.fail(cause)))
-          )
-        )
-      );
+      let closePromise: Promise<void>;
+      try {
+        closePromise = Promise.resolve(close());
+      } catch (cause) {
+        closePromise = Promise.reject(normalizeEffectError(cause));
+      }
+      observation.promise = closePromise
+        .then(() => applyCloseOutcome(observation, { ok: true }))
+        .catch(cause => {
+          const error = normalizeEffectError(cause);
+          applyCloseOutcome(observation, { ok: false, cause: error });
+          throw error;
+        });
       return observation.promise;
     };
     closeObservationByServer.set(server, observation);

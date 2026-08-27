@@ -104,17 +104,6 @@ describe('resolveReactRouterServerBuild', () => {
     ).resolves.toMatchObject({ assets: { version: 'async' } });
   });
 
-  it('resolves server builds through the Effect path', async () => {
-    const build = createBuild('effect');
-
-    await expect(
-      resolveReactRouterServerBuild({
-        ...build,
-        assets: async () => build.assets,
-      })
-    ).resolves.toMatchObject({ assets: { version: 'effect' } });
-  });
-
   it('rejects modules without a React Router server build', async () => {
     await expect(
       resolveReactRouterServerBuild({ default: { routes: {} } })

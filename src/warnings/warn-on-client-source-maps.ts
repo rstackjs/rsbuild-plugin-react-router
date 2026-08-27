@@ -13,10 +13,8 @@ export function isSourceMapEnabled(value: unknown): boolean {
   // Rsbuild normalizes `output.sourceMap` into either:
   //  - boolean
   //  - { js?: devtool; css: boolean }
-  if (value === true) return true;
-  if (value === false || value == null) return false;
-  if (typeof value === 'string') return true;
-  if (typeof value === 'object') {
+  if (value === true || typeof value === 'string') return true;
+  if (value !== null && typeof value === 'object') {
     const js = (value as SourceMapConfigObject).js;
     // Any truthy devtool string/object means source maps are on for JS.
     return Boolean(js);
@@ -26,12 +24,11 @@ export function isSourceMapEnabled(value: unknown): boolean {
 
 function isDevtoolSourceMap(value: unknown): boolean {
   if (value === true) return true;
-  if (value == null || value === false) return false;
   if (typeof value === 'string') {
     return value.includes('source-map');
   }
   // Unknown object shape - treat as enabled to be safe.
-  return typeof value === 'object';
+  return value !== null && typeof value === 'object';
 }
 
 export function getClientSourceMapSetting(
@@ -58,10 +55,9 @@ export function getClientDevtoolSetting(
 }
 
 function getDevtoolFromRspackConfig(config?: ToolsRspackConfig): unknown {
-  if (!config) return undefined;
-  if (typeof config === 'function') return undefined;
-  if (typeof config !== 'object') return undefined;
-  return (config as { devtool?: unknown }).devtool;
+  return config !== null && typeof config === 'object'
+    ? (config as { devtool?: unknown }).devtool
+    : undefined;
 }
 
 export function warnOnClientSourceMaps(

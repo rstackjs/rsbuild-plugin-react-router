@@ -1,5 +1,4 @@
 import type { RsbuildConfig, RsbuildPluginAPI, Rspack } from '@rsbuild/core';
-import * as Effect from 'effect/Effect';
 import type { ServerBuild } from 'react-router';
 import { PLUGIN_NAME } from './constants.js';
 import { escapeHtml } from './plugin-utils.js';
@@ -33,12 +32,7 @@ import {
   createDevRuntimeSessionManager,
   type RuntimeBinding,
 } from './dev-runtime-session.js';
-import {
-  normalizeEffectError,
-  runPluginEffect,
-  tryPluginPromise,
-  tryPluginSync,
-} from './effect-runtime.js';
+import { normalizeEffectError } from './effect-runtime.js';
 
 type ServerSetup = Exclude<
   NonNullable<NonNullable<RsbuildConfig['server']>['setup']>,
@@ -154,58 +148,44 @@ export const createReactRouterDevRuntimeController = ({
     NonNullable<DevGraphIdentity['node']>
   >();
 
-  const finishRuntimeAttemptEffect = (
+  const finishRuntimeAttempt = async (
     binding: RuntimeBinding,
     pair: DevCompilerPair,
     stats: DevRuntimeStats,
     changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
     identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
-  ): Effect.Effect<void, Error, never> =>
-    tryPluginPromise(() =>
-      binding.runtime.finishAttempt(stats, changes, identity)
-    ).pipe(
-      Effect.flatMap(result =>
-        tryPluginSync(() => {
-          if (sessions.getActiveBinding()?.id !== binding.id) {
-            return;
-          }
-          if (result === 'retry-node') {
-            pair.node.watching?.invalidate();
-            return;
-          }
-          if (
-            result === 'committed' &&
-            changes.node.known &&
-            identity.node !== undefined &&
-            hdrSignaledNodeIdentity.get(pair) !== identity.node &&
-            Array.from(changes.node.files).some(
-              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
-            )
-          ) {
-            hdrSignaledNodeIdentity.set(pair, identity.node);
-            onNodeRebuildCommitted?.();
-          }
-        })
-      ),
-      Effect.catchAll(cause =>
-        tryPluginSync(() => {
-          if (sessions.getActiveBinding()?.id === binding.id) {
-            binding.runtime.failAttempt(normalizeEffectError(cause));
-          }
-        })
-      )
-    );
-
-  const finishRuntimeAttempt = (
-    binding: RuntimeBinding,
-    pair: DevCompilerPair,
-    stats: DevRuntimeStats,
-    changes: Parameters<RuntimeBinding['runtime']['finishAttempt']>[1],
-    identity: Parameters<RuntimeBinding['runtime']['finishAttempt']>[2]
-  ): Promise<void> =>
-    runPluginEffect(
-      finishRuntimeAttemptEffect(binding, pair, stats, changes, identity)
-    );
+  ): Promise<void> => {
+    try {
+      const result = await binding.runtime.finishAttempt(
+        stats,
+        changes,
+        identity
+      );
+      if (sessions.getActiveBinding()?.id !== binding.id) {
+        return;
+      }
+      if (result === 'retry-node') {
+        pair.node.watching?.invalidate();
+        return;
+      }
+      if (
+        result === 'committed' &&
+        changes.node.known &&
+        identity.node !== undefined &&
+        hdrSignaledNodeIdentity.get(pair) !== identity.node &&
+        Array.from(changes.node.files).some(
+          file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
+        )
+      ) {
+        hdrSignaledNodeIdentity.set(pair, identity.node);
+        onNodeRebuildCommitted?.();
+      }
+    } catch (cause) {
+      if (sessions.getActiveBinding()?.id === binding.id) {
+        binding.runtime.failAttempt(normalizeEffectError(cause));
+      }
+    }
+  };
 
   const flushSettledAttempt = (
     binding: RuntimeBinding,

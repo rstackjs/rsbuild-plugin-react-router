@@ -1,9 +1,80 @@
 import * as Cause from 'effect/Cause';
+import * as Context from 'effect/Context';
 import * as Duration from 'effect/Duration';
 import * as Effect from 'effect/Effect';
+import * as ExecutionStrategy from 'effect/ExecutionStrategy';
 import * as Exit from 'effect/Exit';
 import * as Fiber from 'effect/Fiber';
+import * as FiberSet from 'effect/FiberSet';
+import * as Layer from 'effect/Layer';
+import * as ManagedRuntime from 'effect/ManagedRuntime';
 import * as Option from 'effect/Option';
+import * as Scope from 'effect/Scope';
+
+const PluginFibers = Context.GenericTag<FiberSet.FiberSet>(
+  'rsbuild-plugin-react-router/PluginFibers'
+);
+type PluginResources = { readonly scope: Scope.CloseableScope };
+const PluginResources: Context.Tag<PluginResources, PluginResources> =
+  Context.GenericTag<PluginResources>(
+    'rsbuild-plugin-react-router/PluginResources'
+  );
+
+type PluginRuntimeContext = Scope.Scope | FiberSet.FiberSet | PluginResources;
+
+const PluginRuntimeLive = Layer.scopedContext(
+  Effect.gen(function* () {
+    const scope = yield* Effect.scope;
+    const resources = yield* Scope.fork(scope, ExecutionStrategy.sequential);
+    const fiberScope = yield* Scope.fork(scope, ExecutionStrategy.sequential);
+    const fibers = yield* FiberSet.make().pipe(
+      Effect.provideService(Scope.Scope, fiberScope)
+    );
+    return Context.make(Scope.Scope, resources).pipe(
+      Context.add(PluginFibers, fibers),
+      Context.add(PluginResources, { scope: resources })
+    );
+  })
+);
+
+export type PluginEffectRuntime = Pick<
+  ManagedRuntime.ManagedRuntime<PluginRuntimeContext, never>,
+  'runFork' | 'runPromise'
+> & {
+  readonly dispose: () => Promise<void>;
+};
+
+export const createPluginEffectRuntime = (): PluginEffectRuntime => {
+  const runtime = ManagedRuntime.make(PluginRuntimeLive);
+  let fiberRunFork: typeof runtime.runFork | undefined;
+
+  let disposePromise: Promise<void> | undefined;
+
+  return {
+    runPromise: runtime.runPromise,
+    runFork: (effect, options) => {
+      if (disposePromise) return Effect.runFork(Effect.interrupt);
+      return (fiberRunFork ??= runtime.runSync(
+        Effect.flatMap(PluginFibers, fibers =>
+          FiberSet.runtime(fibers)<PluginRuntimeContext>()
+        )
+      ))(effect, options);
+    },
+    // Resource finalizers cancel their owned fibers before runtime disposal
+    // closes the fiber scope and interrupts any stragglers. Deferring by one
+    // microtask also lets a managed fiber request its own shutdown safely.
+    dispose: (): Promise<void> =>
+      (disposePromise ??= Promise.resolve()
+        .then(() =>
+          runtime.runPromise(
+            Effect.flatMap(PluginResources, ({ scope }) =>
+              Scope.close(scope, Exit.void)
+            )
+          )
+        )
+        .finally(() => runtime.dispose())),
+  };
+};
 
 export const DEV_BACKGROUND_STARTUP_DELAY_MS = 3_000;
 
@@ -27,14 +98,6 @@ export const runPluginEffect = async <A, E>(
   throw normalizeEffectCause(exit.cause);
 };
 
-export const tryPluginSync = <A>(
-  evaluate: () => A
-): Effect.Effect<A, Error, never> =>
-  Effect.try({
-    try: evaluate,
-    catch: normalizeEffectError,
-  });
-
 export const tryPluginPromise = <A>(
   evaluate: () => PromiseLike<A> | A
 ): Effect.Effect<A, Error, never> =>
@@ -46,45 +109,38 @@ export const tryPluginPromise = <A>(
 type DelayedPluginTask = {
   schedule(): void;
   reschedule(): void;
-  cancelEffect(): Effect.Effect<void, Error, never>;
-  cancel(): Promise<void>;
+  cancelEffect(): Effect.Effect<void>;
 };
 
 export const createDelayedPluginTask = ({
+  runtime,
   delayMs,
   run,
   onError,
 }: {
+  runtime: PluginEffectRuntime;
   delayMs: number;
-  run: () => Effect.Effect<void, Error, never>;
+  run: () => Effect.Effect<void, Error, Scope.Scope>;
   onError: (error: Error) => void;
 }): DelayedPluginTask => {
-  let activeFiber: ReturnType<typeof Effect.runFork> | undefined;
-  let version = 0;
+  let fiber: ReturnType<PluginEffectRuntime['runFork']> | null | undefined;
 
-  const cancelActiveEffect = (): Effect.Effect<void, Error, never> =>
-    Effect.sync(() => {
-      const fiber = activeFiber;
-      activeFiber = undefined;
-      return fiber;
-    }).pipe(
-      Effect.flatMap(fiber =>
-        fiber ? Fiber.interrupt(fiber).pipe(Effect.asVoid) : Effect.void
-      )
-    );
+  const cancelEffect = (): Effect.Effect<void> =>
+    Effect.suspend(() => {
+      const activeFiber = fiber;
+      fiber = null;
+      return activeFiber
+        ? Fiber.interrupt(activeFiber).pipe(Effect.asVoid)
+        : Effect.void;
+    });
 
-  const cancelEffect = (): Effect.Effect<void, Error, never> =>
-    Effect.sync(() => {
-      version += 1;
-    }).pipe(Effect.zipRight(cancelActiveEffect()));
-
-  const start = (taskVersion: number): void => {
-    if (activeFiber || version !== taskVersion) {
+  const start = (): void => {
+    if (fiber !== undefined) {
       return;
     }
 
-    let fiber: ReturnType<typeof Effect.runFork>;
-    fiber = Effect.runFork(
+    let activeFiber: ReturnType<PluginEffectRuntime['runFork']>;
+    activeFiber = runtime.runFork(
       Effect.sleep(Duration.millis(delayMs)).pipe(
         Effect.zipRight(Effect.suspend(run)),
         Effect.catchAll(error =>
@@ -94,37 +150,29 @@ export const createDelayedPluginTask = ({
         ),
         Effect.ensuring(
           Effect.sync(() => {
-            if (activeFiber === fiber) {
-              activeFiber = undefined;
+            if (fiber === activeFiber) {
+              fiber = undefined;
             }
           })
         )
       )
     );
-    activeFiber = fiber;
+    fiber = activeFiber;
+  };
+
+  const reschedule = (): void => {
+    if (fiber) {
+      runtime.runFork(
+        Fiber.interrupt(fiber).pipe(Effect.ensuring(Effect.sync(start)))
+      );
+    } else {
+      start();
+    }
   };
 
   return {
-    schedule(): void {
-      if (activeFiber) {
-        return;
-      }
-      version += 1;
-      start(version);
-    },
-
-    reschedule(): void {
-      version += 1;
-      const taskVersion = version;
-      void runPluginEffect(cancelActiveEffect())
-        .then(() => start(taskVersion))
-        .catch(onError);
-    },
-
+    schedule: start,
+    reschedule,
     cancelEffect,
-
-    async cancel(): Promise<void> {
-      await runPluginEffect(cancelEffect());
-    },
   };
 };

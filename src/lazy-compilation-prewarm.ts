@@ -1,7 +1,12 @@
 import * as Effect from 'effect/Effect';
+import type * as Scope from 'effect/Scope';
 import type { ReactRouterManifestForDev } from './manifest.js';
 import type { RouteManifestItem } from './types.js';
-import { createDelayedPluginTask, tryPluginPromise } from './effect-runtime.js';
+import {
+  createDelayedPluginTask,
+  type PluginEffectRuntime,
+  tryPluginPromise,
+} from './effect-runtime.js';
 
 const DEFAULT_LAZY_COMPILATION_TRIGGER_PREFIX = '/_rspack/lazy/trigger';
 const DEFAULT_PREWARM_DELAY_MS = 0;
@@ -9,17 +14,17 @@ const DEFAULT_ROUTE_PREWARM_LIMIT = 8;
 const PREWARM_FETCH_CONCURRENCY = 8;
 const PREWARM_TRIGGER_CANDIDATES = 4;
 
-type LazyCompilationPrewarmConfig = {
+export type LazyCompilationPrewarmConfig = {
   entry: boolean;
   routeLimit: number;
   delayMs: number;
 };
 
-type LazyCompilationPrewarmController = {
+export type LazyCompilationPrewarmController = {
   setServerOrigin(origin: string): void;
   setManifest(manifest: ReactRouterManifestForDev | null): void;
   schedule(): void;
-  cancelEffect(): Effect.Effect<void, Error, never>;
+  cancelEffect(): Effect.Effect<void>;
 };
 
 export type RspackLazyCompilationTriggerClient = {
@@ -221,9 +226,11 @@ const prewarmLazyCompilation = ({
   });
 
 export const createLazyCompilationPrewarmController = ({
+  runtime,
   config,
   onError,
 }: {
+  runtime: PluginEffectRuntime;
   config: LazyCompilationPrewarmConfig;
   onError: (error: Error) => void;
 }): LazyCompilationPrewarmController => {
@@ -231,6 +238,7 @@ export const createLazyCompilationPrewarmController = ({
   let manifest: ReactRouterManifestForDev | null = null;
   let lastPrewarmAssetsKey: string | undefined;
   const task = createDelayedPluginTask({
+    runtime,
     delayMs: config.delayMs,
     run: () =>
       Effect.gen(function* () {
@@ -277,3 +285,11 @@ export const createLazyCompilationPrewarmController = ({
     },
   };
 };
+
+export const acquireLazyCompilationPrewarm = (
+  options: Parameters<typeof createLazyCompilationPrewarmController>[0]
+): Effect.Effect<LazyCompilationPrewarmController, never, Scope.Scope> =>
+  Effect.acquireRelease(
+    Effect.sync(() => createLazyCompilationPrewarmController(options)),
+    controller => controller.cancelEffect()
+  );

@@ -67,16 +67,19 @@ test.describe(async () => {
     // client is not notified of new route addition (https://github.com/remix-run/remix/issues/7894)
     // however server can handle new route
     await expect
-      .poll(async () => {
-        try {
-          await page.goto(`http://localhost:${port}/new`);
+      .poll(
+        async () => {
+          try {
+            await page.goto(`http://localhost:${port}/new`);
+          } catch {
+            // Rsbuild briefly closes the listener while `reload-server`
+            // replaces the compiler. Keep polling until it is ready.
+            return false;
+          }
           return page.getByText("new route").isVisible();
-        } catch {
-          // Rsbuild briefly closes the listener while `reload-server` replaces
-          // the compiler. Keep polling until the restarted server is ready.
-          return false;
-        }
-      })
+        },
+        { timeout: 10_000 },
+      )
       .toBe(true);
   });
 });

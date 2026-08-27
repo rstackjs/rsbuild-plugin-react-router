@@ -788,17 +788,12 @@ export const detectRouteChunks = (
   };
 };
 
-export const getRouteChunkCode: (
+export const getRouteChunkCode = (
   code: string,
   chunkName: RouteChunkName,
   cache: RouteChunkCache | undefined,
   cacheKey: string
-) => string | undefined = (
-  code: string,
-  chunkName: RouteChunkName,
-  cache: RouteChunkCache | undefined,
-  cacheKey: string
-) => {
+): string | undefined => {
   const analysisCache = cache ?? new Map();
   if (chunkName === 'main') {
     const exportDependencies = getExportDependencies(
@@ -834,7 +829,7 @@ export const getRouteChunkModuleId = (
     `${routeChunkQueryStringPrefix}${encodeURIComponent(chunkName)}`
   }`;
 
-export const isRouteChunkModuleId: (id: string) => boolean = (id: string) =>
+export const isRouteChunkModuleId = (id: string): boolean =>
   getRouteChunkNameFromModuleId(id) !== null;
 
 const isRouteChunkName = (name: string): name is RouteChunkName =>
@@ -900,17 +895,12 @@ export const buildManifestChunkValidity = (
       !exportNames.has(exportName) || hasRouteChunkByExportName[exportName]
   );
 
-export const detectRouteChunksIfEnabled: (
+export const detectRouteChunksIfEnabled = async (
   cache: RouteChunkCache | undefined,
   config: RouteChunkConfig,
   id: string,
   code: string
-) => Promise<RouteChunkInfo> = async (
-  cache: RouteChunkCache | undefined,
-  config: RouteChunkConfig,
-  id: string,
-  code: string
-) => {
+): Promise<RouteChunkInfo> => {
   const noRouteChunks = (): RouteChunkInfo => ({
     exportNames: [],
     chunkedExports: [] as RouteChunkExportName[],
@@ -927,19 +917,13 @@ export const detectRouteChunksIfEnabled: (
   return detectRouteChunks(code, cache, cacheKey);
 };
 
-export const getRouteChunkIfEnabled: (
+export const getRouteChunkIfEnabled = async (
   cache: RouteChunkCache | undefined,
   config: RouteChunkConfig,
   id: string,
   chunkName: RouteChunkName,
   code: string
-) => Promise<string | null> = async (
-  cache: RouteChunkCache | undefined,
-  config: RouteChunkConfig,
-  id: string,
-  chunkName: RouteChunkName,
-  code: string
-) => {
+): Promise<string | null> => {
   if (!config.splitRouteModules) {
     return null;
   }

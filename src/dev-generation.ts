@@ -1,6 +1,7 @@
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import * as EffectDeferred from 'effect/Deferred';
 import * as Effect from 'effect/Effect';
+import * as FiberId from 'effect/FiberId';
 import type { ServerBuild } from 'react-router';
 import { HMR_PATCHABLE_ROUTE_FLAGS } from './route-artifacts.js';
 import {
@@ -264,7 +265,7 @@ const hasRouteManifestMetadataChanges = (
 const createReadinessDeferred = (): EffectDeferred.Deferred<
   CommittedGeneration,
   Error
-> => Effect.runSync(EffectDeferred.make<CommittedGeneration, Error>());
+> => EffectDeferred.unsafeMake<CommittedGeneration, Error>(FiberId.none);
 
 export const createReactRouterDevRuntime = ({
   server,
@@ -355,7 +356,7 @@ export const createReactRouterDevRuntime = ({
     if (state.kind === 'starting') {
       const { readiness } = state;
       state = { kind: 'failed', attemptId, error };
-      Effect.runSync(EffectDeferred.fail(readiness, error));
+      EffectDeferred.unsafeDone(readiness, Effect.fail(error));
     } else if (state.kind === 'ready') {
       state = { ...state, pendingAttemptId: null };
     }
@@ -374,7 +375,7 @@ export const createReactRouterDevRuntime = ({
     if (state.kind === 'starting') {
       const { readiness } = state;
       state = { kind: 'ready', committed, pendingAttemptId: null };
-      Effect.runSync(EffectDeferred.succeed(readiness, committed));
+      EffectDeferred.unsafeDone(readiness, Effect.succeed(committed));
     } else if (state.kind === 'ready') {
       state = { kind: 'ready', committed, pendingAttemptId: null };
     }
@@ -654,7 +655,7 @@ export const createReactRouterDevRuntime = ({
           '[rsbuild-plugin-react-router] The development server closed before a React Router build was ready.'
         );
       if (state.kind === 'starting') {
-        Effect.runSync(EffectDeferred.fail(state.readiness, closeError));
+        EffectDeferred.unsafeDone(state.readiness, Effect.fail(closeError));
       }
       state = { kind: 'closed', error: closeError };
     },
