@@ -4,6 +4,7 @@ import * as React from 'react';
 import { startTransition } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import type { DataRouter } from 'react-router';
+import * as rscReactRouterClientReferences from 'react-router/internal/react-server-client';
 import {
   unstable_createCallServer as createCallServer,
   unstable_getRSCStream as getRSCStream,
@@ -16,6 +17,17 @@ import {
   encodeReply,
   setServerCallback,
 } from 'react-server-dom-rspack/client.browser';
+
+// This client-reference boundary is addressed dynamically by export name in
+// the Flight manifest. Observe its namespace so production tree-shaking keeps
+// the boundary's explicit RSC-safe allowlist available to the decoder.
+if (
+  Object.values(rscReactRouterClientReferences).some(
+    reference => reference === undefined
+  )
+) {
+  throw new Error('React Router RSC client references are unavailable');
+}
 
 setServerCallback(
   createCallServer({
