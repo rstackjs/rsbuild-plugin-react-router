@@ -599,10 +599,19 @@ export const pluginReactRouter = (
           return;
         }
         if (environment.name === 'node') {
+          const compiler = stats?.compilation.compiler;
+          const changedFiles = new Set([
+            ...(compiler?.modifiedFiles ?? []),
+            ...(compiler?.removedFiles ?? []),
+          ]);
+          // Initial and lazy compilations do not represent source edits. Sending
+          // an RSC revalidation for them can race and abort the navigation that
+          // requested the lazy module.
+          if (changedFiles.size === 0) {
+            return;
+          }
           hasPendingRscNodeUpdate = true;
-          pendingRscNodeFiles = new Set(
-            stats?.compilation.compiler.modifiedFiles ?? []
-          );
+          pendingRscNodeFiles = changedFiles;
         }
         if (!hasPendingRscNodeUpdate) {
           return;

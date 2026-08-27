@@ -460,6 +460,42 @@ describe('pluginReactRouter', () => {
     });
   });
 
+  it('does not revalidate RSC routes after lazy compilation', async () => {
+    rstest.useFakeTimers();
+    try {
+      const rsbuild = await createStubRsbuild({
+        rsbuildConfig: {},
+      });
+      const sockWrite = rstest.fn();
+
+      rsbuild.addPlugins([pluginReactRouter({ rsc: true })]);
+      await rsbuild.unwrapConfig();
+
+      const beforeStartDevServer =
+        rsbuild.onBeforeStartDevServer.mock.calls[0][0];
+      const afterRscEnvironmentCompile =
+        rsbuild.onAfterEnvironmentCompile.mock.calls[1][0];
+      beforeStartDevServer({ server: { sockWrite } });
+      afterRscEnvironmentCompile({
+        environment: { name: 'node' },
+        stats: {
+          hasErrors: () => false,
+          compilation: {
+            compiler: {
+              modifiedFiles: new Set<string>(),
+              removedFiles: new Set<string>(),
+            },
+          },
+        },
+      });
+
+      await rstest.advanceTimersByTimeAsync(1_001);
+      expect(sockWrite).not.toHaveBeenCalled();
+    } finally {
+      rstest.useRealTimers();
+    }
+  });
+
   it('installs the RSC dev request handler for SPA mode', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},

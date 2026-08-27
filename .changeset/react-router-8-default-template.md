@@ -9,8 +9,8 @@ React Router RSC mode, analyzes transformed MDX route modules for manifest
 generation, preserves Flight client-reference exports and names in production,
 supports React Router 8.3 stale-client detection in production builds,
 avoids initial RSC client-loader hydration races, coalesces client and server
-RSC hot updates while keeping client-only state mounted, restarts the
-development server reliably when route topology changes, and includes React
-Router 8/RSC examples plus framework integration coverage. Route watcher
-startup no longer interrupts early development hot updates with a server
-restart.
+RSC hot updates while keeping client-only state mounted without revalidating
+ordinary lazy compilations, restarts the development server reliably when
+route topology changes, and includes React Router 8/RSC examples plus framework
+integration coverage. Route watcher startup no longer interrupts early
+development hot updates with a server restart.
