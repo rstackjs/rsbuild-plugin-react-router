@@ -216,13 +216,12 @@ const createRscModePlan = async ({
       module: false,
     },
     webOptimization: {
+      // Flight resolves client references dynamically by export name. Preserve
+      // every export and its public name in production so the manifest can
+      // resolve route components, data exports, and React Router boundaries.
+      mangleExports: false,
       splitChunks: false,
-      ...(isBuild
-        ? {
-            mangleExports: 'size',
-            usedExports: 'global',
-          }
-        : {}),
+      usedExports: false,
       runtimeChunk: false,
     },
     nodeExternals: undefined,

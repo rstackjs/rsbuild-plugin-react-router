@@ -17,19 +17,6 @@ import {
   setServerCallback,
 } from 'react-server-dom-rspack/client.browser';
 
-if (process.env.NODE_ENV === 'production') {
-  // This client-reference boundary is addressed dynamically by export name in
-  // the Flight manifest. Observe its namespace so production tree-shaking
-  // keeps the explicit RSC-safe allowlist available to the decoder. Keeping
-  // this import out of the development graph preserves route component state
-  // across RSC hot updates.
-  void import('react-router/internal/react-server-client').then(references => {
-    if (Object.values(references).some(reference => reference === undefined)) {
-      throw new Error('React Router RSC client references are unavailable');
-    }
-  });
-}
-
 setServerCallback(
   createCallServer({
     createFromReadableStream,
