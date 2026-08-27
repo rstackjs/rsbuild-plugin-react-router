@@ -115,12 +115,52 @@ const cssUrlAssetExtensions =
   /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
 const urlAssetResourceQuery =
   /^(?=.*(?:\?|&)url(?:&|$))(?!.*(?:\?|&)(?:raw|inline)(?:&|$))/;
-const useClientDirective =
-  /^(?:(?:\uFEFF|#![^\n]*(?:\n|$)|\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*(?:\n|$))*)(["'])use client\1\s*;/;
+const javascriptWhitespace = /\s/u;
+
+const hasUseClientDirective = (code: string): boolean => {
+  let index = code.charCodeAt(0) === 0xfeff ? 1 : 0;
+  if (code.startsWith('#!', index)) {
+    const lineEnd = code.indexOf('\n', index + 2);
+    if (lineEnd === -1) return false;
+    index = lineEnd + 1;
+  }
+
+  while (index < code.length) {
+    while (
+      index < code.length &&
+      javascriptWhitespace.test(code.charAt(index))
+    ) {
+      index += 1;
+    }
+    if (code.startsWith('//', index)) {
+      const lineEnd = code.indexOf('\n', index + 2);
+      if (lineEnd === -1) return false;
+      index = lineEnd + 1;
+      continue;
+    }
+    if (code.startsWith('/*', index)) {
+      const commentEnd = code.indexOf('*/', index + 2);
+      if (commentEnd === -1) return false;
+      index = commentEnd + 2;
+      continue;
+    }
+    break;
+  }
+
+  const quote = code.charAt(index);
+  if (quote !== '"' && quote !== "'") return false;
+  const directive = `${quote}use client${quote}`;
+  if (!code.startsWith(directive, index)) return false;
+  index += directive.length;
+  while (index < code.length && javascriptWhitespace.test(code.charAt(index))) {
+    index += 1;
+  }
+  return code.charAt(index) === ';';
+};
 
 const isRscClientModule = (filePath: string): boolean => {
   try {
-    return useClientDirective.test(readFileSync(filePath, 'utf8'));
+    return hasUseClientDirective(readFileSync(filePath, 'utf8'));
   } catch {
     return false;
   }
