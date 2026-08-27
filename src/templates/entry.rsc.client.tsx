@@ -17,6 +17,43 @@ import {
   setServerCallback,
 } from 'react-server-dom-rspack/client.browser';
 
+type RscHydrationWindow = Window & {
+  __reactRouterDataRouter?: DataRouter;
+  __reactRouterHdrActive?: boolean;
+};
+
+const hydrationWindow = window as RscHydrationWindow;
+
+const InitialRscDataLoadGuard = ({
+  active,
+  children,
+}: {
+  active: boolean;
+  children?: React.ReactNode;
+}): React.ReactNode => {
+  React.useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    let frame: number;
+    const clearGuardOnceDataLoadStarts = () => {
+      const router = hydrationWindow.__reactRouterDataRouter;
+      if (
+        router &&
+        (router.state.initialized || router.state.navigation.state !== 'idle')
+      ) {
+        hydrationWindow.__reactRouterHdrActive = false;
+        return;
+      }
+      frame = requestAnimationFrame(clearGuardOnceDataLoadStarts);
+    };
+    frame = requestAnimationFrame(clearGuardOnceDataLoadStarts);
+    return () => cancelAnimationFrame(frame);
+  }, [active]);
+  return children;
+};
+
 setServerCallback(
   createCallServer({
     createFromReadableStream,
@@ -31,16 +68,38 @@ const hydrate = () => {
       startTransition(async () => {
         const formState =
           payload.type === 'render' ? await payload.formState : undefined;
+        const needsInitialDataLoadGuard =
+          payload.type === 'render' &&
+          payload.matches.some(
+            match =>
+              match.clientLoader != null &&
+              !match.hasLoader &&
+              match.hydrateFallbackElement != null
+          );
 
+        // React Router's RSC single-fetch hydration skips its request while the
+        // router is both idle and uninitialized. An implicitly hydrating
+        // clientLoader with a fallback and no server loader can race the layout
+        // effect that starts initialization, leaving it with an empty result
+        // for parent routes. Its HDR guard already means “the initial data
+        // request is required”; keep that guard active until router
+        // initialization starts, then clear it in the effect above.
+        if (needsInitialDataLoadGuard) {
+          hydrationWindow.__reactRouterHdrActive = true;
+        }
         hydrateRoot(
           document,
           React.createElement(
             React.StrictMode,
             null,
-            React.createElement(RSCHydratedRouter, {
-              createFromReadableStream,
-              payload,
-            })
+            React.createElement(
+              InitialRscDataLoadGuard,
+              { active: needsInitialDataLoadGuard },
+              React.createElement(RSCHydratedRouter, {
+                createFromReadableStream,
+                payload,
+              })
+            )
           ),
           {
             // @ts-expect-error React Router RSC formState is not typed yet.
