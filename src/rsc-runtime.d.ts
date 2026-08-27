@@ -85,7 +85,7 @@ declare module 'virtual/react-router/unstable_rsc/allowed-action-origins' {
 }
 
 declare module 'virtual/react-router/unstable_rsc/client-version' {
-  const clientVersion: string;
+  const clientVersion: string | undefined;
   export default clientVersion;
 }
 

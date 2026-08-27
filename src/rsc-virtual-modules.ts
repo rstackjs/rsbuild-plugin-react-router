@@ -95,7 +95,7 @@ export const createReactRouterRscVirtualModules = ({
       defaultExport(allowedActionOrigins),
     'virtual/react-router/unstable_rsc/client-version': isBuild
       ? 'export default __webpack_hash__;'
-      : defaultExport('development'),
+      : 'export default undefined;',
     'virtual/react-router/unstable_rsc/react-router-serve-config':
       defaultExport({
         assetsBuildDirectory: rscAssetsBuildDirectory,

@@ -62,7 +62,7 @@ describe('RSC support helpers', () => {
     ).toBe('export default ["https://app.example.com"];');
     expect(
       modules['virtual/react-router/unstable_rsc/client-version']
-    ).toBe('export default "development";');
+    ).toBe('export default undefined;');
     expect(
       modules['virtual/react-router/unstable_rsc/server-manifest']
     ).toContain('__webpack_require__.rscM?.serverManifest');
