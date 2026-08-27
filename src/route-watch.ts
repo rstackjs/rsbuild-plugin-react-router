@@ -70,8 +70,8 @@ export const mergeWatchFiles = (
   ] as WatchFilesConfig;
 };
 
-export const getRouteRestartMarkerPath = (outputClientPath: string): string =>
-  resolve(outputClientPath, ROUTE_RESTART_MARKER_ASSET);
+export const getRouteRestartMarkerPath = (appDirectory: string): string =>
+  resolve(appDirectory, '..', ROUTE_RESTART_MARKER_ASSET);
 
 export const createRouteManifestSnapshot = (
   routes: RouteManifestSnapshotEntries

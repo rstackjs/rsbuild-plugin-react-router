@@ -68,8 +68,14 @@ test.describe(async () => {
     // however server can handle new route
     await expect
       .poll(async () => {
-        await page.goto(`http://localhost:${port}/new`);
-        return page.getByText("new route").isVisible();
+        try {
+          await page.goto(`http://localhost:${port}/new`);
+          return page.getByText("new route").isVisible();
+        } catch {
+          // Rsbuild briefly closes the listener while `reload-server` replaces
+          // the compiler. Keep polling until the restarted server is ready.
+          return false;
+        }
       })
       .toBe(true);
   });
