@@ -158,11 +158,16 @@ const mergeReactRouterConfig = (...configs: Config[]): Config => {
             buildEnd: async (
               ...args: Parameters<NonNullable<Config['buildEnd']>>
             ) => {
-              try {
-                await configA.buildEnd?.(...args);
-                await configB.buildEnd?.(...args);
-              } catch (cause) {
-                throw normalizeEffectError(cause);
+              let failure: Error | undefined;
+              for (const buildEnd of [configA.buildEnd, configB.buildEnd]) {
+                try {
+                  await buildEnd?.(...args);
+                } catch (cause) {
+                  failure ??= normalizeEffectError(cause);
+                }
+              }
+              if (failure) {
+                throw failure;
               }
             },
           }
