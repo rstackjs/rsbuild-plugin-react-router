@@ -269,12 +269,10 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain('if (pathname[0] !== "/") pathname = "/" + pathname');
   });
 
-  it('strips side-effect style imports from the data route chunk', async () => {
-    // The `?client-route-module=data` chunk carries only route data exports and
-    // must keep its client-manifest `cssFiles` empty so the native rspack
-    // `RscServerPlugin` never wraps these non-component exports in a
-    // CSS-injecting component wrapper. Assert the bare style side-effect import
-    // is dropped from the emitted data chunk.
+  it('keeps side-effect styles with non-component route exports', async () => {
+    // Rspack 2.2 emits client references directly and preinitializes their CSS,
+    // so route data exports can stay in the same CSS-bearing client chunk as
+    // components without losing their React client-reference identity.
     const result = await transform({
       code: `
         import "./styles.css";
@@ -283,11 +281,11 @@ describe('RSC route transforms', () => {
         export default function Route() { return null; }
       `,
       resourcePath: '/app/routes/client.tsx',
-      resourceQuery: '?client-route-module=data',
+      resourceQuery: '?client-route-module=route',
       routeId: 'routes/client',
     });
 
-    expect(result.code).not.toContain('.css');
+    expect(result.code).toContain('import "./styles.css"');
     expect(result.code).toContain('export const meta');
     expect(result.code).toContain('export const links');
   });
@@ -386,28 +384,6 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain('"use client";');
     expect(result.code).toContain('import "./styles-vanilla-local.css";');
     expect(result.code).not.toContain('export function ServerComponent()');
-  });
-
-  it('does not re-add the vanilla style import to the data client chunk of a server-first route', async () => {
-    const result = await transform({
-      code: `
-        import * as localStyles from "./styles-vanilla-local.css";
-        export function loader() {
-          return null;
-        }
-        export function ServerComponent() {
-          return localStyles.index;
-        }
-      `,
-      resourcePath: '/app/routes/server.tsx',
-      resourceQuery: '?client-route-module=data',
-      routeId: 'routes/server',
-      isServerEnvironment: true,
-    });
-
-    // The data chunk keeps `cssFiles` empty so RSC never wraps data exports in a
-    // CSS-injecting component; the vanilla import must not leak into it.
-    expect(result.code).not.toContain('import "./styles-vanilla-local.css";');
   });
 
   it('does not re-add vanilla style imports to client (non-server-component) route chunks', async () => {

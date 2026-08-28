@@ -37,6 +37,7 @@ createFromReadableStream<RSCPayload>(getRSCStream()).then((payload) => {
         />
       </StrictMode>,
       {
+        // @ts-expect-error React Router RSC formState is not typed yet.
         formState,
       },
     );
