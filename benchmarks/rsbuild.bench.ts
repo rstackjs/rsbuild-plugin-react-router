@@ -1,11 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bench } from 'vitest';
-import {
-  benchmarkCases,
-  getCodSpeedBenchmarkOptions,
-  runBenchmarkCase,
-} from './cases.mts';
+import { benchmarkCases, runBenchmarkCase } from './cases.mts';
 
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -20,9 +16,5 @@ const options = {
 };
 
 for (const benchmarkCase of benchmarkCases) {
-  bench(
-    benchmarkCase.id,
-    async () => runBenchmarkCase(benchmarkCase, options),
-    getCodSpeedBenchmarkOptions()
-  );
+  bench(benchmarkCase.id, async () => runBenchmarkCase(benchmarkCase, options));
 }

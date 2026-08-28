@@ -64,7 +64,7 @@
     "build": "rslib build",
     "bench": "pnpm build && node benchmarks/run.mts",
     "bench:smoke": "pnpm build && node benchmarks/run.mts --iterations 1 --warmup 0",
-    "bench:codspeed": "pnpm build && vitest bench --run --config vitest.benchmark.config.mts",
+    "bench:codspeed": "pnpm build && vitest bench --run --config vitest.benchmark.config.mts -t build-256-ssr",
     "e2e": "pnpm build && pnpm e2e:no-build",
     "e2e:no-build": "pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only,react-router-8,rsc-mode}' test:e2e",
     "dev": "rslib build --watch",

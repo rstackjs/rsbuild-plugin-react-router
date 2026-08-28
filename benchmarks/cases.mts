@@ -93,22 +93,6 @@ const failedCaseError = (
         : '')
   );
 
-export const getDevBenchmarkTimeoutMs = (
-  runnerMode = process.env.CODSPEED_RUNNER_MODE
-): number => (runnerMode === 'simulation' ? 600_000 : 120_000);
-
-export const getCodSpeedBenchmarkOptions = (
-  runnerMode = process.env.CODSPEED_RUNNER_MODE
-) =>
-  runnerMode === 'simulation'
-    ? {
-        iterations: 1,
-        warmupIterations: 0,
-        time: 0,
-        warmupTime: 0,
-      }
-    : undefined;
-
 export const runBenchmarkCase = async (
   definition: BenchmarkCase,
   options: { pluginRoot: string; workRoot: string; port?: number }
@@ -167,7 +151,7 @@ export const runBenchmarkCase = async (
       routeTimeoutMs: 30_000,
       updateFile: fixture.updateFile,
       updateRoutePaths: fixture.updateRoutePaths,
-      timeoutMs: getDevBenchmarkTimeoutMs(),
+      timeoutMs: 120_000,
     });
 
     if (result.status !== 0) {

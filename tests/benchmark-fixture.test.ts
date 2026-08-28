@@ -118,29 +118,15 @@ describe('benchmark fixture generator', () => {
 });
 
 describe('focused local benchmark cases', () => {
-  it('extends the dev safety timeout only for CodSpeed simulation', async () => {
-    const { getDevBenchmarkTimeoutMs } = await import(
-      '../benchmarks/cases.mts'
+  it('keeps I/O-heavy dev measurement in the controlled comparison', () => {
+    const packageJson = JSON.parse(
+      readFileSync(join(process.cwd(), 'package.json'), 'utf8')
     );
 
-    expect(getDevBenchmarkTimeoutMs()).toBe(120_000);
-    expect(getDevBenchmarkTimeoutMs('walltime')).toBe(120_000);
-    expect(getDevBenchmarkTimeoutMs('simulation')).toBe(600_000);
-  });
-
-  it('executes each deterministic CodSpeed simulation benchmark once', async () => {
-    const { getCodSpeedBenchmarkOptions } = await import(
-      '../benchmarks/cases.mts'
+    expect(packageJson.scripts['bench:codspeed']).toContain(
+      '-t build-256-ssr'
     );
-
-    expect(getCodSpeedBenchmarkOptions()).toBeUndefined();
-    expect(getCodSpeedBenchmarkOptions('walltime')).toBeUndefined();
-    expect(getCodSpeedBenchmarkOptions('simulation')).toEqual({
-      iterations: 1,
-      warmupIterations: 0,
-      time: 0,
-      warmupTime: 0,
-    });
+    expect(packageJson.scripts['bench:smoke']).not.toContain('-t');
   });
 
   it('registers the focused build and dev cases', async () => {
