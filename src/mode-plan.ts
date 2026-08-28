@@ -306,6 +306,7 @@ const createClassicModePlan = async ({
       isBuild,
       serverAppPath,
       entryServerPath,
+      serverBuildFile: reactRouterConfig.serverBuildFile,
       defaultEntryName,
       serverBundleEntries: artifacts.serverBundleEntries,
     }),

@@ -75,6 +75,7 @@ describe('React Router node entries', () => {
         isBuild: false,
         serverAppPath: '/project/server/index.ts',
         entryServerPath: '/project/app/entry.server.tsx',
+        serverBuildFile: undefined,
         defaultEntryName: 'static/js/app',
         serverBundleEntries,
       })
@@ -92,6 +93,7 @@ describe('React Router node entries', () => {
         isBuild: false,
         serverAppPath: '/project/server/index.ts',
         entryServerPath: '/project/app/entry.server.tsx',
+        serverBuildFile: undefined,
         defaultEntryName: 'static/js/react-router-server-build',
         serverBundleEntries,
       })
@@ -111,11 +113,13 @@ describe('React Router node entries', () => {
         isBuild: true,
         serverAppPath: '/project/server/index.ts',
         entryServerPath: '/project/app/entry.server.tsx',
+        serverBuildFile: undefined,
         defaultEntryName: 'static/js/react-router-server-build',
         serverBundleEntries,
       })
     ).toEqual({
       'static/js/app': '/project/server/index.ts',
+      index: '/project/server/index.ts',
       'static/js/entry.server': '/project/app/entry.server.tsx',
       'admin/index': 'virtual/react-router/server-build-admin',
     });

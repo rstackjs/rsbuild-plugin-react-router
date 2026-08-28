@@ -62,6 +62,7 @@ export const createReactRouterNodeEntries = ({
   isBuild,
   serverAppPath,
   entryServerPath,
+  serverBuildFile,
   defaultEntryName,
   serverBundleEntries,
 }: {
@@ -69,15 +70,25 @@ export const createReactRouterNodeEntries = ({
   isBuild: boolean;
   serverAppPath: string;
   entryServerPath: string;
+  serverBuildFile: string | undefined;
   defaultEntryName: string;
   serverBundleEntries: readonly ReactRouterServerBundleEntry[];
 }): Record<string, string> => {
+  const appEntry = hasServerApp
+    ? serverAppPath
+    : 'virtual/react-router/server-build';
   const entries: Record<string, string> = {
-    'static/js/app': hasServerApp
-      ? serverAppPath
-      : 'virtual/react-router/server-build',
+    'static/js/app': appEntry,
     'static/js/entry.server': entryServerPath,
   };
+
+  if (isBuild) {
+    const configuredEntryName = (serverBuildFile || 'index.js').replace(
+      /\.js$/,
+      ''
+    );
+    entries[configuredEntryName] = appEntry;
+  }
 
   if (hasServerApp && !isBuild) {
     entries[defaultEntryName] = 'virtual/react-router/server-build';
