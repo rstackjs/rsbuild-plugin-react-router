@@ -118,7 +118,7 @@ jobs:
             node "$GITHUB_WORKSPACE/head/scripts/benchmark/comment.mts"
 
   codspeed:
-    name: CodSpeed walltime
+    name: CodSpeed simulation
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -146,8 +146,9 @@ jobs:
       - name: Build plugin
         run: pnpm build
 
-      - name: Upload CodSpeed walltime result
-        uses: CodSpeedHQ/action@f22792bfac16f3e14eb9fbea76f4a48e9cc22b93 # v4
+      - name: Upload CodSpeed simulation result
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
-          mode: walltime
+          mode: simulation
+          simulation-track-subprocess: true
           run: pnpm bench:codspeed
