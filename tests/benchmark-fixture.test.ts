@@ -118,6 +118,16 @@ describe('benchmark fixture generator', () => {
 });
 
 describe('focused local benchmark cases', () => {
+  it('extends the dev safety timeout only for CodSpeed simulation', async () => {
+    const { getDevBenchmarkTimeoutMs } = await import(
+      '../benchmarks/cases.mts'
+    );
+
+    expect(getDevBenchmarkTimeoutMs()).toBe(120_000);
+    expect(getDevBenchmarkTimeoutMs('walltime')).toBe(120_000);
+    expect(getDevBenchmarkTimeoutMs('simulation')).toBe(600_000);
+  });
+
   it('registers the focused build and dev cases', async () => {
     const { benchmarkCases } = await import('../benchmarks/cases.mts');
 

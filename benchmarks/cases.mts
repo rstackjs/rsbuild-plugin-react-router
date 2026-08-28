@@ -69,6 +69,10 @@ const assertRegisteredCase = (definition: BenchmarkCase) => {
 const failedCaseError = (id: string) =>
   new Error(`Benchmark case "${id}" failed.`);
 
+export const getDevBenchmarkTimeoutMs = (
+  runnerMode = process.env.CODSPEED_RUNNER_MODE
+): number => (runnerMode === 'simulation' ? 600_000 : 120_000);
+
 export const runBenchmarkCase = async (
   definition: BenchmarkCase,
   options: { pluginRoot: string; workRoot: string; port?: number }
@@ -127,7 +131,7 @@ export const runBenchmarkCase = async (
       routeTimeoutMs: 30_000,
       updateFile: fixture.updateFile,
       updateRoutePaths: fixture.updateRoutePaths,
-      timeoutMs: 120_000,
+      timeoutMs: getDevBenchmarkTimeoutMs(),
     });
 
     if (result.status !== 0) {
