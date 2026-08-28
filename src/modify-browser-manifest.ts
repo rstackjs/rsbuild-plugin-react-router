@@ -147,6 +147,7 @@ export function registerModifyBrowserManifestAssets(
     options?.manifestChunkNames ??
     getReactRouterManifestChunkNames(
       routes,
+      appDirectory,
       routeChunkOptions?.splitRouteModules
     );
   const isBuild = Boolean(routeChunkOptions?.isBuild);

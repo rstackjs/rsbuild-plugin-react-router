@@ -7,6 +7,7 @@ import {
   getRouteChunkIfEnabled,
   getRouteChunkModuleId,
   getRouteChunkNameFromModuleId,
+  getRouteEntryBaseName,
   isRouteChunkModuleId,
   routeChunkExportNames,
   type RouteChunkConfig,
@@ -674,9 +675,13 @@ describe('route chunks', () => {
       expect(
         getRouteChunkNameFromModuleId('/app/routes/r.tsx?route-chunk=not-valid')
       ).toBeNull();
-      expect(getRouteChunkEntryName('routes/clients', 'clientAction')).toBe(
-        'routes/clients-client-action'
-      );
+      expect(
+        getRouteChunkEntryName(
+          { file: 'routes/clients.tsx' },
+          'clientAction',
+          '/app'
+        )
+      ).toBe('routes/clients-client-action');
     });
   });
 
@@ -819,5 +824,46 @@ describe('route chunks', () => {
         /Error splitting route module:[\s\S]*clientAction[\s\S]*clientLoader[\s\S]*These exports[\s\S]*their own chunks[\s\S]*they share/
       );
     });
+  });
+});
+
+describe('route entry names', () => {
+  it('derives the entry base name from the route file', () => {
+    expect(
+      getRouteEntryBaseName(
+        { file: 'domains/customers/routes/customers.tsx' },
+        '/Users/dev/proj/app'
+      )
+    ).toBe('domains/customers/routes/customers');
+  });
+
+  it('keeps the entry name inside the JS output directory', () => {
+    // `relative()` from `@react-router/dev/routes` hands us absolute files.
+    expect(
+      getRouteEntryBaseName(
+        { file: '/Users/dev/proj/app/routes/a.tsx' },
+        '/Users/dev/proj/app'
+      )
+    ).toBe('routes/a');
+
+    // A route outside `appDirectory` must not escape `static/js`.
+    expect(
+      getRouteEntryBaseName({ file: '../shared/x.tsx' }, '/Users/dev/proj/app')
+    ).toBe('__/shared/x');
+
+    // A Windows drive letter is not a legal filename character.
+    expect(
+      getRouteEntryBaseName({ file: 'C:/other/x.tsx' }, 'D:/proj/app')
+    ).toBe('other/x');
+  });
+
+  it('names a route chunk as a sibling of the route entry', () => {
+    expect(
+      getRouteChunkEntryName(
+        { file: 'routes/clients.tsx' },
+        'clientAction',
+        '/Users/dev/proj/app'
+      )
+    ).toBe('routes/clients-client-action');
   });
 });

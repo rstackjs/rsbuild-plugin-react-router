@@ -13,6 +13,7 @@ import {
   createEmptyRouteChunkByExportName,
   detectRouteChunksIfEnabled,
   getRouteChunkEntryName,
+  getRouteEntryBaseName,
   routeChunkExportNames,
   validateRouteChunks,
   type RouteChunkCache,
@@ -425,23 +426,19 @@ const getManifestVersion = (
     .slice(0, 8);
 };
 
-const getRouteEntryName = (route: Route): string => {
-  const extensionIndex = route.file.lastIndexOf('.');
-  return extensionIndex >= 0 ? route.file.slice(0, extensionIndex) : route.file;
-};
-
 export const getReactRouterManifestChunkNames = (
   routes: Record<string, Route>,
+  appDirectory: string,
   splitRouteModules: boolean | 'enforce' = false
 ): Set<string> => {
   const chunkNames = new Set<string>(['entry.client']);
   for (const route of Object.values(routes)) {
-    chunkNames.add(getRouteEntryName(route));
+    chunkNames.add(getRouteEntryBaseName(route, appDirectory));
     if (!splitRouteModules || route.id === 'root') {
       continue;
     }
     for (const exportName of routeChunkExportNames) {
-      chunkNames.add(getRouteChunkEntryName(route.id, exportName));
+      chunkNames.add(getRouteChunkEntryName(route, exportName, appDirectory));
     }
   }
   return chunkNames;
@@ -449,6 +446,7 @@ export const getReactRouterManifestChunkNames = (
 
 const createRouteManifestItem = ({
   route,
+  appDirectory,
   assetPrefix,
   jsAssets,
   routeAnalysis,
@@ -456,6 +454,7 @@ const createRouteManifestItem = ({
   getCssAssetsForChunk,
 }: {
   route: Route;
+  appDirectory: string;
   assetPrefix: string;
   jsAssets: string[];
   routeAnalysis: RouteManifestAnalysis;
@@ -465,13 +464,17 @@ const createRouteManifestItem = ({
   const routeChunkMap = routeAnalysis.hasRouteChunkByExportName;
   const chunkModulePath = (exportName: RouteChunkExportName) =>
     routeChunkMap?.[exportName]
-      ? getModulePathForChunk(getRouteChunkEntryName(route.id, exportName))
+      ? getModulePathForChunk(
+          getRouteChunkEntryName(route, exportName, appDirectory)
+        )
       : undefined;
   const cssAssets = [
     ...routeAnalysis.cssAssets,
     ...routeChunkExportNames.flatMap(exportName =>
       routeChunkMap?.[exportName]
-        ? getCssAssetsForChunk(getRouteChunkEntryName(route.id, exportName))
+        ? getCssAssetsForChunk(
+            getRouteChunkEntryName(route, exportName, appDirectory)
+          )
         : []
     ),
   ];
@@ -540,7 +543,7 @@ function generateReactRouterManifestForDevEffect(
       Object.entries(routes),
       ([key, route]) =>
         Effect.gen(function* () {
-          const routeEntryName = getRouteEntryName(route);
+          const routeEntryName = getRouteEntryBaseName(route, context);
           const { js: jsAssets, css: discoveredCssAssets } =
             getAssetsForChunk(routeEntryName);
           const routeFilePath = resolve(context, route.file);
@@ -571,6 +574,7 @@ function generateReactRouterManifestForDevEffect(
             key,
             createRouteManifestItem({
               route,
+              appDirectory: context,
               assetPrefix,
               jsAssets,
               routeAnalysis,
