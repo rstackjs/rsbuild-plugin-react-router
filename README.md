@@ -4,7 +4,7 @@
   <a href="https://rsbuild.dev" target="blank"><img src="https://github.com/web-infra-dev/rsbuild/assets/7237365/84abc13e-b620-468f-a90b-dbf28e7e9427" alt="Rsbuild Logo" /></a>
 </p>
 
-A Rsbuild plugin that provides seamless integration with React Router, supporting both client-side routing and server-side rendering (SSR).
+React Router Framework Mode for Rsbuild.
 
 ## Features
 
@@ -19,6 +19,21 @@ A Rsbuild plugin that provides seamless integration with React Router, supportin
 - ☁️ Cloudflare Workers deployment support
 - 🔗 Module Federation support (experimental)
 
+## Framework Mode
+
+The plugin lets an Rsbuild application use the standard React Router Framework
+Mode conventions:
+
+- `react-router.config.*` for application configuration
+- `app/routes.ts` and `@react-router/dev/routes` for route configuration
+- Route Module exports such as `loader`, `action`, `meta`, `links`, and
+  `shouldRevalidate`
+- generated `./+types/*` types
+- standard `entry.client` and `entry.server` entrypoints
+
+Some React Router build-tool integrations are not supported 1:1. See the
+configuration and examples below for the currently supported behavior.
+
 ## Installation
 
 ```bash
@@ -27,18 +42,6 @@ npm install rsbuild-plugin-react-router
 yarn add rsbuild-plugin-react-router
 # or
 pnpm add rsbuild-plugin-react-router
-```
-
-## Local development
-
-For the federation examples and Playwright e2e tests, use Node 22 and the
-repo-pinned pnpm version:
-
-```bash
-nvm install
-nvm use
-corepack enable
-corepack prepare pnpm@9.15.3 --activate
 ```
 
 ## Usage
@@ -58,6 +61,17 @@ export default defineConfig({
     pluginReact(),
   ],
 });
+```
+
+Continue using the standard React Router Framework Mode project structure:
+
+```text
+app/
+  root.tsx
+  routes.ts
+  routes/
+react-router.config.ts
+rsbuild.config.ts
 ```
 
 ## Configuration
@@ -82,9 +96,9 @@ pluginReactRouter({
 | `customServer`                   | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
 | `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
 | `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
-| `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted Rspack lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                        |
+| `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                               |
 | `logPerformance`                 | `false`     | Logs structured React Router plugin timing information.                                                                                                                                                                          |
-| `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses Rspack's default worker count, and a positive integer sets the maximum worker count.                                        |
+| `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses an automatic worker count, and a positive integer sets the maximum worker count.                                             |
 | `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
 | `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
 
@@ -147,25 +161,14 @@ The plugin will look for `react-router.config` with any supported JS/TS extensio
 
 If none are found, it falls back to defaults.
 
-### Framework Mode
-
-React Router "Framework Mode" is implemented as a Vite plugin, but this Rsbuild
-plugin aims to provide equivalent **framework-mode behaviors** (typegen, Route
-Module API types, route module splitting, SPA/SSR/prerender strategies) on top
-of Rsbuild/Rspack.
-
-In practice, you should be able to use the `@react-router/dev/*` config + routes
-APIs, import generated `./+types/*` in route modules, and use the standard
-`entry.client`/`entry.server` entrypoints like you would in the official setup.
-
 ### FAQ
 
 #### rsbuild-plugin-react-router vs ModernJS
 
-This plugin is a lightweight adapter to run React Router on Rsbuild. It does
-not aim to replace ModernJS or its higher-level framework features. If your
-goal is a full framework or advanced microfrontend support, ModernJS may be
-a better fit.
+This plugin is a focused React Router Framework Mode adapter for Rsbuild. It
+does not aim to replace ModernJS or its higher-level framework features. If
+your goal is a broader application framework or advanced microfrontend
+support, ModernJS may be a better fit.
 
 ### SPA Mode (`ssr: false`)
 
@@ -243,10 +246,10 @@ Rsbuild source maps for faster local debugging, prefer a cheap JS map:
 
 Lazy compilation prewarming is disabled by default. When enabled alongside
 `lazyCompilation`, the plugin fetches emitted browser entry and route JS assets,
-extracts activation keys from Rspack's generated lazy-compilation client calls,
-and POSTs those keys to Rspack's configured lazy trigger endpoint after dev
-compiles. It does not request application routes or run route loaders. Because
-the key extraction depends on Rspack's generated client code shape, opt in with
+extracts activation keys from the generated lazy-compilation client calls, and
+POSTs those keys to the configured lazy trigger endpoint after dev compiles. It
+does not request application routes or run route loaders. Because the key
+extraction depends on the generated client code shape, opt in with
 `unstableLazyCompilationPrewarm: true`.
 
 Subresource Integrity is disabled by default. Enable it with
@@ -487,163 +490,10 @@ Then update your `package.json` scripts:
 
 ## Cloudflare Workers Deployment
 
-To deploy your React Router app to Cloudflare Workers:
-
-1. **Configure Rsbuild** (`rsbuild.config.ts`):
-
-```ts
-import { defineConfig } from '@rsbuild/core';
-import { pluginReact } from '@rsbuild/plugin-react';
-import { pluginReactRouter } from 'rsbuild-plugin-react-router';
-
-export default defineConfig({
-  environments: {
-    node: {
-      performance: {
-        chunkSplit: { strategy: 'all-in-one' },
-      },
-      tools: {
-        rspack: {
-          experiments: { outputModule: true },
-          externalsType: 'module',
-          output: {
-            chunkFormat: 'module',
-            chunkLoading: 'import',
-            workerChunkLoading: 'import',
-            wasmLoading: 'fetch',
-            library: { type: 'module' },
-            module: true,
-          },
-          resolve: {
-            conditionNames: [
-              'workerd',
-              'worker',
-              'browser',
-              'import',
-              'require',
-            ],
-          },
-        },
-      },
-    },
-  },
-  plugins: [pluginReactRouter({ customServer: true }), pluginReact()],
-});
-```
-
-2. **Configure Wrangler** (`wrangler.toml`):
-
-```toml
-workers_dev = true
-name = "my-react-router-worker"
-compatibility_date = "2024-11-18"
-main = "./build/server/static/js/app.js"
-assets = { directory = "./build/client/" }
-
-[vars]
-VALUE_FROM_CLOUDFLARE = "Hello from Cloudflare"
-
-# Optional build configuration
-# [build]
-# command = "npm run build"
-# watch_dir = "app"
-```
-
-3. **Create Worker Entry** (`server/index.ts`):
-
-```ts
-import { createRequestHandler } from 'react-router';
-
-declare global {
-  interface CloudflareEnvironment extends Env {}
-  interface ImportMeta {
-    env: {
-      MODE: string;
-    };
-  }
-}
-
-declare module 'react-router' {
-  export interface AppLoadContext {
-    cloudflare: {
-      env: CloudflareEnvironment;
-      ctx: ExecutionContext;
-    };
-  }
-}
-
-// @ts-expect-error - virtual module provided by React Router at build time
-import * as serverBuild from 'virtual/react-router/server-build';
-
-const requestHandler = createRequestHandler(serverBuild, import.meta.env.MODE);
-
-export default {
-  fetch(request, env, ctx) {
-    return requestHandler(request, {
-      cloudflare: { env, ctx },
-    });
-  },
-} satisfies ExportedHandler<CloudflareEnvironment>;
-```
-
-4. **Update Package Dependencies**:
-
-```json
-{
-  "dependencies": {
-    "@react-router/node": "^7.13.0",
-    "@react-router/serve": "^7.13.0",
-    "react-router": "^7.13.0"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241112.0",
-    "@react-router/cloudflare": "^7.13.0",
-    "@react-router/dev": "^7.13.0",
-    "wrangler": "^3.106.0"
-  }
-}
-```
-
-5. **Setup Deployment Scripts** (`package.json`):
-
-```json
-{
-  "scripts": {
-    "build": "rsbuild build",
-    "deploy": "npm run build && wrangler deploy",
-    "dev": "rsbuild dev",
-    "start": "wrangler dev"
-  }
-}
-```
-
-### Key Configuration Notes:
-
-- The `workers_dev = true` setting enables deployment to workers.dev subdomain
-- `main` points to your Worker's entry point in the build output
-- `assets` directory specifies where your static client files are located
-- Environment variables can be set in the `[vars]` section
-- The `compatibility_date` should be kept up to date
-- TypeScript types are provided via `@cloudflare/workers-types`
-- Development can be done locally using `wrangler dev`
-- Deployment is handled through `wrangler deploy`
-
-### Development Workflow:
-
-1. Local Development:
-
-   ```bash
-   # Start local development server
-   npm run dev
-   # or
-   npm start
-   ```
-
-2. Production Deployment:
-   ```bash
-   # Build and deploy
-   npm run deploy
-   ```
+Start from the tested [Cloudflare example](./examples/cloudflare). It contains
+the complete Rsbuild configuration, Worker entry, Wrangler configuration, and
+deployment scripts. The example uses `customServer: true` so the Worker owns
+the React Router request handler.
 
 ## Development
 
@@ -653,6 +503,15 @@ The plugin automatically:
 - Sets up development server with live reload
 - Handles route-based code splitting
 - Manages client and server builds
+
+For local development, use Node 22 and the repository's pinned pnpm version:
+
+```bash
+nvm install
+nvm use
+corepack enable
+corepack prepare pnpm@9.15.3 --activate
+```
 
 ### Benchmarking
 
@@ -668,17 +527,6 @@ See the [benchmark guide](./benchmarks/README.md) for JSON output, pull-request
 comparisons and comments, `BENCHMARK_PLUGIN_ROOT`, and optional CodSpeed
 publication.
 
-## React Router Framework Mode
-
-React Router "Framework Mode" wraps Data Mode using a Vite plugin. This Rsbuild
-plugin aims to match the important framework behaviors on Rsbuild:
-
-- Typegen + Route Module API types (`./+types/*`)
-- Route module splitting (`splitRouteModules`)
-- SPA mode (`ssr: false`), SSR mode, and static prerendering (`prerender`)
-
-Some upstream framework integrations are not supported 1:1.
-
 ## Examples
 
 The repository includes several examples demonstrating different use cases:
@@ -692,6 +540,7 @@ The repository includes several examples demonstrating different use cases:
 | [cloudflare](./examples/cloudflare)                                     | Cloudflare Workers deployment           | 3004 | `pnpm dev` |
 | [client-only](./examples/client-only)                                   | `.client` modules with SSR hydration    | 3010 | `pnpm dev` |
 | [react-router-8](./examples/react-router-8)                             | React Router 8 framework-mode SSR       | 3020 | `pnpm dev` |
+| [rsc-mode](./examples/rsc-mode)                                         | Experimental RSC Framework Mode         | 3021 | `pnpm dev` |
 | [epic-stack](./examples/epic-stack)                                     | Full-featured Epic Stack example        | 3005 | `pnpm dev` |
 | [federation/epic-stack](./examples/federation/epic-stack)               | Module Federation host                  | 3006 | `pnpm dev` |
 | [federation/epic-stack-remote](./examples/federation/epic-stack-remote) | Module Federation remote                | 3007 | `pnpm dev` |
