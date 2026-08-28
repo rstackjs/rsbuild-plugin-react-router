@@ -66,12 +66,48 @@ const assertRegisteredCase = (definition: BenchmarkCase) => {
   }
 };
 
-const failedCaseError = (id: string) =>
-  new Error(`Benchmark case "${id}" failed.`);
+const failedCaseError = (
+  id: string,
+  result?: {
+    status?: number;
+    signal?: string | null;
+    timedOut?: boolean;
+    output?: string;
+    stderr?: string;
+  }
+) =>
+  new Error(
+    `Benchmark case "${id}" failed.` +
+      (result
+        ? `\n${JSON.stringify(
+            {
+              status: result.status,
+              signal: result.signal,
+              timedOut: result.timedOut,
+              output: result.output,
+              stderr: result.stderr,
+            },
+            null,
+            2
+          )}`
+        : '')
+  );
 
 export const getDevBenchmarkTimeoutMs = (
   runnerMode = process.env.CODSPEED_RUNNER_MODE
 ): number => (runnerMode === 'simulation' ? 600_000 : 120_000);
+
+export const getCodSpeedBenchmarkOptions = (
+  runnerMode = process.env.CODSPEED_RUNNER_MODE
+) =>
+  runnerMode === 'simulation'
+    ? {
+        iterations: 1,
+        warmupIterations: 0,
+        time: 0,
+        warmupTime: 0,
+      }
+    : undefined;
 
 export const runBenchmarkCase = async (
   definition: BenchmarkCase,
@@ -101,7 +137,7 @@ export const runBenchmarkCase = async (
       });
 
       if (result.status !== 0) {
-        throw failedCaseError(definition.id);
+        throw failedCaseError(definition.id, result);
       }
       return { wallMs: result.wallMs };
     }
@@ -135,7 +171,7 @@ export const runBenchmarkCase = async (
     });
 
     if (result.status !== 0) {
-      throw failedCaseError(definition.id);
+      throw failedCaseError(definition.id, result);
     }
     return { wallMs: result.wallMs };
   } finally {

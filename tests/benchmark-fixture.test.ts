@@ -128,6 +128,21 @@ describe('focused local benchmark cases', () => {
     expect(getDevBenchmarkTimeoutMs('simulation')).toBe(600_000);
   });
 
+  it('executes each deterministic CodSpeed simulation benchmark once', async () => {
+    const { getCodSpeedBenchmarkOptions } = await import(
+      '../benchmarks/cases.mts'
+    );
+
+    expect(getCodSpeedBenchmarkOptions()).toBeUndefined();
+    expect(getCodSpeedBenchmarkOptions('walltime')).toBeUndefined();
+    expect(getCodSpeedBenchmarkOptions('simulation')).toEqual({
+      iterations: 1,
+      warmupIterations: 0,
+      time: 0,
+      warmupTime: 0,
+    });
+  });
+
   it('registers the focused build and dev cases', async () => {
     const { benchmarkCases } = await import('../benchmarks/cases.mts');
 
