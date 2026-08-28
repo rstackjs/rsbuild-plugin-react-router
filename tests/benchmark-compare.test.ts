@@ -341,6 +341,13 @@ describe('benchmark pull-request comments', () => {
 });
 
 describe('benchmark workflow documentation', () => {
+  it('enables CodSpeed simulation subprocess tracking with the pinned action input', () => {
+    const workflow = readFileSync('.github/workflows/benchmark.yml', 'utf8');
+
+    expect(workflow).toMatch(/^\s+simulation-track-subprocess: true$/m);
+    expect(workflow).not.toMatch(/^\s+simulation-track-subprocesses: true$/m);
+  });
+
   it('removes legacy scripts and documents the focused commands', () => {
     const packageJson = JSON.parse(
       readFileSync('package.json', 'utf8')

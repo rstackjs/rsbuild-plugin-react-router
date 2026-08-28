@@ -118,6 +118,17 @@ describe('benchmark fixture generator', () => {
 });
 
 describe('focused local benchmark cases', () => {
+  it('keeps I/O-heavy dev measurement in the controlled comparison', () => {
+    const packageJson = JSON.parse(
+      readFileSync(join(process.cwd(), 'package.json'), 'utf8')
+    );
+
+    expect(packageJson.scripts['bench:codspeed']).toContain(
+      '-t build-256-ssr'
+    );
+    expect(packageJson.scripts['bench:smoke']).not.toContain('-t');
+  });
+
   it('registers the focused build and dev cases', async () => {
     const { benchmarkCases } = await import('../benchmarks/cases.mts');
 
