@@ -107,3 +107,103 @@ test.describe("RSC server-first route CSS", () => {
     }
   });
 });
+
+test.describe("RSC CSS-bearing route data exports", () => {
+  test("keeps React Router data exports callable across the client boundary", async ({
+    page,
+    rsbuildPreview,
+  }) => {
+    let { port } = await rsbuildPreview(
+      async () => ({
+        "app/root.tsx": js`
+          import { Links, Meta, Outlet } from "react-router";
+
+          export function ServerLayout({ children }: { children: React.ReactNode }) {
+            return (
+              <html lang="en">
+                <head>
+                  <meta charSet="utf-8" />
+                  <Meta />
+                  <Links />
+                </head>
+                <body>{children}</body>
+              </html>
+            );
+          }
+
+          export function ServerComponent() {
+            return <Outlet />;
+          }
+        `,
+        "app/routes/css-data/route.tsx": js`
+          import { Link, useLoaderData, useMatches } from "react-router";
+          import "./styles.css";
+
+          let loaderCalls = 0;
+
+          export function loader() {
+            return { loaderCalls: ++loaderCalls };
+          }
+
+          export const handle = { marker: "css-route-handle" };
+
+          export function meta() {
+            return [{ title: "CSS route references preserved" }];
+          }
+
+          export function links() {
+            return [{ rel: "author", href: "/css-route-author" }];
+          }
+
+          export function shouldRevalidate() {
+            return false;
+          }
+
+          export default function CssDataRoute() {
+            let data = useLoaderData();
+            let routeMatch = useMatches().find(
+              match => match.handle?.marker === "css-route-handle"
+            );
+
+            return (
+              <main id="css-data-route" className="css-data-route">
+                <h1>CSS route data exports</h1>
+                <p data-testid="route-handle">{routeMatch?.handle.marker}</p>
+                <p data-testid="loader-calls">{data.loaderCalls}</p>
+                <Link to="?step=2">Navigate without revalidation</Link>
+              </main>
+            );
+          }
+        `,
+        "app/routes/css-data/styles.css": css`
+          .css-data-route {
+            padding: 37px;
+          }
+        `,
+      }),
+      "rsc-framework",
+    );
+
+    await page.goto(`http://localhost:${port}/css-data`);
+
+    await expect(page).toHaveTitle("CSS route references preserved");
+    await expect(page.locator('link[rel="author"]')).toHaveAttribute(
+      "href",
+      "/css-route-author",
+    );
+    await expect(page.getByTestId("route-handle")).toHaveText(
+      "css-route-handle",
+    );
+    await expect(page.getByTestId("loader-calls")).toHaveText("1");
+    await expect(page.locator("#css-data-route")).toHaveCSS(
+      "padding",
+      "37px",
+    );
+
+    await page.getByRole("link", { name: "Navigate without revalidation" }).click();
+    await expect(page).toHaveURL(/\/css-data\?step=2$/);
+    await expect(page.getByTestId("loader-calls")).toHaveText("1");
+    expect(page.errors).toEqual([]);
+    validateRSCHtml(await page.content());
+  });
+});

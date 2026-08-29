@@ -2,7 +2,6 @@ import { dirname } from 'pathe';
 
 import { generate, parse } from './yuku.js';
 import {
-  CLIENT_EXPORTS,
   CLIENT_NON_COMPONENT_EXPORTS,
   SERVER_ONLY_ROUTE_EXPORTS,
 } from './constants.js';
@@ -75,21 +74,6 @@ const SERVER_ROUTE_EXPORTS_SET = new Set<string>(SERVER_ROUTE_EXPORTS);
 const CLIENT_CHUNK_QUERY = 'client-route-module';
 const SERVER_MODULE_QUERY = 'server-route-module';
 const ROUTE_CLIENT_MODULE_CHUNK = 'route';
-const ROUTE_CLIENT_DATA_CHUNK = 'data';
-
-// Route "data" exports (non-component client functions/objects that ship in the
-// serialized route manifest). They are isolated into their own CSS-free client
-// chunk so the native rspack `RscServerPlugin` never wraps them in a
-// CSS-injecting component wrapper (see `createClientRouteModule`).
-const ROUTE_CLIENT_DATA_EXPORTS = [
-  CLIENT_EXPORTS.handle,
-  CLIENT_EXPORTS.links,
-  CLIENT_EXPORTS.meta,
-  CLIENT_EXPORTS.shouldRevalidate,
-] as const;
-const ROUTE_CLIENT_DATA_EXPORTS_SET = new Set<string>(
-  ROUTE_CLIENT_DATA_EXPORTS
-);
 
 // Bare, specifier-less side-effect style imports (`import "./x.css"`). Matches
 // plain CSS, vanilla-extract `.css.ts`/`.css.js`, and preprocessor extensions,
@@ -108,15 +92,6 @@ const isSideEffectStyleImport = (statement: AnyNode): boolean => {
   return (
     typeof source?.value === 'string' &&
     STYLE_SIDE_EFFECT_IMPORT_SOURCE.test(source.value)
-  );
-};
-
-const removeSideEffectStyleImports = (program: ProgramNode): void => {
-  // Only drop specifier-less side-effect imports. Imports WITH specifiers
-  // (e.g. a `?url` asset import used by `links()`) must survive, as must
-  // non-style side-effect imports.
-  program.body = program.body.filter(
-    (statement: AnyNode) => !isSideEffectStyleImport(statement)
   );
 };
 
@@ -572,13 +547,6 @@ const createRscRouteExportPlan = async (
           chunkName
         );
       }
-      if (ROUTE_CLIENT_DATA_EXPORTS_SET.has(exportName)) {
-        return createClientRouteModuleId(
-          options.resourcePath,
-          options.resourceQuery,
-          ROUTE_CLIENT_DATA_CHUNK
-        );
-      }
       if (isClientRouteExport(exportName)) {
         return createClientRouteModuleId(
           options.resourcePath,
@@ -780,11 +748,11 @@ const createClientRouteModule = async (
   // side-effect import (see `collectVanillaValueImportSources`) makes the client
   // build extract the stylesheet — matching a plain `import "./x.css"` global
   // style — so the server route entry's `entryCssFiles` link resolves.
-  const vanillaValueImportSources =
-    plan.exportNames.some(isServerComponentExport) &&
-    clientRouteChunk !== ROUTE_CLIENT_DATA_CHUNK
-      ? collectVanillaValueImportSources(program)
-      : [];
+  const vanillaValueImportSources = plan.exportNames.some(
+    isServerComponentExport
+  )
+    ? collectVanillaValueImportSources(program)
+    : [];
   if (clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK) {
     stripPreservedDependencyExports(
       program,
@@ -797,9 +765,7 @@ const createClientRouteModule = async (
   const keepsClientExport =
     clientRouteChunk === ROUTE_CLIENT_MODULE_CHUNK
       ? isClientRouteExport
-      : clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK
-        ? (exportName: string) => ROUTE_CLIENT_DATA_EXPORTS_SET.has(exportName)
-        : (exportName: string) => exportName === clientRouteChunk;
+      : (exportName: string) => exportName === clientRouteChunk;
   const exportsToRemove =
     clientRouteChunk === 'shared'
       ? [...SERVER_ROUTE_EXPORTS, ...CLIENT_ROUTE_EXPORTS]
@@ -812,23 +778,6 @@ const createClientRouteModule = async (
   const removed = removeExports(ast, exportsToRemove);
   if (removed) {
     removeUnusedImports(ast);
-  }
-  if (clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK) {
-    // The data chunk re-exports only route data functions (handle/links/meta/
-    // shouldRevalidate). Component chunks still import the route's styles, so
-    // CSS delivery is unchanged; stripping the bare side-effect style imports
-    // here keeps this chunk's client-manifest `cssFiles` empty so the native
-    // rspack `RscServerPlugin` CSS wrapper never converts these data exports
-    // into components (which would break RSC serialization of the data
-    // functions). Imports with specifiers (e.g. a used `?url` import) survive.
-    //
-    // TODO(upstream): this is a workaround for rspack's `RscServerPlugin`
-    // wrapping every CSS-bearing client module export in a CSS-injecting
-    // component wrapper, including non-component (data) exports. If upstream
-    // gains a way to opt data-only chunks out of that wrapping, drop this
-    // strip and the dedicated `=data` chunk. File/track the limitation at
-    // https://github.com/web-infra-dev/rspack before removing this.
-    removeSideEffectStyleImports(program);
   }
   rewriteRscClientRouteImports(ast, sourceFileName, clientRouteChunk, options);
   const generated = generate(ast, {
@@ -880,9 +829,9 @@ const createClientRouteModule = async (
     }
   }
 
-  // A single route edit emits several client chunks (shared + route + data +
-  // one per split export), and each chunk's `accept` callback fires
-  // independently. Letting every callback navigate meant one route change
+  // A single route edit emits several client chunks (shared + route + one per
+  // split export), and each chunk's `accept` callback fires independently.
+  // Letting every callback navigate meant one route change
   // triggered several redundant navigations. Coalesce them through a
   // globalThis-guarded requestAnimationFrame: the first accept in a frame
   // schedules the navigate and the rest short-circuit.
@@ -898,13 +847,7 @@ const createClientRouteModule = async (
 
   const hmrFooter = !options.isDev
     ? ''
-    : clientRouteChunk === ROUTE_CLIENT_DATA_CHUNK
-      ? // Data exports (handle/links/meta/shouldRevalidate) never render a
-        // component, so this chunk self-accepts with no navigate: that keeps a
-        // data-only edit from bubbling to a full reload without adding a
-        // redundant route navigation.
-        `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(); }\n`
-      : `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(${rscHmrAcceptCallback}); }\n`;
+    : `\nif (import.meta.webpackHot) { import.meta.webpackHot.accept(${rscHmrAcceptCallback}); }\n`;
 
   return {
     code:

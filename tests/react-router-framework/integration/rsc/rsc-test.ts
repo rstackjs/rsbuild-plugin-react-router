@@ -7,6 +7,18 @@ import getPort from "get-port";
 
 import { implementations, js, setupRscTest, validateRSCHtml } from "./utils";
 
+const minifiedServerComponentRenderError =
+  "Minified React error #441; visit https://react.dev/errors/441 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.";
+const fullServerComponentRenderError =
+  "An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details. A digest property is included on this error instance which may provide additional details about the nature of the error.";
+
+function expectSanitizedServerComponentRenderError(message: string | null) {
+  expect([
+    fullServerComponentRenderError,
+    minifiedServerComponentRenderError,
+  ]).toContain(message);
+}
+
 implementations.forEach((implementation) => {
   test.describe(`RSC (${implementation.name})`, () => {
     test.describe("Development", () => {
@@ -1845,8 +1857,8 @@ implementations.forEach((implementation) => {
             body: "reject",
           });
           const rejected = await page.waitForSelector("[data-rejected]");
-          expect(await rejected.innerText()).toContain(
-            "An error occurred in the Server Components render.",
+          expectSanitizedServerComponentRenderError(
+            await rejected.innerText(),
           );
         });
 
@@ -2260,8 +2272,8 @@ implementations.forEach((implementation) => {
           // Verify error boundary is shown
           await page.waitForSelector("[data-error-title]");
           await page.waitForSelector("[data-error-message]");
-          expect(await page.locator("[data-error-message]").textContent()).toBe(
-            "An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details. A digest property is included on this error instance which may provide additional details about the nature of the error.",
+          expectSanitizedServerComponentRenderError(
+            await page.locator("[data-error-message]").textContent(),
           );
 
           // Ensure this is using RSC
