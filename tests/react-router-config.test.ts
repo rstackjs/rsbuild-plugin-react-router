@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
+import { createRsbuild, type NormalizedConfig } from '@rsbuild/core';
 import {
   getDefaultTrailingSlashAwareDataRequests,
   resolveReactRouterConfigEffect,
@@ -9,9 +10,16 @@ import type { Config } from '../src/react-router-config';
 const resolveReactRouterConfig = (config: Config) =>
   runPluginEffect(resolveReactRouterConfigEffect(config));
 
+const createNormalizedRsbuildConfig = async (): Promise<NormalizedConfig> => {
+  const rsbuild = await createRsbuild({ rsbuildConfig: {} });
+  await rsbuild.initConfigs();
+  return rsbuild.getNormalizedConfig();
+};
+
 describe('resolveReactRouterConfig', () => {
   it('merges presets and combines buildEnd hooks', async () => {
     const buildEndCalls: string[] = [];
+    const rsbuildConfig = await createNormalizedRsbuildConfig();
     const result = await resolveReactRouterConfig({
       presets: [
         {
@@ -34,8 +42,38 @@ describe('resolveReactRouterConfig', () => {
     await result.resolved.buildEnd?.({
       buildManifest: { routes: {} },
       reactRouterConfig: result.resolved,
-      rsbuildConfig: {} as any,
+      rsbuildConfig,
     });
+    expect(buildEndCalls).toEqual(['preset', 'user']);
+  });
+
+  it('runs every buildEnd hook before propagating a failure', async () => {
+    const buildEndCalls: string[] = [];
+    const presetFailure = new Error('preset buildEnd failed');
+    const rsbuildConfig = await createNormalizedRsbuildConfig();
+    const result = await resolveReactRouterConfig({
+      presets: [
+        {
+          name: 'failing-preset',
+          reactRouterConfig: async () => ({
+            buildEnd: async () => {
+              buildEndCalls.push('preset');
+              throw presetFailure;
+            },
+          }),
+        },
+      ],
+      buildEnd: async () => {
+        buildEndCalls.push('user');
+      },
+    });
+    await expect(
+      result.resolved.buildEnd?.({
+        buildManifest: { routes: {} },
+        reactRouterConfig: result.resolved,
+        rsbuildConfig,
+      })
+    ).rejects.toBe(presetFailure);
     expect(buildEndCalls).toEqual(['preset', 'user']);
   });
 
