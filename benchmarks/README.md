@@ -56,15 +56,17 @@ head, and percentage delta for every shared case.
 pnpm bench:codspeed
 ```
 
-This runs the same cases through Vitest's benchmark runner. Set
-`BENCHMARK_PLUGIN_ROOT` to benchmark a built plugin from another checkout; omit
-it to use this repository. `BENCHMARK_WORK_ROOT` can relocate generated fixture
-work when needed.
+This runs the CPU-heavy production build case through CodSpeed simulation. The
+I/O-heavy dev-server case remains in the controlled base/head comparison above;
+CPU simulation is not a trustworthy instrument for its file-watcher and HTTP
+workload. Set `BENCHMARK_PLUGIN_ROOT` to benchmark a built plugin from another
+checkout; omit it to use this repository. `BENCHMARK_WORK_ROOT` can relocate
+generated fixture work when needed.
 
 ```sh
 BENCHMARK_PLUGIN_ROOT=/absolute/path/to/plugin pnpm bench:codspeed
 ```
 
-The GitHub workflow publishes this wall-time run to CodSpeed when available.
-That publication is optional; the local JSON comparison and pull-request report
-remain the source of record.
+The GitHub workflow publishes the simulated build result to CodSpeed. The local
+same-run JSON comparison and pull-request report remain the source of record for
+both build and dev wall time.
