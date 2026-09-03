@@ -345,10 +345,20 @@ const createClassicModePlan = async ({
       wasmLoading: 'fetch',
       library: { type: 'module' },
       module: true,
+      // Async chunks are addressed by id at runtime, so the chunk name only
+      // adds bytes to the filename and to every place that references it.
+      ...(isBuild
+        ? { chunkFilename: 'static/js/async/[id]-[contenthash:16].js' }
+        : {}),
     },
     webOptimization: {
       avoidEntryIife: true,
       runtimeChunk: 'single',
+      // Classic mode resolves route modules through the browser manifest by
+      // chunk, not by export name, so production builds can mangle export
+      // names and drop exports nothing imports across the whole graph. RSC
+      // mode must keep every export name; see createRscModePlan.
+      ...(isBuild ? { mangleExports: 'size', usedExports: 'global' } : {}),
     },
     nodeExternals: Array.from(
       new Set(['express', ...getSsrExternals(process.cwd())])

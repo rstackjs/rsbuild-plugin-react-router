@@ -445,6 +445,43 @@ describe('pluginReactRouter', () => {
     ).toBeUndefined();
   });
 
+  it('shrinks classic production browser output', async () => {
+    const rsbuild = await createStubRsbuild({
+      action: 'build',
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(config.environments.web.tools.rspack.optimization).toMatchObject({
+      mangleExports: 'size',
+      usedExports: 'global',
+    });
+    expect(config.environments.web.tools.rspack.output.chunkFilename).toBe(
+      'static/js/async/[id]-[contenthash:16].js'
+    );
+  });
+
+  it('keeps classic development export names and chunk names', async () => {
+    const rsbuild = await createStubRsbuild({
+      rsbuildConfig: {},
+    });
+
+    rsbuild.addPlugins([pluginReactRouter()]);
+    const config = await rsbuild.unwrapConfig();
+
+    expect(
+      config.environments.web.tools.rspack.optimization.mangleExports
+    ).toBeUndefined();
+    expect(
+      config.environments.web.tools.rspack.optimization.usedExports
+    ).toBeUndefined();
+    expect(
+      config.environments.web.tools.rspack.output.chunkFilename
+    ).toBeUndefined();
+  });
+
   it('preserves production export names for RSC builds', async () => {
     const rsbuild = await createStubRsbuild({
       action: 'build',
