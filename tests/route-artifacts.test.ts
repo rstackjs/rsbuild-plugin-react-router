@@ -29,10 +29,11 @@ const enforceRouteChunkConfig: RouteChunkConfig = {
 };
 
 const resourcePath = '/app/routes/demo.tsx';
-const routeRequest = `${resourcePath}?react-router-route`;
-const mainRouteChunkRequest = getRouteChunkModuleId(resourcePath, 'main');
+const relativeResourcePath = './demo.tsx';
+const routeRequest = './demo.tsx?react-router-route';
+const mainRouteChunkRequest = getRouteChunkModuleId(relativeResourcePath, 'main');
 const customExportChunkRequest = getRouteChunkModuleId(
-  resourcePath,
+  relativeResourcePath,
   'customExport'
 );
 
@@ -56,6 +57,48 @@ const createRouteChunk = async (
 
 describe('route artifact helpers', () => {
   describe('createRouteClientEntryArtifact', () => {
+    it.each([
+      {
+        name: 'web route',
+        code: `export default function Route() { return null; }`,
+        environmentName: 'web',
+        config: disabledRouteChunkConfig,
+        expected: 'export { default } from "./demo.tsx?react-router-route";',
+      },
+      {
+        name: 'split route',
+        code: `
+          export async function clientLoader() { return null; }
+          export default function Route() { return null; }
+        `,
+        environmentName: 'web',
+        config: routeChunkConfig,
+        expected: 'export { default } from "./demo.tsx?route-chunk=main";',
+      },
+      {
+        name: 'server route',
+        code: `export default function Route() { return null; }`,
+        environmentName: 'node',
+        config: routeChunkConfig,
+        expected: 'export { default } from "./demo.tsx";',
+      },
+    ])('generates location-independent $name requests', async options => {
+      const createArtifact = (projectRoot: string) =>
+        createRouteClientEntryArtifact({
+          code: options.code,
+          resourcePath: `${projectRoot}/app/routes/demo.tsx`,
+          environmentName: options.environmentName,
+          isBuild: true,
+          routeChunkConfig: options.config,
+        });
+
+      const first = await createArtifact('/workspace-a');
+      const second = await createArtifact('/workspace-b');
+
+      expect(first).toEqual({ code: options.expected });
+      expect(second).toEqual(first);
+    });
+
     it('generates web route reexports that filter server-only exports', async () => {
       const result = await createRouteClientEntryArtifact({
         code: `
@@ -93,7 +136,7 @@ describe('route artifact helpers', () => {
 
       expect(result).toEqual({
         code: `export { action, clientLoader, default, loader } from ${JSON.stringify(
-          resourcePath
+          relativeResourcePath
         )};`,
       });
     });
@@ -178,7 +221,7 @@ describe('route artifact helpers', () => {
 
       expect(result).toEqual({
         code: `export { HydrateFallback, clientLoader, default } from ${JSON.stringify(
-          `${rootResourcePath}?react-router-route`
+          './root.tsx?react-router-route'
         )};`,
       });
     });

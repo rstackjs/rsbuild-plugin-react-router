@@ -1,3 +1,4 @@
+import { basename } from 'pathe';
 import {
   CLIENT_EXPORTS,
   CLIENT_ROUTE_EXPORTS_SET,
@@ -175,11 +176,12 @@ export const buildRouteClientEntryCode = ({
     chunkedExports.length > 0 || sharedChunkedExports.length > 0
       ? new Set<string>([...chunkedExports, ...sharedChunkedExports])
       : undefined;
+  const routeRequestPath = `./${basename(resourcePath)}`;
   const target = isServer
-    ? resourcePath
+    ? routeRequestPath
     : chunkedExports.length > 0
-      ? getRouteChunkModuleId(resourcePath, 'main')
-      : `${resourcePath}?react-router-route`;
+      ? getRouteChunkModuleId(routeRequestPath, 'main')
+      : `${routeRequestPath}?react-router-route`;
   const reexports = exportNames
     .filter(exportName =>
       shouldReexportFromRouteEntry({ chunkedExportSet, exportName, isServer })
@@ -192,7 +194,7 @@ export const buildRouteClientEntryCode = ({
     ...sharedChunkedExports.map(
       exportName =>
         `export { ${exportName} } from ${JSON.stringify(
-          getRouteChunkModuleId(resourcePath, exportName)
+          getRouteChunkModuleId(routeRequestPath, exportName)
         )};`
     ),
   ]
