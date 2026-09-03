@@ -1196,11 +1196,19 @@ test.describe("Fog of War", () => {
     await app.clickLink("/a");
     await page.waitForSelector("#a");
     expect(await app.getHtml("#a")).toMatch("A LOADER");
-    expect(
-      await page.evaluate(() =>
-        Object.keys((window as any).__reactRouterManifest.routes),
-      ),
-    ).toEqual(["root", "routes/_index", "routes/a"]);
+    // Navigating to /a discovers /a itself. The rendered page also links to
+    // /a/b, and fog-of-war link discovery for that runs on its own debounce, so
+    // depending on timing `routes/a.b` may already be patched in. Assert on the
+    // routes this navigation had to load and on the absence of the 400 dummy
+    // links rather than on an exact snapshot.
+    let manifestRouteIds = await page.evaluate(() =>
+      Object.keys((window as any).__reactRouterManifest.routes),
+    );
+    expect(manifestRouteIds).toEqual(
+      expect.arrayContaining(["root", "routes/_index", "routes/a"]),
+    );
+    expect(manifestRouteIds.filter((id) => id.includes("dummy"))).toEqual([]);
+    expect(manifestRouteIds.length).toBeLessThanOrEqual(4);
   });
 
   test("includes a version query parameter as a cachebuster", async ({

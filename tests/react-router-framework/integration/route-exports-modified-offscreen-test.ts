@@ -76,8 +76,18 @@ test.describe(async () => {
       originalContents = contents;
       return contents.replace(/export const loader.*/, "");
     });
-    // Give the server time to pick the manifest change
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Wait until the dev server serves the updated route before reloading.
+    // Upstream sleeps for 200ms here, but on a loaded CI runner the rebuild
+    // can outlast that. The browser would then load the page while the
+    // server build is still the previous one, and React Router's stale-client
+    // check would resync with a document reload of /other on the very next
+    // navigation. A direct document load of a route without a loader hydrates
+    // `null` against a server render of `undefined` (a React Router
+    // inconsistency), which would surface here as an unrelated hydration error.
+    await expect(async () => {
+      let response = await page.request.get(`http://localhost:${port}/other`);
+      expect(await response.text()).not.toContain("hello");
+    }).toPass();
 
     // After browser reload, client should be aware that there's no loader on the other route
     if (browserName === "webkit") {

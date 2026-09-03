@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import getPort from "get-port";
 
+import { stubExampleDomain } from "../helpers/external-site.js";
+
 import { implementations, js, setupRscTest, validateRSCHtml } from "./utils";
 
 implementations.forEach((implementation) => {
@@ -237,10 +239,16 @@ implementations.forEach((implementation) => {
         browserName === "firefox",
         "Playwright doesn't like external redirects for tests. It times out waiting for the URL even though it navigates.",
       );
+      await stubExampleDomain(page);
       await page.goto(`http://localhost:${port}/render-redirect`);
       await expect(page.getByText("home")).toBeAttached();
       await page.getByText("External").click();
-      await page.waitForURL(`https://example.com/`);
+      // The RSC error handler assigns `window.location.href` during render and
+      // also commits a `<meta http-equiv="refresh">`, so the browser can start
+      // the external navigation more than once and abort the earlier
+      // attempts. Poll for the final URL instead of latching onto the first
+      // navigation, which `waitForURL` would reject with net::ERR_ABORTED.
+      await expect(page).toHaveURL(`https://example.com/`);
       await expect(page.getByText("Example Domain")).toBeAttached();
     });
 
@@ -272,8 +280,14 @@ implementations.forEach((implementation) => {
         browserName === "firefox",
         "Playwright doesn't like external redirects for tests. It times out waiting for the URL even though it navigates.",
       );
+      await stubExampleDomain(page);
       await page.goto(`http://localhost:${port}/render-redirect/lazy/external`);
-      await page.waitForURL(`https://example.com/`);
+      // The RSC error handler assigns `window.location.href` during render and
+      // also commits a `<meta http-equiv="refresh">`, so the browser can start
+      // the external navigation more than once and abort the earlier
+      // attempts. Poll for the final URL instead of latching onto the first
+      // navigation, which `waitForURL` would reject with net::ERR_ABORTED.
+      await expect(page).toHaveURL(`https://example.com/`);
       await expect(page.getByText("Example Domain")).toBeAttached();
     });
 
