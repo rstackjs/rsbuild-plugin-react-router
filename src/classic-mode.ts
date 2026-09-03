@@ -25,6 +25,7 @@ import {
 import {
   getRouteChunkEntryName,
   getRouteChunkModuleId,
+  getRouteEntryBaseName,
   routeChunkExportNames,
 } from './route-chunks.js';
 import type { Config } from './react-router-config.js';
@@ -144,7 +145,7 @@ export const createClassicWebRouteEntries = ({
   const manifestChunkNames = new Set<string>(['entry.client']);
   const webRouteEntries = Object.values(routes).reduce(
     (acc, route) => {
-      const entryName = route.file.slice(0, route.file.lastIndexOf('.'));
+      const entryName = getRouteEntryBaseName(route, appDirectory);
       const routeFilePath = resolve(appDirectory, route.file);
       manifestChunkNames.add(entryName);
       acc[entryName] = {
@@ -166,7 +167,11 @@ export const createClassicWebRouteEntries = ({
           if (!source.includes(exportName)) {
             continue;
           }
-          const chunkEntryName = getRouteChunkEntryName(route.id, exportName);
+          const chunkEntryName = getRouteChunkEntryName(
+            route,
+            exportName,
+            appDirectory
+          );
           manifestChunkNames.add(chunkEntryName);
           acc[chunkEntryName] = {
             import: getRouteChunkModuleId(routeFilePath, exportName),

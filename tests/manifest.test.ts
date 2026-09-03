@@ -223,11 +223,11 @@ describe('manifest', () => {
   });
 
   it('collects only manifest-readable chunk names', () => {
-    expect(Array.from(getReactRouterManifestChunkNames(routes, false))).toEqual(
+    expect(Array.from(getReactRouterManifestChunkNames(routes, '/app', false))).toEqual(
       ['entry.client', 'root', 'routes/page']
     );
 
-    expect(getReactRouterManifestChunkNames(routes, true)).toEqual(
+    expect(getReactRouterManifestChunkNames(routes, '/app', true)).toEqual(
       new Set([
         'entry.client',
         'root',

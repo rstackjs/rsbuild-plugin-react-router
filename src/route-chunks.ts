@@ -860,6 +860,19 @@ const normalizeRelativeFilePath = (file: string, appDirectory: string) => {
   return normalize(relativePath).split('?')[0];
 };
 
+// An rspack entry name is written out as a path under `output.distPath.js`, so it
+// is a filename, not an identifier. Keep it a safe, app-relative POSIX path: the
+// developer's absolute checkout path must never reach `dist/` (nor the browser
+// manifest), and an entry must never escape the JS output directory. `pathe`
+// already normalizes separators, so only drive prefixes and `..` need handling.
+const toSafeEntryPath = (relativePath: string): string =>
+  relativePath
+    .replace(/^[A-Za-z]:/, '')
+    .split('/')
+    .filter(segment => segment !== '' && segment !== '.')
+    .map(segment => (segment === '..' ? '__' : segment))
+    .join('/');
+
 const isRootRouteModuleId = (config: RouteChunkConfig, id: string) =>
   normalizeRelativeFilePath(id, config.appDirectory) === config.rootRouteFile;
 
@@ -967,7 +980,20 @@ export const validateRouteChunks: (args: {
   );
 };
 
+export const getRouteEntryBaseName = (
+  route: { file: string },
+  appDirectory: string
+): string =>
+  toSafeEntryPath(normalizeRelativeFilePath(route.file, appDirectory)).replace(
+    /\.[^/.]+$/,
+    ''
+  );
+
 export const getRouteChunkEntryName = (
-  routeId: string,
-  chunkName: RouteChunkExportName
-) => `${routeId}-${routeChunkEntrySuffix[chunkName]}`;
+  route: { file: string },
+  chunkName: RouteChunkExportName,
+  appDirectory: string
+): string =>
+  `${getRouteEntryBaseName(route, appDirectory)}-${
+    routeChunkEntrySuffix[chunkName]
+  }`;
