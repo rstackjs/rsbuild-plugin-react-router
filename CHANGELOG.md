@@ -1,5 +1,44 @@
 # rsbuild-plugin-react-router
 
+## 0.6.0
+
+### Minor Changes
+
+- 0dd1fa8: Add React Router 8 compatibility while preserving React Router 7 behavior.
+  The plugin now supports stable React Router 8 config fields, resolves
+  prerender data requests for the installed React Router major version, supports
+  React Router RSC mode, analyzes transformed MDX route modules for manifest
+  generation, preserves Flight client-reference exports and names in production,
+  supports React Router 8.3 stale-client detection in production builds,
+  avoids initial RSC client-loader hydration races, coalesces client and server
+  RSC hot updates while keeping client-only state mounted without revalidating
+  ordinary lazy compilations, restarts the development server reliably when
+  route topology changes, and includes React Router 8/RSC examples plus framework
+  integration coverage. Route watcher startup no longer interrupts early
+  development hot updates with a server restart, and temporarily invalid route
+  configs no longer tear down the active HMR compiler.
+- ae222a3: Keep React Router `handle`, `links`, `meta`, and `shouldRevalidate` exports
+  functional when their RSC route module imports CSS. Require Rsbuild 2.2 and keep
+  the exports in the regular route chunk, relying on Rspack 2.2's direct client
+  reference emission.
+
+### Patch Changes
+
+- c62ae2e: Share one scoped Effect runtime across each plugin setup so route watchers,
+  lazy-compilation prewarm work, type generation, prerendering, and other
+  background resources shut down in a deterministic, idempotent order. Effect
+  remains excluded from emitted transform loaders and browser/runtime templates.
+- f49cf0f: Generate route client entry imports with relative requests so build output and
+  content hashes stay stable when the same project is built from different paths.
+- 0dd1fa8: Stream server-first route CSS during RSC render. CSS imported in the RSC
+  layer never flows through the client manifest's `<Links>`, so it was
+  previously dropped. Modules exporting server components are now marked with
+  the `'use server-entry'` directive so rspack's RSC runtime records
+  `entryCssFiles`, which the server route entry wrapper streams as
+  precedence-tagged stylesheet links, fixing missing styles and
+  flash-of-unstyled-content for server-component routes.
+- df208f5: Run every merged `buildEnd` hook before propagating the first failure.
+
 ## 0.5.0
 
 ### Minor Changes
