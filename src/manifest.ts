@@ -413,18 +413,25 @@ export const getReactRouterManifestPath = ({
   return `${dir}/manifest-${version}.js`;
 };
 
-const getManifestVersion = (
-  fingerprintedValues: { entry: unknown; routes: unknown },
-  isBuild: boolean
-): string => {
-  if (!isBuild) {
-    return String(Math.random());
-  }
-  return createHash('md5')
+// The version is derived from the manifest content in every mode. React
+// Router's stale-client detection compares the version the browser loaded with
+// the one the server build was pinned to, and answers a mismatch with a
+// document reload. In development the browser manifest asset is served from
+// the latest web compilation while the server build stays pinned to the
+// compilation it was committed with, so a random per-compilation version made
+// the two disagree whenever a web compilation completed without changing the
+// manifest (for example the hot data revalidation recompile that follows a
+// server change), reloading the document for no reason. Equal content now
+// yields an equal version, and a real manifest change still busts the browser
+// cache through the `?v=` query on the development manifest URL.
+const getManifestVersion = (fingerprintedValues: {
+  entry: unknown;
+  routes: unknown;
+}): string =>
+  createHash('md5')
     .update(JSON.stringify(fingerprintedValues))
     .digest('hex')
     .slice(0, 8);
-};
 
 export const getReactRouterManifestChunkNames = (
   routes: Record<string, Route>,
@@ -618,7 +625,7 @@ function generateReactRouterManifestForDevEffect(
       },
       routes: result,
     };
-    const version = getManifestVersion(fingerprintedValues, isBuild);
+    const version = getManifestVersion(fingerprintedValues);
     const manifestPath = getReactRouterManifestPath({
       version,
       isBuild,
