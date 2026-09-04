@@ -143,10 +143,26 @@ export const createClassicWebRouteEntries = ({
   webRouteEntries: Record<string, RsbuildEntryDescription>;
 } => {
   const manifestChunkNames = new Set<string>(['entry.client']);
+  // Entry names are sanitized paths, so two distinct route files could in
+  // principle map to one name (for example `../shared/x.tsx` and
+  // `__/shared/x.tsx`). Refuse that instead of letting one route silently
+  // serve the other's module. Routes that share a file intentionally share
+  // an entry.
+  const routeFileByEntryName = new Map<string, string>();
   const webRouteEntries = Object.values(routes).reduce(
     (acc, route) => {
       const entryName = getRouteEntryBaseName(route, appDirectory);
       const routeFilePath = resolve(appDirectory, route.file);
+      const existingRouteFile = routeFileByEntryName.get(entryName);
+      if (
+        existingRouteFile !== undefined &&
+        existingRouteFile !== routeFilePath
+      ) {
+        throw new Error(
+          `[rsbuild-plugin-react-router] Route files ${JSON.stringify(existingRouteFile)} and ${JSON.stringify(routeFilePath)} both resolve to the entry name ${JSON.stringify(entryName)}. Rename one of them so their paths relative to the app directory differ.`
+        );
+      }
+      routeFileByEntryName.set(entryName, routeFilePath);
       manifestChunkNames.add(entryName);
       acc[entryName] = {
         import: `${routeFilePath}${BUILD_CLIENT_ROUTE_QUERY_STRING}`,

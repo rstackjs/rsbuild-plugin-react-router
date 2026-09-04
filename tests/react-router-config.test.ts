@@ -45,6 +45,10 @@ describe('resolveReactRouterConfig', () => {
       rsbuildConfig,
     });
     expect(buildEndCalls).toEqual(['preset', 'user']);
+    // buildEnd receives the resolved future flags, including defaults.
+    expect(result.resolved.future.unstable_enableNodeReadableStream).toBe(
+      false
+    );
   });
 
   it('runs every buildEnd hook before propagating a failure', async () => {

@@ -263,7 +263,6 @@ export const pluginReactRouter = (
 
     const {
       resolved: resolvedConfig,
-      userAndPresetConfig,
       presets: configPresets,
       hasConfiguredServerModuleFormat,
     } = await effectRuntime.runPromise(
@@ -472,10 +471,7 @@ export const pluginReactRouter = (
           resolvedConfigForPreset as ReactRouterPresetResolvedConfig,
       });
     }
-    const buildEndReactRouterConfig: ResolvedReactRouterConfig = {
-      ...resolvedConfigWithRoutes,
-      future: userAndPresetConfig.future ?? {},
-    } as ResolvedReactRouterConfig;
+    const buildEndReactRouterConfig = resolvedConfigWithRoutes;
 
     const isBuild = api.context.action === 'build';
     if (!isBuild) {

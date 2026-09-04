@@ -56,6 +56,41 @@ describe('createClassicWebRouteEntries', () => {
     }
   });
 
+  it('refuses two different route files that sanitize to one entry name', () => {
+    const { root, appDir } = createApp({
+      'shared/x.tsx': ROUTE_SOURCE,
+      'app/__/shared/x.tsx': ROUTE_SOURCE,
+    });
+    const routes: Record<string, Route> = {
+      root: { id: 'root', file: 'root.tsx', path: '' },
+      outside: {
+        id: 'outside',
+        parentId: 'root',
+        file: '../shared/x.tsx',
+        path: 'outside',
+      },
+      inside: {
+        id: 'inside',
+        parentId: 'root',
+        file: '__/shared/x.tsx',
+        path: 'inside',
+      },
+    };
+
+    try {
+      expect(() =>
+        createClassicWebRouteEntries({
+          appDirectory: appDir,
+          isBuild: true,
+          routes,
+          splitRouteModules: true,
+        })
+      ).toThrowError(/both resolve to the entry name "__\/shared\/x"/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('shares one entry between routes that point at the same file', () => {
     // React Router requires explicit ids when two routes reuse a file. Both
     // routes import the very same module, and a route chunk is a pure function
