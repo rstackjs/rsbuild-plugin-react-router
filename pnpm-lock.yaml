@@ -21,6 +21,8 @@ overrides:
   postcss@8: ^8.5.23
   browserslist@4: ^4.28.7
   '@remix-run/router@1': ^1.23.3
+  vite@7: ^7.3.5
+  uuid@8: ^11.1.1
 
 importers:
 
@@ -74,7 +76,7 @@ importers:
         version: 2.31.0(@types/node@25.0.10)
       '@codspeed/vitest-plugin':
         specifier: ^5.7.1
-        version: 5.7.1(tinybench@2.9.0)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
+        version: 5.7.1(tinybench@2.9.0)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
       '@jridgewell/trace-mapping':
         specifier: ^0.3.31
         version: 0.3.31
@@ -83,16 +85,16 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@react-router/express':
         specifier: ^8.3.1
         version: 8.3.1(express@4.22.2)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       '@react-router/fs-routes':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
+        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
       '@react-router/remix-routes-option-adapter':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
+        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
       '@react-router/serve':
         specifier: ^8.3.1
         version: 8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
@@ -233,7 +235,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.10
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
       wait-on:
         specifier: ^9.0.10
         version: 9.0.10
@@ -282,7 +284,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -337,7 +339,7 @@ importers:
         version: 7.18.1(@cloudflare/workers-types@4.20260702.1)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -398,7 +400,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.9.5))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.9.5))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -462,7 +464,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -492,7 +494,7 @@ importers:
         version: 10.1.0
       react-router-devtools:
         specifier: ^6.2.0
-        version: 6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+        version: 6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
       rsbuild-plugin-react-router:
         specifier: workspace:*
         version: link:../..
@@ -537,7 +539,7 @@ importers:
         version: 0.9.1
       '@nasa-gcn/remix-seo':
         specifier: 2.0.1
-        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.4(typescript@5.9.3))
+        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))
       '@oslojs/crypto':
         specifier: 1.0.1
         version: 1.0.1
@@ -582,10 +584,10 @@ importers:
         version: 7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       '@react-router/remix-routes-option-adapter':
         specifier: 7.18.3
-        version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
+        version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
       '@remix-run/server-runtime':
-        specifier: 2.17.4
-        version: 2.17.4(typescript@5.9.3)
+        specifier: 2.17.5
+        version: 2.17.5(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -647,8 +649,8 @@ importers:
         specifier: 5.2.1
         version: 5.2.1
       express-rate-limit:
-        specifier: 8.2.1
-        version: 8.2.1(express@5.2.1)
+        specifier: 8.2.2
+        version: 8.2.2(express@5.2.1)
       get-port:
         specifier: 7.1.0
         version: 7.1.0
@@ -733,7 +735,7 @@ importers:
     devDependencies:
       '@epic-web/config':
         specifier: 1.21.3
-        version: 1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
+        version: 1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
       '@faker-js/faker':
         specifier: 10.5.0
         version: 10.5.0
@@ -742,7 +744,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rstest/core':
         specifier: 0.11.0
         version: 0.11.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)(jsdom@27.4.0(@noble/hashes@2.2.0))
@@ -907,7 +909,7 @@ importers:
         version: 2.5.1(@rsbuild/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0))(@rspack/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23))(node-fetch@2.7.0(encoding@0.1.13))(typescript@5.9.3)(webpack@5.108.3(esbuild@0.27.2)(lightningcss@1.32.0)(postcss@8.5.28))
       '@nasa-gcn/remix-seo':
         specifier: 2.0.1
-        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.4(typescript@5.9.3))
+        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))
       '@oslojs/crypto':
         specifier: 1.0.1
         version: 1.0.1
@@ -952,10 +954,10 @@ importers:
         version: 7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       '@react-router/remix-routes-option-adapter':
         specifier: 7.18.3
-        version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
+        version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
       '@remix-run/server-runtime':
-        specifier: 2.17.4
-        version: 2.17.4(typescript@5.9.3)
+        specifier: 2.17.5
+        version: 2.17.5(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -1017,8 +1019,8 @@ importers:
         specifier: 5.2.1
         version: 5.2.1
       express-rate-limit:
-        specifier: 8.2.1
-        version: 8.2.1(express@5.2.1)
+        specifier: 8.2.2
+        version: 8.2.2(express@5.2.1)
       get-port:
         specifier: 7.1.0
         version: 7.1.0
@@ -1103,7 +1105,7 @@ importers:
     devDependencies:
       '@epic-web/config':
         specifier: 1.21.3
-        version: 1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
+        version: 1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
       '@faker-js/faker':
         specifier: 10.5.0
         version: 10.5.0
@@ -1112,7 +1114,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rstest/core':
         specifier: 0.11.0
         version: 0.11.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)(jsdom@27.4.0(@noble/hashes@2.2.0))
@@ -1271,7 +1273,7 @@ importers:
         version: 2.5.1(@rsbuild/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0))(@rspack/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23))(node-fetch@2.7.0(encoding@0.1.13))(typescript@5.9.3)(webpack@5.108.3(esbuild@0.27.2)(lightningcss@1.32.0)(postcss@8.5.28))
       '@nasa-gcn/remix-seo':
         specifier: 2.0.1
-        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.4(typescript@5.9.3))
+        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))
       '@oslojs/crypto':
         specifier: 1.0.1
         version: 1.0.1
@@ -1316,10 +1318,10 @@ importers:
         version: 7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       '@react-router/remix-routes-option-adapter':
         specifier: 7.18.3
-        version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
+        version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
       '@remix-run/server-runtime':
-        specifier: 2.17.4
-        version: 2.17.4(typescript@5.9.3)
+        specifier: 2.17.5
+        version: 2.17.5(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -1381,8 +1383,8 @@ importers:
         specifier: 5.2.1
         version: 5.2.1
       express-rate-limit:
-        specifier: 8.2.1
-        version: 8.2.1(express@5.2.1)
+        specifier: 8.2.2
+        version: 8.2.2(express@5.2.1)
       get-port:
         specifier: 7.1.0
         version: 7.1.0
@@ -1467,7 +1469,7 @@ importers:
     devDependencies:
       '@epic-web/config':
         specifier: 1.21.3
-        version: 1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
+        version: 1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
       '@faker-js/faker':
         specifier: 10.5.0
         version: 10.5.0
@@ -1476,7 +1478,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rstest/core':
         specifier: 0.11.0
         version: 0.11.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)(jsdom@27.4.0(@noble/hashes@2.2.0))
@@ -1624,7 +1626,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -1648,7 +1650,7 @@ importers:
         version: 10.1.0
       react-router-devtools:
         specifier: ^6.2.0
-        version: 6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+        version: 6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
       rsbuild-plugin-react-router:
         specifier: workspace:*
         version: link:../..
@@ -1672,7 +1674,7 @@ importers:
     dependencies:
       '@react-router/fs-routes':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
+        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
       '@react-router/node':
         specifier: ^8.3.1
         version: 8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
@@ -1700,7 +1702,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -1758,7 +1760,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -1816,7 +1818,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^7.18.3
-        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+        version: 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -1840,7 +1842,7 @@ importers:
         version: 10.1.0
       react-router-devtools:
         specifier: ^6.2.0
-        version: 6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+        version: 6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
       rsbuild-plugin-react-router:
         specifier: workspace:*
         version: link:../..
@@ -1870,7 +1872,7 @@ importers:
         version: 1.61.1
       '@react-router/dev':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
+        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
       '@react-router/express':
         specifier: ^8.3.1
         version: 8.3.1(express@4.22.2)(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
@@ -2012,13 +2014,13 @@ importers:
         version: 3.1.1(rollup@4.62.2)
       '@react-router/dev':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
+        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
       '@react-router/fs-routes':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
+        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
       '@react-router/remix-routes-option-adapter':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
+        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -2106,13 +2108,13 @@ importers:
         version: 3.1.1(rollup@4.62.2)
       '@react-router/dev':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
+        version: 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
       '@react-router/fs-routes':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
+        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
       '@react-router/remix-routes-option-adapter':
         specifier: ^8.3.1
-        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
+        version: 8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -2569,7 +2571,7 @@ packages:
     resolution: {integrity: sha512-yKNqaYVxZZPJYkhVHpz30Oem4TUgcI+/IRDD9YHvcAgi0P42CL6TB/+qYjuFOWghFzTPrm3TUbNFoBsevSTbUA==}
     peerDependencies:
       tinybench: '>=2.9.0'
-      vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
+      vite: ^7.3.5
       vitest: ^3.2 || ^4
 
   '@conform-to/dom@1.16.0':
@@ -4567,7 +4569,7 @@ packages:
       react-router: ^7.18.3
       react-server-dom-webpack: ^19.2.3
       typescript: ^5.1.0 || ^6.0.0
-      vite: ^5.1.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
+      vite: ^7.3.5
       wrangler: ^3.28.2 || ^4.0.0
     peerDependenciesMeta:
       '@react-router/serve':
@@ -4591,7 +4593,7 @@ packages:
       react-router: ^8.3.1
       react-server-dom-webpack: ^19.2.7
       typescript: ^5.1.0 || ^6.0.0 || ^7.0.0
-      vite: ^7.0.0 || ^8.0.0
+      vite: ^7.3.5
       wrangler: ^4.0.0
     peerDependenciesMeta:
       '@react-router/serve':
@@ -4708,22 +4710,9 @@ packages:
       typescript:
         optional: true
 
-  '@remix-run/router@1.23.3':
-    resolution: {integrity: sha512-4An71tdz9X8+3sI4Qqqd2LWd9vS39J7sqd9EU4Scw7TJE/qB10Flv/UuqbPVgfQV9XoK8Np6jNquZitnZq5i+Q==}
-    engines: {node: '>=14.0.0'}
-
   '@remix-run/router@1.23.4':
     resolution: {integrity: sha512-q7j5geK7xs3UJSdm9/iytUNclBnLmYx1EnSeCFXHPeutdqgIMeFeHtUZgS3EhlKxdBEAu8OwtJCwmLrEzpSs7Q==}
     engines: {node: '>=14.0.0'}
-
-  '@remix-run/server-runtime@2.17.4':
-    resolution: {integrity: sha512-oCsFbPuISgh8KpPKsfBChzjcntvTz5L+ggq9VNYWX8RX3yA7OgQpKspRHOSxb05bw7m0Hx+L1KRHXjf3juKX8w==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      typescript: ^5.1.0
-    peerDependenciesMeta:
-      typescript:
-        optional: true
 
   '@remix-run/server-runtime@2.17.5':
     resolution: {integrity: sha512-SyJ5n2pQyo4ERGvjjLvL2PpRWBzlC2qzO5KkkOE2ygOiNcgOu9WQnnom9GI8KgsTRCO8JnIeLHFRcmxZnVBjfw==}
@@ -5600,7 +5589,7 @@ packages:
     resolution: {integrity: sha512-PkMOomcWnl/pUkCqIjqL/csjPHtkMVBirDpJVOZR7XJZDxo5CuD7B+3KsujFCF4Dsn6QYlae97gCZvxi/CB76Q==}
     engines: {node: '>=18'}
     peerDependencies:
-      vite: ^6.0.0 || ^7.0.0
+      vite: ^7.3.5
 
   '@tanstack/devtools@0.10.14':
     resolution: {integrity: sha512-bg1e0PyjmMMsc9VSOGb9etu15CpFdAwlQ5DD2xS6N93iTPgCPWXiZQFZygrEDoKnnx1x7BM6QTaiukizaejgSA==}
@@ -6049,7 +6038,7 @@ packages:
     resolution: {integrity: sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==}
     peerDependencies:
       msw: ^2.4.9
-      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
+      vite: ^7.3.5
     peerDependenciesMeta:
       msw:
         optional: true
@@ -7541,8 +7530,8 @@ packages:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
 
-  express-rate-limit@8.2.1:
-    resolution: {integrity: sha512-PCZEIEIxqwhzw4KF0n7QF4QqruVTcF73O5kFKUnGOyjbCCgizBBiFaYpd/fnBLUMPw/BWw9OsiN7GgrNYr7j6g==}
+  express-rate-limit@8.2.2:
+    resolution: {integrity: sha512-Ybv7bqtOgA914MLwaHWVFXMpMYeR1MQu/D+z2MaLYteqBsTIp9sY3AU7mGNLMJv8eLg8uQMpE20I+L2Lv49nSg==}
     engines: {node: '>= 16'}
     peerDependencies:
       express: '>= 4.11'
@@ -9670,7 +9659,7 @@ packages:
       react: '>=17'
       react-dom: '>=17'
       react-router: '>=7.0.0'
-      vite: '>=5.0.0 || >=6.0.0'
+      vite: ^7.3.5
 
   react-router-dom@6.30.4:
     resolution: {integrity: sha512-q4HvNl+mmDdkS0g+MqiBZNteQJCuimWoOyHMy4T/RQLAn9Z29+E91QXRaxOujeMl2HTzRSS0KFPd7lxX3PjV0Q==}
@@ -10813,9 +10802,8 @@ packages:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
 
-  uuid@8.3.2:
-    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+  uuid@11.1.1:
+    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
     hasBin: true
 
   valibot@1.4.2:
@@ -10847,8 +10835,8 @@ packages:
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
 
-  vite@7.3.1:
-    resolution: {integrity: sha512-w+N7Hifpc3gRjZ63vYBXA56dvvRlNWRczTdmCBBa+CotUzAPf5b7YMdMR/8CQoeYE5LX3W4wj6RYTgonm1b9DA==}
+  vite@7.3.6:
+    resolution: {integrity: sha512-4XP60spRGjSZFf1qYH+dJIkK2znL3zQfl9KkOV9MkkRR/3Dls0dxaBsQPTloEc5BLXWPL9vsOxopxyKoMmDueg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -10903,7 +10891,7 @@ packages:
       '@vitest/ui': 4.1.11
       happy-dom: '*'
       jsdom: '*'
-      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
+      vite: ^7.3.5
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
@@ -11647,12 +11635,12 @@ snapshots:
       - debug
       - supports-color
 
-  '@codspeed/vitest-plugin@5.7.1(tinybench@2.9.0)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))':
+  '@codspeed/vitest-plugin@5.7.1(tinybench@2.9.0)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))':
     dependencies:
       '@codspeed/core': 5.7.1
       tinybench: 2.9.0
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
-      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
     transitivePeerDependencies:
       - debug
       - supports-color
@@ -11735,10 +11723,10 @@ snapshots:
 
   '@epic-web/client-hints@1.3.8': {}
 
-  '@epic-web/config@1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))':
+  '@epic-web/config@1.21.3(@testing-library/dom@10.4.1)(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(prettier@3.8.1)(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))':
     dependencies:
       '@total-typescript/ts-reset': 0.6.1
-      '@vitest/eslint-plugin': 1.6.20(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
+      '@vitest/eslint-plugin': 1.6.20(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))
       eslint-plugin-import-x: 4.17.1(@typescript-eslint/utils@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))
       eslint-plugin-jest-dom: 5.5.0(@testing-library/dom@10.4.1)(eslint@9.39.2(jiti@2.7.0))
       eslint-plugin-playwright: 2.10.4(eslint@9.39.2(jiti@2.7.0))
@@ -12512,10 +12500,10 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@nasa-gcn/remix-seo@2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.4(typescript@5.9.3))':
+  '@nasa-gcn/remix-seo@2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))':
     dependencies:
       '@remix-run/react': 2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
-      '@remix-run/server-runtime': 2.17.4(typescript@5.9.3)
+      '@remix-run/server-runtime': 2.17.5(typescript@5.9.3)
       lodash: 4.18.1
 
   '@noble/hashes@2.2.0': {}
@@ -13553,7 +13541,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))':
+  '@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/generator': 7.29.7
@@ -13583,7 +13571,7 @@ snapshots:
       semver: 7.8.5
       tinyglobby: 0.2.17
       valibot: 1.4.2(typescript@5.9.3)
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
       vite-node: 3.2.4(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     optionalDependencies:
       '@react-router/serve': 7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
@@ -13604,7 +13592,7 @@ snapshots:
       - tsx
       - yaml
 
-  '@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.9.5))':
+  '@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.9.5))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/generator': 7.29.7
@@ -13634,7 +13622,7 @@ snapshots:
       semver: 7.8.5
       tinyglobby: 0.2.17
       valibot: 1.4.2(typescript@5.9.3)
-      vite: 7.3.1(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
       vite-node: 3.2.4(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     optionalDependencies:
       '@react-router/serve': 7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
@@ -13655,7 +13643,7 @@ snapshots:
       - tsx
       - yaml
 
-  '@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))':
+  '@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/generator': 7.29.7
@@ -13681,7 +13669,7 @@ snapshots:
       semver: 7.8.5
       tinyglobby: 0.2.17
       valibot: 1.4.2(typescript@5.9.3)
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     optionalDependencies:
       '@react-router/serve': 8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       typescript: 5.9.3
@@ -13690,7 +13678,7 @@ snapshots:
       - babel-plugin-macros
       - supports-color
 
-  '@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))':
+  '@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/generator': 7.29.7
@@ -13716,7 +13704,7 @@ snapshots:
       semver: 7.8.5
       tinyglobby: 0.2.17
       valibot: 1.4.2(typescript@5.9.3)
-      vite: 7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     optionalDependencies:
       '@react-router/serve': 8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       typescript: 5.9.3
@@ -13725,7 +13713,7 @@ snapshots:
       - babel-plugin-macros
       - supports-color
 
-  '@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))':
+  '@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/generator': 7.29.7
@@ -13751,7 +13739,7 @@ snapshots:
       semver: 7.8.5
       tinyglobby: 0.2.17
       valibot: 1.4.2(typescript@5.9.3)
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     optionalDependencies:
       '@react-router/serve': 8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)
       typescript: 5.9.3
@@ -13808,23 +13796,23 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@react-router/fs-routes@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
+  '@react-router/fs-routes@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
     dependencies:
-      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       minimatch: 10.2.5
     optionalDependencies:
       typescript: 5.9.3
 
-  '@react-router/fs-routes@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)':
+  '@react-router/fs-routes@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)':
     dependencies:
-      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
+      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
       minimatch: 10.2.5
     optionalDependencies:
       typescript: 5.9.3
 
-  '@react-router/fs-routes@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
+  '@react-router/fs-routes@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
     dependencies:
-      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
       minimatch: 10.2.5
     optionalDependencies:
       typescript: 5.9.3
@@ -13850,21 +13838,21 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@react-router/remix-routes-option-adapter@7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
+  '@react-router/remix-routes-option-adapter@7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
     dependencies:
-      '@react-router/dev': 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+      '@react-router/dev': 7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
     optionalDependencies:
       typescript: 5.9.3
 
-  '@react-router/remix-routes-option-adapter@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
+  '@react-router/remix-routes-option-adapter@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)':
     dependencies:
-      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
+      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10))
     optionalDependencies:
       typescript: 5.9.3
 
-  '@react-router/remix-routes-option-adapter@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)':
+  '@react-router/remix-routes-option-adapter@8.3.1(@react-router/dev@8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0)))(typescript@5.9.3)':
     dependencies:
-      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
+      '@react-router/dev': 8.3.1(@react-router/serve@8.3.1(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(react-router@8.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3)(vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@22.20.0))
     optionalDependencies:
       typescript: 5.9.3
 
@@ -13927,21 +13915,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@remix-run/router@1.23.3': {}
-
   '@remix-run/router@1.23.4': {}
-
-  '@remix-run/server-runtime@2.17.4(typescript@5.9.3)':
-    dependencies:
-      '@remix-run/router': 1.23.3
-      '@types/cookie': 0.6.0
-      '@web3-storage/multipart-parser': 1.0.0
-      cookie: 0.7.2
-      set-cookie-parser: 2.7.2
-      source-map: 0.7.6
-      turbo-stream: 2.4.1
-    optionalDependencies:
-      typescript: 5.9.3
 
   '@remix-run/server-runtime@2.17.5(typescript@5.9.3)':
     dependencies:
@@ -14868,7 +14842,7 @@ snapshots:
     transitivePeerDependencies:
       - csstype
 
-  '@tanstack/devtools-vite@0.4.1(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))':
+  '@tanstack/devtools-vite@0.4.1(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/generator': 7.29.7
@@ -14880,7 +14854,7 @@ snapshots:
       chalk: 5.6.2
       launch-editor: 2.14.1
       picomatch: 4.0.5
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -15085,6 +15059,7 @@ snapshots:
   '@types/node@25.9.5':
     dependencies:
       undici-types: 7.24.6
+    optional: true
 
   '@types/pegjs@0.10.6': {}
 
@@ -15378,7 +15353,7 @@ snapshots:
       - babel-plugin-macros
       - supports-color
 
-  '@vitest/eslint-plugin@1.6.20(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))':
+  '@vitest/eslint-plugin@1.6.20(@typescript-eslint/eslint-plugin@8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3)(vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)))':
     dependencies:
       '@typescript-eslint/scope-manager': 8.62.1
       '@typescript-eslint/utils': 8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3)
@@ -15386,7 +15361,7 @@ snapshots:
     optionalDependencies:
       '@typescript-eslint/eslint-plugin': 8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.2(jiti@2.7.0))(typescript@5.9.3)
       typescript: 5.9.3
-      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+      vitest: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -15399,14 +15374,14 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.1
 
-  '@vitest/mocker@4.1.11(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))':
+  '@vitest/mocker@4.1.11(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))':
     dependencies:
       '@vitest/spy': 4.1.11
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
       msw: 2.12.7(@types/node@25.0.10)(typescript@5.9.3)
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
 
   '@vitest/pretty-format@4.1.11':
     dependencies:
@@ -17038,7 +17013,7 @@ snapshots:
 
   expect-type@1.4.0: {}
 
-  express-rate-limit@8.2.1(express@5.2.1):
+  express-rate-limit@8.2.2(express@5.2.1):
     dependencies:
       express: 5.2.1
       ip-address: 10.7.0
@@ -17854,7 +17829,7 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 25.9.5
+      '@types/node': 25.0.10
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
@@ -19241,7 +19216,7 @@ snapshots:
       dequal: 2.0.3
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
-      uuid: 8.3.2
+      uuid: 11.1.1
 
   react-dom@19.2.7(react@19.2.7):
     dependencies:
@@ -19282,7 +19257,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.10
 
-  react-router-devtools@6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)):
+  react-router-devtools@6.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)):
     dependencies:
       '@babel/core': 7.29.0
       '@babel/generator': 7.29.7
@@ -19292,7 +19267,7 @@ snapshots:
       '@radix-ui/react-accordion': 1.2.15(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tanstack/devtools-client': 0.0.5
       '@tanstack/devtools-event-client': 0.4.4
-      '@tanstack/devtools-vite': 0.4.1(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+      '@tanstack/devtools-vite': 0.4.1(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
       '@tanstack/react-devtools': 0.9.13(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(csstype@3.2.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(solid-js@1.9.14)
       '@types/react': 19.2.10
       '@types/react-dom': 19.2.3(@types/react@19.2.10)
@@ -19306,7 +19281,7 @@ snapshots:
       react-hotkeys-hook: 5.3.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-router: 7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-tooltip: 5.30.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     optionalDependencies:
       '@biomejs/cli-darwin-arm64': 2.5.2
       '@rollup/rollup-darwin-arm64': 4.62.2
@@ -20549,7 +20524,8 @@ snapshots:
 
   undici-types@7.16.0: {}
 
-  undici-types@7.24.6: {}
+  undici-types@7.24.6:
+    optional: true
 
   undici@7.29.0: {}
 
@@ -20667,7 +20643,7 @@ snapshots:
 
   utils-merge@1.0.1: {}
 
-  uuid@8.3.2: {}
+  uuid@11.1.1: {}
 
   valibot@1.4.2(typescript@5.9.3):
     optionalDependencies:
@@ -20698,7 +20674,7 @@ snapshots:
       debug: 4.4.3
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -20719,7 +20695,7 @@ snapshots:
       debug: 4.4.3
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 7.3.1(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -20734,7 +20710,7 @@ snapshots:
       - tsx
       - yaml
 
-  vite@7.3.1(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0):
+  vite@7.3.6(@types/node@22.20.0)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0):
     dependencies:
       esbuild: 0.27.2
       fdir: 6.5.0(picomatch@4.0.5)
@@ -20753,7 +20729,7 @@ snapshots:
       terser: 5.51.2
       tsx: 4.21.0
 
-  vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0):
+  vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0):
     dependencies:
       esbuild: 0.27.2
       fdir: 6.5.0(picomatch@4.0.5)
@@ -20772,7 +20748,7 @@ snapshots:
       terser: 5.51.2
       tsx: 4.21.0
 
-  vite@7.3.1(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0):
+  vite@7.3.6(@types/node@25.9.5)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0):
     dependencies:
       esbuild: 0.27.2
       fdir: 6.5.0(picomatch@4.0.5)
@@ -20791,10 +20767,10 @@ snapshots:
       terser: 5.51.2
       tsx: 4.21.0
 
-  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)):
+  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.0.10)(jsdom@27.4.0(@noble/hashes@2.2.0))(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)):
     dependencies:
       '@vitest/expect': 4.1.11
-      '@vitest/mocker': 4.1.11(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
+      '@vitest/mocker': 4.1.11(msw@2.12.7(@types/node@25.0.10)(typescript@5.9.3))(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))
       '@vitest/pretty-format': 4.1.11
       '@vitest/runner': 4.1.11
       '@vitest/snapshot': 4.1.11
@@ -20811,7 +20787,7 @@ snapshots:
       tinyexec: 1.3.0
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.1
-      vite: 7.3.1(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
+      vite: 7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
