@@ -36,6 +36,10 @@ export type Config = Omit<
 };
 
 type FutureConfig = {
+  // React Router 8.3 selects the web-streams server entry when this is set.
+  // The plugin ships its own server entry, so the flag is resolved and passed
+  // through to presets and `buildEnd` but does not change plugin behavior.
+  unstable_enableNodeReadableStream: boolean;
   unstable_optimizeDeps: boolean;
   unstable_subResourceIntegrity: boolean;
   unstable_trailingSlashAwareDataRequests: boolean;
@@ -118,6 +122,7 @@ export type ResolvedReactRouterConfig = Readonly<{
 }>;
 
 const createDefaultFutureConfig = (): FutureConfig => ({
+  unstable_enableNodeReadableStream: false,
   unstable_optimizeDeps: false,
   unstable_subResourceIntegrity: false,
   unstable_trailingSlashAwareDataRequests:
