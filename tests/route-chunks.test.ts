@@ -675,13 +675,9 @@ describe('route chunks', () => {
       expect(
         getRouteChunkNameFromModuleId('/app/routes/r.tsx?route-chunk=not-valid')
       ).toBeNull();
-      expect(
-        getRouteChunkEntryName(
-          { file: 'routes/clients.tsx' },
-          'clientAction',
-          '/app'
-        )
-      ).toBe('routes/clients-client-action');
+      expect(getRouteChunkEntryName('routes/clients', 'clientAction')).toBe(
+        'routes/clients-client-action'
+      );
     });
   });
 
@@ -858,12 +854,12 @@ describe('route entry names', () => {
   });
 
   it('names a route chunk as a sibling of the route entry', () => {
-    expect(
-      getRouteChunkEntryName(
-        { file: 'routes/clients.tsx' },
-        'clientAction',
-        '/Users/dev/proj/app'
-      )
-    ).toBe('routes/clients-client-action');
+    const entryName = getRouteEntryBaseName(
+      { file: 'routes/clients.tsx' },
+      '/Users/dev/proj/app'
+    );
+    expect(getRouteChunkEntryName(entryName, 'clientAction')).toBe(
+      'routes/clients-client-action'
+    );
   });
 });

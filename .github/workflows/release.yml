@@ -10,7 +10,7 @@ on:
         default: 'main'
         type: string
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+concurrency: ${{ github.workflow }}-${{ inputs.branch }}
 
 permissions:
   contents: write
@@ -55,23 +55,17 @@ jobs:
       # instead: bump the version, write the changelog, commit, and push. The
       # publish step below then runs against a tree with no pending changesets.
       - name: Apply pending changesets
-        id: version
         run: |
-          pending="$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l)"
-          if [ "$pending" = "0" ]; then
+          pnpm changeset version
+          if git diff --quiet; then
             echo "No pending changesets; publishing current version."
-            echo "versioned=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          pnpm changeset version
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          version="$(node -p "require('./package.json').version")"
-          git commit -m "chore: version packages (${version})"
-          git push origin "HEAD:${{ github.event.inputs.branch || github.ref_name }}"
-          echo "versioned=true" >> "$GITHUB_OUTPUT"
-          echo "Versioned to ${version}"
+          git commit -m "chore: version packages ($(node -p "require('./package.json').version"))"
+          git push origin "HEAD:${{ inputs.branch }}"
 
       - name: Publish to npm
         id: changesets
@@ -79,7 +73,6 @@ jobs:
         with:
           # Run our custom release script that builds and publishes
           publish: pnpm release
-          createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

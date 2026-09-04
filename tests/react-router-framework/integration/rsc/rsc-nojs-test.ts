@@ -1,7 +1,10 @@
 import { test, expect } from "@playwright/test";
 import getPort from "get-port";
 
-import { stubExampleDomain } from "../helpers/external-site.js";
+import {
+  expectExternalRedirect,
+  stubExampleDomain,
+} from "../helpers/external-site.js";
 
 import { implementations, js, setupRscTest, validateRSCHtml } from "./utils";
 
@@ -243,13 +246,7 @@ implementations.forEach((implementation) => {
       await page.goto(`http://localhost:${port}/render-redirect`);
       await expect(page.getByText("home")).toBeAttached();
       await page.getByText("External").click();
-      // The RSC error handler assigns `window.location.href` during render and
-      // also commits a `<meta http-equiv="refresh">`, so the browser can start
-      // the external navigation more than once and abort the earlier
-      // attempts. Poll for the final URL instead of latching onto the first
-      // navigation, which `waitForURL` would reject with net::ERR_ABORTED.
-      await expect(page).toHaveURL(`https://example.com/`);
-      await expect(page.getByText("Example Domain")).toBeAttached();
+      await expectExternalRedirect(page);
     });
 
     test("Handles unsupported protocol redirect Responses from render", async ({
@@ -282,13 +279,7 @@ implementations.forEach((implementation) => {
       );
       await stubExampleDomain(page);
       await page.goto(`http://localhost:${port}/render-redirect/lazy/external`);
-      // The RSC error handler assigns `window.location.href` during render and
-      // also commits a `<meta http-equiv="refresh">`, so the browser can start
-      // the external navigation more than once and abort the earlier
-      // attempts. Poll for the final URL instead of latching onto the first
-      // navigation, which `waitForURL` would reject with net::ERR_ABORTED.
-      await expect(page).toHaveURL(`https://example.com/`);
-      await expect(page.getByText("Example Domain")).toBeAttached();
+      await expectExternalRedirect(page);
     });
 
     test("Handles unsupported protocol redirect Responses from suspended render", async ({

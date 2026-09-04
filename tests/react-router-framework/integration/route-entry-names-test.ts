@@ -2,12 +2,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test, expect } from "@playwright/test";
 
+import { js } from "./helpers/create-fixture.js";
 import { createProject, build, reactRouterConfig } from "./helpers/rsbuild.js";
 
-const js = String.raw;
-
-// `fs.globSync("**/*")` silently stops short of deeply nested files, which is
-// precisely where a leaked absolute path lands, so walk the tree instead.
+// Walk the tree rather than glob: a leaked absolute path lands deeply nested.
 const listEmittedFiles = (cwd: string, dir: string) =>
   readdirSync(path.join(cwd, dir), { recursive: true })
     .map(String)
@@ -52,20 +50,14 @@ test.describe("Route entry names", () => {
     let emitted = listEmittedFiles(cwd, "build/client");
 
     // An absolute path leaks either verbatim or with its leading separator
-    // swallowed by the `static/js/` join, so check for both shapes.
+    // swallowed by the `static/js/` join; the stripped form matches both.
     let appDirectory = path.join(cwd, "app");
-    let leaks = [cwd, appDirectory].flatMap((absolute) => [
-      absolute,
-      absolute.replace(/^[/\\]+/, ""),
-    ]);
-    let leaking = (text: string) => leaks.filter((leak) => text.includes(leak));
+    let leaking = (text: string) => text.includes(cwd.replace(/^[/\\]+/, ""));
 
-    expect(emitted.filter((file) => leaking(file).length > 0)).toEqual([]);
+    expect(emitted.filter(leaking)).toEqual([]);
 
     // The route chunk must be a sibling of the route entry itself.
-    expect(emitted).toContain(
-      path.join("static/js/routes/customers-client-loader.js"),
-    );
+    expect(emitted).toContain("static/js/routes/customers-client-loader.js");
 
     let manifestFile = emitted.find((file) =>
       /static[/\\]js[/\\]manifest-[^/\\]+\.js$/.test(file),
@@ -82,7 +74,7 @@ test.describe("Route entry names", () => {
     // Guard against a vacuous pass if the manifest format ever changes.
     expect(assetUrls.length).toBeGreaterThan(0);
 
-    expect(assetUrls.filter((url) => leaking(url).length > 0)).toEqual([]);
+    expect(assetUrls.filter(leaking)).toEqual([]);
     // An entry name starting with `/` produced a `/static/js//...` double slash.
     expect(assetUrls.filter((url) => url.includes("//"))).toEqual([]);
     expect(assetUrls).toContain("/static/js/routes/customers-client-loader.js");

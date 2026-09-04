@@ -1207,8 +1207,9 @@ test.describe("Fog of War", () => {
     expect(manifestRouteIds).toEqual(
       expect.arrayContaining(["root", "routes/_index", "routes/a"]),
     );
-    expect(manifestRouteIds.filter((id) => id.includes("dummy"))).toEqual([]);
-    expect(manifestRouteIds.length).toBeLessThanOrEqual(4);
+    for (let id of manifestRouteIds) {
+      expect(["root", "routes/_index", "routes/a", "routes/a.b"]).toContain(id);
+    }
   });
 
   test("includes a version query parameter as a cachebuster", async ({

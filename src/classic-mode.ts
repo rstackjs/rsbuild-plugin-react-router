@@ -167,11 +167,7 @@ export const createClassicWebRouteEntries = ({
           if (!source.includes(exportName)) {
             continue;
           }
-          const chunkEntryName = getRouteChunkEntryName(
-            route,
-            exportName,
-            appDirectory
-          );
+          const chunkEntryName = getRouteChunkEntryName(entryName, exportName);
           manifestChunkNames.add(chunkEntryName);
           acc[chunkEntryName] = {
             import: getRouteChunkModuleId(routeFilePath, exportName),

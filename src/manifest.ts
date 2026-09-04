@@ -413,26 +413,6 @@ export const getReactRouterManifestPath = ({
   return `${dir}/manifest-${version}.js`;
 };
 
-// The version is derived from the manifest content in every mode. React
-// Router's stale-client detection compares the version the browser loaded with
-// the one the server build was pinned to, and answers a mismatch with a
-// document reload. In development the browser manifest asset is served from
-// the latest web compilation while the server build stays pinned to the
-// compilation it was committed with, so a random per-compilation version made
-// the two disagree whenever a web compilation completed without changing the
-// manifest (for example the hot data revalidation recompile that follows a
-// server change), reloading the document for no reason. Equal content now
-// yields an equal version, and a real manifest change still busts the browser
-// cache through the `?v=` query on the development manifest URL.
-const getManifestVersion = (fingerprintedValues: {
-  entry: unknown;
-  routes: unknown;
-}): string =>
-  createHash('md5')
-    .update(JSON.stringify(fingerprintedValues))
-    .digest('hex')
-    .slice(0, 8);
-
 export const getReactRouterManifestChunkNames = (
   routes: Record<string, Route>,
   appDirectory: string,
@@ -440,12 +420,13 @@ export const getReactRouterManifestChunkNames = (
 ): Set<string> => {
   const chunkNames = new Set<string>(['entry.client']);
   for (const route of Object.values(routes)) {
-    chunkNames.add(getRouteEntryBaseName(route, appDirectory));
+    const routeEntryName = getRouteEntryBaseName(route, appDirectory);
+    chunkNames.add(routeEntryName);
     if (!splitRouteModules || route.id === 'root') {
       continue;
     }
     for (const exportName of routeChunkExportNames) {
-      chunkNames.add(getRouteChunkEntryName(route, exportName, appDirectory));
+      chunkNames.add(getRouteChunkEntryName(routeEntryName, exportName));
     }
   }
   return chunkNames;
@@ -453,7 +434,7 @@ export const getReactRouterManifestChunkNames = (
 
 const createRouteManifestItem = ({
   route,
-  appDirectory,
+  routeEntryName,
   assetPrefix,
   jsAssets,
   routeAnalysis,
@@ -461,7 +442,7 @@ const createRouteManifestItem = ({
   getCssAssetsForChunk,
 }: {
   route: Route;
-  appDirectory: string;
+  routeEntryName: string;
   assetPrefix: string;
   jsAssets: string[];
   routeAnalysis: RouteManifestAnalysis;
@@ -469,21 +450,20 @@ const createRouteManifestItem = ({
   getCssAssetsForChunk: (chunkName: string) => string[];
 }): RouteManifestItem => {
   const routeChunkMap = routeAnalysis.hasRouteChunkByExportName;
-  const chunkModulePath = (exportName: RouteChunkExportName) =>
+  const chunkEntryName = (exportName: RouteChunkExportName) =>
     routeChunkMap?.[exportName]
-      ? getModulePathForChunk(
-          getRouteChunkEntryName(route, exportName, appDirectory)
-        )
+      ? getRouteChunkEntryName(routeEntryName, exportName)
       : undefined;
+  const chunkModulePath = (exportName: RouteChunkExportName) => {
+    const name = chunkEntryName(exportName);
+    return name ? getModulePathForChunk(name) : undefined;
+  };
   const cssAssets = [
     ...routeAnalysis.cssAssets,
-    ...routeChunkExportNames.flatMap(exportName =>
-      routeChunkMap?.[exportName]
-        ? getCssAssetsForChunk(
-            getRouteChunkEntryName(route, exportName, appDirectory)
-          )
-        : []
-    ),
+    ...routeChunkExportNames.flatMap(exportName => {
+      const name = chunkEntryName(exportName);
+      return name ? getCssAssetsForChunk(name) : [];
+    }),
   ];
 
   return {
@@ -581,7 +561,7 @@ function generateReactRouterManifestForDevEffect(
             key,
             createRouteManifestItem({
               route,
-              appDirectory: context,
+              routeEntryName,
               assetPrefix,
               jsAssets,
               routeAnalysis,
@@ -625,7 +605,14 @@ function generateReactRouterManifestForDevEffect(
       },
       routes: result,
     };
-    const version = getManifestVersion(fingerprintedValues);
+    // Content-derived in development too. React Router's stale-client check
+    // compares the browser's manifest version with the pinned server build's,
+    // and a random per-compilation version made unchanged manifests differ
+    // whenever a web compilation completed without a new server pin.
+    const version = createHash('md5')
+      .update(JSON.stringify(fingerprintedValues))
+      .digest('hex')
+      .slice(0, 8);
     const manifestPath = getReactRouterManifestPath({
       version,
       isBuild,

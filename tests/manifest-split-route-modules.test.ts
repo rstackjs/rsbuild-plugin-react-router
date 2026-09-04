@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import { getReactRouterManifestForDev } from '../src/manifest';
+import type { Route } from '../src/types';
 import {
   getRouteChunkEntryName,
   getRouteEntryBaseName,
@@ -66,14 +67,23 @@ const routes = {
 
 const clientsRoute = { file: 'routes/clients.tsx' };
 
-const createClientStats = (appDirectory: string, route = clientsRoute) => {
-  const entryName = getRouteEntryBaseName(route, appDirectory);
+const clientsChunkName = (
+  appDirectory: string,
+  exportName: RouteChunkExportName
+) =>
+  getRouteChunkEntryName(
+    getRouteEntryBaseName(clientsRoute, appDirectory),
+    exportName
+  );
+
+const createClientStats = (appDirectory: string) => {
+  const entryName = getRouteEntryBaseName(clientsRoute, appDirectory);
   const assetsByChunkName: Record<string, string[]> = {
     'entry.client': ['static/js/entry.client.js'],
     [entryName]: [`static/js/${entryName}.js`],
   };
   for (const exportName of routeChunkExportNames) {
-    const chunkName = getRouteChunkEntryName(route, exportName, appDirectory);
+    const chunkName = clientsChunkName(appDirectory, exportName);
     assetsByChunkName[chunkName] = [`static/js/${chunkName}.js`];
   }
   return { assetsByChunkName };
@@ -82,10 +92,11 @@ const createClientStats = (appDirectory: string, route = clientsRoute) => {
 const getManifest = async (
   appDir: string,
   splitRouteModules: boolean | 'enforce',
-  isBuild = true
+  isBuild = true,
+  routeTable: Record<string, Route> = routes
 ) =>
   getReactRouterManifestForDev(
-    routes,
+    routeTable,
     {},
     createClientStats(appDir),
     appDir,
@@ -111,7 +122,7 @@ describe('manifest split route modules', () => {
         const field = moduleFieldByExportName[exportName];
 
         expect(manifest.routes['routes/clients'][field]).toBe(
-          `/static/js/${getRouteChunkEntryName(clientsRoute, exportName, appDir)}.js`
+          `/static/js/${clientsChunkName(appDir, exportName)}.js`
         );
       } finally {
         rmSync(root, { recursive: true, force: true });
@@ -130,7 +141,7 @@ describe('manifest split route modules', () => {
     writeFileSync(join(appDir, 'routes/clients.module.css'), '.root {}');
     const clientStats = createClientStats(appDir);
     clientStats.assetsByChunkName[
-      getRouteChunkEntryName(clientsRoute, 'clientLoader', appDir)
+      clientsChunkName(appDir, 'clientLoader')
     ]?.push('static/css/routes/clients-client-loader.css');
 
     try {
@@ -238,19 +249,7 @@ describe('manifest split route modules', () => {
     };
 
     try {
-      const manifest = await getReactRouterManifestForDev(
-        routesWithAbsoluteId,
-        {},
-        createClientStats(appDir),
-        appDir,
-        '/',
-        {
-          splitRouteModules: true,
-          rootRouteFile: 'root.tsx',
-          isBuild: true,
-          cache: new Map(),
-        }
-      );
+      const manifest = await getManifest(appDir, true, true, routesWithAbsoluteId);
       const route = manifest.routes[absoluteId];
 
       expect(route.clientLoaderModule).toBe(
@@ -295,19 +294,7 @@ describe('manifest split route modules', () => {
     };
 
     try {
-      const manifest = await getReactRouterManifestForDev(
-        sharedRoutes,
-        {},
-        createClientStats(appDir),
-        appDir,
-        '/',
-        {
-          splitRouteModules: true,
-          rootRouteFile: 'root.tsx',
-          isBuild: true,
-          cache: new Map(),
-        }
-      );
+      const manifest = await getManifest(appDir, true, true, sharedRoutes);
 
       expect(manifest.routes.a.clientLoaderModule).toBe(
         '/static/js/routes/clients-client-loader.js'

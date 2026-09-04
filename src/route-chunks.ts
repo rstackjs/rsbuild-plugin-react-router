@@ -7,6 +7,7 @@ import { print } from 'yuku-codegen';
 import { walk } from 'yuku-parser';
 import { dirname, normalize, relative, resolve } from 'pathe';
 import { SERVER_ONLY_ROUTE_EXPORTS_SET } from './constants.js';
+import { createRouteId } from './plugin-utils.js';
 
 type AnyNode = Record<string, any>;
 
@@ -984,16 +985,11 @@ export const getRouteEntryBaseName = (
   route: { file: string },
   appDirectory: string
 ): string =>
-  toSafeEntryPath(normalizeRelativeFilePath(route.file, appDirectory)).replace(
-    /\.[^/.]+$/,
-    ''
+  createRouteId(
+    toSafeEntryPath(normalizeRelativeFilePath(route.file, appDirectory))
   );
 
 export const getRouteChunkEntryName = (
-  route: { file: string },
-  chunkName: RouteChunkExportName,
-  appDirectory: string
-): string =>
-  `${getRouteEntryBaseName(route, appDirectory)}-${
-    routeChunkEntrySuffix[chunkName]
-  }`;
+  routeEntryBaseName: string,
+  chunkName: RouteChunkExportName
+): string => `${routeEntryBaseName}-${routeChunkEntrySuffix[chunkName]}`;

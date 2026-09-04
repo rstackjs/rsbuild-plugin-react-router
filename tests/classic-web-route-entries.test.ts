@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import { createClassicWebRouteEntries } from '../src/classic-mode';
 import type { Route } from '../src/types';
@@ -8,29 +8,26 @@ import type { Route } from '../src/types';
 const ROUTE_SOURCE = `export async function clientLoader() { return {}; }
   export default function X() { return null; }`;
 
-/**
- * Lays out a project whose route module lives *outside* `app/`, which is what a
- * shared route package or a `relative()` route table produces.
- */
-const createAppWithOutsideRoute = () => {
+/** Lays out `app/root.tsx` plus the given files, keyed by path under the project root. */
+const createApp = (files: Record<string, string>) => {
   const root = mkdtempSync(join(tmpdir(), 'rr-entries-'));
   const appDir = join(root, 'app');
-  const sharedDir = join(root, 'shared');
-  mkdirSync(appDir, { recursive: true });
-  mkdirSync(sharedDir, { recursive: true });
-
-  writeFileSync(
-    join(appDir, 'root.tsx'),
-    `export default function Root() { return null; }`
-  );
-  writeFileSync(join(sharedDir, 'x.tsx'), ROUTE_SOURCE);
-
+  const allFiles = {
+    'app/root.tsx': `export default function Root() { return null; }`,
+    ...files,
+  };
+  for (const [file, source] of Object.entries(allFiles)) {
+    mkdirSync(dirname(join(root, file)), { recursive: true });
+    writeFileSync(join(root, file), source);
+  }
   return { root, appDir };
 };
 
 describe('createClassicWebRouteEntries', () => {
   it('never emits an entry name that escapes the JS output directory', () => {
-    const { root, appDir } = createAppWithOutsideRoute();
+    // A shared route package or a `relative()` route table produces a route
+    // module that lives outside `app/`.
+    const { root, appDir } = createApp({ 'shared/x.tsx': ROUTE_SOURCE });
     const routes: Record<string, Route> = {
       root: { id: 'root', file: 'root.tsx', path: '' },
       'shared/x': {
@@ -64,14 +61,7 @@ describe('createClassicWebRouteEntries', () => {
     // routes import the very same module, and a route chunk is a pure function
     // of (file, export) — so one entry serves both instead of emitting two
     // byte-identical chunks.
-    const root = mkdtempSync(join(tmpdir(), 'rr-entries-'));
-    const appDir = join(root, 'app');
-    mkdirSync(join(appDir, 'routes'), { recursive: true });
-    writeFileSync(
-      join(appDir, 'root.tsx'),
-      `export default function Root() { return null; }`
-    );
-    writeFileSync(join(appDir, 'routes', 'shared.tsx'), ROUTE_SOURCE);
+    const { root, appDir } = createApp({ 'app/routes/shared.tsx': ROUTE_SOURCE });
 
     const routes: Record<string, Route> = {
       root: { id: 'root', file: 'root.tsx', path: '' },
