@@ -54,7 +54,7 @@ const helpText = dedent`
       --json              Print the routes as JSON
     \`reveal\` Options:
       --config, -c        Use specified Vite config file (string)
-      --no-typescript     Generate plain JavaScript files
+      --no-typescript     Generate plain JavaScript files (deprecated; will be removed in v9)
     \`typegen\` Options:
       --watch             Automatically regenerate types whenever route config (\`routes.ts\`) or route modules change
 
