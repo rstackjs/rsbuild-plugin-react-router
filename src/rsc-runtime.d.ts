@@ -99,6 +99,17 @@ declare module 'virtual/react-router/unstable_rsc/react-router-serve-config' {
 
 declare module 'virtual/react-router/unstable_rsc/inject-hmr-runtime' {}
 
+declare module 'virtual/react-router/unstable_rsc/entry-ssr' {
+  export function generateHTML(
+    request: Request,
+    serverResponse: Response,
+    options?: {
+      bootstrapScripts?: string[];
+      bootstrapModules?: string[];
+    }
+  ): Promise<Response>;
+}
+
 declare module 'virtual/react-router/unstable_rsc/bootstrap-scripts' {
   const bootstrapScripts: string[];
   export default bootstrapScripts;

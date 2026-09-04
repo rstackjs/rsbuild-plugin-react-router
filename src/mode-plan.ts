@@ -104,6 +104,7 @@ type CreateRscModePlanOptions = ModePlanContext & {
   buildDirectory: string;
   finalEntryRscClientPath: string;
   finalEntryRscPath: string;
+  finalEntryRscSsrPath: string;
   outputClientPath: string;
   pluginName: string;
   serverBuildFile: string | undefined;
@@ -133,6 +134,7 @@ const createRscModePlan = async ({
   customServer,
   finalEntryRscClientPath,
   finalEntryRscPath,
+  finalEntryRscSsrPath,
   isBuild,
   outputClientPath,
   pluginName,
@@ -197,7 +199,9 @@ const createRscModePlan = async ({
       }),
     createResolveConfig: (rootPath: string) => ({
       modules: [resolve(rootPath, 'node_modules'), 'node_modules'],
-      alias: createReactRouterRscResolveAliases(rootPath),
+      alias: createReactRouterRscResolveAliases(rootPath, {
+        entrySsrPath: finalEntryRscSsrPath,
+      }),
     }),
     server: !customServer
       ? {

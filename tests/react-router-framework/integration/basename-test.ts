@@ -248,12 +248,14 @@ test.describe("base + React Router basename", () => {
         test("errors if basename does not start with base", async ({
           page,
         }) => {
-          // Vite-only: the base/basename startup validation lives in
-          // @react-router/dev/vite. Without it `rsbuild dev` never exits,
-          // which hangs the sync spawn below.
+          // Not applicable to Rsbuild. Vite's dev server only serves under
+          // `base`, so upstream refuses a `basename` outside it at startup.
+          // The Rsbuild dev middleware serves the app at any `basename`; the
+          // "works when basename does not start with base" cases below cover
+          // that behavior, and `rsbuild dev` would never exit here.
           test.skip(
             true,
-            "rsbuild-plugin-react-router has no base/basename startup validation",
+            "Rsbuild serves a basename outside base; see the 'works when basename does not start with base' cases",
           );
           await setup({
             base: "/mybase/",

@@ -27,6 +27,22 @@ describe('RSC support helpers', () => {
     });
   });
 
+  it('aliases the SSR entry to the resolved user or template file', () => {
+    const aliases = createReactRouterRscResolveAliases('/repo', {
+      entrySsrPath: '/repo/app/entry.ssr.tsx',
+    });
+
+    expect(aliases['virtual/react-router/unstable_rsc/entry-ssr']).toBe(
+      '/repo/app/entry.ssr.tsx'
+    );
+    expect(aliases['virtual:react-router/unstable_rsc/entry-ssr']).toBe(
+      '/repo/app/entry.ssr.tsx'
+    );
+    expect(createReactRouterRscResolveAliases('/repo')).not.toHaveProperty(
+      'virtual/react-router/unstable_rsc/entry-ssr'
+    );
+  });
+
   it('creates only RSC virtual modules with normalized bootstrap scripts', () => {
     const modules = createReactRouterRscVirtualModules({
       allowedActionOrigins: ['https://app.example.com'],

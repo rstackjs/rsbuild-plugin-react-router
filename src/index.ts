@@ -585,6 +585,7 @@ export const pluginReactRouter = (
           buildDirectory,
           finalEntryRscClientPath,
           finalEntryRscPath,
+          finalEntryRscSsrPath,
           outputClientPath,
           pluginName: PLUGIN_NAME,
           serverBuildFile,

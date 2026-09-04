@@ -465,6 +465,29 @@ and every configured bundle are
 evaluated and published as one generation; one failing bundle keeps the whole
 previous generation active.
 
+### Sharing `createContext()` instances with a custom server
+
+React Router middleware contexts are matched by identity, so a custom server's
+`getLoadContext` must use the same `createContext()` instance the routes import.
+With a bundled server build that instance lives inside the build. Re-export it
+from `app/entry.server.tsx` and read it from `build.entry.module`:
+
+```ts
+// app/entry.server.tsx
+export { valueContext } from './context';
+```
+
+```js
+// server.js
+getLoadContext: async () => {
+  const { valueContext } = (await build()).entry.module;
+  return new RouterContextProvider([[valueContext, 'value']]);
+},
+```
+
+This works in development through `loadReactRouterServerBuild` and in
+production through `resolveReactRouterServerBuild`.
+
 `resolveReactRouterServerBuild` accepts an imported production server module,
 normalizes ESM and CommonJS namespace shapes, resolves supported asynchronous
 build exports, and validates the result before it reaches React Router.

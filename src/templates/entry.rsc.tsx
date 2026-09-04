@@ -19,7 +19,7 @@ import clientVersion from 'virtual/react-router/unstable_rsc/client-version';
 import unstable_reactRouterServeConfig from 'virtual/react-router/unstable_rsc/react-router-serve-config';
 import bootstrapScripts from 'virtual/react-router/unstable_rsc/bootstrap-scripts';
 import getServerManifest from 'virtual/react-router/unstable_rsc/server-manifest';
-import { generateHTML } from './entry.rsc.ssr.js';
+import { generateHTML } from 'virtual/react-router/unstable_rsc/entry-ssr';
 
 export { unstable_reactRouterServeConfig };
 

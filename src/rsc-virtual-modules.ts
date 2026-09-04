@@ -39,8 +39,18 @@ type RscVirtualModulesOptions = {
 };
 
 export const createReactRouterRscResolveAliases = (
-  rootPath: string
+  rootPath: string,
+  options: { entrySsrPath?: string } = {}
 ): Record<string, string> => ({
+  // The RSC entry template imports the SSR entry through this alias so a
+  // user-provided `app/entry.ssr.tsx` replaces the template inside the SSR
+  // layer instead of leaving the template to be compiled as server code.
+  ...(options.entrySsrPath
+    ? {
+        'virtual:react-router/unstable_rsc/entry-ssr': options.entrySsrPath,
+        'virtual/react-router/unstable_rsc/entry-ssr': options.entrySsrPath,
+      }
+    : {}),
   ...Object.fromEntries(
     RSC_VIRTUAL_ALIAS_IDS.flatMap(id => {
       const moduleId = `virtual/react-router/unstable_rsc/${id}`;
