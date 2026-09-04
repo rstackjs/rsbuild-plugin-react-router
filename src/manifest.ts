@@ -609,7 +609,8 @@ function generateReactRouterManifestForDevEffect(
     // compares the browser's manifest version with the pinned server build's,
     // and a random per-compilation version made unchanged manifests differ
     // whenever a web compilation completed without a new server pin.
-    const version = createHash('md5')
+    // sha256 rather than md5: md5 is unavailable on FIPS-enabled hosts (#124).
+    const version = createHash('sha256')
       .update(JSON.stringify(fingerprintedValues))
       .digest('hex')
       .slice(0, 8);
