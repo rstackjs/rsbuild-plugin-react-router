@@ -246,9 +246,17 @@ test.describe("presets", async () => {
         "unstable_routeConfig",
       ]);
 
-      // Ensure future flags from presets are properly merged
+      // Ensure future flags from presets are properly merged. Like upstream,
+      // `buildEnd` receives the resolved flags with defaults filled in; the
+      // plugin resolves the flags of both supported React Router majors.
       expect(buildEndArgsMeta.futureFlags).toEqual({
+        unstable_enableNodeReadableStream: false,
         unstable_optimizeDeps: true,
+        unstable_subResourceIntegrity: false,
+        unstable_trailingSlashAwareDataRequests: true,
+        v8_middleware: false,
+        v8_splitRouteModules: false,
+        v8_viteEnvironmentApi: false,
       });
       expect(buildEndArgsMeta.splitRouteModules).toBe(true);
 
