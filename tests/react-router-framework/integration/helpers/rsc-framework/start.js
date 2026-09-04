@@ -24,7 +24,13 @@ const resolveClientBuildPath = (requestPath, ...segments) => {
   return candidatePath;
 };
 
-app.use(base, express.static(clientBuildDirectory, { index: false }));
+// `redirect: false` keeps express.static from answering a prerendered route
+// directory such as `/other` with a 301 to `/other/`; the middleware below
+// serves `<path>/index.html` directly, like a static host or Vite preview.
+app.use(
+  base,
+  express.static(clientBuildDirectory, { index: false, redirect: false }),
+);
 
 // Serve prerendered documents, mirroring the Rsbuild RSC integration's
 // preview server middleware (`<path>/index.html` written at build time).
