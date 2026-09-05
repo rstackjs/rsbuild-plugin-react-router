@@ -465,6 +465,30 @@ and every configured bundle are
 evaluated and published as one generation; one failing bundle keeps the whole
 previous generation active.
 
+### Externalizing server dependencies
+
+The server bundle includes your dependencies by default, which suits targets
+that ship a single file such as Cloudflare Workers. For Node hosts you can let
+Rsbuild leave `package.json` dependencies external so the server build stays
+small and native or generated packages (Prisma, database drivers) load from
+`node_modules` at runtime, matching React Router's Vite default:
+
+```ts
+// rsbuild.config.ts
+export default defineConfig({
+  environments: {
+    node: {
+      output: { autoExternal: true },
+    },
+  },
+  plugins: [pluginReactRouter(), pluginReact()],
+});
+```
+
+`output.autoExternal` (Rsbuild 2.0.7+) externalizes `dependencies`,
+`peerDependencies`, and `optionalDependencies`, including subpath imports such
+as `react/jsx-runtime`. The plugin's own server output works unchanged with it.
+
 ### Sharing `createContext()` instances with a custom server
 
 React Router middleware contexts are matched by identity, so a custom server's
