@@ -11,6 +11,7 @@ describe('manifest asset classification', () => {
       'bundles/entry.payload': 'javascript',
       'bundles/not-code.js': 'asset',
       'styles/main.payload': 'css',
+      'styles/extracted.payload': 'extract-css',
     };
 
     expect(getManifestAssetType('bundles/entry.payload', types)).toBe(
@@ -18,6 +19,7 @@ describe('manifest asset classification', () => {
     );
     expect(getManifestAssetType('bundles/not-code.js', types)).toBe('asset');
     expect(getManifestAssetType('styles/main.payload', types)).toBe('css');
+    expect(getManifestAssetType('styles/extracted.payload', types)).toBe('css');
   });
 
   it.each([

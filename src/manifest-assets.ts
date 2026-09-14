@@ -34,7 +34,7 @@ export const getManifestAssetType = (
   if (/\.hot-update\.[cm]?js(?:[?#]|$)/.test(name)) return undefined;
   const assetType = assetTypesByName?.[name];
   if (assetType !== undefined) {
-    return assetType;
+    return assetType === 'extract-css' ? 'css' : assetType;
   }
 
   // Synthetic stats and older bundlers may not supply asset metadata.
