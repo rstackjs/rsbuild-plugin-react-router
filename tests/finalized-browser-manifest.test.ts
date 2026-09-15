@@ -379,6 +379,7 @@ describe('finalized production browser manifests', () => {
     { filename: 'bundles/[name].[contenthash:8].cjs', enableSri: false },
     { filename: 'bundles/[name].js?[contenthash:8]', enableSri: false },
     { filename: 'bundles/[name]-[contenthash:8]', enableSri: false },
+    { filename: 'bundles/[name]-[contenthash:8]', enableSri: true },
   ])(
     'publishes final URLs for $filename (SRI: $enableSri)',
     async ({ filename, enableSri }) => {
