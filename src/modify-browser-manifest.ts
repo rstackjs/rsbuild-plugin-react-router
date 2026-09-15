@@ -32,6 +32,8 @@ type CompilationAssetWithIntegrity = {
   source?: { source(): string | Buffer };
   info?: {
     integrity?: unknown;
+    assetType?: string;
+    javascriptModule?: boolean;
   };
 };
 
@@ -81,14 +83,10 @@ const toManifestAssetUrl = (assetPrefix: string, assetName: string) => {
 const addIntegrity = (
   sri: Record<string, string>,
   assetPrefix: string,
-  assetName: unknown,
+  assetName: string,
   integrity: unknown
 ) => {
-  if (
-    typeof assetName !== 'string' ||
-    !isManifestJsAsset(assetName) ||
-    typeof integrity !== 'string'
-  ) {
+  if (typeof integrity !== 'string') {
     return;
   }
   sri[toManifestAssetUrl(assetPrefix, assetName)] = integrity;
@@ -113,6 +111,9 @@ export const collectSubresourceIntegrity = (
   const sri: Record<string, string> = {};
 
   for (const asset of stats?.assets ?? []) {
+    if (typeof asset.name !== 'string' || !isManifestJsAsset(asset.name)) {
+      continue;
+    }
     addIntegrity(sri, assetPrefix, asset.name, asset.integrity);
   }
 
@@ -120,7 +121,17 @@ export const collectSubresourceIntegrity = (
     const assets =
       compilation.getAssets() as readonly CompilationAssetWithIntegrity[];
     for (const asset of assets) {
-      if (!isManifestJsAsset(asset.name)) {
+      const assetType =
+        asset.info?.assetType ??
+        (typeof asset.info?.javascriptModule === 'boolean'
+          ? 'javascript'
+          : undefined);
+      if (
+        getManifestAssetType(
+          asset.name,
+          assetType === undefined ? undefined : { [asset.name]: assetType }
+        ) !== 'javascript'
+      ) {
         continue;
       }
       addIntegrity(
