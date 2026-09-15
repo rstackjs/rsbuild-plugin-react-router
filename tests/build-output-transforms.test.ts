@@ -2,6 +2,8 @@ import type { TransformDescriptor, TransformHandler } from '@rsbuild/core';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { resolve } from 'pathe';
 import { registerBuildOutputTransforms } from '../src/build-output-transforms';
+import { getExportNames } from '../src/export-utils';
+import { executeRouteTransformTask } from '../src/route-transform-tasks';
 
 type TransformRegistration = {
   descriptor: TransformDescriptor;
@@ -278,4 +280,33 @@ describe('build output transforms', () => {
       })
     );
   });
+});
+
+it('removes server-only code from generated browser route chunks', async () => {
+  const harness = createTransformHarness();
+  const options = createBaseOptions(harness);
+  const routeChunkCache = new Map();
+  registerBuildOutputTransforms({
+    ...options,
+    routeTransformRunner: task => executeRouteTransformTask(task, { routeChunkCache }),
+  });
+  const transform = harness.transforms.find(({ descriptor }) =>
+    descriptor.resourceQuery instanceof RegExp && descriptor.resourceQuery.test('?route-chunk=main')
+  )!;
+  const source = `
+    import { readData } from './data.server';
+    export const clientLoader = () => 'client';
+    export async function loader() { return readData(); }
+    export async function action() { return readData(); }
+    export const middleware = [() => readData()];
+    export const headers = () => ({ 'Cache-Control': 'private' });
+    export default function Route() { return null; }
+  `;
+  for (const name of ['main', 'clientLoader']) {
+    const result = await transform.handler(createTransformArgs(options.routePath, `?route-chunk=${name}`, source));
+    const code = (typeof result === 'object' && 'code' in result ? result.code : result).toString();
+    expect(await getExportNames(code)).toEqual([name === 'main' ? 'default' : 'clientLoader']);
+    expect(code).not.toContain('./data.server');
+    expect(code).not.toContain('readData');
+  }
 });

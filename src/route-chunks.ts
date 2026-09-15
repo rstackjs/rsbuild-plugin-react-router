@@ -1,10 +1,13 @@
 import {
   Analyzer,
+  SymbolFlags,
+  type Export as YukuExport,
   type Module,
+  type Reference as YukuReference,
   type Symbol as YukuSymbol,
 } from 'yuku-analyzer';
 import { print } from 'yuku-codegen';
-import { walk } from 'yuku-parser';
+import { walk, type Node } from 'yuku-parser';
 import { dirname, normalize, relative, resolve } from 'pathe';
 import { SERVER_ONLY_ROUTE_EXPORTS_SET } from './constants.js';
 import { createRouteId } from './plugin-utils.js';
@@ -146,6 +149,7 @@ type ExportDependencies = {
   importedIdentifierNames: Set<string>;
   importSources: Set<string>;
   exportedVariableDeclarators: Set<AnyNode>;
+  exportedLocalSymbols: Set<YukuSymbol>;
 };
 
 const getTopLevelStatementForNode = (
@@ -162,30 +166,30 @@ const getTopLevelStatementForNode = (
   return current;
 };
 
-const getVariableDeclaratorForNode = (
+const getExportedVariableDeclaratorForNode = (
   module: Module,
   node: AnyNode
 ): AnyNode | null => {
-  let current: AnyNode | null = node;
-  while (current) {
-    if (current.type === 'VariableDeclarator') {
-      return current;
+  let current = node as Node;
+  while (true) {
+    const parent = module.parentOf(current);
+    if (!parent || parent.type === 'Program') {
+      return null;
     }
-    current = module.parentOf(current as never) as AnyNode | null;
+    if (
+      current.type === 'VariableDeclarator' &&
+      parent.type === 'VariableDeclaration'
+    ) {
+      const exported = module.parentOf(parent);
+      if (
+        exported?.type === 'ExportNamedDeclaration' &&
+        module.parentOf(exported)?.type === 'Program'
+      ) {
+        return current;
+      }
+    }
+    current = parent;
   }
-  return null;
-};
-
-const isTopLevelExportedVariableDeclarator = (
-  module: Module,
-  node: AnyNode
-): boolean => {
-  const declaration = module.parentOf(node as never) as AnyNode | null;
-  if (declaration?.type !== 'VariableDeclaration') {
-    return false;
-  }
-  const statement = module.parentOf(declaration as never) as AnyNode | null;
-  return statement?.type === 'ExportNamedDeclaration';
 };
 
 const getExportedName = (exported: AnyNode): string => {
@@ -241,9 +245,29 @@ const getExportDependencies = (
     code,
     () => {
       const { module } = analyzeCode(code, cache, cacheKey);
+      const namedExports = module.exports.filter(
+        (exp): exp is YukuExport & { name: string } =>
+          exp.name !== null &&
+          !exp.typeOnly &&
+          !exp.isStar &&
+          !exp.isExportEquals
+      );
+      // Removing type declarations can change legacy decorator metadata and
+      // name hygiene. Preserve the original dependency graph for decorated
+      // modules because the downstream compiler options are not known here.
+      let hasDecorators = false;
+      walk(module.ast, {
+        Decorator(_node, context) {
+          hasDecorators = true;
+          context.stop();
+        },
+      });
       const exportDependencies = new Map<string, ExportDependencies>();
       const topLevelStatementCache = new Map<AnyNode, AnyNode>();
-      const variableDeclaratorCache = new Map<AnyNode, AnyNode | null>();
+      const exportedVariableDeclaratorCache = new Map<
+        AnyNode,
+        AnyNode | null
+      >();
       const getCachedTopLevelStatementForNode = (node: AnyNode): AnyNode => {
         const cached = topLevelStatementCache.get(node);
         if (cached) {
@@ -254,14 +278,56 @@ const getExportDependencies = (
         return statement;
       };
 
-      const getCachedVariableDeclaratorForNode = (
+      // Ordinary imports can be repeated in multiple chunks. Exported local
+      // bindings must keep a single owner, including functions and classes.
+      const nonShareableExportedSymbols = new Set<YukuSymbol>();
+      for (const { local } of namedExports) {
+        if (
+          !local?.has(SymbolFlags.ValueSpace | SymbolFlags.ValueImport) ||
+          local.declarations.every(
+            declaration =>
+              getCachedTopLevelStatementForNode(declaration).type ===
+              'ImportDeclaration'
+          )
+        ) {
+          continue;
+        }
+        nonShareableExportedSymbols.add(local);
+      }
+
+      const isValueImportEqualsReference = (
+        reference: YukuReference
+      ): boolean => {
+        let node: Node = reference.node;
+        let parent = module.parentOf(node);
+        while (parent?.type === 'TSQualifiedName') {
+          node = parent;
+          parent = module.parentOf(node);
+        }
+        // Yuku also marks the runtime RHS of `import x = Namespace.value`
+        // as a type reference.
+        return (
+          parent?.type === 'TSImportEqualsDeclaration' &&
+          parent.moduleReference === node &&
+          parent.importKind !== 'type'
+        );
+      };
+
+      const isRuntimeRelevantReference = (reference: YukuReference): boolean =>
+        hasDecorators ||
+        reference.kind === 'value' ||
+        isValueImportEqualsReference(reference);
+
+      const getCachedExportedVariableDeclaratorForNode = (
         node: AnyNode
       ): AnyNode | null => {
-        if (variableDeclaratorCache.has(node)) {
-          return variableDeclaratorCache.get(node) ?? null;
+        if (exportedVariableDeclaratorCache.has(node)) {
+          return exportedVariableDeclaratorCache.get(node) ?? null;
         }
-        const declarator = getVariableDeclaratorForNode(module, node);
-        variableDeclaratorCache.set(node, declarator);
+        // Only direct exported declarators can be emitted independently.
+        // Every other top-level statement is moved as a whole.
+        const declarator = getExportedVariableDeclaratorForNode(module, node);
+        exportedVariableDeclaratorCache.set(node, declarator);
         return declarator;
       };
 
@@ -291,9 +357,32 @@ const getExportDependencies = (
           importedIdentifierNames: new Set(),
           importSources: new Set(),
           exportedVariableDeclarators: new Set(),
+          exportedLocalSymbols: new Set(),
         };
         const visitedSymbols = new Set<YukuSymbol>();
         const scannedNodes = new Set<AnyNode>();
+
+        const visitIdentifier = (node: YukuReference['node']) => {
+          const reference = module.referenceOf(node);
+          if (reference) {
+            if (reference.symbol && isRuntimeRelevantReference(reference)) {
+              visitSymbol(reference.symbol);
+            }
+            return;
+          }
+          const symbol = module.symbolOf(node);
+          if (
+            symbol?.scope === module.rootScope &&
+            symbol.has(SymbolFlags.ValueSpace | SymbolFlags.ValueImport) &&
+            dependencies.topLevelNonModuleStatements.has(
+              getCachedTopLevelStatementForNode(node)
+            )
+          ) {
+            // Moving a statement also moves the bindings it declares. Follow
+            // their consumers so no references remain in another chunk.
+            visitSymbol(symbol);
+          }
+        };
 
         const scanNode = (node: AnyNode) => {
           if (scannedNodes.has(node)) {
@@ -301,12 +390,8 @@ const getExportDependencies = (
           }
           scannedNodes.add(node);
           walk(node as any, {
-            Identifier(node: AnyNode) {
-              const reference = module.referenceOf(node as never);
-              if (reference?.symbol) {
-                visitSymbol(reference.symbol);
-              }
-            },
+            Identifier: visitIdentifier,
+            JSXIdentifier: visitIdentifier,
           });
         };
 
@@ -317,6 +402,9 @@ const getExportDependencies = (
           visitedSymbols.add(symbol);
           if (symbol.declarations.length === 0) {
             return;
+          }
+          if (nonShareableExportedSymbols.has(symbol)) {
+            dependencies.exportedLocalSymbols.add(symbol);
           }
 
           for (const declaration of symbol.declarations as AnyNode[]) {
@@ -329,24 +417,27 @@ const getExportDependencies = (
               if (typeof statement.source?.value === 'string') {
                 dependencies.importSources.add(statement.source.value);
               }
-              return;
+              // Ordinary imports are shareable; a directly exported import
+              // also owns setup statements such as `load.hydrate = true`.
+              if (symbol !== localSymbol) return;
             }
-            const declarator = getCachedVariableDeclaratorForNode(declaration);
-            if (
-              declarator &&
-              isTopLevelExportedVariableDeclarator(module, declarator)
-            ) {
+            const declarator =
+              getCachedExportedVariableDeclaratorForNode(declaration);
+            if (declarator) {
               dependencies.exportedVariableDeclarators.add(declarator);
             }
             scanNode(declarator ?? statement);
           }
 
-          for (const reference of symbol.references as any[]) {
+          for (const reference of symbol.references) {
+            if (!isRuntimeRelevantReference(reference)) {
+              continue;
+            }
             const statement = addCachedTopLevelStatement(
               dependencies,
               reference.node
             );
-            const declarator = getCachedVariableDeclaratorForNode(
+            const declarator = getCachedExportedVariableDeclaratorForNode(
               reference.node
             );
             scanNode(declarator ?? statement);
@@ -365,10 +456,7 @@ const getExportDependencies = (
         exportDependencies.set(exportName, dependencies);
       };
 
-      for (const exp of module.exports as any[]) {
-        if (exp.typeOnly || exp.isStar || exp.isExportEquals) {
-          continue;
-        }
+      for (const exp of namedExports) {
         handleExport(exp.name, exp.node as AnyNode, exp.local ?? null);
       }
 
@@ -383,7 +471,7 @@ const isExportChunkable = (
   importer: string
 ) => {
   const dependencies = exportDependencies.get(exportName);
-  if (!dependencies) {
+  if (!dependencies || dependencies.exportedVariableDeclarators.size > 1) {
     return false;
   }
   if (exportName === 'clientLoader' && hasHydrateAssignment(dependencies)) {
@@ -403,27 +491,17 @@ const isExportChunkable = (
       setsIntersect(
         currentDependencies.topLevelNonModuleStatements,
         dependencies.topLevelNonModuleStatements
+      ) ||
+      setsIntersect(
+        currentDependencies.exportedVariableDeclarators,
+        dependencies.exportedVariableDeclarators
+      ) ||
+      setsIntersect(
+        currentDependencies.exportedLocalSymbols,
+        dependencies.exportedLocalSymbols
       )
     ) {
       return false;
-    }
-  }
-  if (dependencies.exportedVariableDeclarators.size > 1) {
-    return false;
-  }
-  if (dependencies.exportedVariableDeclarators.size > 0) {
-    for (const [currentExportName, currentDependencies] of exportDependencies) {
-      if (currentExportName === exportName) {
-        continue;
-      }
-      if (
-        setsIntersect(
-          currentDependencies.exportedVariableDeclarators,
-          dependencies.exportedVariableDeclarators
-        )
-      ) {
-        return false;
-      }
     }
   }
   return true;

@@ -1,3 +1,14 @@
+import {
+  createChunkAssetResolver,
+  type ReactRouterManifestStats,
+  stripAssetQuery,
+  getManifestAssetType,
+} from './manifest-assets.js';
+export {
+  createReactRouterManifestStats,
+  type ReactRouterManifestStats,
+} from './manifest-assets.js';
+import { BROWSER_MANIFEST_ENTRY_NAME } from './constants.js';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import * as Effect from 'effect/Effect';
@@ -143,30 +154,6 @@ export type ReactRouterManifestForDev = {
   routes: Record<string, RouteManifestItem>;
 };
 
-export type ReactRouterManifestStats = {
-  assetsByChunkName?: Record<string, string[]>;
-  entrypointFilesByName?: Record<string, string[]>;
-};
-
-type ReactRouterManifestStatsChunk = {
-  files?: Iterable<string>;
-};
-
-type ReactRouterManifestStatsEntrypoint = {
-  getFiles?: () => Iterable<string>;
-};
-
-type ReactRouterManifestStatsLookup<T> = Iterable<
-  [string, T | null | undefined]
-> & {
-  get?: (name: string) => T | null | undefined;
-};
-
-type ReactRouterManifestStatsCompilation = {
-  namedChunks: ReactRouterManifestStatsLookup<ReactRouterManifestStatsChunk>;
-  entrypoints?: ReactRouterManifestStatsLookup<ReactRouterManifestStatsEntrypoint>;
-};
-
 // Emitted asset names may carry a query (`output.filename.js:
 // '[name].js?v=[contenthash:8]'`); classify on the pathname but keep the full
 // reference, since the query is part of the URL the browser must request.
@@ -252,91 +239,11 @@ export const collectUnsupportedRscScriptAssets = (
   return [...unsupported];
 };
 
-const collectManifestFilesByName = <T>(
-  items: ReactRouterManifestStatsLookup<T>,
-  names: ReadonlySet<string> | undefined,
-  getFiles: (name: string, item: T) => string[]
-): Record<string, string[]> => {
-  const filesByName: Record<string, string[]> = {};
-  if (!names) {
-    for (const [name, item] of items) {
-      if (item == null) {
-        continue;
-      }
-      filesByName[name] = getFiles(name, item);
-    }
-    return filesByName;
-  }
-
-  const missingNames = new Set(names);
-  if (typeof items.get === 'function') {
-    for (const name of names) {
-      const item = items.get(name);
-      if (item == null) {
-        continue;
-      }
-      filesByName[name] = getFiles(name, item);
-      missingNames.delete(name);
-    }
-  }
-
-  if (missingNames.size === 0) {
-    return filesByName;
-  }
-
-  for (const [name, item] of items) {
-    if (!missingNames.has(name)) {
-      continue;
-    }
-    if (item == null) {
-      continue;
-    }
-    filesByName[name] = getFiles(name, item);
-    missingNames.delete(name);
-    if (missingNames.size === 0) {
-      break;
-    }
-  }
-
-  return filesByName;
-};
-
-export const createReactRouterManifestStats = (
-  compilation: ReactRouterManifestStatsCompilation | undefined,
-  chunkNames?: ReadonlySet<string>
-): ReactRouterManifestStats | undefined => {
-  if (!compilation) {
-    return undefined;
-  }
-
-  const assetsByChunkName = collectManifestFilesByName(
-    compilation.namedChunks,
-    chunkNames,
-    (_chunkName, chunk) => Array.from(chunk.files ?? [])
-  );
-  const entrypointFilesByName = compilation.entrypoints
-    ? collectManifestFilesByName(
-        compilation.entrypoints,
-        chunkNames,
-        (_name, entrypoint) => Array.from(entrypoint.getFiles?.() ?? [])
-      )
-    : {};
-
-  return Object.keys(entrypointFilesByName).length > 0
-    ? { assetsByChunkName, entrypointFilesByName }
-    : { assetsByChunkName };
-};
-
 export type RouteManifestModuleExports = Record<string, readonly string[]>;
 
 export type ReactRouterManifestGenerationResult = {
   manifest: ReactRouterManifestForDev;
   moduleExportsByRouteId: RouteManifestModuleExports;
-};
-
-type ChunkAssets = {
-  js: string[];
-  css: string[];
 };
 
 type RouteManifestAnalysis = {
@@ -350,61 +257,6 @@ type RouteManifestAnalysis = {
 
 const DEFAULT_MANIFEST_DIR = DEFAULT_JS_DIST_PATH;
 const CSS_IMPORT_RE = /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/;
-
-const createChunkAssetResolver = (
-  clientStats: ReactRouterManifestStats | undefined,
-  includeEntrypointJs: boolean
-): ((chunkName: string) => ChunkAssets) => {
-  const chunkAssetsByName = new Map<string, ChunkAssets>();
-
-  return (chunkName: string): ChunkAssets => {
-    const cached = chunkAssetsByName.get(chunkName);
-    if (cached) {
-      return cached;
-    }
-
-    const assets = clientStats?.assetsByChunkName?.[chunkName];
-    if (!assets) {
-      const fallback = `${DEFAULT_MANIFEST_DIR}/${chunkName}.js`;
-      const result = { js: [fallback], css: [] };
-      chunkAssetsByName.set(chunkName, result);
-      return result;
-    }
-
-    const cssAssets = new Set<string>();
-    const jsAssets = new Set<string>();
-    // The chunk's own files come first so `js[0]` is the route module itself;
-    // entrypoint files (runtime, shared vendor chunks) follow as `imports`.
-    for (const asset of assets) {
-      if (isManifestCssAsset(asset)) {
-        cssAssets.add(asset);
-      } else if (isManifestJsAsset(asset)) {
-        jsAssets.add(asset);
-      }
-    }
-    for (const asset of clientStats?.entrypointFilesByName?.[chunkName] ?? []) {
-      if (isManifestCssAsset(asset)) {
-        cssAssets.add(asset);
-      } else if (includeEntrypointJs && isManifestJsAsset(asset)) {
-        jsAssets.add(asset);
-      }
-    }
-    if (jsAssets.size === 0) {
-      // Compilation metadata exists for this chunk but names no module script.
-      // Guessing `<dir>/<chunk>.js` here would turn an identifiable build
-      // problem into a browser 404, so surface it at build time instead.
-      throw new Error(
-        `[react-router] Chunk "${chunkName}" emitted no JavaScript asset the browser manifest can reference (files: ${
-          assets.join(', ') || 'none'
-        }). Check the web \`output.filename.js\` scheme.`
-      );
-    }
-
-    const result = { js: [...jsAssets], css: [...cssAssets] };
-    chunkAssetsByName.set(chunkName, result);
-    return result;
-  };
-};
 
 const analyzeRouteForManifestEffect = ({
   discoveredCssAssets,
@@ -696,14 +548,24 @@ function generateReactRouterManifestForDevEffect(
     const manifestPath = getReactRouterManifestPath({
       version,
       isBuild,
-      entryModulePath: entryJsAssets[0],
+      entryModulePath: stripAssetQuery(entryJsAssets[0] ?? ''),
     });
 
+    const browserManifestPath =
+      clientStats?.assetsByChunkName?.[BROWSER_MANIFEST_ENTRY_NAME]?.find(
+        name =>
+          getManifestAssetType(name, clientStats.assetTypesByName) ===
+          'javascript'
+      ) ?? manifestPath;
+    // Report-stage serialization happens after hashing, so retain the version
+    // query even when the virtual manifest has a content-hashed filename.
     const manifest = {
       version,
       url: combineURLs(
         assetPrefix,
-        isBuild ? manifestPath : `${manifestPath}?v=${version}`
+        isBuild
+          ? manifestPath
+          : `${browserManifestPath}${browserManifestPath.includes('?') ? '&' : '?'}v=${version}`
       ),
       hmr: undefined,
       entry: fingerprintedValues.entry,

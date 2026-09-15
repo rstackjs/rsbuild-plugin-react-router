@@ -12,6 +12,13 @@ export type Route = {
 
 export type PluginOptions = {
   /**
+   * Generate React Router route types during development and builds.
+   * Set to false when type generation is managed separately.
+   * @default true
+   */
+  typegen?: boolean;
+
+  /**
    * Whether to disable automatic middleware setup for custom server implementation.
    * Use this when you want to handle server setup manually.
    * @default false

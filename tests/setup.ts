@@ -169,6 +169,7 @@ rstest.mock('@scripts/test-helper', () => ({
       modifyRsbuildConfig: rstest.fn(),
       modifyRspackConfig: rstest.fn(),
       modifyBundlerChain: rstest.fn(),
+      onBeforeEnvironmentCompile: rstest.fn(),
       onAfterEnvironmentCompile: rstest.fn(),
       // Keep as a spy-only hook; tests in this repo assert against the merged
       // Rsbuild config (modifyRsbuildConfig), not post-normalization environment

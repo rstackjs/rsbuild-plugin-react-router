@@ -208,8 +208,9 @@ describe('modify browser manifest plugin', () => {
     expect(sri).toBeUndefined();
   });
 
-  it('computes JS integrity from final compilation assets when metadata is missing', () => {
+  it('computes final JS integrity using metadata with a filename fallback', () => {
     const source = 'console.log("entry");';
+    const integrity = `sha384-${createHash('sha384').update(source).digest('base64')}`;
     const sri = collectSubresourceIntegrity(undefined, {
       getAssets: () => [
         {
@@ -220,13 +221,25 @@ describe('modify browser manifest plugin', () => {
           name: 'static/css/entry.client.css',
           source: { source: () => '.root{}' },
         },
+        ...[
+          { name: 'bundles/entry', info: { assetType: 'javascript' } },
+          { name: 'bundles/module', info: { javascriptModule: true } },
+          { name: 'bundles/script', info: { javascriptModule: false } },
+          { name: 'bundles/style', info: { assetType: 'extract-css' } },
+          { name: 'bundles/data.js', info: { assetType: 'asset' } },
+          {
+            name: 'bundles/main.hot-update.js',
+            info: { assetType: 'javascript' },
+          },
+        ].map(asset => ({ ...asset, source: { source: () => source } })),
       ],
     });
 
     expect(sri).toEqual({
-      '/static/js/entry.client.js': `sha384-${createHash('sha384')
-        .update(source)
-        .digest('base64')}`,
+      '/static/js/entry.client.js': integrity,
+      '/bundles/entry': integrity,
+      '/bundles/module': integrity,
+      '/bundles/script': integrity,
     });
   });
 

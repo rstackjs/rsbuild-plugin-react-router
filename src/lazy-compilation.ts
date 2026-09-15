@@ -1,4 +1,7 @@
-import { BUILD_CLIENT_ROUTE_QUERY_STRING } from './constants.js';
+import {
+  BROWSER_MANIFEST_ENTRY_NAME,
+  BUILD_CLIENT_ROUTE_QUERY_STRING,
+} from './constants.js';
 import type { PluginOptions } from './types.js';
 
 type LazyCompilationOptions = Exclude<
@@ -49,7 +52,7 @@ const matchesLazyCompilationTest = (
 
 const createReactRouterHydrationModuleTest = (entryClientPath: string) => {
   const eagerPatterns = [
-    'virtual/react-router/browser-manifest',
+    BROWSER_MANIFEST_ENTRY_NAME,
     ...(entryClientPath
       ? [
           normalizeSlashes(entryClientPath),

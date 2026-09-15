@@ -325,6 +325,69 @@ describe('route chunks', () => {
       expectOnlyChunkedExport(result, 'clientLoader');
     });
 
+    it('ignores type-only dependencies shared with server exports', async () => {
+      const code = `
+        type LoaderData = { value: string };
+        export const clientLoader: () => LoaderData = () => ({ value: 'client' });
+        export function loader(): LoaderData { return { value: 'server' }; }
+        export default function Route() { return null; }
+      `;
+
+      const result = await detect(code);
+
+      expectOnlyChunkedExport(result, 'clientLoader');
+    });
+
+    it('ignores type-only references to runtime dependencies', async () => {
+      const code = `
+        const clientHelper = () => ({ value: 'client' });
+        const serverHelper: typeof clientHelper = () => ({ value: 'server' });
+        export const clientLoader = () => clientHelper();
+        export const loader = () => serverHelper();
+        export default function Route() { return null; }
+      `;
+
+      const result = await detect(code);
+
+      expectOnlyChunkedExport(result, 'clientLoader');
+    });
+
+    it('does not ignore shared runtime dependencies used with shared types', async () => {
+      const code = `
+        type LoaderData = { value: string };
+        const shared = (): LoaderData => ({ value: 'shared' });
+        export const clientLoader: () => LoaderData = () => shared();
+        export function loader(): LoaderData { return shared(); }
+        export default function Route() { return null; }
+      `;
+
+      const result = await detect(code);
+
+      expectNoRouteChunks(result, ['clientLoader', 'loader', 'default']);
+    });
+
+    it('keeps type dependencies that decorator metadata can emit', async () => {
+      const code = `
+        function decorate(..._args: unknown[]) {}
+        class FirstService {}
+        class SecondService {}
+        class ClientData {
+          method(
+            @decorate first: FirstService,
+            second: SecondService
+          ): SecondService {
+            return second;
+          }
+        }
+        export const clientLoader = () => ClientData;
+        export default function Route() { return SecondService; }
+      `;
+
+      const result = await detect(code);
+
+      expectNoRouteChunks(result, ['clientLoader', 'default']);
+    });
+
     it('does not split two client exports that share a top-level helper', async () => {
       const code = `
         const shared = () => {};
@@ -492,6 +555,30 @@ describe('route chunks', () => {
       );
 
       await expectExports(chunk, ['clientAction'], ['default', 'action']);
+    });
+
+    it('keeps decorator metadata consumers with their value dependencies', async () => {
+      const code = `
+        function decorate(..._args: unknown[]) {}
+        class ClientService {}
+        class MetadataConsumer {
+          @decorate
+          value!: ClientService;
+        }
+        export const clientLoader = () => ClientService;
+        export default function Route() { return null; }
+      `;
+
+      const chunk = await getRouteChunkIfEnabled(
+        new Map(),
+        config,
+        routeId,
+        'clientLoader',
+        code
+      );
+
+      expect(chunk).toContain('class ClientService');
+      expect(chunk).toContain('class MetadataConsumer');
     });
 
     it('keeps only import specifiers used by an individual client chunk', async () => {

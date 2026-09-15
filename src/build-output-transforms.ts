@@ -210,6 +210,11 @@ export const registerBuildOutputTransforms = ({
           );
           const bundleId = bundleMatch?.[1]?.replace(/\.js$/, '');
           const latestServerManifest = getLatestServerManifest();
+          if (isBuild && !latestServerManifest) {
+            throw new Error(
+              `[${PLUGIN_NAME}] Production server manifest requested before the browser manifest was finalized.`
+            );
+          }
           const manifest =
             (latestServerManifest
               ? ((bundleId && getLatestServerManifestByBundleId(bundleId)) ??
