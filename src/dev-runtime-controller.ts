@@ -141,8 +141,7 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
-  // Retain node-edit intent until a coherent generation commits, including
-  // empty retries. A web-only commit must not consume a newer node edit.
+  // Pending node-edit intent until a coherent commit retains that compilation.
   const hdrIntentsByPair = new WeakMap<
     DevCompilerPair,
     ReturnType<typeof createDevHdrIntentTracker>
