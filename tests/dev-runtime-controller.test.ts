@@ -1281,4 +1281,111 @@ describe('React Router development runtime controller', () => {
       assets: { version: 'web-b' },
     });
   });
+
+  it('retains HDR intent across a rejected pairing and empty Node retry', async () => {
+    const {
+      callbacks,
+      controller,
+      loadBundle,
+      onNodeRebuildCommitted,
+      server,
+    } = createHarness();
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const routePath = '/app/routes/route-hdr.tsx';
+    const cssPath = '/app/routes/route-hdr.css';
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+
+    // Relevant Node edit starts while stamped with the previous web identity.
+    callbacks.before();
+    node.setChanges([routePath]);
+    const nodeWithEdit = node.compile();
+
+    // A later web compilation (e.g. CSS) completes first → pairing mismatch.
+    web.setChanges([cssPath]);
+    web.invalidate();
+    const webCss = web.compile();
+    controller.captureWeb(webCss, createManifestSet('web-css'));
+    web.complete(webCss);
+    build = createBuild('node-edit');
+    await callbacks.after({ stats: createGraphStats(webCss, nodeWithEdit) });
+    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+
+    // Coherent empty Node retry still contains the edit; changed-file set is empty.
+    // retry-node invalidates the Node compiler and begins a fresh attempt.
+    node.invalidate();
+    node.setChanges([]);
+    const emptyRetry = node.compile();
+    build = createBuild('node-retry');
+    await callbacks.after({ stats: createGraphStats(webCss, emptyRetry) });
+
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'node-retry',
+      assets: { version: 'web-css' },
+    });
+    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+  });
+
+  it('does not consume a newer pending Node HDR intent on a CSS-only commit', async () => {
+    const {
+      callbacks,
+      controller,
+      loadBundle,
+      onNodeRebuildCommitted,
+      server,
+    } = createHarness();
+    let build = createBuild('base');
+    loadBundle.mockImplementation(() => build);
+    const routePath = '/app/routes/route-pending.tsx';
+    const cssPath = '/app/routes/route-pending.css.ts';
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({
+      compiler: { compilers: [web.compiler, node.compiler] },
+    });
+
+    callbacks.before();
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('web-base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    // Start a relevant Node compilation that captures HDR intent, but do not
+    // settle it yet. A CSS-only web commit that retains the old Node identity
+    // must not acknowledge that pending intent.
+    callbacks.before();
+    node.setChanges([routePath]);
+    const pendingNode = node.compile();
+
+    web.setChanges([cssPath]);
+    const cssWeb = web.compile();
+    controller.captureWeb(cssWeb, createManifestSet('web-css'));
+    web.complete(cssWeb);
+    await callbacks.after({ stats: createGraphStats(cssWeb, baseNode) });
+    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+
+    // Completing the pending Node edit with a coherent web pair notifies once.
+    build = createBuild('node-pending');
+    await callbacks.after({ stats: createGraphStats(cssWeb, pendingNode) });
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'node-pending',
+      assets: { version: 'web-css' },
+    });
+    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+  });
 });

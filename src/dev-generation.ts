@@ -61,6 +61,8 @@ export type ReactRouterDevRuntime = {
     changes: DevGraphChanges,
     identity: DevGraphIdentity
   ) => Promise<'committed' | 'ignored' | 'retry-node'>;
+  /** Node identity actually retained by the last successful generation. */
+  getCommittedNodeIdentity: () => DevCompilationIdentity | undefined;
   failAttempt: (error: Error) => void;
   load: (entryName?: string) => Promise<ServerBuild>;
   close: (error?: Error) => void;
@@ -613,6 +615,10 @@ export const createReactRouterDevRuntime = ({
         rejectAttempt(attemptId, normalizeEffectError(cause), true);
         return 'ignored';
       }
+    },
+
+    getCommittedNodeIdentity() {
+      return state.kind === 'ready' ? state.committed.nodeIdentity : undefined;
     },
 
     failAttempt(error): void {
