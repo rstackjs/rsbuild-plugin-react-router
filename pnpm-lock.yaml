@@ -26,6 +26,15 @@ overrides:
   '@babel/core@7': ^7.29.6
   '@conform-to/dom@1': ^1.19.4
   '@opentelemetry/core@2': ^2.8.0
+  '@nasa-gcn/remix-seo>@remix-run/react': '-'
+  '@nasa-gcn/remix-seo>@remix-run/server-runtime': '-'
+
+packageExtensionsChecksum: 46fee72151c8ad69153b22b00d85cca8
+
+patchedDependencies:
+  '@nasa-gcn/remix-seo@2.0.1':
+    hash: 4i67u7akxdbxxi6pnnyriptasq
+    path: patches/@nasa-gcn__remix-seo.patch
 
 importers:
 
@@ -542,7 +551,7 @@ importers:
         version: 0.9.1
       '@nasa-gcn/remix-seo':
         specifier: 2.0.1
-        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))
+        version: 2.0.1(patch_hash=4i67u7akxdbxxi6pnnyriptasq)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
       '@oslojs/crypto':
         specifier: 1.0.1
         version: 1.0.1
@@ -588,9 +597,6 @@ importers:
       '@react-router/remix-routes-option-adapter':
         specifier: 7.18.3
         version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
-      '@remix-run/server-runtime':
-        specifier: 2.17.5
-        version: 2.17.5(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -912,7 +918,7 @@ importers:
         version: 2.5.1(@rsbuild/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0))(@rspack/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23))(node-fetch@2.7.0(encoding@0.1.13))(typescript@5.9.3)(webpack@5.108.3(esbuild@0.27.2)(lightningcss@1.32.0)(postcss@8.5.28))
       '@nasa-gcn/remix-seo':
         specifier: 2.0.1
-        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))
+        version: 2.0.1(patch_hash=4i67u7akxdbxxi6pnnyriptasq)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
       '@oslojs/crypto':
         specifier: 1.0.1
         version: 1.0.1
@@ -958,9 +964,6 @@ importers:
       '@react-router/remix-routes-option-adapter':
         specifier: 7.18.3
         version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
-      '@remix-run/server-runtime':
-        specifier: 2.17.5
-        version: 2.17.5(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -1276,7 +1279,7 @@ importers:
         version: 2.5.1(@rsbuild/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0))(@rspack/core@2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(@swc/helpers@0.5.23))(node-fetch@2.7.0(encoding@0.1.13))(typescript@5.9.3)(webpack@5.108.3(esbuild@0.27.2)(lightningcss@1.32.0)(postcss@8.5.28))
       '@nasa-gcn/remix-seo':
         specifier: 2.0.1
-        version: 2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))
+        version: 2.0.1(patch_hash=4i67u7akxdbxxi6pnnyriptasq)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))
       '@oslojs/crypto':
         specifier: 1.0.1
         version: 1.0.1
@@ -1322,9 +1325,6 @@ importers:
       '@react-router/remix-routes-option-adapter':
         specifier: 7.18.3
         version: 7.18.3(@react-router/dev@7.18.3(@react-router/serve@7.18.3(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(typescript@5.9.3))(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.6(@types/node@25.0.10)(jiti@2.7.0)(less@4.6.7)(lightningcss@1.32.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.51.2)(tsx@4.21.0))(wrangler@4.107.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.0.10)))(typescript@5.9.3)
-      '@remix-run/server-runtime':
-        specifier: 2.17.5
-        version: 2.17.5(typescript@5.9.3)
       '@rsbuild/core':
         specifier: 2.2.0
         version: 2.2.0(@module-federation/runtime-tools@2.5.1(node-fetch@2.7.0(encoding@0.1.13)))(core-js@3.47.0)
@@ -3463,8 +3463,7 @@ packages:
   '@nasa-gcn/remix-seo@2.0.1':
     resolution: {integrity: sha512-g9biDdYfsdFBnOU7lM+7vPGEXSEMRnWmfVLDQ98pT0PnTT/O3pFuA+s3DA0Mj9IwnAq9IcLs2Wee/aL6fvEA+A==}
     peerDependencies:
-      '@remix-run/react': ^1.0.0 || ^2.0.0
-      '@remix-run/server-runtime': ^1.0.0 || ^2.0.0
+      react-router: '*'
 
   '@noble/hashes@2.2.0':
     resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
@@ -4698,30 +4697,6 @@ packages:
   '@remix-run/node-fetch-server@0.14.1':
     resolution: {integrity: sha512-pKenF5ysIN5lDCnCyvoUxDhKP0tfnGagvGbZh01xxHG6DJXSIXWVC9NpLSDGjxcxd1CKdCOKuZFleXBF3pChIg==}
 
-  '@remix-run/react@2.17.5':
-    resolution: {integrity: sha512-ya6OQ+T9yS4u8www75f4dH11NIYeK8K0eMrei+q4BTp6NrY2lqLTBfHqVlc23ZsUnWqdLUII4hzySVv+AJbTWA==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      react: ^18.0.0
-      react-dom: ^18.0.0
-      typescript: ^5.1.0
-    peerDependenciesMeta:
-      typescript:
-        optional: true
-
-  '@remix-run/router@1.23.4':
-    resolution: {integrity: sha512-q7j5geK7xs3UJSdm9/iytUNclBnLmYx1EnSeCFXHPeutdqgIMeFeHtUZgS3EhlKxdBEAu8OwtJCwmLrEzpSs7Q==}
-    engines: {node: '>=14.0.0'}
-
-  '@remix-run/server-runtime@2.17.5':
-    resolution: {integrity: sha512-SyJ5n2pQyo4ERGvjjLvL2PpRWBzlC2qzO5KkkOE2ygOiNcgOu9WQnnom9GI8KgsTRCO8JnIeLHFRcmxZnVBjfw==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      typescript: ^5.1.0
-    peerDependenciesMeta:
-      typescript:
-        optional: true
-
   '@rollup/pluginutils@5.4.0':
     resolution: {integrity: sha512-MfPp06CjRLfXQ3wY0R8vJDYBy/MvVcc9OulEfR0B8Iv9ko+GCNaRZ+EpJYFl27LhKsZK0o420sYCRHCjfCgeUg==}
     engines: {node: '>=14.0.0'}
@@ -5666,9 +5641,6 @@ packages:
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
 
-  '@types/cookie@0.6.0':
-    resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
-
   '@types/cors@2.8.19':
     resolution: {integrity: sha512-mFNylyeyqN93lfe/9CSxOGREz8cpzAhH+E93xJ4xWQf62V8sQ/24reV2nyzUWM6H6Xji+GGHpkbLe7pVoUEskg==}
 
@@ -6058,9 +6030,6 @@ packages:
 
   '@vitest/utils@4.1.11':
     resolution: {integrity: sha512-zTCVGpyFsGWBhllOyKlTw/vnr6D9qxsfSDyfbyZmTyjHw5N/VuvzHpHoQjm2ZJzn4RJgx5w4r7V0er69CmLgPQ==}
-
-  '@web3-storage/multipart-parser@1.0.0':
-    resolution: {integrity: sha512-BEO6al7BYqcnfX15W2cnGR+Q566ACXAT9UQykORCWW80lmkpWsnEob6zJS1ZVBKsSJC8+7vJkHwlp+lXG1UCdw==}
 
   '@webassemblyjs/ast@1.14.1':
     resolution: {integrity: sha512-nuBEDgQfm1ccRp/8bCQrx1frohyufl4JlbMMZ4P1wpeOfDhF6FQkxZJ1b/e+PLwr6X1Nhw6OLme5usuBWYBvuQ==}
@@ -9660,25 +9629,12 @@ packages:
       react-router: '>=7.0.0'
       vite: ^7.3.5
 
-  react-router-dom@6.30.4:
-    resolution: {integrity: sha512-q4HvNl+mmDdkS0g+MqiBZNteQJCuimWoOyHMy4T/RQLAn9Z29+E91QXRaxOujeMl2HTzRSS0KFPd7lxX3PjV0Q==}
-    engines: {node: '>=14.0.0'}
-    peerDependencies:
-      react: '>=16.8'
-      react-dom: '>=16.8'
-
   react-router-dom@7.18.3:
     resolution: {integrity: sha512-ytVbyBBM7vMfRCam25r0WMhSVSom909A8p+8m0/f1w853dz/xfFu6etAT2SEbVoSnI+ZoPRDqIsQXVT89gp7kg==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
-
-  react-router@6.30.4:
-    resolution: {integrity: sha512-SVUsDe+DybHM/WmYKIVYhZh1o5Dcuf16yM6WjG02Q9XVFMZIJyHYhwrr6bFBXZkVP6z69kNkMyBCujt8FaFLJA==}
-    engines: {node: '>=14.0.0'}
-    peerDependencies:
-      react: '>=16.8'
 
   react-router@7.18.3:
     resolution: {integrity: sha512-gyXgtdr5uACJ5b1Q4udzjVV+tb/rlHIMJKuJ0e89R4Kzgz47z/rgP0dIKxktqIEUhDHluGTPJJH/wRha7CyqsA==}
@@ -10632,9 +10588,6 @@ packages:
 
   tunnel-agent@0.6.0:
     resolution: {integrity: sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==}
-
-  turbo-stream@2.4.1:
-    resolution: {integrity: sha512-v8kOJXpG3WoTN/+at8vK7erSzo6nW6CIaeOvNOkHQVDajfz1ZVeSxCbc6tOH4hrGZW7VUCV0TOXd8CPzYnYkrw==}
 
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
@@ -12512,11 +12465,10 @@ snapshots:
       '@tybys/wasm-util': 0.10.3
     optional: true
 
-  '@nasa-gcn/remix-seo@2.0.1(@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(@remix-run/server-runtime@2.17.5(typescript@5.9.3))':
+  '@nasa-gcn/remix-seo@2.0.1(patch_hash=4i67u7akxdbxxi6pnnyriptasq)(react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7))':
     dependencies:
-      '@remix-run/react': 2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
-      '@remix-run/server-runtime': 2.17.5(typescript@5.9.3)
       lodash: 4.18.1
+      react-router: 7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
 
   '@noble/hashes@2.2.0': {}
 
@@ -13910,32 +13862,6 @@ snapshots:
 
   '@remix-run/node-fetch-server@0.14.1': {}
 
-  '@remix-run/react@2.17.5(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)':
-    dependencies:
-      '@remix-run/router': 1.23.4
-      '@remix-run/server-runtime': 2.17.5(typescript@5.9.3)
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
-      react-router: 6.30.4(react@19.2.7)
-      react-router-dom: 6.30.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      turbo-stream: 2.4.1
-    optionalDependencies:
-      typescript: 5.9.3
-
-  '@remix-run/router@1.23.4': {}
-
-  '@remix-run/server-runtime@2.17.5(typescript@5.9.3)':
-    dependencies:
-      '@remix-run/router': 1.23.4
-      '@types/cookie': 0.6.0
-      '@web3-storage/multipart-parser': 1.0.0
-      cookie: 0.7.2
-      set-cookie-parser: 2.7.2
-      source-map: 0.7.6
-      turbo-stream: 2.4.1
-    optionalDependencies:
-      typescript: 5.9.3
-
   '@rollup/pluginutils@5.4.0(rollup@4.62.2)':
     dependencies:
       '@types/estree': 1.0.9
@@ -14968,8 +14894,6 @@ snapshots:
     dependencies:
       '@types/node': 25.0.10
 
-  '@types/cookie@0.6.0': {}
-
   '@types/cors@2.8.19':
     dependencies:
       '@types/node': 25.0.10
@@ -15413,8 +15337,6 @@ snapshots:
       '@vitest/pretty-format': 4.1.11
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.1
-
-  '@web3-storage/multipart-parser@1.0.0': {}
 
   '@webassemblyjs/ast@1.14.1':
     dependencies:
@@ -19301,23 +19223,11 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  react-router-dom@6.30.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
-    dependencies:
-      '@remix-run/router': 1.23.4
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
-      react-router: 6.30.4(react@19.2.7)
-
   react-router-dom@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       react-router: 7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-
-  react-router@6.30.4(react@19.2.7):
-    dependencies:
-      '@remix-run/router': 1.23.4
-      react: 19.2.7
 
   react-router@7.18.3(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
@@ -20444,8 +20354,6 @@ snapshots:
   tunnel-agent@0.6.0:
     dependencies:
       safe-buffer: 5.2.1
-
-  turbo-stream@2.4.1: {}
 
   type-check@0.4.0:
     dependencies:
