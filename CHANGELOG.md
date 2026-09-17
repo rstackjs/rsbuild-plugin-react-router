@@ -1,5 +1,18 @@
 # rsbuild-plugin-react-router
 
+## 0.7.2
+
+### Patch Changes
+
+- 3e2ab8c: Retain pending HDR notify intent across Node compiler retries (#139).
+
+  HDR notification is decided from edit intent captured at Node `thisCompilation`,
+  including empty retries that retain the latest relevant revision, and is
+  acknowledged only when that Node compilation is retained by a committed
+  generation. The existing revision-file transport is unchanged.
+
+- ac7c9ff: Strengthen HDR intent regression coverage: replace the vacuous CSS-only commit test with an actual CSS ownership transition probe, keep superseded async evaluation coverage, and clarify intent-tracker revision naming without behavior changes.
+
 ## 0.7.1
 
 ### Patch Changes

@@ -1,0 +1,37 @@
+diff --git a/build/sitemap/index.d.ts b/build/sitemap/index.d.ts
+--- a/build/sitemap/index.d.ts
++++ b/build/sitemap/index.d.ts
+@@ -1,3 +1,3 @@
+-import type { ServerBuild } from "@remix-run/server-runtime";
++import type { ServerBuild } from "react-router";
+ import { SEOOptions } from "../types";
+ export declare function generateSitemap(request: Request, routes: ServerBuild["routes"], options: SEOOptions): Promise<Response>;
+diff --git a/build/sitemap/utils.d.ts b/build/sitemap/utils.d.ts
+--- a/build/sitemap/utils.d.ts
++++ b/build/sitemap/utils.d.ts
+@@ -1,4 +1,4 @@
+-import type { ServerBuild } from "@remix-run/server-runtime";
++import type { ServerBuild } from "react-router";
+ declare type Options = {
+     siteUrl: string;
+ };
+diff --git a/src/sitemap/index.ts b/src/sitemap/index.ts
+--- a/src/sitemap/index.ts
++++ b/src/sitemap/index.ts
+@@ -1,4 +1,4 @@
+-import type { ServerBuild } from "@remix-run/server-runtime";
++import type { ServerBuild } from "react-router";
+ import { SEOOptions } from "../types";
+ import { getSitemapXml } from "./utils";
+ 
+diff --git a/src/sitemap/utils.ts b/src/sitemap/utils.ts
+--- a/src/sitemap/utils.ts
++++ b/src/sitemap/utils.ts
+@@ -1,6 +1,6 @@
+ // This is adapted from https://github.com/kentcdodds/kentcdodds.com
+ 
+-import type { ServerBuild } from "@remix-run/server-runtime";
++import type { ServerBuild } from "react-router";
+ import isEqual from "lodash/isEqual";
+ import { SEOHandle, SitemapEntry } from "../types";
+ 
