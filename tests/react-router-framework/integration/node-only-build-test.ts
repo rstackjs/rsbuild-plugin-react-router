@@ -62,6 +62,19 @@ test('node-only builds explain when a browser build is required', async () => {
   );
 });
 
+test('node-only builds isolate manifests for projects sharing node_modules', async () => {
+  const first = await createProject({});
+  const second = await createProject({});
+  expect(fs.realpathSync(path.join(first, 'node_modules'))).toBe(
+    fs.realpathSync(path.join(second, 'node_modules'))
+  );
+  expectBuildSucceeded(build({ cwd: first }));
+  const before = readAssets(first);
+  expectBuildSucceeded(build({ cwd: second }));
+  expectBuildSucceeded(build({ cwd: first, environment: 'node' }));
+  expect(readAssets(first)).toEqual(before);
+});
+
 for (const name of ['loader', 'action']) {
   for (const operation of ['add', 'remove']) {
     test(`node-only builds reject ${operation} of a route ${name}`, async () => {

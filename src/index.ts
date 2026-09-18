@@ -4,6 +4,7 @@ import {
 } from './manifest-snapshot.js';
 import { createReactRouterManifestState } from './manifest-state.js';
 import { registerNodeOnlyManifestValidation } from './node-only-manifest.js';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
@@ -541,6 +542,10 @@ export const pluginReactRouter = (
     const serverManifestStampPath = resolve(
       api.context.cachePath,
       'react-router',
+      // Projects can share node_modules, and therefore Rsbuild's cache path.
+      createHash('sha256')
+        .update(JSON.stringify([appDirectory, outputClientPath]))
+        .digest('hex'),
       'server-manifest.json'
     );
     // Bundle manifests also depend on the route partition, which can change
