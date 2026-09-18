@@ -1,7 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { pathToFileURL } from 'node:url';
 import type { RsbuildConfig } from '@rsbuild/core';
 import type { ServerBuild } from 'react-router';
 import { installDevServerSourceMapSupport } from './dev-source-maps.js';
+import { resolveAppPackagePath } from './plugin-utils.js';
 
 export type ServerSetup = Exclude<
   NonNullable<NonNullable<RsbuildConfig['server']>['setup']>,
@@ -39,9 +41,19 @@ export const createDevServerMiddleware = (
 
   const getListener = () => {
     listenerPromise ??= (async () => {
-      const createRequestHandler =
-        dependencies.createRequestHandler ??
-        (await import('react-router')).createRequestHandler;
+      let createRequestHandler = dependencies.createRequestHandler;
+      if (!createRequestHandler) {
+        const reactRouterPath = resolveAppPackagePath('react-router');
+        if (!reactRouterPath) {
+          throw new Error('Cannot resolve react-router from the application.');
+        }
+        // Match the application's browser/server bundles, including when the
+        // plugin is linked from a workspace with a different Router version.
+        const routerModule: typeof import('react-router') = await import(
+          pathToFileURL(reactRouterPath).href
+        );
+        createRequestHandler = routerModule.createRequestHandler;
+      }
       const createRequestListener =
         dependencies.createRequestListener ??
         (await import('@remix-run/node-fetch-server')).createRequestListener;

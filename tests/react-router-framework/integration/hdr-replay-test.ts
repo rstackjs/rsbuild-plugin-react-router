@@ -33,7 +33,7 @@ for (const mode of ['dev', 'custom server']) {
       },`
         ),
         'app/value.server.ts': 'export const message = "original";',
-        'app/routes/replay.tsx': `
+        'app/routes/_index.tsx': `
         import { useEffect, useState } from 'react';
         import { useLoaderData } from 'react-router';
         import { message } from '../value.server';
@@ -58,7 +58,7 @@ for (const mode of ['dev', 'custom server']) {
         }
       };
     });
-    await page.goto(`http://localhost:${port}/replay`);
+    await page.goto(`http://localhost:${port}/`);
     await expect(page.locator('[data-hydrated]')).toHaveText('true');
     await page.getByLabel('retained input').fill('keep this');
     await page.evaluate(() => {
@@ -81,7 +81,7 @@ for (const mode of ['dev', 'custom server']) {
     );
     await expect
       .poll(async () => {
-        const response = await fetch(`http://localhost:${port}/replay`);
+        const response = await fetch(`http://localhost:${port}/`);
         return response.text();
       })
       .toContain('updated');
@@ -90,7 +90,7 @@ for (const mode of ['dev', 'custom server']) {
     );
     await expect
       .poll(async () => {
-        const response = await fetch(`http://localhost:${port}/replay`);
+        const response = await fetch(`http://localhost:${port}/`);
         return response.text();
       })
       .toContain('latest');
