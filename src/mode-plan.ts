@@ -113,9 +113,14 @@ type CreateReactRouterModePlanOptions =
 
 const RSC_LAYERS = rspack.experiments.rsc.Layers;
 
-const createReactRouterPackageAliases = (): Record<string, string> => {
-  const reactRouterPath = resolveAppPackagePath('react-router');
-  const reactRouterDomPath = resolveAppPackagePath('react-router/dom');
+const createReactRouterPackageAliases = (
+  rootPath: string
+): Record<string, string> => {
+  const reactRouterPath = resolveAppPackagePath('react-router', rootPath);
+  const reactRouterDomPath = resolveAppPackagePath(
+    'react-router/dom',
+    rootPath
+  );
   return {
     ...(reactRouterPath ? { 'react-router$': reactRouterPath } : {}),
     ...(reactRouterDomPath ? { 'react-router/dom$': reactRouterDomPath } : {}),
@@ -284,7 +289,9 @@ const createClassicModePlan = async ({
     ssr,
     devHmr,
   });
-  const reactRouterAliases = createReactRouterPackageAliases();
+  const reactRouterAliases = createReactRouterPackageAliases(
+    api.context.rootPath
+  );
   return {
     kind: 'classic',
     artifacts,
@@ -334,6 +341,7 @@ const createClassicModePlan = async ({
           setup: [
             createReactRouterDevServerSetup({
               loadBuild: artifacts.devRuntime.createBuildLoader(),
+              rootPath: api.context.rootPath,
             }),
           ],
         },

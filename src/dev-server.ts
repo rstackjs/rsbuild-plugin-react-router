@@ -20,6 +20,7 @@ type RequestHandler = (request: Request) => Response | Promise<Response>;
 type BuildProvider = () => Promise<ServerBuild>;
 
 export type DevServerMiddlewareDependencies = {
+  rootPath: string;
   loadBuild: BuildProvider;
   createRequestHandler?: (
     build: BuildProvider,
@@ -43,7 +44,10 @@ export const createDevServerMiddleware = (
     listenerPromise ??= (async () => {
       let createRequestHandler = dependencies.createRequestHandler;
       if (!createRequestHandler) {
-        const reactRouterPath = resolveAppPackagePath('react-router');
+        const reactRouterPath = resolveAppPackagePath(
+          'react-router',
+          dependencies.rootPath
+        );
         if (!reactRouterPath) {
           throw new Error('Cannot resolve react-router from the application.');
         }
@@ -85,8 +89,10 @@ export const createDevServerMiddleware = (
 
 export const createReactRouterDevServerSetup = ({
   loadBuild,
+  rootPath,
 }: {
   loadBuild: BuildProvider;
+  rootPath: string;
 }): ServerSetup =>
   function reactRouterDevServerSetup(context) {
     if (context.action !== 'dev') {
@@ -97,6 +103,8 @@ export const createReactRouterDevServerSetup = ({
     // request handler.
     return () => {
       installDevServerSourceMapSupport();
-      context.server.middlewares.use(createDevServerMiddleware({ loadBuild }));
+      context.server.middlewares.use(
+        createDevServerMiddleware({ loadBuild, rootPath })
+      );
     };
   };

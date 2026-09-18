@@ -6,10 +6,14 @@ import { JS_EXTENSIONS } from './constants.js';
 const requireFromApp = createRequire(resolve(process.cwd(), 'package.json'));
 
 export const resolveAppPackagePath = (
-  specifier: string
+  specifier: string,
+  rootPath?: string
 ): string | undefined => {
   try {
-    return requireFromApp.resolve(specifier);
+    const require = rootPath
+      ? createRequire(resolve(rootPath, 'package.json'))
+      : requireFromApp;
+    return require.resolve(specifier);
   } catch {
     return undefined;
   }
