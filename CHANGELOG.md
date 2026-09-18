@@ -1,5 +1,26 @@
 # rsbuild-plugin-react-router
 
+## 0.7.3
+
+### Patch Changes
+
+- 5b215fc: Fix two `ssr: false` / prerender build issues:
+  - `rsbuild build` no longer hangs when the app's server graph opens a ref'd handle at module scope (for example a `BroadcastChannel`). Build-time rendering (SPA-mode `index.html` and prerendering, classic and RSC) now evaluates the server bundle in a worker thread that is terminated once rendering is done, instead of importing it into the build process (#135).
+  - With `performance.buildCache` enabled, a warm build no longer renders `index.html` against the previous build's asset URLs. Server manifests and route tables now declare a file dependency on the captured manifests, so Rspack invalidates them when asset names or server bundle route partitions change (#136).
+
+## 0.7.2
+
+### Patch Changes
+
+- 3e2ab8c: Retain pending HDR notify intent across Node compiler retries (#139).
+
+  HDR notification is decided from edit intent captured at Node `thisCompilation`,
+  including empty retries that retain the latest relevant revision, and is
+  acknowledged only when that Node compilation is retained by a committed
+  generation. The existing revision-file transport is unchanged.
+
+- ac7c9ff: Strengthen HDR intent regression coverage: replace the vacuous CSS-only commit test with an actual CSS ownership transition probe, keep superseded async evaluation coverage, and clarify intent-tracker revision naming without behavior changes.
+
 ## 0.7.1
 
 ### Patch Changes

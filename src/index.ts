@@ -1,4 +1,7 @@
-import { createReactRouterManifestSnapshot } from './manifest-snapshot.js';
+import {
+  createReactRouterManifestSnapshot,
+  type ReactRouterManifestSnapshot,
+} from './manifest-snapshot.js';
 import { createReactRouterManifestState } from './manifest-state.js';
 import { existsSync, readFileSync } from 'node:fs';
 import fsExtra from 'fs-extra';
@@ -527,6 +530,39 @@ export const pluginReactRouter = (
       routeRestartMarkerPath,
       onRouteTopologyChange: pluginOptions.onRouteTopologyChange,
     });
+    // The node `server-manifest` module's source is a constant; its real
+    // content is injected by a transform from the web compilation's emitted
+    // asset names. Rspack's persistent cache would therefore reuse a previous
+    // build's module even when those names changed (#136). The transform
+    // declares this file, which holds the captured manifests, as a file
+    // dependency so the cache invalidates exactly when the manifest changes.
+    const serverManifestStampPath = resolve(
+      api.context.cachePath,
+      'react-router',
+      'server-manifest.json'
+    );
+    // Bundle manifests also depend on the route partition, which can change
+    // independently of browser assets (for example via deployment inputs).
+    // Only rewrite on change: a bumped mtime would otherwise invalidate the
+    // module on every build and, if the cache dir is watched, rebuild node
+    // after every web rebuild in dev.
+    const writeServerManifestStamp = (
+      snapshot: ReactRouterManifestSnapshot
+    ): void => {
+      const stamp = JSON.stringify({
+        manifest: snapshot.server,
+        bundles: snapshot.serverByBundleId,
+      });
+      let previous: string | undefined;
+      try {
+        previous = readFileSync(serverManifestStampPath, 'utf8');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      if (stamp !== previous) {
+        fsExtra.outputFileSync(serverManifestStampPath, stamp);
+      }
+    };
 
     const routeByFilePath = new Map(
       Object.values(routes).map(route => [
@@ -709,6 +745,7 @@ export const pluginReactRouter = (
       api,
       isBuild,
       onPublish: (compilation, snapshot) => {
+        writeServerManifestStamp(snapshot);
         devBackgroundResources.setManifest(snapshot.browser);
         if (!isBuild && modePlan.kind === 'classic') {
           modePlan.artifacts.devRuntime.captureWeb(
@@ -1131,6 +1168,7 @@ export const pluginReactRouter = (
         resolvedServerOutput,
         performanceProfiler,
         getLatestServerManifest: () => manifestState.read()?.server ?? null,
+        serverManifestStampPath,
         getLatestServerManifestByBundleId: bundleId =>
           manifestState.read()?.serverByBundleId[bundleId],
         routes,

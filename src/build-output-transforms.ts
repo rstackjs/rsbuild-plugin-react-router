@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import type { RsbuildPluginAPI, TransformHandler } from '@rsbuild/core';
 import jsesc from 'jsesc';
 import { relative } from 'pathe';
@@ -80,6 +81,8 @@ type RegisterBuildOutputTransformsOptions = {
   resolvedServerOutput: 'module' | 'commonjs';
   performanceProfiler: ReactRouterPerformanceProfiler;
   getLatestServerManifest: () => ReactRouterManifest | null;
+  /** File holding the captured manifests; a dependency of the server-manifest module. */
+  serverManifestStampPath: string;
   getLatestServerManifestByBundleId: (
     bundleId: string
   ) => ReactRouterManifest | undefined;
@@ -112,6 +115,7 @@ export const registerBuildOutputTransforms = ({
   resolvedServerOutput,
   performanceProfiler,
   getLatestServerManifest,
+  serverManifestStampPath,
   getLatestServerManifestByBundleId,
   routes,
   pluginOptions,
@@ -191,7 +195,7 @@ export const registerBuildOutputTransforms = ({
 
   api.transform(
     {
-      test: /virtual\/react-router\/(browser|server)-manifest/,
+      test: /virtual\/react-router\/((browser|server)-manifest|server-build)/,
     },
     async args =>
       performanceProfiler.record(
@@ -205,6 +209,18 @@ export const registerBuildOutputTransforms = ({
             };
           }
 
+          // Cache identity for a module whose source never changes (#136);
+          // see `serverManifestStampPath` in index.ts.
+          if (existsSync(serverManifestStampPath)) {
+            args.addDependency(serverManifestStampPath);
+          } else {
+            args.addMissingDependency(serverManifestStampPath);
+          }
+          // The virtual server build contains the bundle's route table. A
+          // partition change must invalidate it alongside the asset manifest.
+          if (args.resource.includes('virtual/react-router/server-build')) {
+            return { code: args.code };
+          }
           const bundleMatch = args.resource.match(
             /virtual\/react-router\/server-manifest(?:-([^?]+))?/
           );

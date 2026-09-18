@@ -19,6 +19,7 @@ import {
   registerReactRouterDevRuntime,
   unregisterReactRouterDevRuntime,
 } from './dev-generation.js';
+import { createDevHdrIntentTracker } from './dev-hdr-intent.js';
 import { DEV_MANIFEST_UPDATE_EVENT } from './dev-hmr.js';
 import {
   getEnvironmentStats,
@@ -140,12 +141,10 @@ export const createReactRouterDevRuntimeController = ({
   const compilationIdentities = createCompilationIdentityTracker();
   const { getCompilationIdentity } = compilationIdentities;
 
-  // Web-only commits reuse the node compiler's stale `modifiedFiles`
-  // snapshot, and every HDR bump itself triggers a web rebuild — so signal
-  // once per node compilation identity or the bump loop self-sustains.
-  const hdrSignaledNodeIdentity = new WeakMap<
+  // Pending node-edit intent until a coherent commit retains that compilation.
+  const hdrIntentsByPair = new WeakMap<
     DevCompilerPair,
-    NonNullable<DevGraphIdentity['node']>
+    ReturnType<typeof createDevHdrIntentTracker>
   >();
 
   const finishRuntimeAttempt = async (
@@ -168,17 +167,15 @@ export const createReactRouterDevRuntimeController = ({
         pair.node.watching?.invalidate();
         return;
       }
+      const nodeCompilation = getEnvironmentStats(stats, 'node')?.compilation;
       if (
         result === 'committed' &&
-        changes.node.known &&
-        identity.node !== undefined &&
-        hdrSignaledNodeIdentity.get(pair) !== identity.node &&
-        Array.from(changes.node.files).some(
-          file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
-        )
+        nodeCompilation &&
+        identity.node === binding.runtime.getCommittedNodeIdentity()
       ) {
-        hdrSignaledNodeIdentity.set(pair, identity.node);
-        onNodeRebuildCommitted?.();
+        hdrIntentsByPair.get(pair)?.signalCommitted(nodeCompilation, () => {
+          onNodeRebuildCommitted?.();
+        });
       }
     } catch (cause) {
       if (sessions.getActiveBinding()?.id === binding.id) {
@@ -344,6 +341,8 @@ export const createReactRouterDevRuntimeController = ({
     }
     const pair: DevCompilerPair = createDevCompilerPair({ web, node });
     binding.compilers = pair;
+    const hdrIntents = createDevHdrIntentTracker();
+    hdrIntentsByPair.set(pair, hdrIntents);
     const sessionId = binding.id;
     const runtime = binding.runtime;
     const failCurrentAttempt = (side: 'web' | 'node', error: Error): void => {
@@ -427,6 +426,14 @@ export const createReactRouterDevRuntimeController = ({
         if (sessions.getActiveBinding()?.id !== sessionId) {
           return;
         }
+        const changes = snapshotDevChangedFiles(pair.node);
+        hdrIntents.capture(
+          compilation,
+          changes.known &&
+            Array.from(changes.files).some(
+              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
+            )
+        );
         pair.latestNodeStart = {
           status: 'started',
           identity: getCompilationIdentity(compilation),
