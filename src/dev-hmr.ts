@@ -104,7 +104,6 @@ const RefreshRuntime =
 const pendingRouteUpdates = new Map();
 let flushTimeout;
 let pendingRevalidation = false;
-let pendingComponentRouteRevalidation = false;
 let flushing = false;
 let hdrSession;
 let latestHdrRevision = 0;
@@ -384,7 +383,6 @@ async function flush() {
     // Loader updates must be visible during revalidation. Component-only routes
     // stay staged until revalidation completes, matching React Router's HMR flow.
     if (nextManifest && shouldRefreshRouteState) {
-      pendingComponentRouteRevalidation = false;
       if (hmrRoutes) {
         patchCurrentRouteMatches(router, hmrRoutes);
       }
@@ -396,16 +394,11 @@ async function flush() {
         patchCurrentRouteMatches(router, hmrRoutes);
       }
       Object.assign(manifest, nextManifest);
-      // The node compiler also emits an HDR revision for this route edit. If it
-      // did not arrive in this flush, consume that redundant revalidation later.
-      pendingComponentRouteRevalidation = !shouldRevalidate;
-      shouldRevalidate = false;
-    } else if (shouldRevalidate) {
-      if (pendingComponentRouteRevalidation) {
-        pendingComponentRouteRevalidation = false;
-      } else {
-        await revalidateRouter(router);
-      }
+    }
+    // A replay may represent several server edits, not just the component
+    // update in this batch. Only an actual data revalidation can consume it.
+    if (shouldRevalidate) {
+      await revalidateRouter(router);
     }
     performReactRefresh();
   } finally {

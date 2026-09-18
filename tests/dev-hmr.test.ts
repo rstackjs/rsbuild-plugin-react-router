@@ -17,7 +17,7 @@ const createRuntime = () => {
   const window = {
     __reactRouterDataRouter: router as typeof router | undefined,
     __reactRouterRouteModules: {},
-    __reactRouterManifest: { routes: {} },
+    __reactRouterManifest: { routes: {} as Record<string, object> },
     __reactRouterContext: {},
   };
   const code = generateDevHmrRuntimeModule({
@@ -26,13 +26,13 @@ const createRuntime = () => {
     .replace(/^import .*;$/m, '')
     .replaceAll('import.meta.webpackHot', 'hot')
     .replaceAll('export function ', 'function ');
-  new Function(
+  const updateRoute = new Function(
     'window',
     'hot',
     '__refreshRuntimeModule',
     'setTimeout',
     'clearTimeout',
-    code
+    code + '\nreturn scheduleReactRouterRouteUpdate;'
   )(
     window,
     {
@@ -48,6 +48,10 @@ const createRuntime = () => {
     window,
     router,
     revalidate,
+    updateComponent: () => {
+      window.__reactRouterManifest.routes.component = {};
+      updateRoute('component', {}, () => ({ default: () => null }));
+    },
     receive: (revision: number, sessionId = 'first') =>
       listeners.get(DEV_HDR_UPDATE_EVENT)!({ sessionId, revision }),
     setStatus: (next: string) => {
@@ -60,6 +64,19 @@ const createRuntime = () => {
 afterEach(() => rstest.useRealTimers());
 
 describe('HDR custom events', () => {
+  for (const timing of ['same batch', 'after component update']) {
+    it(`does not lose coalesced server revisions ${timing}`, async () => {
+      const runtime = createRuntime();
+      runtime.updateComponent();
+      if (timing === 'after component update') await runtime.flush();
+      // A reconnect can replay just the latest of a component edit and a
+      // subsequent server-only edit; the component must not consume both.
+      runtime.receive(2);
+      await runtime.flush();
+      expect(runtime.revalidate).toHaveBeenCalledTimes(1);
+    });
+  }
+
   it('revalidates once for duplicate or older revisions', async () => {
     const runtime = createRuntime();
     runtime.receive(2);
