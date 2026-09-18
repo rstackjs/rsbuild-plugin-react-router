@@ -88,6 +88,7 @@ describe('pluginReactRouter', () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {},
     });
+    rsbuild.context.rootPath = process.cwd();
 
     rsbuild.addPlugins([pluginReactRouter()]);
     const config = await rsbuild.unwrapConfig();
