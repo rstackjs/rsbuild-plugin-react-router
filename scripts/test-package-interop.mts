@@ -73,7 +73,10 @@ const verifyRegistration = async (writer, reader) => {
   const start = startHook.handler;
   const server = {
     close: async () => undefined,
-    environments: { node: { loadBundle: async () => build } },
+    environments: {
+      node: { loadBundle: async () => build },
+      web: { hot: { send: noop, onConnect: () => noop } },
+    },
     sockWrite: noop,
   };
   await start({ environments: {}, server });

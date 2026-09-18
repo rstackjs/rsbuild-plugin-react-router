@@ -57,6 +57,9 @@ describe('guardReactRouterLazyCompilation', () => {
       })
     ).toBe(false);
     expect(test({ resource: '/project/app/components/card.tsx' })).toBe(true);
+    expect(test({
+      resource: '/project/node_modules/virtual/react-router/hmr-runtime.js',
+    })).toBe(false);
   });
 
   it('preserves user tests for non-React Router hydration modules', () => {

@@ -133,7 +133,7 @@ const createHarness = (
   let after!: OnAfterDevCompileFn;
   const closeRecords = new WeakMap<RsbuildDevServer, { count: number }>();
   const warn = rstest.fn();
-  const onNodeRebuildCommitted = rstest.fn();
+  const sendHdr = rstest.fn();
   let serverSetups = userSetup ? [userSetup] : [];
   const api = {
     logger: { error: rstest.fn(), warn },
@@ -212,8 +212,7 @@ const createHarness = (
       defaultEntryName: 'static/js/app',
       entryNames: ['static/js/app'],
     },
-    clientPatchesRouteMetadata: options.clientPatchesRouteMetadata,
-    onNodeRebuildCommitted,
+    clientPatchesRouteMetadata: options.clientPatchesRouteMetadata ?? true,
   });
   const createServer = (
     loadBundle: (entryName: string) => Promise<unknown> | unknown,
@@ -232,7 +231,7 @@ const createHarness = (
           }
           return closing;
         },
-      environments: { node: { loadBundle } },
+      environments: { node: { loadBundle }, web: { hot: { send: sendHdr, onConnect: rstest.fn(() => () => {}) } } },
       sockWrite: rstest.fn(),
     } as unknown as RsbuildDevServer;
     closeRecords.set(server, record);
@@ -298,7 +297,7 @@ const createHarness = (
     getCloseCount: (server: RsbuildDevServer) =>
       closeRecords.get(server)?.count ?? 0,
     loadBundle,
-    onNodeRebuildCommitted,
+    sendHdr,
     server,
     startOrder,
     warn,
@@ -307,7 +306,7 @@ const createHarness = (
 
 describe('React Router development runtime controller', () => {
   it('independent probe retains pending HDR through an actual CSS ownership commit', async () => {
-    const { callbacks, controller, loadBundle, onNodeRebuildCommitted, server } = createHarness();
+    const { callbacks, controller, loadBundle, sendHdr, server } = createHarness();
     loadBundle.mockImplementation(() => createBuild('base'));
     const web = createCompiler('web');
     const node = createCompiler('node');
@@ -329,14 +328,14 @@ describe('React Router development runtime controller', () => {
     await callbacks.after({ stats: createGraphStats(cssWeb, pendingNode) });
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base', assets: { version: 'css' } });
     expect(loadBundle).toHaveBeenCalledOnce();
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
     node.invalidate();
     node.setChanges([]);
     const retry = node.compile();
     loadBundle.mockImplementation(() => createBuild('updated-loader'));
     await callbacks.after({ stats: createGraphStats(cssWeb, retry) });
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base', assets: { version: 'css' } });
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
     web.invalidate();
     const pairedWeb = web.compile();
     controller.captureWeb(pairedWeb, createManifestSet('paired', { entry: ['/style.css'] }));
@@ -345,11 +344,11 @@ describe('React Router development runtime controller', () => {
     const pairedNode = node.compile();
     await callbacks.after({ stats: createGraphStats(pairedWeb, pairedNode) });
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'updated-loader', assets: { version: 'paired' } });
-    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+    expect(sendHdr).toHaveBeenCalledOnce();
   });
 
   it('independent probe preserves intent through superseded asynchronous evaluation', async () => {
-    const { callbacks, controller, loadBundle, onNodeRebuildCommitted, server } = createHarness();
+    const { callbacks, controller, loadBundle, sendHdr, server } = createHarness();
     let resolveCandidate!: (build: ReturnType<typeof createBuild>) => void;
     const candidate = new Promise<ReturnType<typeof createBuild>>(resolve => { resolveCandidate = resolve; });
     loadBundle.mockImplementationOnce(() => createBuild('base')).mockImplementationOnce(() => candidate).mockImplementation(() => createBuild('latest'));
@@ -373,10 +372,10 @@ describe('React Router development runtime controller', () => {
     resolveCandidate(createBuild('obsolete'));
     await evaluating;
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base' });
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
     await callbacks.after({ stats: createGraphStats(baseWeb, retry) });
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base' });
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
     web.invalidate();
     const pairedWeb = web.compile();
     controller.captureWeb(pairedWeb, createManifestSet('latest'));
@@ -385,11 +384,11 @@ describe('React Router development runtime controller', () => {
     const pairedNode = node.compile();
     await callbacks.after({ stats: createGraphStats(pairedWeb, pairedNode) });
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'latest' });
-    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+    expect(sendHdr).toHaveBeenCalledOnce();
   });
 
   it('independent probe drops pending HDR when the server session is replaced', async () => {
-    const { callbacks, controller, createServer, loadBundle, onNodeRebuildCommitted, server } = createHarness();
+    const { callbacks, controller, createServer, loadBundle, sendHdr, server } = createHarness();
     loadBundle.mockImplementation(() => createBuild('old'));
     const oldWeb = createCompiler('web');
     const oldNode = createCompiler('node');
@@ -414,7 +413,7 @@ describe('React Router development runtime controller', () => {
     const newNode = node.compile();
     await callbacks.after({ stats: createGraphStats(newWeb, newNode) });
     await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'new' });
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
   });
   it('validates lifecycle state before default startup hooks', () => {
     const { beforeOrder, closeOrder, startOrder } = createHarness();
@@ -697,7 +696,7 @@ describe('React Router development runtime controller', () => {
       callbacks,
       controller,
       loadBundle,
-      onNodeRebuildCommitted,
+      sendHdr,
       server,
     } = createHarness();
     let build = createBuild('base');
@@ -726,7 +725,7 @@ describe('React Router development runtime controller', () => {
       assets: { version: 'web-base' },
     });
     expect(loadBundle).toHaveBeenCalledTimes(2);
-    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+    expect(sendHdr).toHaveBeenCalledOnce();
   });
 
   it('signals a node rebuild for paired web and node route changes', async () => {
@@ -734,7 +733,7 @@ describe('React Router development runtime controller', () => {
       callbacks,
       controller,
       loadBundle,
-      onNodeRebuildCommitted,
+      sendHdr,
       server,
     } = createHarness();
     let build = createBuild('base');
@@ -768,7 +767,7 @@ describe('React Router development runtime controller', () => {
       marker: 'route-next',
       assets: { version: 'web-next' },
     });
-    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+    expect(sendHdr).toHaveBeenCalledOnce();
 
     // A web-only rebuild (e.g. the HDR revision bump itself) commits with the
     // node compiler's stale modifiedFiles snapshot; it must not re-signal or
@@ -779,7 +778,7 @@ describe('React Router development runtime controller', () => {
     controller.captureWeb(webOnly, createManifestSet('web-only'));
     web.complete(webOnly);
     await callbacks.after({ stats: createGraphStats(webOnly, nextNode) });
-    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+    expect(sendHdr).toHaveBeenCalledOnce();
   });
 
   it('does not signal a node rebuild for paired CSS source changes', async () => {
@@ -787,7 +786,7 @@ describe('React Router development runtime controller', () => {
       callbacks,
       controller,
       loadBundle,
-      onNodeRebuildCommitted,
+      sendHdr,
       server,
     } = createHarness();
     let build = createBuild('base');
@@ -821,7 +820,7 @@ describe('React Router development runtime controller', () => {
       marker: 'css-next',
       assets: { version: 'web-next' },
     });
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
   });
 
   it('keeps last-good output when a one-sided node compile cannot evaluate', async () => {
@@ -1397,7 +1396,7 @@ describe('React Router development runtime controller', () => {
       callbacks,
       controller,
       loadBundle,
-      onNodeRebuildCommitted,
+      sendHdr,
       server,
     } = createHarness();
     let build = createBuild('base');
@@ -1417,7 +1416,7 @@ describe('React Router development runtime controller', () => {
     web.complete(baseWeb);
     const baseNode = node.compile();
     await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
 
     callbacks.before();
     node.setChanges([routePath]);
@@ -1430,7 +1429,7 @@ describe('React Router development runtime controller', () => {
     web.complete(webCss);
     build = createBuild('node-edit');
     await callbacks.after({ stats: createGraphStats(webCss, nodeWithEdit) });
-    expect(onNodeRebuildCommitted).not.toHaveBeenCalled();
+    expect(sendHdr).not.toHaveBeenCalled();
 
     node.invalidate();
     node.setChanges([]);
@@ -1442,7 +1441,7 @@ describe('React Router development runtime controller', () => {
       marker: 'node-retry',
       assets: { version: 'web-css' },
     });
-    expect(onNodeRebuildCommitted).toHaveBeenCalledOnce();
+    expect(sendHdr).toHaveBeenCalledOnce();
   });
 
 });

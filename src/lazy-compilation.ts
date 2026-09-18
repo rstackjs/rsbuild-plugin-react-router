@@ -3,6 +3,7 @@ import {
   BUILD_CLIENT_ROUTE_QUERY_STRING,
 } from './constants.js';
 import type { PluginOptions } from './types.js';
+import { DEV_HMR_RUNTIME_MODULE_ID } from './dev-hmr.js';
 
 type LazyCompilationOptions = Exclude<
   NonNullable<PluginOptions['lazyCompilation']>,
@@ -53,6 +54,7 @@ const matchesLazyCompilationTest = (
 const createReactRouterHydrationModuleTest = (entryClientPath: string) => {
   const eagerPatterns = [
     BROWSER_MANIFEST_ENTRY_NAME,
+    DEV_HMR_RUNTIME_MODULE_ID,
     ...(entryClientPath
       ? [
           normalizeSlashes(entryClientPath),

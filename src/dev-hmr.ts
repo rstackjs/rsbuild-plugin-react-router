@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { Rspack } from '@rsbuild/core';
-import { dirname, join } from 'pathe';
+import { join } from 'pathe';
+import { DEV_HDR_UPDATE_EVENT } from './dev-hdr-channel.js';
 
 export const DEV_HMR_RUNTIME_MODULE_ID = 'virtual/react-router/hmr-runtime';
 export const DEV_MANIFEST_UPDATE_EVENT = 'react-router:manifest-update';
@@ -9,7 +9,6 @@ export const DEV_MANIFEST_UPDATE_EVENT = 'react-router:manifest-update';
 export type DevHmrPlanOptions = {
   isEnabled: () => boolean;
   runtimeModule: string;
-  onNodeRebuildCommitted: () => void;
 };
 
 type SwcLoaderOptions = {
@@ -80,57 +79,6 @@ export const resolveReactRefreshRuntimePath = (
   }
 };
 
-const hdrRevisionModuleContent = (revision: number): string =>
-  `export default ${revision};\n`;
-
-/**
- * The HDR revision module is a real file (not a virtual module) because it
- * must wake the web compiler through the regular file watcher: the browser
- * HMR runtime imports it, so bumping the revision produces a web hot update
- * whenever server code changes, which the client answers by revalidating
- * React Router loader data.
- */
-export const getDevHdrRevisionFilePath = (rootPath: string): string =>
-  join(rootPath, '.react-router', 'hdr-revision.mjs');
-
-export type DevHdrRevisionSignal = {
-  filePath: string;
-  /** Writes the initial revision module so the first compile can resolve it. */
-  ensure: () => void;
-  /** Increments the revision, signaling hot data revalidation to the client. */
-  bump: () => void;
-};
-
-export const createDevHdrRevisionSignal = ({
-  filePath,
-  onError,
-}: {
-  filePath: string;
-  onError?: (error: Error) => void;
-}): DevHdrRevisionSignal => {
-  let revision = 0;
-  let dirEnsured = false;
-  const write = (): void => {
-    try {
-      if (!dirEnsured) {
-        mkdirSync(dirname(filePath), { recursive: true });
-        dirEnsured = true;
-      }
-      writeFileSync(filePath, hdrRevisionModuleContent(revision));
-    } catch (error) {
-      onError?.(error instanceof Error ? error : new Error(String(error)));
-    }
-  };
-  return {
-    filePath,
-    ensure: write,
-    bump() {
-      revision += 1;
-      write();
-    },
-  };
-};
-
 /**
  * Browser-side HMR runtime shared by all route client entries in development.
  *
@@ -143,20 +91,10 @@ export const createDevHdrRevisionSignal = ({
  */
 export const generateDevHmrRuntimeModule = ({
   reactRefreshRuntimePath,
-  hdrRevisionFilePath,
 }: {
   reactRefreshRuntimePath: string;
-  hdrRevisionFilePath: string;
 }): string => `
 import * as __refreshRuntimeModule from ${JSON.stringify(reactRefreshRuntimePath)};
-// Read revision so the import survives sideEffects: false tree-shaking.
-import __hdrRevision from ${JSON.stringify(hdrRevisionFilePath)};
-
-let latestHdrRevision = __hdrRevision;
-
-export function getReactRouterHdrRevision() {
-  return latestHdrRevision;
-}
 
 const RefreshRuntime =
   __refreshRuntimeModule && __refreshRuntimeModule.performReactRefresh
@@ -167,6 +105,24 @@ const pendingRouteUpdates = new Map();
 let flushTimeout;
 let pendingRevalidation = false;
 let pendingComponentRouteRevalidation = false;
+let flushing = false;
+let hdrSession;
+let latestHdrRevision = 0;
+const retiredHdrSessions = new Set();
+
+function receiveHdrRevision(message) {
+  if (!message || typeof message.sessionId !== 'string' ||
+      !Number.isSafeInteger(message.revision) || message.revision < 1 ||
+      retiredHdrSessions.has(message.sessionId)) return;
+  if (hdrSession !== message.sessionId) {
+    if (hdrSession) retiredHdrSessions.add(hdrSession);
+    hdrSession = message.sessionId;
+    latestHdrRevision = 0;
+  }
+  if (message.revision <= latestHdrRevision) return;
+  latestHdrRevision = message.revision;
+  scheduleReactRouterRevalidation();
+}
 
 function getCurrentRouterPath(router) {
   const basename = router.basename || '/';
@@ -207,7 +163,7 @@ export function scheduleReactRouterRouteUpdate(
   scheduleFlush();
 }
 
-export function scheduleReactRouterRevalidation() {
+function scheduleReactRouterRevalidation() {
   pendingRevalidation = true;
   scheduleFlush();
 }
@@ -406,45 +362,56 @@ function applyManifestUpdate(nextRoutes) {
 }
 
 async function flush() {
+  if (flushing) return;
+  if (import.meta.webpackHot && import.meta.webpackHot.status() !== 'idle') {
+    scheduleFlush();
+    return;
+  }
   const router = window.__reactRouterDataRouter;
   const routeModules = window.__reactRouterRouteModules;
   const manifest = window.__reactRouterManifest;
   const context = window.__reactRouterContext;
   if (!router || !routeModules || !manifest || !context) {
+    scheduleFlush();
     return;
   }
-
-  let shouldRevalidate = pendingRevalidation;
-  pendingRevalidation = false;
-  const { nextManifest, hmrRoutes, shouldRefreshRouteState } =
-    applyPendingRouteUpdates(router, routeModules, manifest, context);
-  // Loader updates must be visible during revalidation. Component-only routes
-  // stay staged until revalidation completes, matching React Router's HMR flow.
-  if (nextManifest && shouldRefreshRouteState) {
-    pendingComponentRouteRevalidation = false;
-    if (hmrRoutes) {
-      patchCurrentRouteMatches(router, hmrRoutes);
-    }
-    Object.assign(manifest, nextManifest);
-    await refreshRouteState(router);
-    shouldRevalidate = false;
-  } else if (nextManifest) {
-    if (hmrRoutes) {
-      patchCurrentRouteMatches(router, hmrRoutes);
-    }
-    Object.assign(manifest, nextManifest);
-    // The node compiler also emits an HDR revision for this route edit. If it
-    // did not arrive in this flush, consume that redundant revalidation later.
-    pendingComponentRouteRevalidation = !shouldRevalidate;
-    shouldRevalidate = false;
-  } else if (shouldRevalidate) {
-    if (pendingComponentRouteRevalidation) {
+  flushing = true;
+  try {
+    let shouldRevalidate = pendingRevalidation;
+    pendingRevalidation = false;
+    const { nextManifest, hmrRoutes, shouldRefreshRouteState } =
+      applyPendingRouteUpdates(router, routeModules, manifest, context);
+    // Loader updates must be visible during revalidation. Component-only routes
+    // stay staged until revalidation completes, matching React Router's HMR flow.
+    if (nextManifest && shouldRefreshRouteState) {
       pendingComponentRouteRevalidation = false;
-    } else {
-      await revalidateRouter(router);
+      if (hmrRoutes) {
+        patchCurrentRouteMatches(router, hmrRoutes);
+      }
+      Object.assign(manifest, nextManifest);
+      await refreshRouteState(router);
+      shouldRevalidate = false;
+    } else if (nextManifest) {
+      if (hmrRoutes) {
+        patchCurrentRouteMatches(router, hmrRoutes);
+      }
+      Object.assign(manifest, nextManifest);
+      // The node compiler also emits an HDR revision for this route edit. If it
+      // did not arrive in this flush, consume that redundant revalidation later.
+      pendingComponentRouteRevalidation = !shouldRevalidate;
+      shouldRevalidate = false;
+    } else if (shouldRevalidate) {
+      if (pendingComponentRouteRevalidation) {
+        pendingComponentRouteRevalidation = false;
+      } else {
+        await revalidateRouter(router);
+      }
     }
+    performReactRefresh();
+  } finally {
+    flushing = false;
+    if (pendingRevalidation || pendingRouteUpdates.size > 0) scheduleFlush();
   }
-  performReactRefresh();
 }
 
 if (typeof window !== 'undefined' && import.meta.webpackHot) {
@@ -452,12 +419,9 @@ if (typeof window !== 'undefined' && import.meta.webpackHot) {
     ${JSON.stringify(DEV_MANIFEST_UPDATE_EVENT)},
     applyManifestUpdate
   );
-  import.meta.webpackHot.accept(
-    ${JSON.stringify(hdrRevisionFilePath)},
-    () => {
-      latestHdrRevision = __hdrRevision;
-      scheduleReactRouterRevalidation();
-    }
+  import.meta.webpackHot.on(
+    ${JSON.stringify(DEV_HDR_UPDATE_EVENT)},
+    receiveHdrRevision
   );
 }
 `;

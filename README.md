@@ -76,6 +76,9 @@ rsbuild.config.ts
 
 ## Configuration
 
+This plugin requires Rsbuild 2.2.8 or newer. Development hot data revalidation
+uses its custom-event connection API and no longer writes an HDR revision file.
+
 For server-only changes, `rsbuild build --environment node` can reuse the
 finalized browser manifest from a previous full build in the same project.
 Keep the browser output and build cache. Run a full build after changing routes

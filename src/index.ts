@@ -63,9 +63,8 @@ import {
 } from './performance.js';
 import { mapVirtualModules } from './virtual-modules.js';
 import {
-  createDevHdrRevisionSignal,
+  DEV_HMR_RUNTIME_MODULE_ID,
   generateDevHmrRuntimeModule,
-  getDevHdrRevisionFilePath,
   isRspackSwcReactRefreshEnabled,
   resolveReactRefreshRuntimePath,
 } from './dev-hmr.js';
@@ -589,17 +588,8 @@ export const pluginReactRouter = (
       isBuild || isRscMode
         ? undefined
         : resolveReactRefreshRuntimePath(api.context.rootPath);
-    const devHdrSignal = devHmrRefreshRuntimePath
-      ? createDevHdrRevisionSignal({
-          filePath: getDevHdrRevisionFilePath(api.context.rootPath),
-          onError: error =>
-            api.logger.debug(
-              `[${PLUGIN_NAME}] Failed to signal hot data revalidation: ${error.message}`
-            ),
-        })
-      : undefined;
     let devHmrEnabled = false;
-    if (devHmrRefreshRuntimePath && devHdrSignal) {
+    if (devHmrRefreshRuntimePath) {
       api.modifyEnvironmentConfig(
         async (environmentConfig, { name, mergeEnvironmentConfig }) => {
           if (name !== 'web') return environmentConfig;
@@ -607,7 +597,28 @@ export const pluginReactRouter = (
             tools: {
               rspack: rspackConfig => {
                 devHmrEnabled = isRspackSwcReactRefreshEnabled(rspackConfig);
-                if (devHmrEnabled) devHdrSignal.ensure();
+                if (devHmrEnabled) {
+                  const entries = rspackConfig.entry;
+                  if (
+                    entries &&
+                    typeof entries === 'object' &&
+                    !Array.isArray(entries)
+                  ) {
+                    for (const [name, entry] of Object.entries(entries)) {
+                      const description =
+                        typeof entry === 'string' || Array.isArray(entry)
+                          ? { import: entry }
+                          : entry;
+                      entries[name] = {
+                        ...description,
+                        import: [
+                          DEV_HMR_RUNTIME_MODULE_ID,
+                          ...[description.import ?? []].flat(),
+                        ],
+                      };
+                    }
+                  }
+                }
                 return rspackConfig;
               },
             },
@@ -657,19 +668,14 @@ export const pluginReactRouter = (
           routeChunkCache,
           serverAppPath,
           shouldDependOnWebCompiler,
-          devHmr:
-            devHmrRefreshRuntimePath && devHdrSignal
-              ? {
-                  isEnabled: () => devHmrEnabled,
-                  runtimeModule: generateDevHmrRuntimeModule({
-                    reactRefreshRuntimePath: devHmrRefreshRuntimePath,
-                    hdrRevisionFilePath: devHdrSignal.filePath,
-                  }),
-                  onNodeRebuildCommitted: () => {
-                    if (devHmrEnabled) devHdrSignal.bump();
-                  },
-                }
-              : undefined,
+          devHmr: devHmrRefreshRuntimePath
+            ? {
+                isEnabled: () => devHmrEnabled,
+                runtimeModule: generateDevHmrRuntimeModule({
+                  reactRefreshRuntimePath: devHmrRefreshRuntimePath,
+                }),
+              }
+            : undefined,
         }));
 
     const { manifestChunkNames } = modePlan;

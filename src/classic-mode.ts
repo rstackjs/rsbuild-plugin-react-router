@@ -125,7 +125,6 @@ export const createClassicBuildArtifacts = async ({
       isBuild,
       buildPlan: serverBuildPlan,
       clientPatchesRouteMetadata: devHmr?.isEnabled,
-      onNodeRebuildCommitted: devHmr?.onNodeRebuildCommitted,
     }),
     prerenderPaths,
     routesByServerBundleId,

@@ -20,6 +20,7 @@ import {
   unregisterReactRouterDevRuntime,
 } from './dev-generation.js';
 import { createDevHdrIntentTracker } from './dev-hdr-intent.js';
+import { createDevHdrChannel } from './dev-hdr-channel.js';
 import { DEV_MANIFEST_UPDATE_EVENT } from './dev-hmr.js';
 import {
   getEnvironmentStats,
@@ -57,17 +58,9 @@ type CreateControllerOptions = {
    * flags) in place, so metadata-only changes no longer need a full reload.
    */
   clientPatchesRouteMetadata?: boolean | (() => boolean);
-  /**
-   * Invoked after a development attempt commits a re-evaluated node build for
-   * changed server files. Used to signal hot data revalidation to the client.
-   */
-  onNodeRebuildCommitted?: () => void;
 };
 
 const CSS_SOURCE_RELOAD_DELAY_MS = 1000;
-
-const isHdrRevisionFile = (file: string): boolean =>
-  file.includes('.react-router/hdr-revision.mjs');
 
 const isCssSourceFile = (file: string): boolean =>
   /\.css(?:\.[cm]?[jt]s)?$/.test(file);
@@ -77,7 +70,6 @@ export const createReactRouterDevRuntimeController = ({
   isBuild,
   buildPlan,
   clientPatchesRouteMetadata,
-  onNodeRebuildCommitted,
 }: CreateControllerOptions): ReactRouterDevRuntimeController => {
   if (isBuild) {
     return {
@@ -122,7 +114,18 @@ export const createReactRouterDevRuntimeController = ({
     }, CSS_SOURCE_RELOAD_DELAY_MS);
   };
 
+  const hdrChannels = new WeakMap<
+    RuntimeBinding,
+    ReturnType<typeof createDevHdrChannel>
+  >();
+  const isHmrEnabled = () =>
+    typeof clientPatchesRouteMetadata === 'function'
+      ? clientPatchesRouteMetadata()
+      : clientPatchesRouteMetadata === true;
+
   const closeBinding = (binding: RuntimeBinding, error?: Error): void => {
+    hdrChannels.get(binding)?.close();
+    hdrChannels.delete(binding);
     if (scheduledCssAssetOwnershipReload) {
       clearTimeout(scheduledCssAssetOwnershipReload);
       scheduledCssAssetOwnershipReload = undefined;
@@ -174,7 +177,7 @@ export const createReactRouterDevRuntimeController = ({
         identity.node === binding.runtime.getCommittedNodeIdentity()
       ) {
         hdrIntentsByPair.get(pair)?.signalCommitted(nodeCompilation, () => {
-          onNodeRebuildCommitted?.();
+          hdrChannels.get(binding)?.publish();
         });
       }
     } catch (cause) {
@@ -278,11 +281,7 @@ export const createReactRouterDevRuntimeController = ({
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
           }
-          const patchesRouteMetadata =
-            typeof clientPatchesRouteMetadata === 'function'
-              ? clientPatchesRouteMetadata()
-              : clientPatchesRouteMetadata;
-          if (patchesRouteMetadata) {
+          if (isHmrEnabled()) {
             server.sockWrite('custom', {
               event: DEV_MANIFEST_UPDATE_EVENT,
               data: manifest.routes,
@@ -294,6 +293,14 @@ export const createReactRouterDevRuntimeController = ({
         onWarning: message => api.logger.warn(message),
       });
       const binding = sessions.createBinding(server, runtime);
+      hdrChannels.set(
+        binding,
+        createDevHdrChannel({
+          hot: server.environments.web.hot,
+          isEnabled: () =>
+            sessions.getActiveBinding() === binding && isHmrEnabled(),
+        })
+      );
       registerReactRouterDevRuntime(server, runtime);
       sessions.bindCloseObservation(binding);
     },
@@ -430,9 +437,7 @@ export const createReactRouterDevRuntimeController = ({
         hdrIntents.capture(
           compilation,
           changes.known &&
-            Array.from(changes.files).some(
-              file => !isHdrRevisionFile(file) && !isCssSourceFile(file)
-            )
+            Array.from(changes.files).some(file => !isCssSourceFile(file))
         );
         pair.latestNodeStart = {
           status: 'started',
