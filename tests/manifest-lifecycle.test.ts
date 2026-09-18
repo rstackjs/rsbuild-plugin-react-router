@@ -137,13 +137,22 @@ describe('manifest publication lifecycle', () => {
     expect(harness.read()?.version).toBe('recovered');
   });
 
-  it('keeps development manifest publication immediate', async () => {
+  it('keeps the last successful development manifest through a failed rebuild', async () => {
     const harness = await createHarness('dev');
-    harness.stage(createCompilation(), 'development');
-
+    const first = createCompilation();
+    harness.stage(first, 'development');
+    expect(harness.read()).toBeNull();
+    await harness.finish('web', first);
     expect(harness.read()?.version).toBe('development');
     await harness.start('web');
+    const failed = createCompilation();
+    harness.stage(failed, 'failed');
+    await harness.finish('web', failed, true);
     expect(harness.read()?.version).toBe('development');
+    const recovered = createCompilation();
+    harness.stage(recovered, 'recovered');
+    await harness.finish('web', recovered);
+    expect(harness.read()?.version).toBe('recovered');
   });
 
   it('does not prerender or call buildEnd using output from a failed build', async () => {

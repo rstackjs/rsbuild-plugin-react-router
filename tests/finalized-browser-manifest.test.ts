@@ -66,6 +66,7 @@ type CompilationObservation = {
   before: number;
   afterAdditions?: number;
   afterHash?: number;
+  hashedManifestSource?: string;
   early?: EmittedManifest;
 };
 
@@ -284,6 +285,12 @@ const compileManifests = async (
                 },
                 () => {
                   observation.afterHash = publications.length;
+                  const name = getJavaScriptAsset(
+                    compilation,
+                    BROWSER_MANIFEST_ENTRY_NAME
+                  );
+                  observation.hashedManifestSource = compilation
+                    .getAsset(name)!.source.source().toString();
                 }
               );
             }
@@ -394,6 +401,13 @@ describe('finalized production browser manifests', () => {
         const publication = result.publications[0];
         expect(publication.stage).toBe('report');
         expect(publication.manifestStats).toEqual(result.manifestStats);
+        const placeholderName = getJavaScriptAsset(
+          result.compilation,
+          BROWSER_MANIFEST_ENTRY_NAME
+        );
+        expect(
+          result.compilation.getAsset(placeholderName)!.source.source().toString()
+        ).toBe(result.observation.hashedManifestSource);
 
         const browser = result.emitted.manifest;
         expect(browser.entry.module).toBe(assetUrl(result.entryFile));

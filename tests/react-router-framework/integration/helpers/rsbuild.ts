@@ -200,16 +200,20 @@ export const build = ({
   cwd,
   env = {},
   timeout,
+  environment,
 }: {
   cwd: string;
   env?: Record<string, string>;
   /** Kill the build (SIGKILL) after this many ms; `status` is then `null`. */
   timeout?: number;
+  environment?: string;
 }) => {
   let nodeBin = process.argv[0];
   prepareFixtureProjectDependencies(cwd);
 
-  return spawnSync(nodeBin, [rsbuildBin, "build"], {
+  const args = [rsbuildBin, "build"];
+  if (environment) args.push("--environment", environment);
+  return spawnSync(nodeBin, args, {
     cwd,
     env: withFrameworkTestRunEnv({
       ...process.env,

@@ -45,32 +45,26 @@ export const createReactRouterManifestState = ({
         latest = null;
       }
     });
-    api.onAfterEnvironmentCompile(({ environment, stats }) => {
-      if (environment.name !== 'web') {
-        return;
-      }
-      const snapshot =
-        stats && !stats.hasErrors()
-          ? pending.get(stats.compilation)
-          : undefined;
-      if (stats) {
-        pending.delete(stats.compilation);
-      }
-      if (snapshot && stats) {
-        publish(stats.compilation, snapshot);
-      } else {
-        latest = null;
-      }
-    });
   }
+  api.onAfterEnvironmentCompile(({ environment, stats }) => {
+    if (environment.name !== 'web') {
+      return;
+    }
+    const snapshot =
+      stats && !stats.hasErrors() ? pending.get(stats.compilation) : undefined;
+    if (stats) {
+      pending.delete(stats.compilation);
+    }
+    if (snapshot && stats) {
+      publish(stats.compilation, snapshot);
+    } else if (isBuild) {
+      latest = null;
+    }
+  });
 
   return {
     stage(compilation, snapshot) {
-      if (isBuild) {
-        pending.set(compilation, snapshot);
-      } else {
-        publish(compilation, snapshot);
-      }
+      pending.set(compilation, snapshot);
     },
     read: () => latest,
   };

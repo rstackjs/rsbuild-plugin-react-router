@@ -207,7 +207,9 @@ export function registerModifyBrowserManifestAssets(
       name =>
         getManifestAssetType(name, stats.assetTypesByName) === 'javascript'
     ) ?? [BROWSER_MANIFEST_ASSET];
-    for (const browserManifestPath of browserManifestPaths) {
+    // Production consumes the separately emitted versioned manifest. Leave the
+    // placeholder chunk unchanged: its content hash has already been finalized.
+    for (const browserManifestPath of isBuild ? [] : browserManifestPaths) {
       const browserManifestAsset = assets[browserManifestPath];
       if (!browserManifestAsset) continue;
       const originalSource = browserManifestAsset.source().toString();

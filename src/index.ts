@@ -550,8 +550,13 @@ export const pluginReactRouter = (
       snapshot: ReactRouterManifestSnapshot
     ): void => {
       const stamp = JSON.stringify({
-        manifest: snapshot.server,
-        bundles: snapshot.serverByBundleId,
+        schema: 1,
+        isBuild,
+        appDirectory,
+        outputClientPath,
+        routes,
+        assetPrefix,
+        snapshot,
       });
       let previous: string | undefined;
       try {
@@ -756,6 +761,55 @@ export const pluginReactRouter = (
       },
     });
 
+    let persistedSnapshot: ReactRouterManifestSnapshot | null = null;
+    let persistedSnapshotError: Error | undefined;
+    // A separate node-only invocation has no browser compilation to publish a
+    // snapshot. Reuse finalized output from a compatible successful web build.
+    api.onBeforeCreateCompiler(() => {
+      if (
+        !isBuild ||
+        modePlan.kind !== 'classic' ||
+        api.getNormalizedConfig().environments.web
+      )
+        return;
+      const rebuildMessage = `[${PLUGIN_NAME}] Run a full build before building only the node environment; no compatible finalized browser manifest is available.`;
+      try {
+        const stamp = JSON.parse(readFileSync(serverManifestStampPath, 'utf8'));
+        if (
+          stamp.schema !== 1 ||
+          stamp.isBuild !== true ||
+          stamp.appDirectory !== appDirectory ||
+          stamp.outputClientPath !== outputClientPath ||
+          stamp.assetPrefix !== assetPrefix ||
+          JSON.stringify(stamp.routes) !== JSON.stringify(routes) ||
+          typeof stamp.snapshot?.server?.version !== 'string' ||
+          !stamp.snapshot?.serverByBundleId ||
+          !stamp.snapshot?.browser
+        ) {
+          throw new Error(rebuildMessage);
+        }
+        persistedSnapshot = createReactRouterManifestSnapshot({
+          manifest: stamp.snapshot.browser,
+          sri: stamp.snapshot.server.sri,
+          moduleExportsByRouteId: stamp.snapshot.moduleExportsByRouteId,
+          serverBuildPlan: {
+            defaultEntryName: devServerBuildEntryName,
+            serverBundleEntries: modePlan.artifacts.serverBundleEntries,
+          },
+          routesByServerBundleId: modePlan.artifacts.routesByServerBundleId,
+        });
+        // A node-only deployment can change server bundle partitions without
+        // changing browser assets; invalidate cached virtual modules too.
+        writeServerManifestStamp(persistedSnapshot);
+      } catch (cause) {
+        persistedSnapshotError = new Error(rebuildMessage, { cause });
+      }
+    });
+    const readManifestSnapshot = () => {
+      if (persistedSnapshotError) throw persistedSnapshotError;
+      return manifestState.read() ?? persistedSnapshot;
+    };
+
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
       if (environment.name === 'web') {
@@ -818,9 +872,10 @@ export const pluginReactRouter = (
                   basename,
                   future,
                   routes,
-                  latestBrowserManifest: manifestState.read()?.browser ?? null,
+                  latestBrowserManifest:
+                    readManifestSnapshot()?.browser ?? null,
                   latestBrowserManifestModuleExports:
-                    manifestState.read()?.moduleExportsByRouteId ?? {},
+                    readManifestSnapshot()?.moduleExportsByRouteId ?? {},
                   clientStats,
                   pluginOptions,
                   appDirectory,
@@ -1167,10 +1222,10 @@ export const pluginReactRouter = (
         api,
         resolvedServerOutput,
         performanceProfiler,
-        getLatestServerManifest: () => manifestState.read()?.server ?? null,
+        getLatestServerManifest: () => readManifestSnapshot()?.server ?? null,
         serverManifestStampPath,
         getLatestServerManifestByBundleId: bundleId =>
-          manifestState.read()?.serverByBundleId[bundleId],
+          readManifestSnapshot()?.serverByBundleId[bundleId],
         routes,
         pluginOptions,
         getClientStats: () => clientStats,
