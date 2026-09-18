@@ -195,7 +195,7 @@ export const registerBuildOutputTransforms = ({
 
   api.transform(
     {
-      test: /virtual\/react-router\/(browser|server)-manifest/,
+      test: /virtual\/react-router\/((browser|server)-manifest|server-build)/,
     },
     async args =>
       performanceProfiler.record(
@@ -215,6 +215,11 @@ export const registerBuildOutputTransforms = ({
             args.addDependency(serverManifestStampPath);
           } else {
             args.addMissingDependency(serverManifestStampPath);
+          }
+          // The virtual server build contains the bundle's route table. A
+          // partition change must invalidate it alongside the asset manifest.
+          if (args.resource.includes('virtual/react-router/server-build')) {
+            return { code: args.code };
           }
           const bundleMatch = args.resource.match(
             /virtual\/react-router\/server-manifest(?:-([^?]+))?/

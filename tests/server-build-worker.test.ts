@@ -35,6 +35,15 @@ export default {
         return new Response("bye");
       case "/throw":
         throw new TypeError("boom");
+      case "/unread-body":
+        request.signal.addEventListener("abort", () => {
+          appendFileSync(url.searchParams.get("file"), "aborted\\n");
+        });
+        return new Response(new ReadableStream({
+          start(controller) {
+            if (url.searchParams.get("error")) controller.error(new Error("body failed"));
+          },
+        }), { status: Number(url.searchParams.get("status")), headers: { location: "/target" } });
       default:
         return new Response("hello " + url.pathname, {
           status: 201,
@@ -114,6 +123,51 @@ describe('server build worker', () => {
     await expect(
       worker.handler(new Request('http://localhost/throw'))
     ).rejects.toMatchObject({ name: 'TypeError', message: 'boom' });
+  });
+
+  it.each([302, 500])(
+    'returns status %s before reading a pending body and relays release',
+    async status => {
+      const worker = await start();
+      const log = resolve(directory, 'abort.log');
+      const controller = new AbortController();
+      const response = await worker.handler(
+        new Request(
+          `http://localhost/unread-body?status=${status}&file=${encodeURIComponent(log)}`,
+          { signal: controller.signal }
+        )
+      );
+      expect(response.status).toBe(status);
+      expect(response.headers.get('location')).toBe('/target');
+      controller.abort();
+      await worker.close();
+      expect(readFileSync(log, 'utf8')).toBe('aborted\n');
+    }
+  );
+
+  it('reports a stream error only when its body is consumed', async () => {
+    const worker = await start();
+    const log = resolve(directory, 'abort.log');
+    const response = await worker.handler(
+      new Request(
+        `http://localhost/unread-body?status=302&error=1&file=${encodeURIComponent(log)}`
+      )
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('/target');
+    await expect(response.text()).rejects.toThrow('body failed');
+    expect(readFileSync(log, 'utf8')).toBe('aborted\n');
+  });
+
+  it('rejects body reads after the worker is closed', async () => {
+    const worker = await start();
+    const response = await worker.handler(
+      new Request('http://localhost/greet')
+    );
+    await worker.close();
+    await expect(response.text()).rejects.toThrow(
+      'Server build worker was closed'
+    );
   });
 
   it('rejects requests sent after the worker exited while idle', async () => {

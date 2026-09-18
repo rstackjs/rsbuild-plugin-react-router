@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { test, expect } from "@playwright/test";
 
 import { js } from "./helpers/create-fixture.js";
@@ -192,5 +193,60 @@ test.describe("ssr: false with performance.buildCache (#136)", () => {
     const warmScripts = referencedScripts();
     expect(warmScripts).not.toEqual(coldScripts);
     expect(missing(warmScripts)).toEqual([]);
+  });
+});
+
+test("warm server bundle manifests reflect changed route partitions", async () => {
+  const cwd = await createProject({
+    "rsbuild.config.ts": await rsbuildConfig.basic({ buildCache: true }),
+    "react-router.config.ts": js`
+      export default {
+        buildEnd: async ({ buildManifest }) => {
+          const { writeFileSync } = await import("node:fs");
+          writeFileSync("build/partitions.json", JSON.stringify(buildManifest.routeIdToServerBundleId));
+        },
+        serverBundles: ({ branch }) => {
+          const other = branch.some(route => route.id === "routes/other");
+          return (other !== (process.env.SWAP_BUNDLES === "1")) ? "b" : "a";
+        },
+      };
+    `,
+    "app/routes/other.tsx": js`
+      export default function Other() { return <h1>Other</h1>; }
+    `,
+  });
+  const inspect = () =>
+    JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "-e",
+          `const build = await import('./build/server/a/index.js');
+     console.log(JSON.stringify({ routes: Object.keys(build.routes).sort(), assets: Object.keys(build.assets.routes).sort() }));`,
+        ],
+        { cwd, encoding: "utf8" },
+      ),
+    );
+  expectBuildSucceeded(
+    build({ cwd, env: { SWAP_BUNDLES: "0" }, timeout: BUILD_TIMEOUT_MS }),
+  );
+  const cold = inspect();
+  expect(cold).toEqual({
+    routes: ["root", "routes/_index"],
+    assets: ["root", "routes/_index"],
+  });
+  expectBuildSucceeded(
+    build({ cwd, env: { SWAP_BUNDLES: "1" }, timeout: BUILD_TIMEOUT_MS }),
+  );
+  const warm = inspect();
+  expect(
+    JSON.parse(
+      fs.readFileSync(path.join(cwd, "build/partitions.json"), "utf8"),
+    ),
+  ).toMatchObject({ "routes/other": "a", "routes/_index": "b" });
+  expect(warm).toEqual({
+    routes: ["root", "routes/other"],
+    assets: ["root", "routes/other"],
   });
 });

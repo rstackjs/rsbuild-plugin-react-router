@@ -22,7 +22,7 @@ export type ServerBuildWorker = {
   close(): Promise<void>;
 };
 
-type Reply = Extract<ServerBuildWorkerResponse, { type: 'reply' }>;
+type Reply = Exclude<ServerBuildWorkerResponse, { type: 'ready' | 'closed' }>;
 
 type Pending = {
   resolve: (reply: Reply) => void;
@@ -55,8 +55,13 @@ export const startServerBuildWorker = async (
 ): Promise<ServerBuildWorker> => {
   const worker = new Worker(workerPath, { workerData: data });
   const pending = new Map<number, Pending>();
+  const active = new Map<number, (error: Error) => void>();
   let nextId = 0;
   let failure: Error | undefined;
+  let acknowledgeClose: () => void = () => {};
+  const closed = new Promise<void>(resolve => {
+    acknowledgeClose = resolve;
+  });
 
   const fail = (error: Error): void => {
     failure ??= error;
@@ -64,11 +69,17 @@ export const startServerBuildWorker = async (
       reject(failure);
     }
     pending.clear();
+    for (const stop of active.values()) stop(failure);
+    active.clear();
   };
 
   const ready = new Promise<ServerBuildDescription | undefined>(
     (resolve, reject) => {
       worker.on('message', (message: ServerBuildWorkerResponse) => {
+        if (message.type === 'closed') {
+          acknowledgeClose();
+          return;
+        }
         if (message.type === 'ready') {
           resolve(message.description);
           return;
@@ -78,10 +89,12 @@ export const startServerBuildWorker = async (
         entry?.resolve(message);
       });
       worker.on('error', error => {
+        acknowledgeClose();
         fail(normalizeEffectError(error));
         reject(failure);
       });
       worker.on('exit', code => {
+        acknowledgeClose();
         fail(new Error(`Server build worker exited with code ${code}`));
         reject(failure);
       });
@@ -105,11 +118,25 @@ export const startServerBuildWorker = async (
       const body = request.body
         ? new Uint8Array(await request.arrayBuffer())
         : undefined;
-      // Relay the parent's release so the worker-side Request aborts too.
+      let responseController:
+        | ReadableStreamDefaultController<Uint8Array>
+        | undefined;
+      const cleanup = (): void => {
+        active.delete(id);
+        request.signal.removeEventListener('abort', onAbort);
+      };
+      const stop = (error: Error): void => {
+        responseController?.error(error);
+        pending.get(id)?.reject(error);
+        pending.delete(id);
+        cleanup();
+      };
+      // Keep the relay alive after headers arrive: RSC may release a redirect
+      // or rejected status without ever consuming its response body.
       const onAbort = (): void => {
-        if (pending.has(id)) {
-          send({ type: 'abort', id });
-        }
+        send({ type: 'abort', id });
+        if (responseController)
+          stop(new Error('Server build request was aborted'));
       };
       const reply = await new Promise<Reply>((resolve, reject) => {
         if (failure) {
@@ -117,6 +144,7 @@ export const startServerBuildWorker = async (
           return;
         }
         pending.set(id, { resolve, reject });
+        active.set(id, stop);
         request.signal.addEventListener('abort', onAbort, { once: true });
         send(
           {
@@ -129,17 +157,55 @@ export const startServerBuildWorker = async (
           },
           body ? [body.buffer] : []
         );
-      }).finally(() => request.signal.removeEventListener('abort', onAbort));
+        if (request.signal.aborted) onAbort();
+      }).catch(error => {
+        cleanup();
+        throw error;
+      });
       if (!reply.ok) {
+        cleanup();
         throw replyError(reply);
       }
-      const {
-        status,
-        statusText,
-        headers,
-        body: responseBody,
-      } = reply.response;
-      return new Response(responseBody.byteLength ? responseBody : null, {
+      if (reply.type !== 'reply')
+        throw new Error('Unexpected server build response');
+      const { status, statusText, headers, hasBody } = reply.response;
+      const responseBody = hasBody
+        ? new ReadableStream<Uint8Array>(
+            {
+              start(controller) {
+                responseController = controller;
+              },
+              async pull(controller) {
+                try {
+                  const result = await new Promise<Reply>((resolve, reject) => {
+                    if (failure) {
+                      reject(failure);
+                      return;
+                    }
+                    pending.set(id, { resolve, reject });
+                    send({ type: 'read', id });
+                  });
+                  if (!result.ok) throw replyError(result);
+                  if (result.type !== 'body')
+                    throw new Error('Unexpected server build body');
+                  controller.enqueue(result.body);
+                  controller.close();
+                } catch (error) {
+                  controller.error(error);
+                } finally {
+                  cleanup();
+                }
+              },
+              cancel() {
+                send({ type: 'abort', id });
+                stop(new Error('Server build response was canceled'));
+              },
+            },
+            { highWaterMark: 0 }
+          )
+        : null;
+      if (!hasBody) cleanup();
+      return new Response(responseBody, {
         status,
         statusText,
         headers,
@@ -147,6 +213,8 @@ export const startServerBuildWorker = async (
     },
     async close() {
       fail(new Error('Server build worker was closed'));
+      send({ type: 'close' });
+      await closed;
       await worker.terminate();
     },
   };

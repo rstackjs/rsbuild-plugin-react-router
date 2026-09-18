@@ -13,6 +13,7 @@ export type ServerBuildWorkerData = {
 };
 
 export type ServerBuildWorkerRequest =
+  | { type: 'close' }
   | {
       id: number;
       type: 'request';
@@ -21,14 +22,16 @@ export type ServerBuildWorkerRequest =
       headers: [string, string][];
       body?: Uint8Array<ArrayBuffer>;
     }
-  /** The parent released the request before a reply arrived. */
+  /** Consume a response body only when the parent asks for it. */
+  | { id: number; type: 'read' }
+  /** The parent released the request, possibly without reading its body. */
   | { id: number; type: 'abort' };
 
 export type SerializedResponse = {
   status: number;
   statusText: string;
   headers: [string, string][];
-  body: Uint8Array<ArrayBuffer>;
+  hasBody: boolean;
 };
 
 export type SerializedError = {
@@ -38,9 +41,11 @@ export type SerializedError = {
 };
 
 export type ServerBuildWorkerResponse =
+  | { type: 'closed' }
   /** Sent once the bundle is evaluated; carries the classic build description. */
   | { type: 'ready'; description?: ServerBuildDescription }
   | { type: 'reply'; id: number; ok: true; response: SerializedResponse }
+  | { type: 'body'; id: number; ok: true; body: Uint8Array<ArrayBuffer> }
   | { type: 'reply'; id: number; ok: false; error: SerializedError };
 
 /**

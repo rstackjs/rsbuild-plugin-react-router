@@ -113,14 +113,45 @@ if (mode === 'classic') {
 // is aborted when the parent releases it (`createBuildRequestEffect`) or once
 // its response has been consumed here, mirroring the in-process contract.
 const controllers = new Map<number, AbortController>();
+const responses = new Map<number, Response>();
 const release = (id: number): void => {
   controllers.get(id)?.abort();
   controllers.delete(id);
+  responses.delete(id);
 };
 
 port.on('message', async (message: ServerBuildWorkerRequest) => {
+  if (message.type === 'close') {
+    for (const id of controllers.keys()) release(id);
+    post({ type: 'closed' });
+    return;
+  }
   if (message.type === 'abort') {
+    // Cancellation can itself stay pending in application streams. It must
+    // not prevent request cleanup or worker shutdown.
+    void responses
+      .get(message.id)
+      ?.body?.cancel()
+      .catch(() => {});
     release(message.id);
+    return;
+  }
+  if (message.type === 'read') {
+    try {
+      const response = responses.get(message.id);
+      if (!response) throw new Error('Server build response was released');
+      const body = new Uint8Array(await response.arrayBuffer());
+      release(message.id);
+      post({ type: 'body', id: message.id, ok: true, body }, [body.buffer]);
+    } catch (error) {
+      release(message.id);
+      post({
+        type: 'reply',
+        id: message.id,
+        ok: false,
+        error: serializeError(error),
+      });
+    }
     return;
   }
   const controller = new AbortController();
@@ -134,22 +165,19 @@ port.on('message', async (message: ServerBuildWorkerRequest) => {
         signal: controller.signal,
       })
     );
-    const body = new Uint8Array(await response.arrayBuffer());
-    release(message.id);
-    post(
-      {
-        type: 'reply',
-        id: message.id,
-        ok: true,
-        response: {
-          status: response.status,
-          statusText: response.statusText,
-          headers: headerEntries(response.headers),
-          body,
-        },
+    if (response.body) responses.set(message.id, response);
+    else release(message.id);
+    post({
+      type: 'reply',
+      id: message.id,
+      ok: true,
+      response: {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headerEntries(response.headers),
+        hasBody: response.body !== null,
       },
-      [body.buffer]
-    );
+    });
   } catch (error) {
     release(message.id);
     post({
