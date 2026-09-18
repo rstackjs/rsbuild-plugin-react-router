@@ -193,6 +193,12 @@ test.describe('lazy compilation', () => {
       }
     });
 
+    // Establish the probe before opening the page; the test exercises the
+    // subsequent CSS edits, not a navigation racing the initial rebuild.
+    await expect.poll(async () => {
+      const response = await page.request.get('/about');
+      return response.text();
+    }).toContain('About CSS HMR Probe');
     await page.goto('/about');
     await expect(
       page.getByRole('heading', { name: 'About CSS HMR Probe' })
