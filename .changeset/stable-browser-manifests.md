@@ -2,8 +2,8 @@
 'rsbuild-plugin-react-router': patch
 ---
 
-Respect configured browser filenames and publish production manifests with finalized asset URLs and subresource integrity. Refresh development manifests when real content hashing is enabled. Preserve each compilation's route metadata, and prevent failed builds from exposing stale server manifests or running prerender/build-end work.
+Use configured browser filenames, final asset URLs, and subresource integrity in production manifests. Refresh development manifests when real content hashing is enabled. Keep route metadata tied to its compilation. Failed builds no longer expose stale server manifests, prerender pages, or run build-end hooks.
 
-Reuse compatible finalized browser manifests for separate node-only builds, publish development snapshots only after successful compilation, and leave production content-hashed placeholder chunks unchanged after hashing.
+Reuse compatible browser manifests for separate node-only builds. Publish development snapshots only after successful compilation. Leave production placeholder chunks unchanged after computing their content hashes.
 
-Validate loader/action export compatibility during node-only compilation, including cached modules, and preserve asset prefixes configured only on the web environment.
+Reject node-only builds when a route adds or removes a `loader` or `action` export, including when modules come from the build cache. Preserve asset prefixes configured only on the web environment.

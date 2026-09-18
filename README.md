@@ -78,11 +78,10 @@ rsbuild.config.ts
 
 For server-only changes, `rsbuild build --environment node` can reuse the
 finalized browser manifest from a previous full build in the same project.
-Keep the browser output and build cache, and run a full build again after
-changing routes or browser assets. A missing or incompatible cached manifest
-produces an error asking for a full build.
-Adding or removing a route's `loader` or `action` also requires a full build;
-node-only builds check the compiled exports and reject stale browser metadata.
+Keep the browser output and build cache. Run a full build after changing routes
+or browser assets, or adding or removing a route's `loader` or `action` export.
+Node-only builds check the compiled exports against the cached manifest. If the
+manifest is missing or incompatible, the build fails and asks for a full build.
 
 React Router application settings live in `react-router.config.*`. The Rsbuild
 plugin only needs options for Rsbuild-specific behavior.
