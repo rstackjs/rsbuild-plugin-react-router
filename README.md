@@ -81,6 +81,8 @@ finalized browser manifest from a previous full build in the same project.
 Keep the browser output and build cache, and run a full build again after
 changing routes or browser assets. A missing or incompatible cached manifest
 produces an error asking for a full build.
+Adding or removing a route's `loader` or `action` also requires a full build;
+node-only builds check the compiled exports and reject stale browser metadata.
 
 React Router application settings live in `react-router.config.*`. The Rsbuild
 plugin only needs options for Rsbuild-specific behavior.

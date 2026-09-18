@@ -282,16 +282,27 @@ const getExportDependencies = (
       // bindings must keep a single owner, including functions and classes.
       const nonShareableExportedSymbols = new Set<YukuSymbol>();
       for (const { local } of namedExports) {
-        if (
-          !local?.has(SymbolFlags.ValueSpace | SymbolFlags.ValueImport) ||
-          local.declarations.every(
-            declaration =>
-              getCachedTopLevelStatementForNode(declaration).type ===
-              'ImportDeclaration'
-          )
-        ) {
+        if (!local?.has(SymbolFlags.ValueSpace | SymbolFlags.ValueImport)) {
           continue;
         }
+        const isImport = local.declarations.every(
+          declaration =>
+            getCachedTopLevelStatementForNode(declaration).type ===
+            'ImportDeclaration'
+        );
+        // Setup belongs to the imported value too. If another export consumes
+        // that value, moving its setup into a separate chunk changes behavior.
+        const hasSetup =
+          isImport &&
+          local.references.some(reference => {
+            const statement = getCachedTopLevelStatementForNode(reference.node);
+            return (
+              reference.kind === 'value' &&
+              statement.type !== 'ImportDeclaration' &&
+              !statement.type.startsWith('Export')
+            );
+          });
+        if (isImport && !hasSetup) continue;
         nonShareableExportedSymbols.add(local);
       }
 

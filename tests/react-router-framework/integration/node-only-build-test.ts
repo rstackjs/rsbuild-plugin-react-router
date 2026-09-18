@@ -7,6 +7,7 @@ import {
   createEditor,
   createProject,
   expectBuildSucceeded,
+  rsbuildConfig,
 } from './helpers/rsbuild.js';
 
 const readAssets = (cwd: string) =>
@@ -59,4 +60,43 @@ test('node-only builds explain when a browser build is required', async () => {
   expect(`${result.stdout}\n${result.stderr}`).toContain(
     'Run a full build before building only the node environment'
   );
+});
+
+for (const name of ['loader', 'action']) {
+  for (const operation of ['add', 'remove']) {
+    test(`node-only builds reject ${operation} of a route ${name}`, async () => {
+      const declaration = `export const ${name} = () => 'server';\n`;
+      const cwd = await createProject({
+        'rsbuild.config.ts': await rsbuildConfig.basic({ buildCache: true }),
+      });
+      if (operation === 'remove') {
+        await createEditor(cwd)('app/root.tsx', source => declaration + source);
+      }
+      expectBuildSucceeded(build({ cwd }));
+      expectBuildSucceeded(build({ cwd, environment: 'node' }));
+      await createEditor(cwd)('app/root.tsx', source =>
+        operation === 'add'
+          ? declaration + source
+          : source.replace(declaration, '')
+      );
+      const result = build({ cwd, environment: 'node' });
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        'loader/action exports changed'
+      );
+    });
+  }
+}
+
+test('node-only builds retain a CDN prefix configured only for web', async () => {
+  const config = (await rsbuildConfig.basic({})).replace(
+    'defineConfig({',
+    'defineConfig({ environments: { web: { output: { assetPrefix: "https://cdn.example.test/app/" } } },'
+  );
+  const cwd = await createProject({ 'rsbuild.config.ts': config });
+  expectBuildSucceeded(build({ cwd }));
+  const before = readAssets(cwd);
+  expect(before.entry.module).toMatch(/^https:\/\/cdn\.example\.test\/app\//);
+  expectBuildSucceeded(build({ cwd, environment: 'node' }));
+  expect(readAssets(cwd)).toEqual(before);
 });

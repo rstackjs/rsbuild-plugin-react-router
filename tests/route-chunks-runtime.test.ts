@@ -356,6 +356,23 @@ describe('route chunk runtime dependencies', () => {
     expect(load.hydrate).toBe(true);
   });
 
+  it('keeps imported loader setup with a component that consumes it', () => {
+    const code = `
+      import { load } from './shared';
+      load.hydrate = true;
+      export { load as clientLoader };
+      export default function Route() { return load.hydrate; }
+    `;
+    const load = Object.assign(() => 'value', { hydrate: false });
+    const main = getRouteChunkCode(code, 'main', undefined, routeId);
+    expect(runExport(main, 'default', { require: () => ({ load }) })).toBe(
+      true
+    );
+    expect(detectRouteChunks(code, undefined, routeId).chunkedExports).toEqual(
+      []
+    );
+  });
+
   it('preserves type-name hygiene for legacy decorator metadata', () => {
     const code = `
       type Service = string;

@@ -3,6 +3,7 @@ import {
   type ReactRouterManifestSnapshot,
 } from './manifest-snapshot.js';
 import { createReactRouterManifestState } from './manifest-state.js';
+import { registerNodeOnlyManifestValidation } from './node-only-manifest.js';
 import { existsSync, readFileSync } from 'node:fs';
 import fsExtra from 'fs-extra';
 import type { Config } from './react-router-config.js';
@@ -232,7 +233,8 @@ export const pluginReactRouter = (
       // `getNormalizedConfig({ environment: 'web' })` throws when the build was
       // narrowed to other environments (`--environment node`), so look the web
       // environment up on the root config instead.
-      const web = root.environments.web;
+      const web =
+        root.environments.web ?? api.getRsbuildConfig().environments?.web;
       assetPrefix = resolveEffectiveAssetPrefix(
         {
           dev: web?.dev,
@@ -809,6 +811,13 @@ export const pluginReactRouter = (
       if (persistedSnapshotError) throw persistedSnapshotError;
       return manifestState.read() ?? persistedSnapshot;
     };
+    if (isBuild && modePlan.kind === 'classic') {
+      registerNodeOnlyManifestValidation({
+        api,
+        routeByFilePath,
+        getSnapshot: () => persistedSnapshot,
+      });
+    }
 
     let clientStats: ReactRouterManifestStats | undefined;
     api.onAfterEnvironmentCompile(({ stats, environment }) => {
