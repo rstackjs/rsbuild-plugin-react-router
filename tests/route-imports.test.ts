@@ -21,6 +21,29 @@ describe('queryless route imports', () => {
     ).toBe('/app/routes/target.tsx?react-router-route');
   });
 
+  it('rewrites a resolved alias to the same registered route', () => {
+    expect(
+      resolveQuerylessRouteImportRequest({
+        compilerName: 'web',
+        context: '/app/routes',
+        issuer: '/app/routes/source.tsx',
+        request: '@app/routes/target',
+        resolvedPath: '/app/routes/target.tsx',
+        routeByFilePath,
+      })
+    ).toBe('/app/routes/target.tsx?react-router-route');
+    expect(
+      resolveQuerylessRouteImportRequest({
+        compilerName: 'web',
+        context: '/app/routes',
+        issuer: '/app/routes/source.tsx',
+        request: '@app/routes/target?raw',
+        resolvedPath: '/app/routes/target.tsx',
+        routeByFilePath,
+      })
+    ).toBeUndefined();
+  });
+
   it('rewrites RSC client route module imports to shared client modules', () => {
     expect(
       resolveQuerylessRouteImportRequest({

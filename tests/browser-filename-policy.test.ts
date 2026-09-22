@@ -36,7 +36,7 @@ describe('browser output filenames', () => {
     expect(config.environments.node.output.filename.js).toBe('[name].js');
   });
 
-  it('uses the emitted browser manifest filename in development', async () => {
+  it('uses a versioned browser manifest filename in development', async () => {
     const manifest = await getReactRouterManifestForDev(
       {},
       {},
@@ -53,7 +53,7 @@ describe('browser output filenames', () => {
     );
 
     expect(manifest.url).toBe(
-      `https://cdn.example.test/build/bundles/virtual/react-router/browser-manifest-b2.js?v=${manifest.version}`
+      `https://cdn.example.test/build/bundles/manifest-${manifest.version}.js`
     );
   });
 

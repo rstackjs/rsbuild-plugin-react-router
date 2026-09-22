@@ -48,8 +48,7 @@ const getJavaScriptAsset = (
   return file;
 };
 
-const readBrowserManifest = (compilation: Rspack.Compilation) => {
-  const name = getJavaScriptAsset(compilation, BROWSER_MANIFEST_ENTRY_NAME);
+const readBrowserManifest = (compilation: Rspack.Compilation, name: string) => {
   const context: {
     window: { __reactRouterManifest?: ReactRouterManifestForDev };
   } = { window: {} };
@@ -82,7 +81,7 @@ const compileDevelopmentManifest = async (
   let activeStage: ProcessAssetsDescriptor['stage'] | undefined;
   let afterAdditions = 0;
   let afterHash = 0;
-  let early: ReturnType<typeof readBrowserManifest> | undefined;
+  let early: string | undefined;
 
   writeFileSync(
     join(root, 'entry.client.js'),
@@ -130,7 +129,11 @@ const compileDevelopmentManifest = async (
     plugins: [
       {
         apply(compiler: Rspack.Compiler) {
-          const api: Pick<RsbuildPluginAPI, 'processAssets'> = {
+          const api: Pick<
+            RsbuildPluginAPI,
+            'processAssets' | 'onBeforeCreateCompiler'
+          > = {
+            onBeforeCreateCompiler() {},
             processAssets(descriptor, handler) {
               const stage = stages.get(descriptor.stage);
               if (stage === undefined) {
@@ -192,7 +195,10 @@ const compileDevelopmentManifest = async (
                 },
                 () => {
                   afterAdditions = publications.length;
-                  early = readBrowserManifest(compilation);
+                  early = getJavaScriptAsset(
+                    compilation,
+                    BROWSER_MANIFEST_ENTRY_NAME
+                  );
                   if (changeRouteSource) {
                     writeFileSync(
                       pageFile,
@@ -259,7 +265,10 @@ const compileDevelopmentManifest = async (
       afterAdditions,
       afterHash,
       early,
-      emitted: readBrowserManifest(compilation),
+      emitted: readBrowserManifest(
+        compilation,
+        publications[0].manifest.url.slice(assetPrefix.length)
+      ),
       manifestStats: createReactRouterManifestStats(
         compilation,
         manifestChunkNames
@@ -311,13 +320,13 @@ describe('development manifests with content hashes', () => {
     expect(result.compiledPageSource).not.toContain('edited-action');
 
     const browser = result.emitted.manifest;
-    expect(browser.url).toBe(`${assetUrl(result.emitted.name)}?v=${browser.version}`);
+    expect(browser.url).toBe(assetUrl(result.emitted.name));
     expect(browser.entry.module).toBe(assetUrl(result.entryFile));
     expect(browser.entry.imports).toEqual([]);
     expect(browser.routes.root.module).toBe(assetUrl(result.rootFile));
     expect(browser.routes.page.module).toBe(assetUrl(result.pageFile));
     expect(browser.routes.page.imports).toEqual([]);
-    expect(result.assetNames.has(result.early.name)).toBe(false);
+    expect(result.assetNames.has(result.early)).toBe(false);
     for (const url of [
       browser.url,
       browser.entry.module,
@@ -328,7 +337,7 @@ describe('development manifests with content hashes', () => {
       ]),
     ]) {
       expect(url.startsWith(assetPrefix)).toBe(true);
-      expect(result.assetNames.has(url.slice(assetPrefix.length).replace(/\?v=.*$/, ''))).toBe(true);
+      expect(result.assetNames.has(url.slice(assetPrefix.length))).toBe(true);
     }
   });
 
@@ -342,8 +351,8 @@ describe('development manifests with content hashes', () => {
     ]);
     expect(result.publications[0].compilation).toBe(result.compilation);
     expect(result.publications[0].manifest).toEqual(result.emitted.manifest);
-    expect(result.emitted.name).toBe(result.early.name);
-    expect(result.emitted.manifest.url).toBe(`${assetUrl(result.emitted.name)}?v=${result.emitted.manifest.version}`);
+    expect(result.assetNames.has(result.early)).toBe(true);
+    expect(result.emitted.manifest.url).toBe(assetUrl(result.emitted.name));
     expect(result.emitted.manifest.entry.module).toBe(
       assetUrl(result.entryFile)
     );

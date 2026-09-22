@@ -582,12 +582,19 @@ describe('React Router development runtime controller', () => {
       path: '*',
     });
 
-    web.invalidate();
-    await expect
-      .poll(() => (server.sockWrite as any).mock.calls.length, {
-        timeout: 2000,
-      })
-      .toBe(2);
+    rstest.useFakeTimers();
+    try {
+      web.invalidate();
+      web.fail(new Error('deliberate compile failure'));
+      await rstest.advanceTimersByTimeAsync(1_001);
+      expect(
+        (server.sockWrite as any).mock.calls.filter(
+          ([event]: [string]) => event === 'full-reload'
+        )
+      ).toHaveLength(1);
+    } finally {
+      rstest.useRealTimers();
+    }
   });
 
   it('hard reloads when CSS ownership is restored after a removal', async () => {

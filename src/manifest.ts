@@ -2,13 +2,11 @@ import {
   createChunkAssetResolver,
   type ReactRouterManifestStats,
   stripAssetQuery,
-  getManifestAssetType,
 } from './manifest-assets.js';
 export {
   createReactRouterManifestStats,
   type ReactRouterManifestStats,
 } from './manifest-assets.js';
-import { BROWSER_MANIFEST_ENTRY_NAME } from './constants.js';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import * as Effect from 'effect/Effect';
@@ -330,16 +328,11 @@ const getManifestDirFromEntryAsset = (entryModulePath?: string): string => {
 
 export const getReactRouterManifestPath = ({
   version,
-  isBuild,
   entryModulePath,
 }: {
   version: string;
-  isBuild: boolean;
   entryModulePath?: string;
 }): string => {
-  if (!isBuild) {
-    return 'static/js/virtual/react-router/browser-manifest.js';
-  }
   const dir = getManifestDirFromEntryAsset(entryModulePath);
   return `${dir}/manifest-${version}.js`;
 };
@@ -547,26 +540,11 @@ function generateReactRouterManifestForDevEffect(
       .slice(0, 8);
     const manifestPath = getReactRouterManifestPath({
       version,
-      isBuild,
       entryModulePath: stripAssetQuery(entryJsAssets[0] ?? ''),
     });
-
-    const browserManifestPath =
-      clientStats?.assetsByChunkName?.[BROWSER_MANIFEST_ENTRY_NAME]?.find(
-        name =>
-          getManifestAssetType(name, clientStats.assetTypesByName) ===
-          'javascript'
-      ) ?? manifestPath;
-    // Report-stage serialization happens after hashing, so retain the version
-    // query even when the virtual manifest has a content-hashed filename.
     const manifest = {
       version,
-      url: combineURLs(
-        assetPrefix,
-        isBuild
-          ? manifestPath
-          : `${browserManifestPath}${browserManifestPath.includes('?') ? '&' : '?'}v=${version}`
-      ),
+      url: combineURLs(assetPrefix, manifestPath),
       hmr: undefined,
       entry: fingerprintedValues.entry,
       sri: undefined,

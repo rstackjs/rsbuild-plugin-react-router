@@ -63,9 +63,15 @@ type ProcessAssetsRegistration = {
 
 const createProcessAssetsHarness = () => {
   const registrations: ProcessAssetsRegistration[] = [];
+  let beforeCreateCompiler:
+    | ((context: { bundlerConfigs: Array<{ name?: string; output?: { clean?: boolean } }> }) => void)
+    | undefined;
 
   return {
     api: {
+      onBeforeCreateCompiler(handler: typeof beforeCreateCompiler) {
+        beforeCreateCompiler = handler;
+      },
       processAssets(
         processAssetsDescriptor: ProcessAssetsDescriptor,
         processAssetsHandler: ProcessAssetsHandler
@@ -79,6 +85,9 @@ const createProcessAssetsHarness = () => {
     getDescriptor: () => registrations[0]?.descriptor,
     getDescriptors: () =>
       registrations.map(registration => registration.descriptor),
+    beforeCreateCompiler(configs: Array<{ name?: string; output?: { clean?: boolean } }>) {
+      beforeCreateCompiler?.({ bundlerConfigs: configs });
+    },
     run(context: ProcessAssetsContext) {
       const registration = registrations[0];
       expect(registration).toBeDefined();
@@ -141,6 +150,14 @@ const createRoutesWithPage = () => ({
 const createBrowserManifestAssets = () => ({
   [BROWSER_MANIFEST_PATH]: createAsset(PLACEHOLDER_MANIFEST_SOURCE),
 });
+
+const getEmittedManifestSource = (assets: Record<string, Asset>) => {
+  const asset = Object.entries(assets).find(([name]) =>
+    /manifest-[a-f0-9]{8}\.js$/.test(name)
+  );
+  expect(asset).toBeDefined();
+  return asset![1].source();
+};
 
 describe('modify browser manifest plugin', () => {
   it('uses official integrity metadata from stats and compilation assets', () => {
@@ -243,7 +260,7 @@ describe('modify browser manifest plugin', () => {
     });
   });
 
-  it('registers browser manifest mutation with Rsbuild processAssets', async () => {
+  it('emits a versioned browser manifest with Rsbuild processAssets', async () => {
     const { root, appDir } = createTempApp();
     const harness = createProcessAssetsHarness();
     const assets = createBrowserManifestAssets();
@@ -269,13 +286,41 @@ describe('modify browser manifest plugin', () => {
       });
       await harness.run({ assets, compilation });
 
-      expect(assets[BROWSER_MANIFEST_PATH].source()).toContain('routes');
+      expect(getEmittedManifestSource(assets)).toContain('routes');
+      expect(assets[BROWSER_MANIFEST_PATH].source()).toBe(
+        PLACEHOLDER_MANIFEST_SOURCE
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('treats serialized browser manifest values as literal replacement text', async () => {
+  it('rejects per-rebuild cleanup of development browser manifests', () => {
+    const { root, appDir } = createTempApp();
+    const harness = createProcessAssetsHarness();
+    try {
+      registerModifyBrowserManifestAssets(
+        harness.api as never,
+        { root: rootRoute },
+        {},
+        appDir
+      );
+      expect(() =>
+        harness.beforeCreateCompiler([
+          { name: 'web', output: { clean: true } },
+        ])
+      ).toThrow('output.clean');
+      expect(() =>
+        harness.beforeCreateCompiler([
+          { name: 'web', output: { clean: false } },
+        ])
+      ).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('serializes special route IDs without changing the virtual entry', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rr-modify-manifest-'));
     const appDir = join(root, 'app');
     const routeFile = join(appDir, 'routes/dollar.tsx');
@@ -335,12 +380,12 @@ describe('modify browser manifest plugin', () => {
 
       await harness.run({ assets, compilation });
 
-      const source = assets[BROWSER_MANIFEST_PATH].source();
+      const source = getEmittedManifestSource(assets);
       for (const routeId of specialRouteIds) {
         expect(source).toContain(`'${routeId}'`);
       }
       expect(source).not.toContain('PLACEHOLDER');
-      expect(source.match(/window\.afterPlaceholder=true/g)).toHaveLength(1);
+      expect(assets[BROWSER_MANIFEST_PATH].source()).toContain(suffix);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -1,4 +1,4 @@
-import { BROWSER_MANIFEST_ENTRY_NAME } from './constants.js';
+import { BROWSER_MANIFEST_ENTRY_NAME, PLUGIN_NAME } from './constants.js';
 import { getManifestAssetType, stripAssetQuery } from './manifest-assets.js';
 import { createHash } from 'node:crypto';
 import type { Route, PluginOptions } from './types.js';
@@ -59,14 +59,15 @@ type ModifyBrowserManifestOptions = {
   ) => void;
 };
 
-type ProcessAssetsApi = Pick<RsbuildPluginAPI, 'processAssets'>;
+type ManifestAssetsApi = Pick<
+  RsbuildPluginAPI,
+  'processAssets' | 'onBeforeCreateCompiler'
+>;
 type AssetPrefixInput = string | (() => string);
 type ManifestProcessAssetsContext = Parameters<
   Parameters<RsbuildPluginAPI['processAssets']>[1]
 >[0];
 
-const BROWSER_MANIFEST_ASSET =
-  'static/js/virtual/react-router/browser-manifest.js';
 const ABSOLUTE_URL_RE = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 
 const toManifestAssetUrl = (assetPrefix: string, assetName: string) => {
@@ -147,7 +148,7 @@ export const collectSubresourceIntegrity = (
 };
 
 export function registerModifyBrowserManifestAssets(
-  api: ProcessAssetsApi,
+  api: ManifestAssetsApi,
   routes: Record<string, Route>,
   pluginOptions: PluginOptions,
   appDirectory: string,
@@ -167,6 +168,21 @@ export function registerModifyBrowserManifestAssets(
   );
   manifestChunkNames.add(BROWSER_MANIFEST_ENTRY_NAME);
   const isBuild = Boolean(routeChunkOptions?.isBuild);
+  if (!isBuild) {
+    api.onBeforeCreateCompiler(({ bundlerConfigs }) => {
+      for (const config of bundlerConfigs) {
+        if (
+          config.name === 'web' &&
+          config.output?.clean !== undefined &&
+          config.output.clean !== false
+        ) {
+          throw new Error(
+            `[${PLUGIN_NAME}] Development SSR requires previous browser manifests and assets to remain available. Leave the web Rspack output.clean unset or set it to false; use Rsbuild output.cleanDistPath for startup cleanup.`
+          );
+        }
+      }
+    });
+  }
   const finalizeSri = Boolean(
     isBuild &&
     (options?.subResourceIntegrity ??
@@ -174,10 +190,9 @@ export function registerModifyBrowserManifestAssets(
   );
 
   // Build the React Router manifest from the compilation's current asset names,
-  // emit the build-mode `manifest-<version>.js` asset (or replace the dev
-  // browser-manifest placeholder), and fire the `onManifest` callback.
+  // emit a versioned browser manifest, and fire the `onManifest` callback.
   const buildAndEmitManifest = async (
-    { assets, sources, compilation }: ManifestProcessAssetsContext,
+    { sources, compilation }: ManifestProcessAssetsContext,
     { withSri }: { withSri: boolean }
   ): Promise<void> => {
     if (compilation.errors?.length) return;
@@ -201,51 +216,25 @@ export function registerModifyBrowserManifestAssets(
     const browserManifest = { ...manifest };
     delete browserManifest.sri;
 
-    const browserManifestPaths = stats?.assetsByChunkName?.[
-      BROWSER_MANIFEST_ENTRY_NAME
-    ]?.filter(
-      name =>
-        getManifestAssetType(name, stats.assetTypesByName) === 'javascript'
-    ) ?? [BROWSER_MANIFEST_ASSET];
-    // Production consumes the separately emitted versioned manifest. Leave the
-    // placeholder chunk unchanged: its content hash has already been finalized.
-    for (const browserManifestPath of isBuild ? [] : browserManifestPaths) {
-      const browserManifestAsset = assets[browserManifestPath];
-      if (!browserManifestAsset) continue;
-      const originalSource = browserManifestAsset.source().toString();
-      const serializedManifest = jsesc(browserManifest, { es6: true });
-      const newSource = originalSource.replace(
-        /["'`]PLACEHOLDER["'`]/,
-        () => serializedManifest
-      );
-      compilation.updateAsset(
-        browserManifestPath,
-        new sources.RawSource(newSource)
-      );
-    }
-
-    if (isBuild) {
-      const entryAssets = stats?.assetsByChunkName?.['entry.client'];
-      const entryJsAssets =
-        entryAssets?.filter(
-          name =>
-            getManifestAssetType(name, stats?.assetTypesByName) === 'javascript'
-        ) || [];
-      const manifestPath = getReactRouterManifestPath({
-        version: manifest.version,
-        isBuild: true,
-        entryModulePath: stripAssetQuery(entryJsAssets[0] ?? ''),
-      });
-      const manifestSource = `window.__reactRouterManifest=${jsesc(
-        browserManifest,
-        { es6: true }
-      )};`;
-      const source = new sources.RawSource(manifestSource);
-      if (compilation.getAsset(manifestPath)) {
-        compilation.updateAsset(manifestPath, source);
-      } else {
-        compilation.emitAsset(manifestPath, source);
-      }
+    const entryAssets = stats?.assetsByChunkName?.['entry.client'];
+    const entryJsAssets =
+      entryAssets?.filter(
+        name =>
+          getManifestAssetType(name, stats?.assetTypesByName) === 'javascript'
+      ) || [];
+    const manifestPath = getReactRouterManifestPath({
+      version: manifest.version,
+      entryModulePath: stripAssetQuery(entryJsAssets[0] ?? ''),
+    });
+    const manifestSource = `window.__reactRouterManifest=${jsesc(
+      browserManifest,
+      { es6: true }
+    )};`;
+    const source = new sources.RawSource(manifestSource);
+    if (compilation.getAsset(manifestPath)) {
+      compilation.updateAsset(manifestPath, source);
+    } else {
+      compilation.emitAsset(manifestPath, source);
     }
 
     // Rspack's SRI stats are finalized by a later report-stage hook. Hash the

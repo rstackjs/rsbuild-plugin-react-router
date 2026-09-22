@@ -328,6 +328,44 @@ describe('React Router development runtime', () => {
     });
   });
 
+  it('evaluates a paired node rebuild even when node started before web finished', async () => {
+    let build = createBuild('old-loader');
+    const { loadBundle, runtime } = createHarness(() => build);
+    const firstWeb = createCompilation('web');
+    const firstNode = createCompilation('node');
+    runtime.beginAttempt();
+    captureWeb(runtime, firstWeb, 'with-css', {
+      routes: { 'routes/about': ['/assets/about.css'] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(firstWeb, firstNode),
+      noKnownChanges,
+      graphIdentity(firstWeb, firstNode)
+    );
+
+    build = createBuild('new-loader');
+    const nextWeb = createCompilation('web');
+    const nextNode = createCompilation('node');
+    runtime.beginAttempt();
+    captureWeb(runtime, nextWeb, 'without-css', {
+      routes: { 'routes/about': [] },
+    });
+    await runtime.finishAttempt(
+      createGraphStats(nextWeb, nextNode),
+      {
+        web: { known: true, files: new Set(['/app/routes/about.tsx']) },
+        node: { known: true, files: new Set(['/app/routes/about.tsx']) },
+      },
+      { ...graphIdentity(nextWeb, nextNode, firstWeb), attempt: Symbol() }
+    );
+
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(runtime.load()).resolves.toMatchObject({
+      marker: 'new-loader',
+      assets: { version: 'without-css' },
+    });
+  });
+
   it('publishes re-added css when route imports change with css ownership', async () => {
     const onCssAssetOwnershipChanged = rstest.fn();
     const { loadBundle, runtime, warnings } = createHarness(

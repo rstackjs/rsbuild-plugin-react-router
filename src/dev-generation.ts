@@ -537,7 +537,8 @@ export const createReactRouterDevRuntime = ({
       const reusePreviousNodeBuild =
         !!previous &&
         cssOnlyWebManifestChange &&
-        (!nodeChanged || identity.nodeWeb !== webIdentity);
+        (!nodeChanged ||
+          (!identity.attempt && identity.nodeWeb !== webIdentity));
 
       if (
         nodeChanged &&

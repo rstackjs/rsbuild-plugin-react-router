@@ -17,12 +17,22 @@ const CLASSIC_CLIENT_ROUTE_MODULE_QUERY = '?react-router-route';
 const isRscClientRouteModuleIssuer = (issuer: string): boolean =>
   issuer.includes(RSC_CLIENT_ROUTE_MODULE_QUERY_PREFIX);
 
+const isEligibleRouteIssuer = (
+  issuer: string,
+  compilerName: string | undefined,
+  rsc: boolean,
+  routeByFilePath: ReadonlyMap<string, Route>
+): boolean =>
+  routeByFilePath.has(issuer.split('?')[0]) &&
+  (rsc || compilerName === 'web' || isRscClientRouteModuleIssuer(issuer));
+
 export const resolveQuerylessRouteImportRequest = ({
   compilerName,
   context,
   issuer,
   rsc = false,
   request,
+  resolvedPath,
   routeByFilePath,
 }: {
   compilerName?: string;
@@ -30,6 +40,7 @@ export const resolveQuerylessRouteImportRequest = ({
   issuer?: string;
   rsc?: boolean;
   request?: string;
+  resolvedPath?: string;
   routeByFilePath: ReadonlyMap<string, Route>;
 }): string | undefined => {
   if (
@@ -37,23 +48,15 @@ export const resolveQuerylessRouteImportRequest = ({
     typeof context !== 'string' ||
     typeof issuer !== 'string' ||
     request.includes('?') ||
-    (!request.startsWith('.') && !request.startsWith('/'))
+    (!resolvedPath && !request.startsWith('.') && !request.startsWith('/')) ||
+    !isEligibleRouteIssuer(issuer, compilerName, rsc, routeByFilePath)
   ) {
-    return;
-  }
-
-  const issuerPath = issuer.split('?')[0];
-  if (!routeByFilePath.has(issuerPath)) {
     return;
   }
 
   const isRscClientIssuer = isRscClientRouteModuleIssuer(issuer);
   const isWebCompiler = compilerName === 'web';
-  if (!rsc && !isWebCompiler && !isRscClientIssuer) {
-    return;
-  }
-
-  const candidate = resolve(context, request);
+  const candidate = resolvedPath ?? resolve(context, request);
   const routeFilePath = routeByFilePath.has(candidate)
     ? candidate
     : JS_EXTENSIONS.map(extension => `${candidate}${extension}`).find(
@@ -82,18 +85,54 @@ export const createQuerylessRouteImportPlugin = (
   name: `${PLUGIN_NAME}:queryless-route-imports`,
   apply(compiler: Rspack.Compiler) {
     compiler.hooks.normalModuleFactory.tap(PLUGIN_NAME, factory => {
-      factory.hooks.beforeResolve.tap(PLUGIN_NAME, data => {
-        const resolvedRequest = resolveQuerylessRouteImportRequest({
+      factory.hooks.beforeResolve.tapAsync(PLUGIN_NAME, (data, done) => {
+        const input = {
           compilerName: compiler.options?.name,
           context: data?.context ?? data?.contextInfo?.issuer,
           issuer: data?.contextInfo?.issuer,
           rsc: options.rsc,
           request: data?.request,
           routeByFilePath,
-        });
+        };
+        const resolvedRequest = resolveQuerylessRouteImportRequest(input);
         if (resolvedRequest) {
           data.request = resolvedRequest;
+          done();
+          return;
         }
+
+        if (
+          typeof input.request !== 'string' ||
+          typeof input.context !== 'string' ||
+          typeof input.issuer !== 'string' ||
+          input.request.includes('?') ||
+          input.request.startsWith('.') ||
+          input.request.startsWith('/') ||
+          !isEligibleRouteIssuer(
+            input.issuer,
+            input.compilerName,
+            Boolean(input.rsc),
+            routeByFilePath
+          )
+        ) {
+          done();
+          return;
+        }
+
+        factory
+          .getResolver('normal', {})
+          .resolve({}, input.context, input.request, {}, (error, resolved) => {
+            if (!error && typeof resolved === 'string') {
+              const routeRequest = resolveQuerylessRouteImportRequest({
+                ...input,
+                resolvedPath: resolved,
+              });
+              if (routeRequest) {
+                data.request = routeRequest;
+              }
+            }
+            done();
+          });
       });
     });
   },
