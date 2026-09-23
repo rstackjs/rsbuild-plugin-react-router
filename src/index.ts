@@ -13,7 +13,11 @@ import { rspack, type RsbuildPlugin, type Rspack } from '@rsbuild/core';
 import { relative, resolve } from 'pathe';
 
 import { getDefaultConcurrency } from './concurrency.js';
-import { JS_EXTENSIONS, PLUGIN_NAME } from './constants.js';
+import {
+  BUILD_CLIENT_ROUTE_QUERY_STRING,
+  JS_EXTENSIONS,
+  PLUGIN_NAME,
+} from './constants.js';
 import { guardReactRouterLazyCompilation } from './lazy-compilation.js';
 import {
   findEntryFile,
@@ -435,7 +439,8 @@ export const pluginReactRouter = (
     if (isRscMode) {
       assertReactRouterRscSupport({
         pluginName: PLUGIN_NAME,
-        resolvePackagePath: resolveAppPackagePath,
+        resolvePackagePath: specifier =>
+          resolveAppPackagePath(specifier, rootDirectory),
       });
       assertReactRouterRscConfigSupport({
         pluginName: PLUGIN_NAME,
@@ -522,10 +527,13 @@ export const pluginReactRouter = (
       string,
       RouteModuleAnalysis
     >();
+    const routeClientModules = new Map<string, Rspack.Module>();
     const rememberRouteModuleAnalysis = (
       resourcePath: string,
       analysis: RouteModuleAnalysis
     ) => {
+      const module = routeClientModules.get(resourcePath);
+      if (module) module.buildInfo.reactRouterRouteAnalysis = analysis;
       transformedRouteModuleAnalyses.set(resolve(resourcePath), analysis);
       const route = routeByFilePath.get(resolve(resourcePath));
       if (route) {
@@ -1234,6 +1242,39 @@ export const pluginReactRouter = (
         performanceProfiler,
       });
     } else {
+      // Loader side effects do not run on persistent-cache hits. Keep compiled
+      // route facts in Rspack's cached module metadata, then restore the exact
+      // compilation's facts before manifest generation (and concatenation).
+      api.onAfterCreateCompiler(({ compiler }) => {
+        const compilers =
+          'compilers' in compiler ? compiler.compilers : [compiler];
+        for (const child of compilers) {
+          if (child.options.name !== 'web') continue;
+          child.hooks.thisCompilation.tap(PLUGIN_NAME, compilation => {
+            routeClientModules.clear();
+            rspack.NormalModule.getCompilationHooks(compilation).loader.tap(
+              PLUGIN_NAME,
+              (loader, module) => {
+                if (loader.resourceQuery === BUILD_CLIENT_ROUTE_QUERY_STRING) {
+                  routeClientModules.set(loader.resourcePath, module);
+                }
+              }
+            );
+            compilation.hooks.finishModules.tap(PLUGIN_NAME, modules => {
+              transformedRouteModuleAnalyses.clear();
+              for (const module of modules) {
+                const analysis = module.buildInfo.reactRouterRouteAnalysis as
+                  | RouteModuleAnalysis
+                  | undefined;
+                const resource = (module as Rspack.NormalModule).resource;
+                if (analysis && resource) {
+                  rememberRouteModuleAnalysis(resource.split('?')[0], analysis);
+                }
+              }
+            });
+          });
+        }
+      });
       registerModifyBrowserManifestAssets(
         api,
         routes,

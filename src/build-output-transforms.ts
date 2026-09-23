@@ -140,7 +140,10 @@ export const registerBuildOutputTransforms = ({
   const rememberRouteModuleAnalysis = (
     args: Parameters<TransformHandler>[0]
   ): void => {
-    if (!routeByFilePath.has(args.resourcePath)) {
+    if (
+      args.environment.name !== 'web' ||
+      !routeByFilePath.has(args.resourcePath)
+    ) {
       return;
     }
     onRouteModuleAnalysis?.(

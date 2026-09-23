@@ -100,6 +100,22 @@ describe('pluginReactRouter', () => {
     });
   });
 
+  it('checks RSC support in the target project rather than the caller project', async () => {
+    const directory = fs.mkdtempSync(join(tmpdir(), 'rr-rsc-project-version-'));
+    try {
+      const packageDirectory = join(directory, 'node_modules/react-router');
+      fs.mkdirSync(packageDirectory, { recursive: true });
+      fs.writeFileSync(join(packageDirectory, 'package.json'), JSON.stringify({name: 'react-router', version: '7.0.0'}));
+      const rsbuild = await createStubRsbuild({ rsbuildConfig: {} });
+      rsbuild.context.rootPath = directory;
+      rsbuild.addPlugins([pluginReactRouterRSC({typegen: false})]);
+
+      await expect(rsbuild.unwrapConfig()).rejects.toThrow('requires react-router >=7.18.0 or >=8.0.0');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('preserves an explicit writeToDisk override', async () => {
     const rsbuild = await createStubRsbuild({
       rsbuildConfig: {
@@ -138,7 +154,6 @@ describe('pluginReactRouter', () => {
     ).toBeUndefined();
     expect(buildRsbuild.onBeforeDevCompile).not.toHaveBeenCalled();
     expect(buildRsbuild.onAfterDevCompile).not.toHaveBeenCalled();
-    expect(buildRsbuild.onAfterCreateCompiler).not.toHaveBeenCalled();
   });
 
   it('should restart the dev server when route entries are added', async () => {

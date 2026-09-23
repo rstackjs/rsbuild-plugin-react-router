@@ -1,4 +1,5 @@
 import type { RouteConfigEntry } from '@react-router/dev/routes';
+import { createRouteId } from './plugin-utils.js';
 
 type ValidationResult =
   | { valid: true; routeConfig: RouteConfigEntry[] }
@@ -28,7 +29,13 @@ const validateEntry = (
   if (typeof entry.file !== 'string') {
     issues.push(`${path}.file\nInvalid type: Expected string.`);
   }
-  if ('id' in entry && entry.id === 'root') {
+  if ('id' in entry && entry.id !== undefined && typeof entry.id !== 'string') {
+    issues.push(`${path}.id\nInvalid type: Expected string.`);
+  }
+  const id =
+    entry.id ||
+    (typeof entry.file === 'string' ? createRouteId(entry.file) : undefined);
+  if (id === 'root') {
     issues.push(`${path}.id\nA route cannot use the reserved id 'root'.`);
   }
   if (
