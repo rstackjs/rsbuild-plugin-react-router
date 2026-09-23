@@ -592,6 +592,60 @@ describe('React Router development runtime controller', () => {
     expect(loadBundle).toHaveBeenCalledOnce();
   });
 
+  it.each([true, false])(
+    'retains Web edit provenance only for known-empty retries (%s)',
+    async known => {
+      const { callbacks, controller, loadBundle, server } = createHarness();
+      loadBundle.mockImplementation(() => createBuild('base'));
+      const web = createCompiler('web');
+      const node = createCompiler('node');
+      await callbacks.start({ server });
+      callbacks.created({
+        compiler: { compilers: [web.compiler, node.compiler] },
+      });
+      const baseWeb = web.compile();
+      controller.captureWeb(baseWeb, createManifestSet('base'));
+      web.complete(baseWeb);
+      const baseNode = node.compile();
+      await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+      web.invalidate();
+      web.setChanges(['/app/client-only.ts']);
+      const editedWeb = web.compile();
+      controller.captureWeb(editedWeb, createManifestSet('edited'));
+      web.complete(editedWeb);
+      await callbacks.aggregate({ stats: createGraphStats(editedWeb, baseNode) });
+      await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+        assets: { version: 'base' },
+      });
+
+      web.invalidate();
+      web.compiler.modifiedFiles = known ? new Set() : undefined;
+      const retryWeb = web.compile();
+      controller.captureWeb(retryWeb, createManifestSet('latest'));
+      web.complete(retryWeb);
+      await callbacks.after({ stats: createGraphStats(retryWeb, baseNode) });
+      web.settle(editedWeb);
+      const expectedVersion = known ? 'latest' : 'base';
+      await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+        assets: { version: expectedVersion },
+      });
+
+      web.invalidate();
+      web.setChanges([]);
+      const unrelatedEmptyRetry = web.compile();
+      controller.captureWeb(unrelatedEmptyRetry, createManifestSet('unrelated'));
+      web.complete(unrelatedEmptyRetry);
+      await callbacks.after({
+        stats: createGraphStats(unrelatedEmptyRetry, baseNode),
+      });
+      await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+        assets: { version: expectedVersion },
+      });
+      expect(loadBundle).toHaveBeenCalledOnce();
+    }
+  );
+
   it('hard reloads when a safe web-only compile removes CSS assets', async () => {
     const { callbacks, controller, loadBundle, server } = createHarness();
     loadBundle.mockImplementation(() => createBuild('base'));

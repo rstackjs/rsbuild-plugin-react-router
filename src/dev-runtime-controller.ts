@@ -106,7 +106,8 @@ export const createReactRouterDevRuntimeController = ({
     hdrChannels.delete(binding);
     const pair = binding.compilers;
     if (pair) {
-      pendingNodeChanges.delete(pair);
+      pendingChangesByCompiler.delete(pair.web);
+      pendingChangesByCompiler.delete(pair.node);
       resetDevCompilerPair(pair);
     }
     binding.compilers = undefined;
@@ -125,11 +126,27 @@ export const createReactRouterDevRuntimeController = ({
   >();
 
   // A retry may report no files even though an earlier uncommitted build had edits.
-  const pendingNodeChanges = new WeakMap<DevCompilerPair, DevChangedFiles>();
-  const nodeChangesByCompilation = new WeakMap<
+  const pendingChangesByCompiler = new WeakMap<
+    Rspack.Compiler,
+    DevChangedFiles
+  >();
+  const changesByCompilation = new WeakMap<
     Rspack.Compilation,
     DevChangedFiles
   >();
+  const captureCompilationChanges = (
+    compilation: Rspack.Compilation
+  ): DevChangedFiles => {
+    const changes = snapshotDevChangedFiles(compilation.compiler);
+    const pendingChanges = pendingChangesByCompiler.get(compilation.compiler);
+    const accumulatedChanges = {
+      known: changes.known && (pendingChanges?.known ?? true),
+      files: new Set([...(pendingChanges?.files ?? []), ...changes.files]),
+    };
+    pendingChangesByCompiler.set(compilation.compiler, accumulatedChanges);
+    changesByCompilation.set(compilation, accumulatedChanges);
+    return changes;
+  };
 
   const finishRuntimeAttempt = async (
     binding: RuntimeBinding,
@@ -151,18 +168,24 @@ export const createReactRouterDevRuntimeController = ({
         pair.node.watching?.invalidate();
         return;
       }
+      if (result === 'committed') {
+        for (const side of ['web', 'node'] as const) {
+          const compilation = getEnvironmentStats(stats, side)?.compilation;
+          if (
+            compilation &&
+            pendingChangesByCompiler.get(compilation.compiler) ===
+              changesByCompilation.get(compilation)
+          ) {
+            pendingChangesByCompiler.delete(compilation.compiler);
+          }
+        }
+      }
       const nodeCompilation = getEnvironmentStats(stats, 'node')?.compilation;
       if (
         result === 'committed' &&
         nodeCompilation &&
         identity.node === binding.runtime.getCommittedNodeIdentity()
       ) {
-        if (
-          pendingNodeChanges.get(pair) ===
-          nodeChangesByCompilation.get(nodeCompilation)
-        ) {
-          pendingNodeChanges.delete(pair);
-        }
         hdrIntentsByPair.get(pair)?.signalCommitted(nodeCompilation, () => {
           hdrChannels.get(binding)?.publish();
         });
@@ -392,6 +415,7 @@ export const createReactRouterDevRuntimeController = ({
       `${PLUGIN_NAME}:dev-web-compilation`,
       compilation => {
         if (sessions.getActiveBinding()?.id === sessionId) {
+          captureCompilationChanges(compilation);
           if (pair.currentAttemptIdentity) {
             compilationIdentities.setAttemptIdentityForCompilation(
               compilation,
@@ -411,14 +435,7 @@ export const createReactRouterDevRuntimeController = ({
         if (sessions.getActiveBinding()?.id !== sessionId) {
           return;
         }
-        const changes = snapshotDevChangedFiles(pair.node);
-        const pendingChanges = pendingNodeChanges.get(pair);
-        const accumulatedChanges = {
-          known: changes.known && (pendingChanges?.known ?? true),
-          files: new Set([...(pendingChanges?.files ?? []), ...changes.files]),
-        };
-        pendingNodeChanges.set(pair, accumulatedChanges);
-        nodeChangesByCompilation.set(compilation, accumulatedChanges);
+        const changes = captureCompilationChanges(compilation);
         hdrIntents.capture(
           compilation,
           changes.known &&
@@ -494,9 +511,11 @@ export const createReactRouterDevRuntimeController = ({
       return;
     }
     const changes = {
-      web: snapshotDevChangedFiles(pair.web),
+      web:
+        (webStats && changesByCompilation.get(webStats.compilation)) ??
+        snapshotDevChangedFiles(pair.web),
       node:
-        (nodeStats && nodeChangesByCompilation.get(nodeStats.compilation)) ??
+        (nodeStats && changesByCompilation.get(nodeStats.compilation)) ??
         snapshotDevChangedFiles(pair.node),
     };
     const webAttempt = webStats
