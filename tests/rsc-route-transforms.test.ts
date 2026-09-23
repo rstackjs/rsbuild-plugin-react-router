@@ -1,7 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
 import { transformRscRouteModule } from '../src/rsc-route-transforms';
 import type { RouteChunkConfig } from '../src/route-chunks';
-import type { Route } from '../src/types';
 
 const routeChunkConfig: RouteChunkConfig = {
   splitRouteModules: false,
@@ -12,10 +11,6 @@ const enforceRouteChunkConfig: RouteChunkConfig = {
   ...routeChunkConfig,
   splitRouteModules: 'enforce',
 };
-const routeByFilePath = new Map<string, Route>([
-  ['/app/routes/client.tsx', { id: 'routes/client', file: 'routes/client.tsx' }],
-  ['/app/routes/target.tsx', { id: 'routes/target', file: 'routes/target.tsx' }],
-]);
 
 type TransformOverrides = Partial<Parameters<typeof transformRscRouteModule>[0]> &
   Pick<Parameters<typeof transformRscRouteModule>[0], 'code' | 'resourcePath' | 'routeId'>;
@@ -406,7 +401,7 @@ describe('RSC route transforms', () => {
     expect(result.code).toContain('export default function Route()');
   });
 
-  it('rewrites RSC client route module imports to shared client modules', async () => {
+  it('preserves RSC client route imports for native bundler resolution', async () => {
     const result = await transform({
       code: `
         import { customExport } from "./target";
@@ -419,14 +414,11 @@ describe('RSC route transforms', () => {
       resourcePath: '/app/routes/client.tsx',
       resourceQuery: '?client-route-module=default',
       routeId: 'routes/client',
-      routeByFilePath,
       isServerEnvironment: true,
     });
 
-    expect(result.code).toContain(
-      'from \"/app/routes/target.tsx?client-route-module=shared\"'
-    );
-    expect(result.code).not.toContain('from \"./target\"');
+    expect(result.code).toContain('from \"./target\"');
+    expect(result.code).not.toContain('/app/routes/target.tsx');
   });
 
   it('targets server route modules from the server route module query', async () => {

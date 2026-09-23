@@ -469,8 +469,7 @@ const expectFirstCommittedGeneration = async (
   expect(
     harness.hasDiskOutput('build/server/static/js/react-router-server-build.js')
   ).toBe(false);
-  const browserManifestAsset =
-    'static/js/virtual/react-router/browser-manifest.js';
+  const browserManifestAsset = build.assets.url.replace(/^\//, '');
   expect(harness.hasEmittedWebAsset(browserManifestAsset)).toBe(true);
   expect(
     harness.hasDiskOutput(`build/client/${browserManifestAsset}`)

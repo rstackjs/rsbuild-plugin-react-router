@@ -1,6 +1,7 @@
+import { join } from "node:path";
 import { expect } from "@playwright/test";
 
-import { test } from "../helpers/rsbuild";
+import { test, grep } from "../helpers/rsbuild";
 import { js, validateRSCHtml } from "./utils";
 
 test.describe("RSC Framework", () => {
@@ -49,4 +50,43 @@ test.describe("RSC Framework", () => {
     );
     validateRSCHtml(await page.content());
   });
+});
+
+test('RSC route imports preserve native resolution and prune server exports', async ({
+  page,
+  rsbuildPreview,
+}) => {
+  const { port, cwd } = await rsbuildPreview(
+    async () => ({
+      'app/routes/_index.tsx': js`
+      import { customExport as relativeMeta } from "./target";
+      import { customExport as aliasMeta } from "@route";
+      export function clientLoader() { return { title: aliasMeta()[0].title }; }
+      export default function Index() {
+        return <h1>{relativeMeta()[0].title} {aliasMeta()[0].title}</h1>;
+      }
+    `,
+      'app/routes/target.tsx': js`
+      import { readSecret } from "../secret.server";
+      export function loader() { return readSecret(); }
+      export function customExport() { return [{ title: "Shared metadata" }]; }
+      export default function Target() { return <h1>Target</h1>; }
+    `,
+      'app/secret.server.ts': js`
+      export function readSecret() { return "SERVER_ONLY_SENTINEL"; }
+    `,
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@route': ['./app/routes/target.tsx'] },
+        },
+      }),
+    }),
+    'rsc-framework'
+  );
+  expect(grep(join(cwd, "build/client"), /SERVER_ONLY_SENTINEL/)).toHaveLength(0);
+  await page.goto(`http://localhost:${port}/`);
+  await expect(page.getByRole('heading')).toHaveText(
+    'Shared metadata Shared metadata'
+  );
 });

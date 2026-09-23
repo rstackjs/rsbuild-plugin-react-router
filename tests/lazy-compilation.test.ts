@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@rstest/core';
+import { DEV_HMR_RUNTIME_MODULE_ID } from '../src/dev-hmr';
 import { guardReactRouterLazyCompilation } from '../src/lazy-compilation';
 
 type LazyCompilationTestModule = {
@@ -135,7 +136,7 @@ describe('guardReactRouterLazyCompilation', () => {
 
     expect(
       test({
-        request: 'virtual/react-router/browser-manifest',
+        request: DEV_HMR_RUNTIME_MODULE_ID,
       })
     ).toBe(false);
     expect(
@@ -162,7 +163,7 @@ describe('guardReactRouterLazyCompilation', () => {
 
     expect(
       test({
-        request: 'virtual/react-router/browser-manifest',
+        request: DEV_HMR_RUNTIME_MODULE_ID,
       })
     ).toBe(false);
     expect(

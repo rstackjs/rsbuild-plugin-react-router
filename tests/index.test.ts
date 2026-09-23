@@ -11,6 +11,7 @@ import {
   pluginReactRouterRSC,
   shouldParallelizeEnvironmentBuilds,
 } from '../src';
+import { DEV_HMR_RUNTIME_MODULE_ID } from '../src/dev-hmr';
 import { getVirtualModuleFilePath } from '../src/virtual-modules';
 
 type ReactRouterTestGlobal = typeof globalThis & {
@@ -591,7 +592,7 @@ describe('pluginReactRouter', () => {
       await rsbuild.unwrapConfig();
 
       const beforeStartDevServer =
-        rsbuild.onBeforeStartDevServer.mock.calls[0][0];
+        rsbuild.onBeforeStartDevServer.mock.calls[1][0];
       const afterRscEnvironmentCompile =
         rsbuild.onAfterEnvironmentCompile.mock.calls[1][0];
       beforeStartDevServer({ server: { sockWrite } });
@@ -633,7 +634,7 @@ describe('pluginReactRouter', () => {
       await rsbuild.unwrapConfig();
 
       const beforeStartDevServer =
-        rsbuild.onBeforeStartDevServer.mock.calls[0][0];
+        rsbuild.onBeforeStartDevServer.mock.calls[1][0];
       const afterRscEnvironmentCompile =
         rsbuild.onAfterEnvironmentCompile.mock.calls[1][0];
       beforeStartDevServer({ server: { sockWrite } });
@@ -923,7 +924,7 @@ describe('pluginReactRouter', () => {
     ).toBe(true);
     expect(
       test({
-        resource: 'virtual/react-router/browser-manifest',
+        resource: DEV_HMR_RUNTIME_MODULE_ID,
       })
     ).toBe(false);
   });
@@ -1026,10 +1027,9 @@ describe('pluginReactRouter', () => {
       import: expect.stringMatching(/entry\.client/),
       html: false,
     });
-    expect(webEntries['virtual/react-router/browser-manifest']).toEqual({
-      import: 'virtual/react-router/browser-manifest',
-      html: false,
-    });
+    expect(Object.keys(webEntries)).not.toContain(
+      'virtual/react-router/browser-manifest'
+    );
     expect(webEntries['routes/index']).toMatchObject({
       html: false,
     });

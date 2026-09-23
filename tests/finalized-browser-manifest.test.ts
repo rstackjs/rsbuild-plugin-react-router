@@ -11,7 +11,6 @@ import {
   type Rspack,
 } from '@rsbuild/core';
 import { describe, expect, it } from '@rstest/core';
-import { BROWSER_MANIFEST_ENTRY_NAME } from '../src/constants';
 import { getRouteModuleAnalysis } from '../src/export-utils';
 import {
   createReactRouterManifestStats,
@@ -61,13 +60,11 @@ const readEmittedManifest = (compilation: Rspack.Compilation) => {
   };
 };
 
-type EmittedManifest = ReturnType<typeof readEmittedManifest>;
 type CompilationObservation = {
   before: number;
   afterAdditions?: number;
   afterHash?: number;
-  hashedManifestSource?: string;
-  early?: EmittedManifest;
+  hashedEntrySource?: string;
 };
 
 const getJavaScriptAsset = (
@@ -122,7 +119,6 @@ const compileManifests = async (
     page: { id: 'page', parentId: 'root', file: 'page.js', path: 'page' },
   };
   const manifestChunkNames = getReactRouterManifestChunkNames(routes, root, true);
-  manifestChunkNames.add(BROWSER_MANIFEST_ENTRY_NAME);
   const publications: ManifestPublication[] = [];
   const observations = new WeakMap<
     Rspack.Compilation,
@@ -134,10 +130,6 @@ const compileManifests = async (
   writeFileSync(
     join(root, 'root.js'),
     `export default function Root() { return 'root'; }`
-  );
-  writeFileSync(
-    join(root, 'browser-manifest.js'),
-    `window.__reactRouterManifest = "PLACEHOLDER";`
   );
   writeFileSync(
     join(root, 'page-client-loader.js'),
@@ -153,7 +145,6 @@ const compileManifests = async (
       root: './root.js',
       page: './page.js',
       [clientLoaderEntryName]: './page-client-loader.js',
-      [BROWSER_MANIFEST_ENTRY_NAME]: './browser-manifest.js',
     },
     output: {
       path: join(root, 'dist'),
@@ -285,11 +276,8 @@ const compileManifests = async (
                 },
                 () => {
                   observation.afterHash = publications.length;
-                  const name = getJavaScriptAsset(
-                    compilation,
-                    BROWSER_MANIFEST_ENTRY_NAME
-                  );
-                  observation.hashedManifestSource = compilation
+                  const name = getJavaScriptAsset(compilation, 'entry.client');
+                  observation.hashedEntrySource = compilation
                     .getAsset(name)!.source.source().toString();
                 }
               );
@@ -332,6 +320,9 @@ const compileManifests = async (
       results.push({
         compilation,
         observation,
+        finalEntrySource: compilation
+          .getAsset(getJavaScriptAsset(compilation, 'entry.client'))!
+          .source.source().toString(),
 
         emitted: readEmittedManifest(compilation),
         publications: publications.filter(
@@ -401,13 +392,9 @@ describe('finalized production browser manifests', () => {
         const publication = result.publications[0];
         expect(publication.stage).toBe('report');
         expect(publication.manifestStats).toEqual(result.manifestStats);
-        const placeholderName = getJavaScriptAsset(
-          result.compilation,
-          BROWSER_MANIFEST_ENTRY_NAME
+        expect(result.finalEntrySource).toBe(
+          result.observation.hashedEntrySource
         );
-        expect(
-          result.compilation.getAsset(placeholderName)!.source.source().toString()
-        ).toBe(result.observation.hashedManifestSource);
 
         const browser = result.emitted.manifest;
         expect(browser.entry.module).toBe(assetUrl(result.entryFile));

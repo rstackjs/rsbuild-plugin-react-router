@@ -195,7 +195,8 @@ export const registerBuildOutputTransforms = ({
 
   api.transform(
     {
-      test: /virtual\/react-router\/((browser|server)-manifest|server-build)/,
+      test: /virtual\/react-router\/(server-manifest|server-build)/,
+      environments: ['node'],
     },
     async args =>
       performanceProfiler.record(
@@ -203,12 +204,6 @@ export const registerBuildOutputTransforms = ({
         'manifest:transform',
         args.resource,
         async () => {
-          if (args.environment.name === 'web') {
-            return {
-              code: `window.__reactRouterManifest = "PLACEHOLDER";`,
-            };
-          }
-
           // Cache identity for a module whose source never changes (#136);
           // see `serverManifestStampPath` in index.ts.
           if (existsSync(serverManifestStampPath)) {
@@ -350,6 +345,11 @@ export const registerBuildOutputTransforms = ({
         order: 'post',
       },
       async args => {
+        // Route-to-route imports receive this query after native resolution,
+        // once Rspack has already selected this queryless transform.
+        if (args.resourceQuery === '?react-router-route') {
+          return transformRouteModule(args);
+        }
         return performanceProfiler.record(
           args.environment?.name,
           'route:split-exports',

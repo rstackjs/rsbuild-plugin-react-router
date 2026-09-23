@@ -302,10 +302,6 @@ const createClassicModePlan = async ({
       // `html: false` prevents rsbuild from emitting a stray entry.client.html
       // into build/client; React Router renders HTML itself.
       'entry.client': { import: finalEntryClientPath, html: false },
-      'virtual/react-router/browser-manifest': {
-        import: 'virtual/react-router/browser-manifest',
-        html: false,
-      },
       ...webRouteEntries,
     },
     nodeEntries: createReactRouterNodeEntries({

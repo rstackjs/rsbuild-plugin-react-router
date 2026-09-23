@@ -266,7 +266,7 @@ describe('React Router development runtime', () => {
     });
   });
 
-  it('publishes css-only web manifest changes when a node result comes from an older web cycle', async () => {
+  it('retries changed node output from an older web cycle before restoring CSS', async () => {
     const onCssAssetOwnershipChanged = rstest.fn();
     const { loadBundle, runtime, warnings } = createHarness(
       () => createBuild('build'),
@@ -314,15 +314,32 @@ describe('React Router development runtime', () => {
     captureWeb(runtime, readdedCssWeb, 'readded-css', {
       routes: { 'routes/about': ['/assets/about.css'] },
     });
-    await runtime.finishAttempt(
-      createGraphStats(readdedCssWeb, staleNode),
-      cssOnlyChange,
-      graphIdentity(readdedCssWeb, staleNode, removedCssWeb)
-    );
+    await expect(
+      runtime.finishAttempt(
+        createGraphStats(readdedCssWeb, staleNode),
+        cssOnlyChange,
+        graphIdentity(readdedCssWeb, staleNode, removedCssWeb)
+      )
+    ).resolves.toBe('retry-node');
 
-    expect(onCssAssetOwnershipChanged).toHaveBeenCalledTimes(2);
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
     expect(loadBundle).toHaveBeenCalledOnce();
-    expect(warnings).toEqual([]);
+    await expect(runtime.load()).resolves.toMatchObject({
+      assets: { version: 'without-css' },
+    });
+
+    const retriedNode = createCompilation('node');
+    runtime.beginAttempt();
+    await expect(
+      runtime.finishAttempt(
+        createGraphStats(readdedCssWeb, retriedNode),
+        noKnownChanges,
+        graphIdentity(readdedCssWeb, retriedNode)
+      )
+    ).resolves.toBe('committed');
+    expect(onCssAssetOwnershipChanged).toHaveBeenCalledTimes(2);
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    expect(warnings).toHaveLength(1);
     await expect(runtime.load()).resolves.toMatchObject({
       assets: { version: 'readded-css' },
     });
@@ -403,16 +420,15 @@ describe('React Router development runtime', () => {
     expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
 
     const readdedCssWeb = createCompilation('web');
-    const staleNode = createCompilation('node');
     runtime.beginAttempt();
     captureWeb(runtime, readdedCssWeb, 'readded-css', {
       routes: { 'routes/about': ['/assets/about.css'] },
       routeImports: { 'routes/about': ['/assets/about.css'] },
     });
     await runtime.finishAttempt(
-      createGraphStats(readdedCssWeb, staleNode),
+      createGraphStats(readdedCssWeb, node),
       cssOnlyChange,
-      graphIdentity(readdedCssWeb, staleNode, removedCssWeb)
+      graphIdentity(readdedCssWeb, node, removedCssWeb)
     );
 
     expect(onCssAssetOwnershipChanged).toHaveBeenCalledTimes(2);

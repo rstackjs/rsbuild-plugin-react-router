@@ -157,23 +157,20 @@ describe('pluginReactRouter', () => {
         path.join(compiler.context, getVirtualModuleFilePath(id));
 
       expect(virtualFilePaths).toContain(
-        virtualModulePath('virtual/react-router/browser-manifest')
-      );
-      expect(virtualFilePaths).toContain(
         virtualModulePath('virtual/react-router/server-build')
       );
       expect(virtualFilePaths).toContain(
         virtualModulePath('virtual/react-router/with-props')
       );
       expect(virtualFilePaths).not.toContain(
-        '/virtual/project/virtual/react-router/browser-manifest'
+        '/virtual/project/virtual/react-router/server-build'
       );
     });
 
     it('should map bare React Router virtual module ids to resolvable files', () => {
       expect(
-        getVirtualModuleFilePath('virtual/react-router/browser-manifest')
-      ).toBe('node_modules/virtual/react-router/browser-manifest.js');
+        getVirtualModuleFilePath('virtual/react-router/server-build')
+      ).toBe('node_modules/virtual/react-router/server-build.js');
       expect(
         getVirtualModuleFilePath('virtual/react-router/server-build-edge')
       ).toBe('node_modules/virtual/react-router/server-build-edge.js');

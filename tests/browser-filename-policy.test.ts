@@ -43,9 +43,6 @@ describe('browser output filenames', () => {
       {
         assetsByChunkName: {
           'entry.client': ['bundles/entry.client-a1.js'],
-          'virtual/react-router/browser-manifest': [
-            'bundles/virtual/react-router/browser-manifest-b2.js',
-          ],
         },
       },
       '/app',

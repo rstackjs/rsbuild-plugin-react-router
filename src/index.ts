@@ -683,8 +683,15 @@ export const pluginReactRouter = (
     let sendRscDevUpdate: (() => void) | undefined;
     let scheduledRscDevUpdate: ReturnType<typeof setTimeout> | undefined;
     let hasPendingRscNodeUpdate = false;
-    let pendingRscNodeFiles = new Set<string>();
+    const unreadyRscEnvironments = new Set<string>();
     if (isRscMode && !isBuild) {
+      const markRscEnvironmentPending = (name: string) => {
+        unreadyRscEnvironments.add(name);
+        if (scheduledRscDevUpdate) {
+          clearTimeout(scheduledRscDevUpdate);
+          scheduledRscDevUpdate = undefined;
+        }
+      };
       api.onBeforeStartDevServer(({ server }) => {
         sendRscDevUpdate = () =>
           server.sockWrite('custom', {
@@ -698,16 +705,36 @@ export const pluginReactRouter = (
           scheduledRscDevUpdate = undefined;
         }
         hasPendingRscNodeUpdate = false;
-        pendingRscNodeFiles.clear();
+        unreadyRscEnvironments.clear();
         sendRscDevUpdate = undefined;
       });
-      api.onAfterEnvironmentCompile(({ environment, stats }) => {
-        if (
-          (environment.name !== 'node' && environment.name !== 'web') ||
-          stats?.hasErrors()
-        ) {
+      api.onBeforeEnvironmentCompile(({ environment }) => {
+        if (environment.name !== 'node' && environment.name !== 'web') {
           return;
         }
+        markRscEnvironmentPending(environment.name);
+      });
+      api.onAfterCreateCompiler(({ compiler }) => {
+        const compilers =
+          'compilers' in compiler ? compiler.compilers : [compiler];
+        for (const child of compilers) {
+          const name = child.options.name;
+          if (name === 'node' || name === 'web') {
+            child.hooks.invalid.tap(PLUGIN_NAME, () =>
+              markRscEnvironmentPending(name)
+            );
+          }
+        }
+      });
+      api.onAfterEnvironmentCompile(({ environment, stats }) => {
+        if (environment.name !== 'node' && environment.name !== 'web') {
+          return;
+        }
+        if (!stats || stats.hasErrors()) {
+          markRscEnvironmentPending(environment.name);
+          return;
+        }
+        unreadyRscEnvironments.delete(environment.name);
         if (environment.name === 'node') {
           const compiler = stats?.compilation.compiler;
           const changedFiles = new Set([
@@ -717,13 +744,16 @@ export const pluginReactRouter = (
           // Initial and lazy compilations do not represent source edits. Sending
           // an RSC revalidation for them can race and abort the navigation that
           // requested the lazy module.
-          if (changedFiles.size === 0) {
-            return;
+          if (
+            [...changedFiles].some(file => routeByFilePath.has(resolve(file)))
+          ) {
+            // Route HMR revalidates the current server build, including prior edits.
+            hasPendingRscNodeUpdate = false;
+          } else if ([...changedFiles].some(file => !isRscClientModule(file))) {
+            hasPendingRscNodeUpdate = true;
           }
-          hasPendingRscNodeUpdate = true;
-          pendingRscNodeFiles = changedFiles;
         }
-        if (!hasPendingRscNodeUpdate) {
+        if (!hasPendingRscNodeUpdate || unreadyRscEnvironments.size > 0) {
           return;
         }
         if (scheduledRscDevUpdate) {
@@ -731,15 +761,8 @@ export const pluginReactRouter = (
         }
         scheduledRscDevUpdate = setTimeout(() => {
           scheduledRscDevUpdate = undefined;
-          hasPendingRscNodeUpdate = false;
-          const clientHotUpdateHandlesChange =
-            pendingRscNodeFiles.size > 0 &&
-            [...pendingRscNodeFiles].every(isRscClientModule);
-          const routeHotUpdateHandlesChange = [...pendingRscNodeFiles].some(
-            filePath => routeByFilePath.has(resolve(filePath))
-          );
-          pendingRscNodeFiles.clear();
-          if (!clientHotUpdateHandlesChange && !routeHotUpdateHandlesChange) {
+          if (hasPendingRscNodeUpdate) {
+            hasPendingRscNodeUpdate = false;
             sendRscDevUpdate?.();
           }
         }, 1000);

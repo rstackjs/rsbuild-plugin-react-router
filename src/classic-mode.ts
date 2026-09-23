@@ -253,7 +253,6 @@ export const createClassicVirtualModules = ({
   );
 
   return {
-    'virtual/react-router/browser-manifest': 'export default {};',
     'virtual/react-router/server-manifest': 'export default {};',
     'virtual/react-router/server-build': generateServerBuild(
       routes,

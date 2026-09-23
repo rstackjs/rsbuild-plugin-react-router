@@ -25,6 +25,7 @@ import { DEV_MANIFEST_UPDATE_EVENT } from './dev-hmr.js';
 import {
   getEnvironmentStats,
   snapshotDevChangedFiles,
+  type DevChangedFiles,
   type DevGraphIdentity,
   type DevRuntimeStats,
   type ReactRouterDevBuildPlan,
@@ -105,6 +106,7 @@ export const createReactRouterDevRuntimeController = ({
     hdrChannels.delete(binding);
     const pair = binding.compilers;
     if (pair) {
+      pendingNodeChanges.delete(pair);
       resetDevCompilerPair(pair);
     }
     binding.compilers = undefined;
@@ -120,6 +122,13 @@ export const createReactRouterDevRuntimeController = ({
   const hdrIntentsByPair = new WeakMap<
     DevCompilerPair,
     ReturnType<typeof createDevHdrIntentTracker>
+  >();
+
+  // A retry may report no files even though an earlier uncommitted build had edits.
+  const pendingNodeChanges = new WeakMap<DevCompilerPair, DevChangedFiles>();
+  const nodeChangesByCompilation = new WeakMap<
+    Rspack.Compilation,
+    DevChangedFiles
   >();
 
   const finishRuntimeAttempt = async (
@@ -148,6 +157,12 @@ export const createReactRouterDevRuntimeController = ({
         nodeCompilation &&
         identity.node === binding.runtime.getCommittedNodeIdentity()
       ) {
+        if (
+          pendingNodeChanges.get(pair) ===
+          nodeChangesByCompilation.get(nodeCompilation)
+        ) {
+          pendingNodeChanges.delete(pair);
+        }
         hdrIntentsByPair.get(pair)?.signalCommitted(nodeCompilation, () => {
           hdrChannels.get(binding)?.publish();
         });
@@ -397,6 +412,13 @@ export const createReactRouterDevRuntimeController = ({
           return;
         }
         const changes = snapshotDevChangedFiles(pair.node);
+        const pendingChanges = pendingNodeChanges.get(pair);
+        const accumulatedChanges = {
+          known: changes.known && (pendingChanges?.known ?? true),
+          files: new Set([...(pendingChanges?.files ?? []), ...changes.files]),
+        };
+        pendingNodeChanges.set(pair, accumulatedChanges);
+        nodeChangesByCompilation.set(compilation, accumulatedChanges);
         hdrIntents.capture(
           compilation,
           changes.known &&
@@ -473,7 +495,9 @@ export const createReactRouterDevRuntimeController = ({
     }
     const changes = {
       web: snapshotDevChangedFiles(pair.web),
-      node: snapshotDevChangedFiles(pair.node),
+      node:
+        (nodeStats && nodeChangesByCompilation.get(nodeStats.compilation)) ??
+        snapshotDevChangedFiles(pair.node),
     };
     const webAttempt = webStats
       ? compilationIdentities.getAttemptIdentityForCompilation(

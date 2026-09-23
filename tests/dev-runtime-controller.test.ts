@@ -305,11 +305,14 @@ const createHarness = (
 };
 
 describe('React Router development runtime controller', () => {
-  it('independent probe retains pending HDR through an actual CSS ownership commit', async () => {
-    const { callbacks, controller, loadBundle, sendHdr, server } = createHarness();
+  it('retries an unpaired loader edit before committing CSS ownership changes', async () => {
+    const { callbacks, controller, loadBundle, sendHdr, server } =
+      createHarness();
     loadBundle.mockImplementation(() => createBuild('base'));
     const web = createCompiler('web');
     const node = createCompiler('node');
+    const requestRetry = rstest.fn();
+    node.compiler.watching = { invalidate: requestRetry } as Rspack.Watching;
     await callbacks.start({ server });
     callbacks.created({ compiler: { compilers: [web.compiler, node.compiler] } });
     const baseWeb = web.compile();
@@ -317,41 +320,52 @@ describe('React Router development runtime controller', () => {
     web.complete(baseWeb);
     const baseNode = node.compile();
     await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
     callbacks.before();
     node.setChanges(['/app/routes/loader.tsx']);
     const pendingNode = node.compile();
     web.invalidate();
     web.setChanges(['/app/style.css']);
     const cssWeb = web.compile();
-    controller.captureWeb(cssWeb, createManifestSet('css', { entry: ['/style.css'] }));
+    controller.captureWeb(
+      cssWeb,
+      createManifestSet('css', { entry: ['/style.css'] })
+    );
     web.complete(cssWeb);
+    loadBundle.mockImplementation(() => createBuild('updated-loader'));
     await callbacks.after({ stats: createGraphStats(cssWeb, pendingNode) });
-    await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base', assets: { version: 'css' } });
+    expect(requestRetry).toHaveBeenCalledOnce();
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'base',
+      assets: { version: 'base' },
+    });
     expect(loadBundle).toHaveBeenCalledOnce();
     expect(sendHdr).not.toHaveBeenCalled();
+
     node.invalidate();
     node.setChanges([]);
     const retry = node.compile();
-    loadBundle.mockImplementation(() => createBuild('updated-loader'));
     await callbacks.after({ stats: createGraphStats(cssWeb, retry) });
-    await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base', assets: { version: 'css' } });
-    expect(sendHdr).not.toHaveBeenCalled();
-    web.invalidate();
-    const pairedWeb = web.compile();
-    controller.captureWeb(pairedWeb, createManifestSet('paired', { entry: ['/style.css'] }));
-    web.complete(pairedWeb);
-    node.invalidate();
-    const pairedNode = node.compile();
-    await callbacks.after({ stats: createGraphStats(pairedWeb, pairedNode) });
-    await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'updated-loader', assets: { version: 'paired' } });
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'updated-loader',
+      assets: { version: 'css' },
+    });
+    expect(requestRetry).toHaveBeenCalledOnce();
+    expect(loadBundle).toHaveBeenCalledTimes(2);
     expect(sendHdr).toHaveBeenCalledOnce();
   });
 
-  it('independent probe preserves intent through superseded asynchronous evaluation', async () => {
-    const { callbacks, controller, loadBundle, sendHdr, server } = createHarness();
+  it('retains server-only changes through superseded evaluation and clears them after commit', async () => {
+    const { callbacks, controller, loadBundle, sendHdr, server } =
+      createHarness();
     let resolveCandidate!: (build: ReturnType<typeof createBuild>) => void;
-    const candidate = new Promise<ReturnType<typeof createBuild>>(resolve => { resolveCandidate = resolve; });
-    loadBundle.mockImplementationOnce(() => createBuild('base')).mockImplementationOnce(() => candidate).mockImplementation(() => createBuild('latest'));
+    const candidate = new Promise<ReturnType<typeof createBuild>>(resolve => {
+      resolveCandidate = resolve;
+    });
+    loadBundle
+      .mockImplementationOnce(() => createBuild('base'))
+      .mockImplementationOnce(() => candidate)
+      .mockImplementation(() => createBuild('latest'));
     const web = createCompiler('web');
     const node = createCompiler('node');
     await callbacks.start({ server });
@@ -364,27 +378,66 @@ describe('React Router development runtime controller', () => {
     callbacks.before();
     node.setChanges(['/app/server.ts']);
     const editedNode = node.compile();
-    const evaluating = callbacks.after({ stats: createGraphStats(baseWeb, editedNode) });
-    await expect.poll(() => loadBundle.mock.calls.length, { timeout: 1000 }).toBe(2);
+    const evaluating = callbacks.after({
+      stats: createGraphStats(baseWeb, editedNode),
+    });
+    await expect
+      .poll(() => loadBundle.mock.calls.length, { timeout: 1000 })
+      .toBe(2);
     node.invalidate();
     node.setChanges([]);
     const retry = node.compile();
     resolveCandidate(createBuild('obsolete'));
     await evaluating;
-    await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base' });
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'base',
+    });
     expect(sendHdr).not.toHaveBeenCalled();
     await callbacks.after({ stats: createGraphStats(baseWeb, retry) });
-    await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'base' });
-    expect(sendHdr).not.toHaveBeenCalled();
-    web.invalidate();
-    const pairedWeb = web.compile();
-    controller.captureWeb(pairedWeb, createManifestSet('latest'));
-    web.complete(pairedWeb);
-    node.invalidate();
-    const pairedNode = node.compile();
-    await callbacks.after({ stats: createGraphStats(pairedWeb, pairedNode) });
-    await expect(controller.createBuildLoader()()).resolves.toMatchObject({ marker: 'latest' });
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'latest',
+    });
     expect(sendHdr).toHaveBeenCalledOnce();
+    expect(loadBundle).toHaveBeenCalledTimes(3);
+
+    node.invalidate();
+    node.setChanges([]);
+    const unrelatedEmptyRetry = node.compile();
+    await callbacks.after({
+      stats: createGraphStats(baseWeb, unrelatedEmptyRetry),
+    });
+    expect(loadBundle).toHaveBeenCalledTimes(3);
+    expect(sendHdr).toHaveBeenCalledOnce();
+  });
+
+  it('does not treat unknown Node changes as a known-empty retry', async () => {
+    const { callbacks, controller, loadBundle, server } = createHarness();
+    loadBundle.mockImplementation(() => createBuild('base'));
+    const web = createCompiler('web');
+    const node = createCompiler('node');
+    await callbacks.start({ server });
+    callbacks.created({ compiler: { compilers: [web.compiler, node.compiler] } });
+    const baseWeb = web.compile();
+    controller.captureWeb(baseWeb, createManifestSet('base'));
+    web.complete(baseWeb);
+    const baseNode = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, baseNode) });
+
+    callbacks.before();
+    node.setChanges(['/app/server.ts']);
+    node.compile();
+    node.invalidate();
+    node.compiler.modifiedFiles = undefined;
+    const unknownRetry = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, unknownRetry) });
+    node.invalidate();
+    node.setChanges([]);
+    const emptyRetry = node.compile();
+    await callbacks.after({ stats: createGraphStats(baseWeb, emptyRetry) });
+    expect(loadBundle).toHaveBeenCalledOnce();
+    await expect(controller.createBuildLoader()()).resolves.toMatchObject({
+      marker: 'base',
+    });
   });
 
   it('independent probe drops pending HDR when the server session is replaced', async () => {

@@ -1,4 +1,4 @@
-import { BROWSER_MANIFEST_ENTRY_NAME, PLUGIN_NAME } from './constants.js';
+import { PLUGIN_NAME } from './constants.js';
 import { getManifestAssetType, stripAssetQuery } from './manifest-assets.js';
 import { createHash } from 'node:crypto';
 import type { Route, PluginOptions } from './types.js';
@@ -166,7 +166,6 @@ export function registerModifyBrowserManifestAssets(
         routeChunkOptions?.splitRouteModules
       )
   );
-  manifestChunkNames.add(BROWSER_MANIFEST_ENTRY_NAME);
   const isBuild = Boolean(routeChunkOptions?.isBuild);
   if (!isBuild) {
     api.onBeforeCreateCompiler(({ bundlerConfigs }) => {

@@ -221,3 +221,46 @@ test.describe("non-route / server-only module referenced by client", () => {
     });
   }
 });
+
+
+test("route re-exports use native dependency aliases and prune server exports", async () => {
+  const cwd = await createProject({
+    "rsbuild.config.ts": `
+      import path from "node:path";
+      import { defineConfig } from "@rsbuild/core";
+      import { pluginReact } from "@rsbuild/plugin-react";
+      import { pluginReactRouter } from "rsbuild-plugin-react-router";
+      export default defineConfig({
+        plugins: [pluginReact(), pluginReactRouter({ typegen: false })],
+        tools: { rspack: { resolve: {
+          alias: { "@route": path.resolve("app/routes/wrong.tsx") },
+          byDependency: { esm: { alias: { "@route": path.resolve("app/routes/target.tsx") } } },
+        } } },
+      });
+    `,
+    "app/secret.server.ts": serverOnlyModule,
+    "app/routes/target.tsx": `
+      import serverOnly from "../secret.server";
+      export function loader() { return serverOnly; }
+      export function meta() { return [{ title: "Correct shared metadata" }]; }
+      export default function Target() { return <h1>Target</h1>; }
+    `,
+    "app/routes/wrong.tsx": `export default function Wrong() { return <h1>Wrong</h1>; }`,
+    "app/routes/_index.tsx": `
+      export { meta } from "@route";
+      export default function Index() { return <h1>Index</h1>; }
+    `,
+    "app/routes/relative.tsx": `
+      export { meta } from "./target";
+      export default function Relative() { return <h1>Relative</h1>; }
+    `,
+    "app/routes/named.tsx": `
+      import { meta } from "@route";
+      export default function Named() { return <h1>{meta()[0].title}</h1>; }
+    `,
+  });
+  const result = build({ cwd });
+  expect(result.status, result.stdout.toString() + result.stderr.toString()).toBe(0);
+  expect(grep(path.join(cwd, "build/client"), /SERVER_ONLY/)).toHaveLength(0);
+  expect(grep(path.join(cwd, "build/server"), /SERVER_ONLY/).length).toBeGreaterThan(0);
+});

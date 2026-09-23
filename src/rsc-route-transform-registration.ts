@@ -69,7 +69,6 @@ export const registerReactRouterRscRouteTransforms = ({
           resourceQuery: args.resourceQuery,
           isRootRoute: route.id === 'root',
           routeId: route.id,
-          routeByFilePath,
           routeChunkCache,
           routeChunkConfig,
           isServerEnvironment: args.environment.name === 'node',

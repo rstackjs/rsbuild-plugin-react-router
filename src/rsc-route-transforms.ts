@@ -1,5 +1,3 @@
-import { dirname } from 'pathe';
-
 import { generate, parse } from './yuku.js';
 import {
   CLIENT_NON_COMPONENT_EXPORTS,
@@ -18,7 +16,6 @@ import {
   removeExports,
   removeUnusedImports,
 } from './route-export-pruning.js';
-import { resolveQuerylessRouteImportRequest } from './route-imports.js';
 import {
   createEmptyRouteChunkByExportName,
   detectRouteChunks,
@@ -33,7 +30,6 @@ import {
   RSC_MUTUALLY_EXCLUSIVE_ROUTE_EXPORTS,
   RSC_SERVER_COMPONENT_EXPORTS,
 } from './rsc-route-exports.js';
-import type { Route } from './types.js';
 
 // Canonical client HMR navigate snippet for generated route chunks: read the
 // live data router, strip the configured basename from the current URL, and
@@ -172,7 +168,6 @@ type RscRouteTransformOptions = {
   resourceQuery?: string;
   isRootRoute: boolean;
   routeId: string;
-  routeByFilePath?: ReadonlyMap<string, Route>;
   routeChunkCache: RouteChunkCache;
   routeChunkConfig: RouteChunkConfig;
   isServerEnvironment: boolean;
@@ -775,7 +770,6 @@ const createClientRouteModule = async (
   if (removed) {
     removeUnusedImports(ast);
   }
-  rewriteRscClientRouteImports(ast, sourceFileName, clientRouteChunk, options);
   const generated = generate(ast, {
     sourceMaps: false,
     filename: sourceFileName,
@@ -854,51 +848,6 @@ const createClientRouteModule = async (
       hmrFooter,
     map: null,
   };
-};
-
-const rewriteRouteImportSource = (
-  statement: AnyNode,
-  sourceFileName: string,
-  clientRouteChunk: string,
-  options: RscRouteTransformOptions
-): void => {
-  const source = statement.source;
-  if (!source || typeof source.value !== 'string' || !options.routeByFilePath) {
-    return;
-  }
-  const resolved = resolveQuerylessRouteImportRequest({
-    compilerName: options.isServerEnvironment ? 'node' : 'web',
-    context: dirname(sourceFileName),
-    issuer: `${sourceFileName}?client-route-module=${clientRouteChunk}`,
-    request: source.value,
-    routeByFilePath: options.routeByFilePath,
-  });
-  if (resolved) {
-    source.value = resolved;
-    source.raw = JSON.stringify(resolved);
-  }
-};
-
-const rewriteRscClientRouteImports = (
-  ast: ReturnType<typeof parse>,
-  sourceFileName: string,
-  clientRouteChunk: string,
-  options: RscRouteTransformOptions
-): void => {
-  for (const statement of getProgram(ast).body ?? []) {
-    if (
-      statement.type === 'ImportDeclaration' ||
-      statement.type === 'ExportAllDeclaration' ||
-      statement.type === 'ExportNamedDeclaration'
-    ) {
-      rewriteRouteImportSource(
-        statement,
-        sourceFileName,
-        clientRouteChunk,
-        options
-      );
-    }
-  }
 };
 
 const createServerRouteModule = async (

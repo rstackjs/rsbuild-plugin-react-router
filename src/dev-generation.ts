@@ -534,17 +534,10 @@ export const createReactRouterDevRuntime = ({
           manifestsByEntryName,
           true
         );
-      const reusePreviousNodeBuild =
-        !!previous &&
-        cssOnlyWebManifestChange &&
-        (!nodeChanged ||
-          (!identity.attempt && identity.nodeWeb !== webIdentity));
-
       if (
         nodeChanged &&
         identity.nodeWeb !== webIdentity &&
-        !identity.attempt &&
-        !reusePreviousNodeBuild
+        !identity.attempt
       ) {
         const message =
           '[rsbuild-plugin-react-router] Discarded web and node results from different compiler cycles and kept the last-good build.';
@@ -556,10 +549,9 @@ export const createReactRouterDevRuntime = ({
         return 'retry-node';
       }
 
-      const shouldEvaluateNode = nodeChanged && !reusePreviousNodeBuild;
       if (
         previous &&
-        webChanged !== shouldEvaluateNode &&
+        webChanged !== nodeChanged &&
         !cssOnlyWebManifestChange &&
         discardUnsafeOneSidedResult(attemptId, previous, webChanged, changes)
       ) {
@@ -567,7 +559,7 @@ export const createReactRouterDevRuntime = ({
       }
 
       try {
-        const buildsByEntryName = shouldEvaluateNode
+        const buildsByEntryName = nodeChanged
           ? await evaluateServerBuilds(server, buildPlan.entryNames)
           : previous!.buildsByEntryName;
         if (!isCurrentAttempt(attemptId)) {
@@ -586,11 +578,9 @@ export const createReactRouterDevRuntime = ({
             web.manifestsByEntryName
           ),
           webIdentity,
-          nodeIdentity: shouldEvaluateNode
-            ? nodeIdentity
-            : previous!.nodeIdentity,
+          nodeIdentity: nodeChanged ? nodeIdentity : previous!.nodeIdentity,
           web,
-          nodeDependencies: shouldEvaluateNode
+          nodeDependencies: nodeChanged
             ? snapshotDependencies(nodeCompilation)
             : previous!.nodeDependencies,
         });

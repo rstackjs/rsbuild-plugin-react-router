@@ -1,7 +1,4 @@
-import {
-  BROWSER_MANIFEST_ENTRY_NAME,
-  BUILD_CLIENT_ROUTE_QUERY_STRING,
-} from './constants.js';
+import { BUILD_CLIENT_ROUTE_QUERY_STRING } from './constants.js';
 import type { PluginOptions } from './types.js';
 import { DEV_HMR_RUNTIME_MODULE_ID } from './dev-hmr.js';
 
@@ -53,7 +50,6 @@ const matchesLazyCompilationTest = (
 
 const createReactRouterHydrationModuleTest = (entryClientPath: string) => {
   const eagerPatterns = [
-    BROWSER_MANIFEST_ENTRY_NAME,
     DEV_HMR_RUNTIME_MODULE_ID,
     ...(entryClientPath
       ? [
