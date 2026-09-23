@@ -39,10 +39,7 @@ export const registerReactRouterEnvironmentOutput = ({
   api.modifyRspackConfig((rspackConfig, { environment, mergeConfig }) => {
     if (environment.name === 'web') {
       return mergeConfig(rspackConfig, {
-        output: {
-          ...webOutput,
-          ...(federation ? { chunkLoading: 'import' } : {}),
-        },
+        output: webOutput,
       });
     }
     if (environment.name === 'node') {

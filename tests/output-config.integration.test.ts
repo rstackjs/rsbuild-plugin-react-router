@@ -28,12 +28,9 @@ beforeAll(() => {
     recursive: true,
   });
   (fs.existsSync as { mockRestore?: () => void }).mockRestore?.();
-  // The plugin resolves the app directory from the working directory.
-  process.chdir(fixtureRoot);
 });
 
 afterAll(() => {
-  process.chdir(repositoryRoot);
   rmSync(fixtureRoot, { recursive: true, force: true });
 });
 
@@ -68,6 +65,24 @@ const output = (config: Rspack.Configuration) =>
   config.output as NonNullable<Rspack.Configuration['output']>;
 
 describe('final Rspack output configuration (real Rsbuild)', () => {
+  it.each(['relative', 'absolute'])('resolves %s app and build directories against the project root', async kind => {
+    const appDirectory = join(fixtureRoot, 'custom-app');
+    const buildDirectory = join(fixtureRoot, 'custom-build');
+    cpSync(join(fixtureRoot, 'app'), appDirectory, { recursive: true });
+    (globalThis as typeof globalThis & { __reactRouterTestConfig?: unknown }).__reactRouterTestConfig = {
+      appDirectory: kind === 'relative' ? 'custom-app' : appDirectory,
+      buildDirectory: kind === 'relative' ? 'custom-build' : buildDirectory,
+    };
+
+    const { web, node } = await inspect(pluginReactRouter({ typegen: false }));
+
+    expect(process.cwd()).toBe(repositoryRoot);
+    expect(output(web).path).toBe(join(buildDirectory, 'client'));
+    expect(output(node).path).toBe(join(buildDirectory, 'server'));
+    expect(JSON.stringify(web.entry)).toContain(join(appDirectory, 'routes/index.tsx'));
+    expect(JSON.stringify(web.entry)).not.toContain(join(repositoryRoot, 'custom-app'));
+  });
+
   it('leaves browser filenames and publicPath to Rsbuild in classic mode', async () => {
     const { web, node } = await inspect(pluginReactRouter());
 
@@ -148,7 +163,11 @@ describe('final Rspack output configuration (real Rsbuild)', () => {
       _options: options,
       apply() {},
     });
-    const webPlugin = federationPlugin({ name: 'host', shared: { react: {} } });
+    const webPlugin = federationPlugin({
+      name: 'host',
+      exposes: { './Widget': './app/widget.tsx' },
+      shared: { react: {} },
+    });
     const nodePlugin = federationPlugin({ name: 'host', shared: { react: {} } });
     const { web, node } = await inspect(
       pluginReactRouter({ serverOutput: 'commonjs', federation: true }),
@@ -264,15 +283,18 @@ describe('final Rspack output configuration (real Rsbuild)', () => {
     }
   }, 60_000);
 
-  it('configures RSC browser output', async () => {
-    const { web } = await inspect(pluginReactRouterRSC());
+  it.each([false, true])(
+    'configures RSC browser output with federation=%s',
+    async federation => {
+      const { web } = await inspect(pluginReactRouterRSC({ federation }));
 
-    expect(output(web)).toMatchObject({
-      chunkFormat: 'array-push',
-      chunkLoading: 'jsonp',
-      workerChunkLoading: 'import-scripts',
-      module: false,
-    });
-    expect(output(web).filename).toBe('static/js/[name].[contenthash:10].js');
-  });
+      expect(output(web)).toMatchObject({
+        chunkFormat: 'array-push',
+        chunkLoading: 'jsonp',
+        workerChunkLoading: 'import-scripts',
+        module: false,
+      });
+      expect(output(web).filename).toBe('static/js/[name].[contenthash:10].js');
+    }
+  );
 });

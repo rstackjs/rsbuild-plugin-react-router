@@ -248,12 +248,15 @@ export const pluginReactRouter = (
       );
     });
 
-    const configPath = findEntryFile(resolve('react-router.config'));
+    const rootDirectory = api.context.rootPath;
+    const configPath = findEntryFile(
+      resolve(rootDirectory, 'react-router.config')
+    );
     const configExists = existsSync(configPath);
     let configWatchPaths: string | string[] = configExists
       ? configPath
       : JS_EXTENSIONS.map(extension =>
-          resolve(`react-router.config${extension}`)
+          resolve(rootDirectory, `react-router.config${extension}`)
         );
     let reactRouterUserConfig: Config = {};
     if (!configExists) {
@@ -261,7 +264,7 @@ export const pluginReactRouter = (
         'No react-router.config found, using default configuration.'
       );
     } else {
-      const displayPath = relative(process.cwd(), configPath);
+      const displayPath = relative(rootDirectory, configPath);
       try {
         const { value: imported, watchPaths } =
           await importConfigWithWatchPaths<Config>(configPath);
@@ -283,13 +286,13 @@ export const pluginReactRouter = (
       presets: configPresets,
       hasConfiguredServerModuleFormat,
     } = await effectRuntime.runPromise(
-      resolveReactRouterConfigEffect(reactRouterUserConfig)
+      resolveReactRouterConfigEffect(reactRouterUserConfig, rootDirectory)
     );
 
     const {
-      appDirectory,
+      appDirectory: configuredAppDirectory,
       basename,
-      buildDirectory,
+      buildDirectory: configuredBuildDirectory,
       future,
       allowedActionOrigins,
       routeDiscovery: userRouteDiscovery,
@@ -302,6 +305,8 @@ export const pluginReactRouter = (
       subResourceIntegrity,
       buildEnd,
     } = resolvedConfig;
+    const appDirectory = resolve(rootDirectory, configuredAppDirectory);
+    const buildDirectory = resolve(rootDirectory, configuredBuildDirectory);
 
     if (pluginOptions.typegen !== false) {
       await registerReactRouterTypegen(api, {
@@ -358,7 +363,7 @@ export const pluginReactRouter = (
     const routesPath = findEntryFile(resolve(appDirectory, 'routes'));
     if (!existsSync(routesPath)) {
       const missingRoutesPath = relative(
-        process.cwd(),
+        rootDirectory,
         resolve(appDirectory, 'routes.ts')
       );
       throw new Error(`Route config file not found at "${missingRoutesPath}".`);
@@ -533,7 +538,7 @@ export const pluginReactRouter = (
     const routeModuleAnalysis = async (routeFilePath: string) =>
       transformedRouteModuleAnalyses.get(resolve(routeFilePath));
     const outputClientPath = resolve(buildDirectory, 'client');
-    const assetsBuildDirectory = relative(process.cwd(), outputClientPath);
+    const assetsBuildDirectory = relative(rootDirectory, outputClientPath);
     const watchDirectory = resolve(appDirectory);
     const routeRestartMarkerPath = getRouteRestartMarkerPath(appDirectory);
     const routeWatchFiles = createReactRouterRouteWatchFiles({

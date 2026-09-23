@@ -129,8 +129,27 @@ describe('React Router typegen runner', () => {
     expect(execa).toHaveBeenCalledWith(
       'npx',
       ['--yes', 'react-router', 'typegen'],
-      { stdio: 'inherit' }
+      { stdio: 'inherit', cwd: undefined }
     );
+  });
+
+  it('runs build and watch typegen from the configured project root', async () => {
+    const { process: watchProcess } = createProcess();
+    const execa = rstest.fn().mockResolvedValueOnce(undefined).mockReturnValueOnce(watchProcess);
+    const runner = createReactRouterTypegenRunner(
+      async () => execa,
+      undefined,
+      '/project/root'
+    );
+
+    await runner.runBuild();
+    await runner.startWatch();
+
+    expect(execa.mock.calls.map(([, , options]) => options.cwd)).toEqual([
+      '/project/root',
+      '/project/root',
+    ]);
+    await runner.closeWatch();
   });
 
   it('spawns the react-router bin directly when resolvable from the app directory', async () => {
@@ -162,7 +181,7 @@ describe('React Router typegen runner', () => {
     expect(execa).toHaveBeenCalledWith(
       'npx',
       ['--yes', 'react-router', 'typegen', '--watch'],
-      { stdio: 'inherit', detached: false, cleanup: true }
+      { stdio: 'inherit', cwd: undefined, detached: false, cleanup: true }
     );
     await runner.closeWatch();
   });

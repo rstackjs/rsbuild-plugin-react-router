@@ -2,6 +2,7 @@ import type { Rspack } from '@rsbuild/core';
 
 type ModuleFederationPluginOptionsLike = {
   name?: string;
+  exposes?: unknown[] | Record<string, unknown>;
   experiments?: { asyncStartup?: boolean };
 };
 
@@ -36,6 +37,9 @@ export const getFederationContainerNames = (
 ): string[] =>
   (rspackConfig?.plugins ?? [])
     .map(getModuleFederationOptions)
+    .filter(
+      options => options?.exposes && Object.keys(options.exposes).length > 0
+    )
     .map(options => options?.name)
     .filter((name): name is string => typeof name === 'string');
 

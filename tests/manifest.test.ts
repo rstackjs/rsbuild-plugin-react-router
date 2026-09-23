@@ -738,7 +738,7 @@ describe('manifest', () => {
     }
   });
 
-  it('preserves dev css fallback when route analysis uses transformed code', async () => {
+  it('does not invent dev CSS assets when the compilation emitted none', async () => {
     const { root, appDir } = createTempApp(`
       import './page.css';
       export default function Page() { return <h1>Page</h1>; }
@@ -757,9 +757,7 @@ describe('manifest', () => {
         }
       );
 
-      expect(manifest.routes['routes/page'].css).toEqual([
-        '/static/css/routes/page.css',
-      ]);
+      expect(manifest.routes['routes/page'].css).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -69,7 +69,8 @@ const resolveDirectTypegenCommand = (
 
 export const createReactRouterTypegenRunner = (
   loadExeca: LoadExeca = loadDefaultExeca,
-  appDirectory?: string
+  appDirectory?: string,
+  rootDirectory?: string
 ): ReactRouterTypegenRunner => {
   let typegenProcess: ResultPromise | undefined;
   let typegenCommand: TypegenCommand | undefined;
@@ -109,6 +110,7 @@ export const createReactRouterTypegenRunner = (
       const { command, args } = getTypegenCommand();
       const process = execa(command, [...args, 'typegen', '--watch'], {
         stdio: 'inherit',
+        cwd: rootDirectory,
         detached: false,
         cleanup: true,
       });
@@ -133,6 +135,7 @@ export const createReactRouterTypegenRunner = (
       const { command, args } = getTypegenCommand();
       await execa(command, [...args, 'typegen'], {
         stdio: 'inherit',
+        cwd: rootDirectory,
       });
     },
   };
@@ -153,7 +156,12 @@ export const registerReactRouterTypegen = async (
   }
 ): Promise<void> => {
   const resolvedRunner =
-    runner ?? createReactRouterTypegenRunner(loadDefaultExeca, appDirectory);
+    runner ??
+    createReactRouterTypegenRunner(
+      loadDefaultExeca,
+      appDirectory,
+      api.context.rootPath
+    );
 
   if (api.context.action !== 'build') {
     let devWatchStarted = false;

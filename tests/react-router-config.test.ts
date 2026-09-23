@@ -1,3 +1,6 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from '@rstest/core';
 import { createRsbuild, type NormalizedConfig } from '@rsbuild/core';
 import {
@@ -17,6 +20,22 @@ const createNormalizedRsbuildConfig = async (): Promise<NormalizedConfig> => {
 };
 
 describe('resolveReactRouterConfig', () => {
+  it('reads version-dependent defaults from each project root', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'rr-config-roots-'));
+    try {
+      for (const [version, expected] of [['7.18.0', false], ['8.3.1', true]] as const) {
+        const rootDirectory = join(directory, version);
+        const packageDirectory = join(rootDirectory, 'node_modules/react-router');
+        mkdirSync(packageDirectory, { recursive: true });
+        writeFileSync(join(packageDirectory, 'package.json'), JSON.stringify({ name: 'react-router', version }));
+        const { resolved } = await runPluginEffect(resolveReactRouterConfigEffect({}, rootDirectory));
+        expect(resolved.future.unstable_trailingSlashAwareDataRequests).toBe(expected);
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('merges presets and combines buildEnd hooks', async () => {
     const buildEndCalls: string[] = [];
     const rsbuildConfig = await createNormalizedRsbuildConfig();

@@ -589,3 +589,28 @@ async function hmrWorkflow({
     expect(pageErrors).toEqual([]);
   }
 }
+
+
+test("dev CSS URL imports do not invent extracted route stylesheets", async ({ page }) => {
+  const port = await getPort();
+  const cwd = await createProject({
+    "rsbuild.config.ts": await rsbuildConfig.basic({ port }),
+    "app/styles.css": `.linked { color: rgb(255, 0, 0); }`,
+    "app/routes/_index.tsx": `
+      import stylesheet from "../styles.css?url";
+      export function links() { return [{ rel: "stylesheet", href: stylesheet }]; }
+      export default function Index() { return <h1 className="linked">Linked CSS</h1>; }
+    `,
+  });
+  const stop = await dev({ cwd, port });
+  try {
+    await page.goto(`http://localhost:${port}/`);
+    await expect(page.locator("h1")).toHaveCSS("color", "rgb(255, 0, 0)");
+    const routeCss = await page.evaluate(() =>
+      (window as any).__reactRouterManifest.routes["routes/_index"].css
+    );
+    expect(routeCss).toEqual([]);
+  } finally {
+    stop();
+  }
+});

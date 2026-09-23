@@ -1,7 +1,8 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createLogger } from '@rsbuild/core';
+import { startServerBuildWorker } from '../src/server-build-worker-client';
 import { describe, expect, it, rstest } from '@rstest/core';
 import {
   SPA_FALLBACK_REQUEST_PATH,
@@ -13,15 +14,13 @@ import {
   runReactRouterRscPrerenderBuild,
 } from '../src/rsc-prerender';
 
-// The server bundle is evaluated in a worker shipped with `dist/`, which does
-// not exist when unit tests run from source; the worker itself is exercised by
-// the React Router integration suite (spa-build-process-test.ts). Stand in a
-// handler that always fails so the error reporting path is what's under test.
+// Mock responses for artifact rendering; real worker lifecycle behavior is
+// covered by server-build-worker.test.ts and spa-build-process-test.ts.
 rstest.mock('../src/server-build-worker-client', () => ({
-  startServerBuildWorker: async () => ({
+  startServerBuildWorker: rstest.fn(async () => ({
     handler: async () => new Response(null, { status: 500 }),
     close: async () => {},
-  }),
+  })),
 }));
 
 const flightScript = (chunk: string) =>
@@ -168,27 +167,125 @@ describe('getRscPayloadFilePath', () => {
 });
 
 describe('runReactRouterRscPrerenderBuild', () => {
-  it('reports a failed RSC response without duplicating the path', async () => {
-    const buildDirectory = await mkdtemp(
-      resolve(tmpdir(), 'rsbuild-rsc-prerender-')
-    );
-
-    try {
-      await expect(
-        runReactRouterRscPrerenderBuild({
+  it.each(['/', '/base'])(
+    'accepts a 404 SPA fallback with basename %s',
+    async basename => {
+      const buildDirectory = await mkdtemp(
+        resolve(tmpdir(), 'rsbuild-rsc-fallback-')
+      );
+      const html = `<html><body>${flightScript('fallback-data')}</body></html>`;
+      const handler = rstest.fn(
+        async () =>
+          new Response(html, {
+            status: 404,
+            headers: { 'content-type': 'text/html' },
+          })
+      );
+      const close = rstest.fn(async () => {});
+      rstest
+        .mocked(startServerBuildWorker)
+        .mockResolvedValueOnce({ description: undefined, handler, close });
+      try {
+        await runReactRouterRscPrerenderBuild({
           api: { logger: createLogger({ level: 'silent' }) },
           hasWebEnvironment: true,
           buildDirectory,
-          ssr: true,
-          prerenderConfig: true,
-          prerenderPaths: ['/about'],
-          basename: '/',
-        })
-      ).rejects.toThrowError(
-        /^Prerender: Received a 500 status code from the RSC server while prerendering the `\/about` path\.$/
+          ssr: false,
+          prerenderConfig: false,
+          prerenderPaths: [],
+          basename,
+        });
+        expect(
+          await readFile(
+            resolve(buildDirectory, 'client/__spa-fallback.html'),
+            'utf8'
+          )
+        ).toBe(html);
+        expect(
+          await readFile(
+            resolve(buildDirectory, 'client/__spa-fallback.rsc'),
+            'utf8'
+          )
+        ).toBe('fallback-data');
+        expect(close).toHaveBeenCalledOnce();
+      } finally {
+        await rm(buildDirectory, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('escapes RSC redirect destinations without consuming their body', async () => {
+    const buildDirectory = await mkdtemp(
+      resolve(tmpdir(), 'rsbuild-rsc-redirect-')
+    );
+    rstest.mocked(startServerBuildWorker).mockResolvedValueOnce({
+      description: undefined,
+      handler: async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(new Error('redirect body must not be read'));
+            },
+          }),
+          {
+            status: 302,
+            headers: { location: '/target?x="<script>bad</script>&y=1' },
+          }
+        ),
+      close: async () => {},
+    });
+    try {
+      await runReactRouterRscPrerenderBuild({
+        api: { logger: createLogger({ level: 'silent' }) },
+        hasWebEnvironment: true,
+        buildDirectory,
+        ssr: true,
+        prerenderConfig: ['/about'],
+        prerenderPaths: ['/about'],
+        basename: '/',
+      });
+      const html = await readFile(
+        resolve(buildDirectory, 'client/about/index.html'),
+        'utf8'
       );
+      expect(html).toContain(
+        'href="/target?x=&quot;&lt;script&gt;bad&lt;/script&gt;&amp;y=1"'
+      );
+      expect(html).not.toContain('<script>');
     } finally {
       await rm(buildDirectory, { recursive: true, force: true });
     }
   });
+
+  it.each([404, 500])(
+    'reports a failed %s RSC response without duplicating the path',
+    async status => {
+      rstest.mocked(startServerBuildWorker).mockResolvedValueOnce({
+        description: undefined,
+        handler: async () => new Response(null, { status }),
+        close: async () => {},
+      });
+      const buildDirectory = await mkdtemp(
+        resolve(tmpdir(), 'rsbuild-rsc-prerender-')
+      );
+
+      try {
+        await expect(
+          runReactRouterRscPrerenderBuild({
+            api: { logger: createLogger({ level: 'silent' }) },
+            hasWebEnvironment: true,
+            buildDirectory,
+            ssr: true,
+            prerenderConfig: true,
+            prerenderPaths: ['/about'],
+            basename: '/',
+          })
+        ).rejects.toMatchObject({
+          message: `Prerender: Received a ${status} status code from the RSC server while prerendering the \`/about\` path.`,
+        });
+      } finally {
+        await rm(buildDirectory, { recursive: true, force: true });
+      }
+    }
+  );
 });

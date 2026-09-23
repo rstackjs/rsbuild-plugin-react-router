@@ -285,7 +285,7 @@ const createClassicModePlan = async ({
     reactRouterConfig,
     routeConfig,
     routes,
-    rootDirectory: process.cwd(),
+    rootDirectory: api.context.rootPath,
     ssr,
     devHmr,
   });
@@ -363,7 +363,7 @@ const createClassicModePlan = async ({
       ...(isBuild ? { mangleExports: 'size', usedExports: 'global' } : {}),
     },
     nodeExternals: Array.from(
-      new Set(['express', ...getSsrExternals(process.cwd())])
+      new Set(['express', ...getSsrExternals(api.context.rootPath)])
     ),
     nodeDependencies: shouldDependOnWebCompiler
       ? { dependencies: ['web'] }

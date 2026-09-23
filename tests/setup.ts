@@ -182,7 +182,7 @@ rstest.mock('@scripts/test-helper', () => ({
         error: rstest.fn(),
       },
       context: {
-        rootPath: '/Users/bytedance/dev/rsbuild-plugin-react-router',
+        rootPath: process.cwd(),
         action,
       },
       compiler: {

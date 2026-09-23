@@ -91,6 +91,28 @@ describe('createClassicWebRouteEntries', () => {
     }
   });
 
+  it.each([false, true])('refuses a route file that collides with a split chunk (reversed: %s)', reverse => {
+    const { root, appDir } = createApp({
+      'app/routes/page.tsx': ROUTE_SOURCE,
+      'app/routes/page-client-loader.tsx': 'export default function Other() { return null; }',
+    });
+    const routeList: Route[] = [
+      { id: 'page', file: 'routes/page.tsx', path: 'page' },
+      { id: 'other', file: 'routes/page-client-loader.tsx', path: 'other' },
+    ];
+    if (reverse) routeList.reverse();
+    try {
+      expect(() => createClassicWebRouteEntries({
+        appDirectory: appDir,
+        isBuild: true,
+        routes: Object.fromEntries(routeList.map(route => [route.id, route])),
+        splitRouteModules: true,
+      })).toThrowError(/both resolve to the entry name "routes\/page-client-loader"/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('shares one entry between routes that point at the same file', () => {
     // React Router requires explicit ids when two routes reuse a file. Both
     // routes import the very same module, and a route chunk is a pure function

@@ -9,7 +9,7 @@ import {
   createBuildRequestEffect,
   createBoundedPrerenderTasksEffect,
 } from './prerender-build.js';
-import { normalizeAssetPrefix } from './plugin-utils.js';
+import { escapeHtml, normalizeAssetPrefix } from './plugin-utils.js';
 import { getPrerenderConcurrency } from './prerender.js';
 import type { Config } from './react-router-config.js';
 import { runPluginEffect } from './effect-runtime.js';
@@ -132,15 +132,16 @@ const createRedirectHtml = ({
 }): string => {
   // A short delay causes Google to interpret the redirect as temporary.
   const delay = status === 302 ? 2 : 0;
+  const escapedLocation = escapeHtml(location);
   return `<!doctype html>
 <head>
-<title>Redirecting to: ${location}</title>
-<meta http-equiv="refresh" content="${delay};url=${location}">
+<title>Redirecting to: ${escapedLocation}</title>
+<meta http-equiv="refresh" content="${delay};url=${escapedLocation}">
 <meta name="robots" content="noindex">
 </head>
 <body>
-\t<a href="${location}">
-  Redirecting from <code>${pathname}</code> to <code>${location}</code>
+\t<a href="${escapedLocation}">
+  Redirecting from <code>${escapeHtml(pathname)}</code> to <code>${escapedLocation}</code>
 </a>
 </body>
 </html>`;
@@ -168,13 +169,14 @@ const writePrerenderedFile = async ({
 
 const assertPrerenderableResponse = (
   pathname: string,
-  response: Response
+  response: Response,
+  isSpaFallback: boolean
 ): void => {
   if (
     response.status === 200 ||
     response.status === 202 ||
     redirectStatusCodes.has(response.status) ||
-    (pathname === SPA_FALLBACK_REQUEST_PATH && response.status === 404)
+    (isSpaFallback && response.status === 404)
   ) {
     return;
   }
@@ -201,7 +203,11 @@ const prerenderRscUrlEffect = ({
     const response = await handler(request);
     const pathname = url.pathname;
     const outputPathname = artifactPath ?? pathname;
-    assertPrerenderableResponse(pathname, response);
+    assertPrerenderableResponse(
+      pathname,
+      response,
+      outputPathname === SPA_FALLBACK_REQUEST_PATH
+    );
 
     if (redirectStatusCodes.has(response.status)) {
       const location = response.headers.get('Location') ?? '';

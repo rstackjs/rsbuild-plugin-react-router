@@ -254,14 +254,12 @@ type RouteManifestAnalysis = {
 };
 
 const DEFAULT_MANIFEST_DIR = DEFAULT_JS_DIST_PATH;
-const CSS_IMPORT_RE = /\.(?:css|less|sass|scss)(?:\?[^'"`]+)?['"`]/;
 
 const analyzeRouteForManifestEffect = ({
   discoveredCssAssets,
   isBuild,
   routeChunkCache,
   routeChunkConfig,
-  routeEntryName,
   routeFilePath,
   route,
   routeModuleAnalysis,
@@ -270,7 +268,6 @@ const analyzeRouteForManifestEffect = ({
   isBuild: boolean;
   routeChunkCache: RouteChunkCache | undefined;
   routeChunkConfig: RouteChunkConfig | null;
-  routeEntryName: string;
   routeFilePath: string;
   route: Route;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
@@ -279,12 +276,6 @@ const analyzeRouteForManifestEffect = ({
     const { code, exports: exportNames } =
       (await routeModuleAnalysis?.(routeFilePath, route)) ??
       (await getRouteModuleAnalysis(routeFilePath));
-    const cssAssets =
-      !isBuild && discoveredCssAssets.length === 0 && CSS_IMPORT_RE.test(code)
-        ? [
-            `${DEFAULT_MANIFEST_DIR.replace('/js', '/css')}/${routeEntryName}.css`,
-          ]
-        : discoveredCssAssets;
     const chunkInfo =
       isBuild && routeChunkConfig
         ? await detectRouteChunksIfEnabled(
@@ -296,7 +287,7 @@ const analyzeRouteForManifestEffect = ({
         : null;
 
     return {
-      cssAssets,
+      cssAssets: discoveredCssAssets,
       exports: new Set(exportNames),
       routeModuleExports: exportNames,
       hasRouteChunkByExportName: chunkInfo?.hasRouteChunkByExportName ?? null,
@@ -463,7 +454,6 @@ function generateReactRouterManifestForDevEffect(
             isBuild,
             routeChunkCache: manifestOptions?.cache,
             routeChunkConfig,
-            routeEntryName,
             routeFilePath,
             route,
             routeModuleAnalysis: manifestOptions?.routeModuleAnalysis,

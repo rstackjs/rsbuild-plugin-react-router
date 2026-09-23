@@ -7,7 +7,11 @@ import type { RouteConfigEntry } from '@react-router/dev/routes';
 import * as Effect from 'effect/Effect';
 import { getCappedPluginConcurrency } from './concurrency.js';
 import { normalizeEffectError, tryPluginPromise } from './effect-runtime.js';
-import { getPackageVersion, parseVersionMajorMinor } from './plugin-utils.js';
+import {
+  getPackageVersion,
+  parseVersionMajorMinor,
+  resolveAppPackagePath,
+} from './plugin-utils.js';
 import type { PrerenderConfigObject, PrerenderPathsConfig } from './types.js';
 
 export type BuildEndHook = {
@@ -69,7 +73,7 @@ type ResolveReactRouterConfigResult = {
 };
 
 export const getDefaultTrailingSlashAwareDataRequests = (
-  reactRouterVersion: string | undefined = getPackageVersion('react-router')
+  reactRouterVersion: string | undefined
 ): boolean => (parseVersionMajorMinor(reactRouterVersion)?.major ?? 0) >= 8;
 
 export const resolveRouteDiscoveryConfig = ({
@@ -121,12 +125,16 @@ export type ResolvedReactRouterConfig = Readonly<{
   unstable_routeConfig: RouteConfigEntry[];
 }>;
 
-const createDefaultFutureConfig = (): FutureConfig => ({
+const createDefaultFutureConfig = (rootDirectory?: string): FutureConfig => ({
   unstable_enableNodeReadableStream: false,
   unstable_optimizeDeps: false,
   unstable_subResourceIntegrity: false,
   unstable_trailingSlashAwareDataRequests:
-    getDefaultTrailingSlashAwareDataRequests(),
+    getDefaultTrailingSlashAwareDataRequests(
+      getPackageVersion('react-router', specifier =>
+        resolveAppPackagePath(specifier, rootDirectory)
+      )
+    ),
   v8_middleware: false,
   v8_splitRouteModules: false,
   v8_viteEnvironmentApi: false,
@@ -141,7 +149,6 @@ const DEFAULT_CONFIG = {
   splitRouteModules: true,
   subResourceIntegrity: false,
   ssr: true,
-  future: createDefaultFutureConfig(),
   routeDiscovery: undefined,
   prerender: undefined,
   serverBundles: undefined,
@@ -149,7 +156,7 @@ const DEFAULT_CONFIG = {
   allowedActionOrigins: false,
   routes: {},
   unstable_routeConfig: [],
-} as const satisfies ResolvedReactRouterConfig;
+} as const satisfies Omit<ResolvedReactRouterConfig, 'future'>;
 
 const mergeReactRouterConfig = (...configs: Config[]): Config => {
   const reducer = (configA: Config, configB: Config): Config => {
@@ -214,7 +221,8 @@ const normalizeSubResourceIntegrity = (config: Config): Config => {
 };
 
 export const resolveReactRouterConfigEffect = (
-  reactRouterUserConfig: Config
+  reactRouterUserConfig: Config,
+  rootDirectory?: string
 ): Effect.Effect<ResolveReactRouterConfigResult, Error, never> =>
   Effect.gen(function* () {
     const presets = yield* Effect.forEach(
@@ -258,7 +266,7 @@ export const resolveReactRouterConfigEffect = (
       userAndPresetConfigs.future?.unstable_subResourceIntegrity ??
       DEFAULT_CONFIG.subResourceIntegrity;
     const resolvedFuture: FutureConfig = {
-      ...DEFAULT_CONFIG.future,
+      ...createDefaultFutureConfig(rootDirectory),
       ...(userAndPresetConfigs.future ?? {}),
       unstable_subResourceIntegrity: subResourceIntegrity,
     };

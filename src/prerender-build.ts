@@ -7,6 +7,7 @@ import { matchRoutes } from 'react-router';
 import { dirname, relative, resolve } from 'pathe';
 import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import { getBuildManifest } from './build-manifest.js';
+import { escapeHtml } from './plugin-utils.js';
 import {
   createReactRouterManifestOptions,
   generateReactRouterManifestForDev,
@@ -230,10 +231,10 @@ const prerenderRouteEffect = ({
     requestInit,
     async request => {
       const response = await handler(request);
-      let html = await response.text();
+      let html: string;
 
       if (redirectStatusCodes.has(response.status)) {
-        const location = response.headers.get('Location');
+        const location = escapeHtml(response.headers.get('Location') ?? '');
         const delay = response.status === 302 ? 2 : 0;
         html = `<!doctype html>
 <head>
@@ -243,16 +244,19 @@ const prerenderRouteEffect = ({
 </head>
 <body>
 \t<a href="${location}">
-    Redirecting from <code>${normalizedPath}</code> to <code>${location}</code>
+    Redirecting from <code>${escapeHtml(normalizedPath)}</code> to <code>${location}</code>
   </a>
 </body>
 </html>`;
-      } else if (response.status !== 200) {
-        throw new Error(
-          `Prerender (html): Received a ${response.status} status code from ` +
-            `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
-            html
-        );
+      } else {
+        html = await response.text();
+        if (response.status !== 200) {
+          throw new Error(
+            `Prerender (html): Received a ${response.status} status code from ` +
+              `\`entry.server.tsx\` while prerendering the \`${normalizedPath}\` path.\n` +
+              html
+          );
+        }
       }
 
       const outputPath = resolve(
