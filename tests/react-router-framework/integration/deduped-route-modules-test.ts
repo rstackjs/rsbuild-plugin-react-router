@@ -5,27 +5,33 @@ import type { Fixture, AppFixture } from "./helpers/create-fixture.js";
 import { PlaywrightFixture } from "./helpers/playwright-fixture.js";
 import { type TemplateName, rsbuildConfig } from "./helpers/rsbuild.js";
 
-const templateNames = [
-  "rsbuild-template",
-  "rsc-framework",
-] as const satisfies TemplateName[];
+const templateCases = [
+  ["rsbuild-template", false],
+  ["rsbuild-template", true],
+  ["rsc-framework", false],
+] as const satisfies ReadonlyArray<readonly [TemplateName, boolean]>;
 
 // This test ensures that code is not accidentally duplicated when a route is
 // imported within user code since they're not importing one of our internal
 // virtual route modules.
 test.describe("Deduped route modules", () => {
-  for (const templateName of templateNames) {
-    test.describe(`template: ${templateName}`, () => {
+  for (const [templateName, parallelRouteTransform] of templateCases) {
+    test.describe(`template: ${templateName}, parallel: ${parallelRouteTransform}`, () => {
       let fixture: Fixture;
       let appFixture: AppFixture;
 
       test.beforeAll(async () => {
+        // Classic fixtures load their server modules in this test worker.
+        for (const key of ["custom_export_count", "loader_count", "component_count", "client_loader_count"]) {
+          delete (globalThis as Record<string, unknown>)[key];
+        }
         fixture = await createFixture({
           templateName,
           files: {
-            "rsbuild.config.ts": await rsbuildConfig.basic({
-              templateName,
-            }),
+            "rsbuild.config.ts": (await rsbuildConfig.basic({ templateName })).replace(
+              "pluginReactRouter()",
+              `pluginReactRouter({ parallelRouteTransform: ${parallelRouteTransform} })`,
+            ),
             "app/routes/client-first.a.tsx": `
               import { Link } from "react-router";
 

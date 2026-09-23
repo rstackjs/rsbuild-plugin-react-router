@@ -1,3 +1,4 @@
+import { mkdirSync, renameSync, symlinkSync } from "node:fs";
 import * as path from "node:path";
 import { expect } from "@playwright/test";
 import stripAnsi from "strip-ansi";
@@ -264,3 +265,42 @@ test("route re-exports use native dependency aliases and prune server exports", 
   expect(grep(path.join(cwd, "build/client"), /SERVER_ONLY/)).toHaveLength(0);
   expect(grep(path.join(cwd, "build/server"), /SERVER_ONLY/).length).toBeGreaterThan(0);
 });
+
+
+for (const symlinked of ["route file", "app directory"]) {
+  test(`prunes server exports through a symlinked ${symlinked}`, async () => {
+    const cwd = await createProject({
+      "app/routes.ts": `export default [
+        { index: true, file: "routes/_index.tsx" },
+        { path: "target", file: "routes/target.tsx" },
+      ];`,
+      "app/secret.server.ts": serverOnlyModule,
+      "app/routes/target.tsx": `
+        import serverOnly from "../secret.server";
+        export function loader() { return serverOnly; }
+        export function meta() { return [{ title: "Symlinked route" }]; }
+        export default function Target() { return <h1>Target</h1>; }
+      `,
+      "app/routes/_index.tsx": `
+        export { meta } from "~/routes/target";
+        export default function Index() { return <h1>Index</h1>; }
+      `,
+    });
+    if (symlinked === "route file") {
+      mkdirSync(path.join(cwd, "app/route-impl"));
+      const registered = path.join(cwd, "app/routes/target.tsx");
+      const actual = path.join(cwd, "app/route-impl/target.tsx");
+      renameSync(registered, actual);
+      symlinkSync(actual, registered, "file");
+    } else {
+      const registered = path.join(cwd, "app");
+      const actual = path.join(cwd, "app-real");
+      renameSync(registered, actual);
+      symlinkSync(actual, registered, "junction");
+    }
+    const result = build({ cwd });
+    expect(result.status, result.stdout.toString() + result.stderr.toString()).toBe(0);
+    expect(grep(path.join(cwd, "build/client"), /SERVER_ONLY/)).toHaveLength(0);
+    expect(grep(path.join(cwd, "build/server"), /SERVER_ONLY/).length).toBeGreaterThan(0);
+  });
+}

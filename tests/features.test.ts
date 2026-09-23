@@ -236,19 +236,17 @@ describe('pluginReactRouter', () => {
         )
       ).toBe(true);
 
-      const splitRouteExportsTransform = calls.find(
+      const routeTransforms = calls.filter(
         (call: any) =>
           typeof call.test === 'function' &&
-          call.resourceQuery?.not?.toString().includes('route-chunk=') &&
-          call.environments?.includes('web')
+          call.resourceQuery?.not?.toString().includes('route-chunk=')
       );
-      expect(splitRouteExportsTransform).toBeDefined();
-      expect(
-        splitRouteExportsTransform.test(path.resolve('app/routes/index.tsx'))
-      ).toBe(true);
-      expect(splitRouteExportsTransform.test(path.resolve('app/other.tsx'))).toBe(
-        false
-      );
+      expect(routeTransforms).toHaveLength(1);
+      const [routeTransform] = routeTransforms;
+      expect(routeTransform.test(path.resolve('app/routes/index.tsx'))).toBe(true);
+      expect(routeTransform.test(path.resolve('app/other.tsx'))).toBe(false);
+      expect(routeTransform.resourceQuery.not.test('')).toBe(false);
+      expect(routeTransform.resourceQuery.not.test('?react-router-route')).toBe(false);
 
       expect(
         calls.some(

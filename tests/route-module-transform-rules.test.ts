@@ -50,10 +50,10 @@ describe('route module transform rules', () => {
 
   it('registers route module loader rules with loader options', () => {
     const config = createRuleConfig(true, { devHmr: true });
-    const [queryRule, routeRule] = config.module.rules;
+    const [routeRule] = config.module.rules;
 
-    expect(config.module.rules).toHaveLength(2);
-    expect(queryRule.use[0]).toMatchObject({
+    expect(config.module.rules).toHaveLength(1);
+    expect(routeRule.use[0]).toMatchObject({
       options: {
         environmentName: 'web',
         performanceScopeId: 'web:dev:ssr:/project/app/root.tsx',

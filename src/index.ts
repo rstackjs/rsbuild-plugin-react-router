@@ -90,7 +90,10 @@ import {
   setupReactRouterRscPlugin,
 } from './rsc-support.js';
 import { createReactRouterModePlan } from './mode-plan.js';
-import { createQuerylessRouteImportPlugin } from './route-imports.js';
+import {
+  createQuerylessRouteImportPlugin,
+  createRouteFilePathMap,
+} from './route-imports.js';
 import { registerDevServerSourceMaps } from './dev-source-maps.js';
 
 export type { Config as ReactRouterRsbuildConfig } from './react-router-config.js';
@@ -519,6 +522,13 @@ export const pluginReactRouter = (
       analysis: RouteModuleAnalysis
     ) => {
       transformedRouteModuleAnalyses.set(resolve(resourcePath), analysis);
+      const route = routeByFilePath.get(resolve(resourcePath));
+      if (route) {
+        transformedRouteModuleAnalyses.set(
+          resolve(appDirectory, route.file),
+          analysis
+        );
+      }
     };
     const routeModuleAnalysis = async (routeFilePath: string) =>
       transformedRouteModuleAnalyses.get(resolve(routeFilePath));
@@ -575,12 +585,7 @@ export const pluginReactRouter = (
       }
     };
 
-    const routeByFilePath = new Map(
-      Object.values(routes).map(route => [
-        resolve(appDirectory, route.file),
-        route,
-      ])
-    );
+    const routeByFilePath = createRouteFilePathMap(appDirectory, routes);
     const allowedActionOriginsForBuild =
       allowedActionOrigins === false ? undefined : allowedActionOrigins;
 

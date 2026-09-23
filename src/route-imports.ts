@@ -1,7 +1,28 @@
+import { realpathSync } from 'node:fs';
+import { resolve } from 'pathe';
 import { rspack, type Rspack } from '@rsbuild/core';
 
 import { PLUGIN_NAME } from './constants.js';
 import type { Route } from './types.js';
+
+export const createRouteFilePathMap = (
+  appDirectory: string,
+  routes: Record<string, Route>
+): Map<string, Route> => {
+  const routeByFilePath = new Map<string, Route>();
+  for (const route of Object.values(routes)) {
+    const filePath = resolve(appDirectory, route.file);
+    routeByFilePath.set(filePath, route);
+    try {
+      routeByFilePath.set(resolve(realpathSync(filePath)), route);
+    } catch (error) {
+      // Leave missing/generated routes for the compiler to diagnose.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
+    }
+  }
+  return routeByFilePath;
+};
 
 type QuerylessRouteImportPlugin = {
   name: string;

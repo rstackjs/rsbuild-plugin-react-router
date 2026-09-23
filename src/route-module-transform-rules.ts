@@ -97,19 +97,12 @@ export const registerRouteModuleTransformRules = (
 
   rspackConfig.module ??= {};
   rspackConfig.module.rules ??= [];
-  rspackConfig.module.rules.push(
-    {
-      resourceQuery: /\?react-router-route/,
-      enforce: 'post',
-      use: [routeModuleTransformUse],
+  rspackConfig.module.rules.push({
+    test: path => routeByFilePath.has(path),
+    resourceQuery: {
+      not: /__react-router-build-client-route|route-chunk=/,
     },
-    {
-      test: path => routeByFilePath.has(path),
-      resourceQuery: {
-        not: /__react-router-build-client-route|react-router-route|route-chunk=/,
-      },
-      enforce: 'post',
-      use: [routeModuleTransformUse],
-    }
-  );
+    enforce: 'post',
+    use: [routeModuleTransformUse],
+  });
 };

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { rspack, type Rspack } from '@rsbuild/core';
@@ -6,6 +6,7 @@ import { describe, expect, it } from '@rstest/core';
 
 import {
   createQuerylessRouteImportPlugin,
+  createRouteFilePathMap,
   resolveQuerylessRouteImportRequest,
 } from '../src/route-imports';
 import type { Route } from '../src/types';
@@ -116,6 +117,9 @@ describe('queryless route imports with the native resolver', () => {
     'extension priority',
     'directory index',
     'TypeScript paths',
+    'symlink target',
+    'symlink issuer',
+    'symlinks disabled',
     'RSC browser',
     'RSC SSR',
     'RSC server',
@@ -140,6 +144,7 @@ describe('queryless route imports with the native resolver', () => {
       extensions: ['.js', '.tsx'],
       alias: { [request]: target },
     };
+    if (kind === 'symlinks disabled') resolve.symlinks = false;
     if (kind === 'dependency alias') {
       resolve.alias = { '@route': wrong };
       resolve.byDependency = { esm: { alias: { '@route': target } } };
@@ -190,6 +195,13 @@ describe('queryless route imports with the native resolver', () => {
     );
     writeFileSync(target, `export const value = 'correct route';`);
     writeFileSync(wrong, `export const value = 'wrong route';`);
+    const realTarget = kind === 'symlink target' ? join(root, 'real-target.js') : target;
+    if (kind.startsWith('symlink')) {
+      const file = kind === 'symlink issuer' ? source : target;
+      const realFile = join(root, kind === 'symlink issuer' ? 'real-source.js' : 'real-target.js');
+      renameSync(file, realFile);
+      symlinkSync(realFile, file);
+    }
     const files = [
       source,
       target,
@@ -197,7 +209,7 @@ describe('queryless route imports with the native resolver', () => {
       join(root, 'target.tsx'),
       join(root, 'directory/index.js'),
     ];
-    const routes = new Map(files.map(file => [file, { id: file, file }]));
+    const routes = createRouteFilePathMap(root, Object.fromEntries(files.map(file => [file, {id: file, file}])));
     const rsc = kind.startsWith('RSC');
     const query =
       kind === 'RSC server'
@@ -248,7 +260,7 @@ describe('queryless route imports with the native resolver', () => {
         stats.compilation.modules,
         module => (module as Rspack.NormalModule).resource
       );
-      expect(resources).toContain(`${target}${query}`);
+      expect(resources).toContain(`${realTarget}${query}`);
       expect(resources).not.toContain(target);
       expect(resources.some(resource => resource?.includes('wrong.js'))).toBe(
         false
