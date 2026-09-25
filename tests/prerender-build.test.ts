@@ -1,13 +1,19 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createLogger } from '@rsbuild/core';
 import { expect, it, rstest } from '@rstest/core';
+import { getPackageVersion } from '../src/plugin-utils';
+import * as actualPluginUtils from '../src/plugin-utils' with { rstest: 'importActual' };
 import { runReactRouterPrerenderBuild } from '../src/prerender-build';
 import { startServerBuildWorker } from '../src/server-build-worker-client';
 
 rstest.mock('../src/server-build-worker-client', () => ({
   startServerBuildWorker: rstest.fn(),
+}));
+rstest.mock('../src/plugin-utils', () => ({
+  ...actualPluginUtils,
+  getPackageVersion: rstest.fn(),
 }));
 
 it('writes escaped classic redirects without consuming their body and releases the request', async () => {
@@ -95,12 +101,7 @@ it.each([
     const buildDirectory = await mkdtemp(
       resolve(tmpdir(), 'rsbuild-prerender-root-data-')
     );
-    const reactRouterDir = resolve(buildDirectory, 'node_modules/react-router');
-    await mkdir(reactRouterDir, { recursive: true });
-    await writeFile(
-      resolve(reactRouterDir, 'package.json'),
-      JSON.stringify({ name: 'react-router', version })
-    );
+    rstest.mocked(getPackageVersion).mockReturnValueOnce(version);
     const routes = {
       root: { id: 'root', path: '', file: 'root.tsx' },
     };

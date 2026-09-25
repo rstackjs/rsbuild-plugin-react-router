@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import fsExtra from 'fs-extra';
 import * as Effect from 'effect/Effect';
 import type { RsbuildPluginAPI } from '@rsbuild/core';
@@ -7,11 +8,7 @@ import { matchRoutes } from 'react-router';
 import { dirname, relative, resolve } from 'pathe';
 import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import { getBuildManifest } from './build-manifest.js';
-import {
-  escapeHtml,
-  getPackageVersion,
-  resolveAppPackagePath,
-} from './plugin-utils.js';
+import { escapeHtml, getPackageVersion } from './plugin-utils.js';
 import {
   createReactRouterManifestOptions,
   generateReactRouterManifestForDev,
@@ -36,6 +33,8 @@ import { startServerBuildWorker } from './server-build-worker-client.js';
 import type { ServerBuildDescription } from './server-build-worker-protocol.js';
 import type { PluginOptions, Route } from './types.js';
 import { runPluginEffect, tryPluginPromise } from './effect-runtime.js';
+
+const requireFromPlugin = createRequire(import.meta.url);
 
 type PrerenderBuildApi = Pick<
   RsbuildPluginAPI,
@@ -645,9 +644,10 @@ export const runReactRouterPrerenderBuild = async (
         }
 
         const buildRoutes = createPrerenderRoutes(build.routes);
+        // The worker's request handler uses the react-router this plugin resolves.
         const legacyRootDataRequest = !getDefaultTrailingSlashAwareDataRequests(
           getPackageVersion('react-router', specifier =>
-            resolveAppPackagePath(specifier, appDirectory)
+            requireFromPlugin.resolve(specifier)
           )
         );
         await runPluginEffect(
