@@ -7,7 +7,11 @@ import { matchRoutes } from 'react-router';
 import { dirname, relative, resolve } from 'pathe';
 import { PLUGIN_NAME, SPA_FALLBACK_HTML_FILE } from './constants.js';
 import { getBuildManifest } from './build-manifest.js';
-import { escapeHtml } from './plugin-utils.js';
+import {
+  escapeHtml,
+  getPackageVersion,
+  resolveAppPackagePath,
+} from './plugin-utils.js';
 import {
   createReactRouterManifestOptions,
   generateReactRouterManifestForDev,
@@ -23,9 +27,10 @@ import {
   getSsrFalsePrerenderExportErrors,
   normalizePrerenderMatchPath,
 } from './prerender.js';
-import type {
-  Config,
-  ResolvedReactRouterConfig,
+import {
+  getDefaultTrailingSlashAwareDataRequests,
+  type Config,
+  type ResolvedReactRouterConfig,
 } from './react-router-config.js';
 import { startServerBuildWorker } from './server-build-worker-client.js';
 import type { ServerBuildDescription } from './server-build-worker-protocol.js';
@@ -150,6 +155,7 @@ const prerenderDataEffect = ({
   clientBuildDir,
   basename,
   trailingSlashAwareDataRequests,
+  legacyRootDataRequest,
   api,
   requestInit,
 }: {
@@ -159,6 +165,7 @@ const prerenderDataEffect = ({
   clientBuildDir: string;
   basename: string;
   trailingSlashAwareDataRequests: boolean;
+  legacyRootDataRequest: boolean;
   api: PrerenderBuildApi;
   requestInit?: RequestInit;
 }) => {
@@ -166,10 +173,13 @@ const prerenderDataEffect = ({
     prerenderPath,
     trailingSlashAwareDataRequests
   );
-  // The handler always serves the root route's data at /_root.data, even when
-  // trailing-slash-aware naming writes the root output to /_.data.
+  // React Router 7 handlers serve root data only at /_root.data, even when
+  // trailing-slash-aware naming writes the output to /_.data. React Router 8
+  // handlers only understand /_.data.
   const dataRequestPath =
-    trailingSlashAwareDataRequests && prerenderPath === '/'
+    legacyRootDataRequest &&
+    trailingSlashAwareDataRequests &&
+    prerenderPath === '/'
       ? '/_root.data'
       : dataOutputPath;
   const normalizedPath = `${basename}${dataRequestPath}`.replace(/\/\/+/g, '/');
@@ -442,6 +452,7 @@ const createPrerenderPathEffect = ({
   buildRoutes,
   requestHandler,
   clientBuildDir,
+  legacyRootDataRequest,
   options,
 }: {
   path: string;
@@ -449,6 +460,7 @@ const createPrerenderPathEffect = ({
   buildRoutes: ReturnType<typeof createPrerenderRoutes>;
   requestHandler: (request: Request) => Promise<Response>;
   clientBuildDir: string;
+  legacyRootDataRequest: boolean;
   options: RunReactRouterPrerenderBuildOptions;
 }): Effect.Effect<void, Error, never> =>
   Effect.gen(function* () {
@@ -474,6 +486,7 @@ const createPrerenderPathEffect = ({
           basename,
           trailingSlashAwareDataRequests:
             future.unstable_trailingSlashAwareDataRequests,
+          legacyRootDataRequest,
           api,
         });
         yield* prerenderResourceRouteEffect({
@@ -509,6 +522,7 @@ const createPrerenderPathEffect = ({
           basename,
           trailingSlashAwareDataRequests:
             future.unstable_trailingSlashAwareDataRequests,
+          legacyRootDataRequest,
           api,
         })
       : undefined;
@@ -631,6 +645,11 @@ export const runReactRouterPrerenderBuild = async (
         }
 
         const buildRoutes = createPrerenderRoutes(build.routes);
+        const legacyRootDataRequest = !getDefaultTrailingSlashAwareDataRequests(
+          getPackageVersion('react-router', specifier =>
+            resolveAppPackagePath(specifier, appDirectory)
+          )
+        );
         await runPluginEffect(
           createBoundedPrerenderTasksEffect(
             prerenderPaths,
@@ -642,6 +661,7 @@ export const runReactRouterPrerenderBuild = async (
                 buildRoutes,
                 requestHandler,
                 clientBuildDir,
+                legacyRootDataRequest,
                 options,
               })
           )

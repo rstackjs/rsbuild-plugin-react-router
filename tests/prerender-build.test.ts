@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createLogger } from '@rsbuild/core';
@@ -85,3 +85,77 @@ it('writes escaped classic redirects without consuming their body and releases t
     await rm(buildDirectory, { recursive: true, force: true });
   }
 });
+
+it.each([
+  ['8.4.0', '/_.data'],
+  ['7.18.0', '/_root.data'],
+])(
+  'requests root data the way React Router %s handlers expect',
+  async (version, expectedRequestPath) => {
+    const buildDirectory = await mkdtemp(
+      resolve(tmpdir(), 'rsbuild-prerender-root-data-')
+    );
+    const reactRouterDir = resolve(buildDirectory, 'node_modules/react-router');
+    await mkdir(reactRouterDir, { recursive: true });
+    await writeFile(
+      resolve(reactRouterDir, 'package.json'),
+      JSON.stringify({ name: 'react-router', version })
+    );
+    const routes = {
+      root: { id: 'root', path: '', file: 'root.tsx' },
+    };
+    const requestPaths: string[] = [];
+    rstest.mocked(startServerBuildWorker).mockResolvedValueOnce({
+      description: {
+        routes: {
+          root: {
+            ...routes.root,
+            module: { default: true, ErrorBoundary: false, loader: true },
+          },
+        },
+        assets: { routes: { root: { hasLoader: true } } },
+      },
+      handler: async request => {
+        const { pathname } = new URL(request.url);
+        requestPaths.push(pathname);
+        return new Response(pathname.endsWith('.data') ? 'data' : '<html>', {
+          status: 200,
+        });
+      },
+      close: async () => {},
+    });
+    try {
+      await runReactRouterPrerenderBuild({
+        api: {
+          logger: createLogger({ level: 'silent' }),
+          getNormalizedConfig: () => ({}) as never,
+        },
+        hasWebEnvironment: true,
+        buildDirectory,
+        ssr: true,
+        isPrerenderEnabled: true,
+        prerenderConfig: ['/'],
+        prerenderPaths: ['/'],
+        basename: '/',
+        future: { unstable_trailingSlashAwareDataRequests: true } as never,
+        routes,
+        latestBrowserManifest: null,
+        latestBrowserManifestModuleExports: {},
+        clientStats: undefined,
+        pluginOptions: {},
+        appDirectory: buildDirectory,
+        assetPrefix: '/',
+        routeChunkOptions: undefined,
+        buildManifest: { routes },
+        buildEndReactRouterConfig: {} as never,
+        buildEnd: undefined,
+      });
+      expect(requestPaths).toContain(expectedRequestPath);
+      expect(
+        await readFile(resolve(buildDirectory, 'client/_.data'), 'utf8')
+      ).toBe('data');
+    } finally {
+      await rm(buildDirectory, { recursive: true, force: true });
+    }
+  }
+);
