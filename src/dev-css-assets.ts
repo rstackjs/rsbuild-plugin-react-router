@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Rspack } from '@rsbuild/core';
+import { rspack, type Rspack } from '@rsbuild/core';
 import {
   getManifestAssetType,
   type ReactRouterManifestStats,
@@ -7,6 +7,27 @@ import {
 
 export const stripDevCssVersion = (url: string): string =>
   url.replace(/\.__react_router_css_[a-f0-9]{64}\.css(?=[?#]|$)/, '');
+
+export const devCssOwnershipPlugin: Rspack.RspackPluginInstance = {
+  apply(compiler) {
+    compiler.hooks.compilation.tap('ReactRouterCssOwnership', compilation => {
+      rspack.NormalModule.getCompilationHooks(compilation).loader.tap(
+        'ReactRouterCssOwnership',
+        context => {
+          if (
+            context.loaders.some(
+              ({ path }) => path === rspack.CssExtractRspackPlugin.loader
+            )
+          ) {
+            // Router updates extracted styles through committed manifests. The
+            // loader's fallback scans all links, including React-owned nodes.
+            context.hot = false;
+          }
+        }
+      );
+    });
+  },
+};
 
 export const versionDevCssAssets = (
   compilation: Pick<Rspack.Compilation, 'getAsset' | 'emitAsset'>,
