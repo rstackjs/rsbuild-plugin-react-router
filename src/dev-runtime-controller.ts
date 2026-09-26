@@ -64,6 +64,16 @@ type CreateControllerOptions = {
 const isCssSourceFile = (file: string): boolean =>
   /\.css(?:\.[cm]?[jt]s)?$/.test(file);
 
+const manifestPayload = (manifest: ReactRouterDevManifestSet[string]) => ({
+  event: DEV_MANIFEST_UPDATE_EVENT,
+  data: {
+    entry: manifest.entry,
+    routes: manifest.routes,
+    version: manifest.version,
+    url: manifest.url,
+  },
+});
+
 export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
@@ -92,6 +102,7 @@ export const createReactRouterDevRuntimeController = ({
     binding.server.sockWrite('full-reload', { path: '*' });
   };
 
+  const manifestSubscriptions = new WeakMap<RuntimeBinding, () => void>();
   const hdrChannels = new WeakMap<
     RuntimeBinding,
     ReturnType<typeof createDevHdrChannel>
@@ -102,6 +113,8 @@ export const createReactRouterDevRuntimeController = ({
       : clientPatchesRouteMetadata === true;
 
   const closeBinding = (binding: RuntimeBinding, error?: Error): void => {
+    manifestSubscriptions.get(binding)?.();
+    manifestSubscriptions.delete(binding);
     hdrChannels.get(binding)?.close();
     hdrChannels.delete(binding);
     const pair = binding.compilers;
@@ -291,10 +304,7 @@ export const createReactRouterDevRuntimeController = ({
             return;
           }
           if (isHmrEnabled()) {
-            server.sockWrite('custom', {
-              event: DEV_MANIFEST_UPDATE_EVENT,
-              data: manifest.routes,
-            });
+            server.sockWrite('custom', manifestPayload(manifest));
           } else {
             server.sockWrite('full-reload', { path: '*' });
           }
@@ -302,6 +312,18 @@ export const createReactRouterDevRuntimeController = ({
         onWarning: message => api.logger.warn(message),
       });
       const binding = sessions.createBinding(server, runtime);
+      manifestSubscriptions.set(
+        binding,
+        server.environments.web.hot.onConnect(client => {
+          const manifest = runtime.getCommittedManifest();
+          if (
+            sessions.getActiveBinding() === binding &&
+            isHmrEnabled() &&
+            manifest
+          )
+            client.send('custom', manifestPayload(manifest));
+        })
+      );
       hdrChannels.set(
         binding,
         createDevHdrChannel({

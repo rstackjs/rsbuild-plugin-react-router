@@ -90,4 +90,103 @@ describe('React Router development runtime CSS ownership', () => {
       assets: { version: 'without-entry-css' },
     });
   });
+  it('commits CSS version changes in web-only builds without reloading or reevaluating loaders', async () => {
+    const changed = rstest.fn();
+    const ownership = rstest.fn();
+    let build = createBuild('loader-v1');
+    const { runtime, loadBundle, warnings } = createDevRuntimeHarness(
+      () => build,
+      { onRouteManifestChanged: changed, onCssAssetOwnershipChanged: ownership }
+    );
+    let node = createCompilation('node', { files: ['/app/style.css'] });
+    for (const [i, token] of ['a', 'b', 'a'].entries()) {
+      const web = createCompilation('web');
+      runtime.beginAttempt();
+      captureWeb(runtime, web, token, {
+        entry: [`/entry.css.__react_router_css_${token.repeat(64)}.css`],
+        routes: {
+          'routes/about': [
+            `/route.css.__react_router_css_${token.repeat(64)}.css?theme=x`,
+          ],
+        },
+      });
+      expect(
+        await runtime.finishAttempt(
+          createGraphStats(web, node),
+          {
+            web: { known: true, files: new Set(['/app/style.css']) },
+            node: { known: false, files: new Set() },
+          },
+          graphIdentity(web, node)
+        )
+      ).toBe('committed');
+      expect((await runtime.load()).marker).toBe('loader-v1');
+      expect(changed).toHaveBeenCalledTimes(i);
+    }
+    expect(loadBundle).toHaveBeenCalledTimes(1);
+    expect(ownership).not.toHaveBeenCalled();
+    expect(warnings).toEqual([]);
+    const web = createCompilation('web');
+    node = createCompilation('node');
+    build = createBuild('loader-v2');
+    runtime.beginAttempt();
+    captureWeb(runtime, web, 'c', {
+      entry: [`/entry.css.__react_router_css_${'c'.repeat(64)}.css`],
+      routes: {
+        'routes/about': [
+          `/route.css.__react_router_css_${'c'.repeat(64)}.css?theme=x`,
+        ],
+      },
+    });
+    expect(
+      await runtime.finishAttempt(
+        createGraphStats(web, node),
+        noKnownChanges,
+        graphIdentity(web, node)
+      )
+    ).toBe('committed');
+    expect((await runtime.load()).marker).toBe('loader-v2');
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    expect(changed).toHaveBeenCalledTimes(3);
+    expect(ownership).not.toHaveBeenCalled();
+  });
+
+  it('does not publish failed CSS/loader generations or replay them to reconnecting clients', async () => {
+    const changed = rstest.fn();
+    let fail = false;
+    const { runtime } = createDevRuntimeHarness(
+      () => {
+        if (fail) throw new Error('loader evaluation failed');
+        return createBuild('good-loader');
+      },
+      { onRouteManifestChanged: changed }
+    );
+    for (const token of ['a', 'b']) {
+      const web = createCompilation('web');
+      const node = createCompilation('node');
+      runtime.beginAttempt();
+      captureWeb(runtime, web, token, {
+        entry: [`/entry.css.__react_router_css_${token.repeat(64)}.css`],
+        routes: {
+          'routes/about': [
+            `/route.css.__react_router_css_${token.repeat(64)}.css`,
+          ],
+        },
+      });
+      fail = token === 'b';
+      expect(
+        await runtime.finishAttempt(
+          createGraphStats(web, node),
+          noKnownChanges,
+          graphIdentity(web, node)
+        )
+      ).toBe(fail ? 'ignored' : 'committed');
+    }
+    expect(changed).not.toHaveBeenCalled();
+    expect(runtime.getCommittedManifest()?.version).toBe('a');
+    expect(runtime.getCommittedManifest()?.entry.css).toEqual([
+      `/entry.css.__react_router_css_${'a'.repeat(64)}.css`,
+    ]);
+    expect((await runtime.load()).marker).toBe('good-loader');
+  });
 });

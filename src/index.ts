@@ -3,6 +3,7 @@ import {
   type ReactRouterManifestSnapshot,
 } from './manifest-snapshot.js';
 import { createReactRouterManifestState } from './manifest-state.js';
+import { devCssOwnershipPlugin } from './dev-css-assets.js';
 import { registerNodeOnlyManifestValidation } from './node-only-manifest.js';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -616,6 +617,8 @@ export const pluginReactRouter = (
               rspack: rspackConfig => {
                 devHmrEnabled = isRspackSwcReactRefreshEnabled(rspackConfig);
                 if (devHmrEnabled) {
+                  rspackConfig.plugins ??= [];
+                  rspackConfig.plugins.push(devCssOwnershipPlugin);
                   const entries = rspackConfig.entry;
                   if (
                     entries &&

@@ -347,7 +347,10 @@ describe('development manifests with content hashes', () => {
     const [finalized] = result.publications;
     expect(finalized.compilation).toBe(result.compilation);
     expect(finalized.manifest).toEqual(result.emitted.manifest);
-    expect(finalized.manifestStats).toEqual(result.manifestStats);
+    expect(finalized.manifestStats).toEqual({
+      ...result.manifestStats,
+      cssUrlsByName: {},
+    });
     expect(finalized.moduleExportsByRouteId.page).toEqual([
       'clientLoader',
       'loader',
