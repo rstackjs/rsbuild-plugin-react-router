@@ -1,6 +1,7 @@
 import { DEFAULT_JS_DIST_PATH } from './constants.js';
 
 export type ReactRouterManifestStats = {
+  cssUrlsByName?: Record<string, string>;
   assetsByChunkName?: Record<string, string[]>;
   entrypointFilesByName?: Record<string, string[]>;
   assetTypesByName?: Record<string, string>;
@@ -220,7 +221,9 @@ export const createChunkAssetResolver = (
 
     const result = {
       js: [...new Set(jsAssets)],
-      css: [...cssAssets],
+      css: [...cssAssets].map(
+        asset => clientStats?.cssUrlsByName?.[asset] ?? asset
+      ),
     };
     chunkAssetsByName.set(chunkName, result);
     return result;

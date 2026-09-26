@@ -102,6 +102,7 @@ const RefreshRuntime =
     : __refreshRuntimeModule.default;
 
 const pendingRouteUpdates = new Map();
+let pendingManifestUpdate;
 let flushTimeout;
 let pendingRevalidation = false;
 let flushing = false;
@@ -332,30 +333,16 @@ function performReactRefresh() {
   }
 }
 
-function applyManifestUpdate(nextRoutes) {
-  const router = window.__reactRouterDataRouter;
-  const routeModules = window.__reactRouterRouteModules;
-  const manifest = window.__reactRouterManifest;
-  const context = window.__reactRouterContext;
-  if (
-    !router ||
-    !routeModules ||
-    !manifest ||
-    !context ||
-    !nextRoutes ||
-    typeof router.createRoutesForHMR !== 'function' ||
-    typeof router._internalSetRoutes !== 'function'
-  ) {
-    return;
-  }
+function applyManifestUpdate(update, router, routeModules, manifest, context) {
+  if (typeof router.createRoutesForHMR !== 'function' || typeof router._internalSetRoutes !== 'function') return;
   const routes = router.createRoutesForHMR(
-    new Set(Object.keys(nextRoutes)),
-    nextRoutes,
+    new Set(Object.keys(update.routes)),
+    update.routes,
     routeModules,
     context.ssr,
     context.isSpaMode
   );
-  manifest.routes = nextRoutes;
+  Object.assign(manifest, update);
   router._internalSetRoutes(routes);
   patchCurrentRouteMatches(router, routes);
 }
@@ -374,8 +361,19 @@ async function flush() {
     scheduleFlush();
     return;
   }
+  // Reconnect also replays the initial SSR manifest. Avoid route-state changes
+  // during hydration when the client already has exactly that committed version.
+  if (pendingManifestUpdate?.version && pendingManifestUpdate.version === manifest.version) {
+    pendingManifestUpdate = undefined;
+    if (!pendingRevalidation && pendingRouteUpdates.size === 0) return;
+  }
   flushing = true;
   try {
+    if (pendingManifestUpdate) {
+      const update = pendingManifestUpdate;
+      pendingManifestUpdate = undefined;
+      applyManifestUpdate(update, router, routeModules, manifest, context);
+    }
     let shouldRevalidate = pendingRevalidation;
     pendingRevalidation = false;
     const { nextManifest, hmrRoutes, shouldRefreshRouteState } =
@@ -403,14 +401,14 @@ async function flush() {
     performReactRefresh();
   } finally {
     flushing = false;
-    if (pendingRevalidation || pendingRouteUpdates.size > 0) scheduleFlush();
+    if (pendingManifestUpdate || pendingRevalidation || pendingRouteUpdates.size > 0) scheduleFlush();
   }
 }
 
 if (typeof window !== 'undefined' && import.meta.webpackHot) {
   import.meta.webpackHot.on(
     ${JSON.stringify(DEV_MANIFEST_UPDATE_EVENT)},
-    applyManifestUpdate
+    update => { pendingManifestUpdate = update; scheduleFlush(); }
   );
   import.meta.webpackHot.on(
     ${JSON.stringify(DEV_HDR_UPDATE_EVENT)},

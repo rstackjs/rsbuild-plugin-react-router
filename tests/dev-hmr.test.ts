@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, rstest } from '@rstest/core';
 import {
+  DEV_MANIFEST_UPDATE_EVENT,
   generateDevHmrRuntimeModule,
   resolveReactRefreshRuntimePath,
 } from '../src/dev-hmr';
@@ -13,7 +14,11 @@ const createRuntime = () => {
   const listeners = new Map<string, (data: unknown) => void>();
   let status = 'idle';
   const revalidate = rstest.fn(async () => {});
-  const router = { revalidate };
+  const router = {
+    revalidate,
+    createRoutesForHMR: rstest.fn(() => []),
+    _internalSetRoutes: rstest.fn(),
+  };
   const window = {
     __reactRouterDataRouter: router as typeof router | undefined,
     __reactRouterRouteModules: {},
@@ -52,6 +57,8 @@ const createRuntime = () => {
       window.__reactRouterManifest.routes.component = {};
       updateRoute('component', {}, () => ({ default: () => null }));
     },
+    receiveManifest: (manifest: object) =>
+      listeners.get(DEV_MANIFEST_UPDATE_EVENT)!(manifest),
     receive: (revision: number, sessionId = 'first') =>
       listeners.get(DEV_HDR_UPDATE_EVENT)!({ sessionId, revision }),
     setStatus: (next: string) => {
@@ -151,5 +158,45 @@ describe('resolveReactRefreshRuntimePath', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('committed CSS manifests', () => {
+  it('retains early entry and route updates, coalesces, and waits for HMR idle without revalidating loaders', async () => {
+    const runtime = createRuntime();
+    runtime.window.__reactRouterDataRouter = undefined;
+    runtime.receiveManifest({
+      entry: { css: ['/entry.css?v=1'] },
+      routes: { home: { css: ['/route.css?v=1'] } },
+    });
+    await runtime.flush();
+    runtime.window.__reactRouterDataRouter = runtime.router;
+    runtime.setStatus('apply');
+    runtime.receiveManifest({
+      entry: { css: ['/entry.css?v=2'] },
+      routes: { home: { css: ['/route.css?v=2'] } },
+    });
+    await runtime.flush();
+    expect(runtime.router._internalSetRoutes).not.toHaveBeenCalled();
+    runtime.setStatus('idle');
+    await runtime.flush();
+    expect(runtime.window.__reactRouterManifest).toMatchObject({
+      entry: { css: ['/entry.css?v=2'] },
+      routes: { home: { css: ['/route.css?v=2'] } },
+    });
+    expect(runtime.router._internalSetRoutes).toHaveBeenCalledTimes(1);
+    expect(runtime.revalidate).not.toHaveBeenCalled();
+  });
+  it('does not rebuild routes for an identical SSR manifest replay during hydration', async () => {
+    const runtime = createRuntime();
+    Object.assign(runtime.window.__reactRouterManifest, { version: 'initial' });
+    runtime.receiveManifest({
+      version: 'initial',
+      entry: { css: [] },
+      routes: {},
+    });
+    await runtime.flush();
+    expect(runtime.router._internalSetRoutes).not.toHaveBeenCalled();
+    expect(runtime.revalidate).not.toHaveBeenCalled();
   });
 });

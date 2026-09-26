@@ -800,9 +800,33 @@ describe('React Router development runtime controller', () => {
     expect(server.sockWrite).toHaveBeenCalledWith('custom', {
       event: 'react-router:manifest-update',
       data: expect.objectContaining({
-        'routes/about': expect.objectContaining({ hasClientLoader: true }),
+        routes: expect.objectContaining({
+          'routes/about': expect.objectContaining({ hasClientLoader: true }),
+        }),
       }),
     });
+    const client = { send: rstest.fn() };
+    for (const [listener] of (server.environments.web.hot.onConnect as any).mock
+      .calls)
+      listener(client);
+    expect(client.send).toHaveBeenCalledWith(
+      'custom',
+      expect.objectContaining({
+        event: 'react-router:manifest-update',
+        data: expect.objectContaining({
+          version: 'web-next',
+          routes: expect.objectContaining({
+            'routes/about': expect.objectContaining({ hasClientLoader: true }),
+          }),
+        }),
+      })
+    );
+    await callbacks.close();
+    client.send.mockClear();
+    for (const [listener] of (server.environments.web.hot.onConnect as any).mock
+      .calls)
+      listener(client);
+    expect(client.send).not.toHaveBeenCalled();
   });
 
   it('publishes a safe node-only compile after the aggregate pre-hook', async () => {

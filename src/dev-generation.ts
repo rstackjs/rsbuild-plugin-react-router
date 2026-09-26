@@ -1,3 +1,4 @@
+import { stripDevCssVersion } from './dev-css-assets.js';
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import * as EffectDeferred from 'effect/Deferred';
 import * as Effect from 'effect/Effect';
@@ -63,6 +64,7 @@ export type ReactRouterDevRuntime = {
   ) => Promise<'committed' | 'ignored' | 'retry-node'>;
   /** Node identity actually retained by the last successful generation. */
   getCommittedNodeIdentity: () => DevCompilationIdentity | undefined;
+  getCommittedManifest: () => ReactRouterDevManifestSet[string] | undefined;
   failAttempt: (error: Error) => void;
   load: (entryName?: string) => Promise<ServerBuild>;
   close: (error?: Error) => void;
@@ -84,11 +86,11 @@ const collectManifestCssAssetOwnership = (
 ): Set<string> => {
   const ownership = new Set<string>();
   for (const asset of manifest.entry?.css ?? []) {
-    ownership.add(`entry\0${asset}`);
+    ownership.add(`entry\0${stripDevCssVersion(asset)}`);
   }
   for (const [routeId, route] of Object.entries(manifest.routes ?? {})) {
     for (const asset of route.css ?? []) {
-      ownership.add(`route\0${routeId}\0${asset}`);
+      ownership.add(`route\0${routeId}\0${stripDevCssVersion(asset)}`);
     }
   }
   return ownership;
@@ -116,6 +118,23 @@ const hasRemovedCssAssetOwnership = (
     }
   }
   return false;
+};
+
+const hasCssManifestChanges = (
+  previous: ReactRouterDevManifestSet,
+  next: ReactRouterDevManifestSet
+): boolean => {
+  const css = (manifests: ReactRouterDevManifestSet) =>
+    Object.entries(manifests)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, manifest]) => [
+        name,
+        manifest.entry?.css ?? [],
+        Object.entries(manifest.routes ?? {})
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([id, route]) => [id, route.css ?? []]),
+      ]);
+  return JSON.stringify(css(previous)) !== JSON.stringify(css(next));
 };
 
 const hasAddedCssAssetOwnership = (
@@ -520,8 +539,15 @@ export const createReactRouterDevRuntime = ({
           previous.web.manifestsByEntryName,
           manifestsByEntryName
         );
+      const cssManifestChanged =
+        !!previous &&
+        webChanged &&
+        hasCssManifestChanges(
+          previous.web.manifestsByEntryName,
+          manifestsByEntryName
+        );
       const cssOnlyWebManifestChange =
-        (cssAssetsRemoved || cssAssetsAdded) &&
+        cssManifestChanged &&
         hasOnlyCssAssetOwnershipChanges(
           previous.web.manifestsByEntryName,
           manifestsByEntryName
@@ -587,6 +613,8 @@ export const createReactRouterDevRuntime = ({
         if (!committed) {
           return 'ignored';
         }
+        const ownershipReloaded =
+          cssAssetsRemoved || (cssAssetsAdded && reloadAfterCssRemoval);
         if (cssAssetsRemoved) {
           reloadAfterCssRemoval = !cssAssetsAdded;
           notifyCssAssetOwnershipChanged('removed');
@@ -596,7 +624,10 @@ export const createReactRouterDevRuntime = ({
           }
           reloadAfterCssRemoval = false;
         }
-        if (routeManifestMetadataChanged) {
+        if (
+          routeManifestMetadataChanged ||
+          (cssManifestChanged && !ownershipReloaded)
+        ) {
           notifyRouteManifestChanged(
             web.manifestsByEntryName[buildPlan.defaultEntryName]
           );
@@ -606,6 +637,12 @@ export const createReactRouterDevRuntime = ({
         rejectAttempt(attemptId, normalizeEffectError(cause), true);
         return 'ignored';
       }
+    },
+
+    getCommittedManifest() {
+      return state.kind === 'ready'
+        ? state.committed.web.manifestsByEntryName[buildPlan.defaultEntryName]
+        : undefined;
     },
 
     getCommittedNodeIdentity() {

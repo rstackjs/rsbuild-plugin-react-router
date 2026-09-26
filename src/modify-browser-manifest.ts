@@ -1,3 +1,4 @@
+import { versionDevCssAssets } from './dev-css-assets.js';
 import { PLUGIN_NAME } from './constants.js';
 import { getManifestAssetType, stripAssetQuery } from './manifest-assets.js';
 import { createHash } from 'node:crypto';
@@ -200,6 +201,7 @@ export function registerModifyBrowserManifestAssets(
       compilation,
       manifestChunkNames
     );
+    if (!isBuild && stats) versionDevCssAssets(compilation, stats);
     const { manifest, moduleExportsByRouteId } =
       await generateReactRouterManifestForDev(
         routes,
