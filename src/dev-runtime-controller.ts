@@ -314,7 +314,17 @@ export const createReactRouterDevRuntimeController = ({
       const binding = sessions.createBinding(server, runtime);
       manifestSubscriptions.set(
         binding,
-        server.environments.web.hot.onConnect(client => {
+        server.environments.web.hot.onConnect(async client => {
+          if (sessions.getActiveBinding() !== binding || !isHmrEnabled()) {
+            return;
+          }
+          if (!runtime.getCommittedManifest()) {
+            try {
+              await runtime.load();
+            } catch {
+              return;
+            }
+          }
           const manifest = runtime.getCommittedManifest();
           if (
             sessions.getActiveBinding() === binding &&

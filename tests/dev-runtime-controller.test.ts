@@ -791,7 +791,20 @@ describe('React Router development runtime controller', () => {
       });
     };
 
+    const earlyClient = { send: rstest.fn() };
+    const connections = (server.environments.web.hot.onConnect as any).mock.calls.map(
+      ([listener]: any) => listener(earlyClient)
+    );
+    expect(earlyClient.send).not.toHaveBeenCalled();
     await finishCompile('web-base', { hasClientLoader: false });
+    await Promise.all(connections);
+    expect(earlyClient.send).toHaveBeenCalledWith(
+      'custom',
+      expect.objectContaining({
+        event: 'react-router:manifest-update',
+        data: expect.objectContaining({ version: 'web-base' }),
+      })
+    );
     await finishCompile('web-next', {
       hasClientLoader: true,
       clientLoaderModule: '/routes/about.clientLoader.js',
