@@ -1,7 +1,10 @@
+import { createRequestHandler, type ServerBuild } from 'react-router';
 import { describe, expect, it, rstest } from '@rstest/core';
 import { captureWeb, createDevRuntimeHarness } from './dev-generation-fixtures';
 import {
   createBuild,
+  createDevManifest,
+  createRouteManifest,
   createCompilation,
   createGraphStats,
   graphIdentity,
@@ -151,27 +154,94 @@ describe('React Router development runtime CSS ownership', () => {
     expect(ownership).not.toHaveBeenCalled();
   });
 
-  for (const files of [
-    undefined,
-    [],
-    ['/app/style.css', '/app/shared.ts'],
-    ['/app/style.css.ts'],
-    ['/app/style.module.css'],
+  // A real Router server entry exposes the loader result and its paired CSS in
+  // the response, so generation regressions can assert the request contract.
+  const createDocumentBuild = (message: string, stylesheets: string[] = []) =>
+    ({
+      ...createBuild(message),
+      assets: {
+        ...createDevManifest(message),
+        routes: {
+          'routes/about': createRouteManifest('routes/about', stylesheets, {
+            hasLoader: true,
+            path: '/',
+          }),
+        },
+      },
+      routes: {
+        'routes/about': {
+          id: 'routes/about',
+          path: '/',
+          module: { default: () => null, loader: () => message },
+        },
+      },
+      entry: {
+        module: {
+          default: async (_request, status, _headers, context) =>
+            Response.json(
+              {
+                message:
+                  context.staticHandlerContext.loaderData['routes/about'],
+                stylesheets: context.manifest.routes['routes/about'].css,
+              },
+              { status }
+            ),
+        },
+      },
+    }) satisfies ServerBuild;
+
+  const originalCss =
+    '/about.css.__react_router_css_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.css';
+  const editedCss =
+    '/about.css.__react_router_css_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.css';
+  for (const { name, files, stylesheets } of [
+    {
+      name: 'unknown invalidation',
+      files: undefined,
+      stylesheets: [editedCss],
+    },
+    { name: 'empty invalidation', files: [], stylesheets: [editedCss] },
+    {
+      name: 'CSS and shared JavaScript',
+      files: ['/app/style.css', '/app/shared.ts'],
+      stylesheets: [editedCss],
+    },
+    {
+      name: 'CSS-in-JS',
+      files: ['/app/style.css.ts'],
+      stylesheets: [editedCss],
+    },
+    {
+      name: 'CSS Module exports',
+      files: ['/app/style.module.css'],
+      stylesheets: [editedCss],
+    },
+    {
+      name: 'shared route removes CSS',
+      files: ['/app/routes/about.tsx'],
+      stylesheets: [],
+    },
   ]) {
-    it(`rejects unpaired CSS version changes with unsafe source changes: ${files}`, async () => {
-      const { runtime } = createDevRuntimeHarness(() =>
-        createBuild('old-loader')
-      );
+    it(`serves matching loader data and CSS while waiting for Node: ${name}`, async () => {
+      let build = createDocumentBuild('original loader');
+      const { runtime } = createDevRuntimeHarness(() => build);
+      const request = createRequestHandler(() => runtime.load(), 'development');
       const node = createCompilation('node', {
-        files: ['/app/shared.ts', '/app/style.css.ts', '/app/style.module.css'],
+        files: [
+          '/app/shared.ts',
+          '/app/style.css.ts',
+          '/app/style.module.css',
+          '/app/routes/about.tsx',
+        ],
       });
-      for (const [index, token] of ['a', 'b'].entries()) {
-        const web = createCompilation('web');
+      let web = createCompilation('web');
+      for (const css of [[originalCss], stylesheets]) {
+        web = createCompilation('web');
         runtime.beginAttempt();
-        captureWeb(runtime, web, token, {
-          entry: [`/entry.css.__react_router_css_${token.repeat(64)}.css`],
+        runtime.captureWeb(web, {
+          'static/js/app': createDocumentBuild(css.join(), css).assets,
         });
-        const result = await runtime.finishAttempt(
+        await runtime.finishAttempt(
           createGraphStats(web, node),
           {
             web: { known: files !== undefined, files: new Set(files) },
@@ -179,9 +249,28 @@ describe('React Router development runtime CSS ownership', () => {
           },
           graphIdentity(web, node)
         );
-        expect(result).toBe(index === 0 ? 'committed' : 'ignored');
       }
-      expect((await runtime.load()).assets.version).toBe('a');
+      const waiting = await request(new Request('http://localhost/'));
+      expect(waiting.status).toBe(200);
+      expect(await waiting.json()).toEqual({
+        message: 'original loader',
+        stylesheets: [originalCss],
+      });
+
+      build = createDocumentBuild('edited loader');
+      const nextNode = createCompilation('node');
+      runtime.beginAttempt();
+      await runtime.finishAttempt(
+        createGraphStats(web, nextNode),
+        noKnownChanges,
+        graphIdentity(web, nextNode)
+      );
+      const updated = await request(new Request('http://localhost/'));
+      expect(updated.status).toBe(200);
+      expect(await updated.json()).toEqual({
+        message: 'edited loader',
+        stylesheets,
+      });
     });
   }
 
