@@ -8,6 +8,11 @@ import {
 export const stripDevCssVersion = (url: string): string =>
   url.replace(/\.__react_router_css_[a-f0-9]{64}\.css(?=[?#]|$)/, '');
 
+// TODO: Once supported Rspack versions include the ownership fix below, remove
+// this plugin and its registration in index.ts. Verify CSS edit/restore/remount
+// preserves form state and async chunk CSS still hot-updates. Keep immutable
+// CSS aliases: the upstream fix does not address stale document preloads.
+// https://github.com/web-infra-dev/rspack/pull/15879 (fixes issue #15845)
 export const devCssOwnershipPlugin: Rspack.RspackPluginInstance = {
   apply(compiler) {
     compiler.hooks.compilation.tap('ReactRouterCssOwnership', compilation => {
@@ -48,7 +53,7 @@ export const versionDevCssAssets = (
       .digest('hex');
     const bareName = name.replace(/[?#].*$/, '');
     const alias = `${bareName}.__react_router_css_${version}.css`;
-    // A distinct path keeps Rspack HMR from removing React-owned links.
+    // A distinct path identifies the exact CSS bytes for document preloads.
     // The same directory preserves relative CSS URLs. Development output
     // retention keeps old manifest URLs serving their original bytes.
     if (!compilation.getAsset(alias)) {
