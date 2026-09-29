@@ -60,7 +60,7 @@ describe('React Router development runtime', () => {
     });
   });
 
-  it('publishes css-only removals when the route file overlaps node dependencies', async () => {
+  it('waits for the Node build when CSS removal also edits a shared route', async () => {
     const routePath = '/app/routes/about.tsx';
     const onCssAssetOwnershipChanged = rstest.fn();
     const { runtime, warnings } = createHarness(() => createBuild('build'), {
@@ -93,8 +93,20 @@ describe('React Router development runtime', () => {
       graphIdentity(removedCssWeb, node)
     );
 
+    expect(onCssAssetOwnershipChanged).not.toHaveBeenCalled();
+    expect(warnings).toHaveLength(1);
+    await expect(runtime.load()).resolves.toMatchObject({
+      assets: { version: 'with-css' },
+    });
+
+    const nextNode = createCompilation('node', { files: [routePath] });
+    runtime.beginAttempt();
+    await runtime.finishAttempt(
+      createGraphStats(removedCssWeb, nextNode),
+      noKnownChanges,
+      graphIdentity(removedCssWeb, nextNode)
+    );
     expect(onCssAssetOwnershipChanged).toHaveBeenCalledOnce();
-    expect(warnings).toEqual([]);
     await expect(runtime.load()).resolves.toMatchObject({
       assets: { version: 'without-css' },
     });
@@ -480,9 +492,7 @@ describe('React Router development runtime', () => {
   });
 
   it('resolves all initial waiters from one committed generation', async () => {
-    const { loadBundle, runtime } = createHarness(() =>
-      createBuild('shared')
-    );
+    const { loadBundle, runtime } = createHarness(() => createBuild('shared'));
     const web = createCompilation('web');
     const node = createCompilation('node');
 
@@ -1165,5 +1175,4 @@ describe('React Router development runtime', () => {
     );
     expect(errors).toEqual([]);
   });
-
 });

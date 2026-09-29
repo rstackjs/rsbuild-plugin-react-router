@@ -90,7 +90,7 @@ describe('React Router development runtime CSS ownership', () => {
       assets: { version: 'without-entry-css' },
     });
   });
-  it('commits CSS version changes in web-only builds without reloading or reevaluating loaders', async () => {
+  it('commits browser-only CSS changes without reloading or reevaluating loaders', async () => {
     const changed = rstest.fn();
     const ownership = rstest.fn();
     let build = createBuild('loader-v1');
@@ -98,7 +98,7 @@ describe('React Router development runtime CSS ownership', () => {
       () => build,
       { onRouteManifestChanged: changed, onCssAssetOwnershipChanged: ownership }
     );
-    let node = createCompilation('node', { files: ['/app/style.css'] });
+    let node = createCompilation('node', { files: ['/app/server.ts'] });
     for (const [i, token] of ['a', 'b', 'a'].entries()) {
       const web = createCompilation('web');
       runtime.beginAttempt();
@@ -150,6 +150,40 @@ describe('React Router development runtime CSS ownership', () => {
     expect(changed).toHaveBeenCalledTimes(3);
     expect(ownership).not.toHaveBeenCalled();
   });
+
+  for (const files of [
+    undefined,
+    [],
+    ['/app/style.css', '/app/shared.ts'],
+    ['/app/style.css.ts'],
+    ['/app/style.module.css'],
+  ]) {
+    it(`rejects unpaired CSS version changes with unsafe source changes: ${files}`, async () => {
+      const { runtime } = createDevRuntimeHarness(() =>
+        createBuild('old-loader')
+      );
+      const node = createCompilation('node', {
+        files: ['/app/shared.ts', '/app/style.css.ts', '/app/style.module.css'],
+      });
+      for (const [index, token] of ['a', 'b'].entries()) {
+        const web = createCompilation('web');
+        runtime.beginAttempt();
+        captureWeb(runtime, web, token, {
+          entry: [`/entry.css.__react_router_css_${token.repeat(64)}.css`],
+        });
+        const result = await runtime.finishAttempt(
+          createGraphStats(web, node),
+          {
+            web: { known: files !== undefined, files: new Set(files) },
+            node: { known: false, files: new Set() },
+          },
+          graphIdentity(web, node)
+        );
+        expect(result).toBe(index === 0 ? 'committed' : 'ignored');
+      }
+      expect((await runtime.load()).assets.version).toBe('a');
+    });
+  }
 
   it('does not publish failed CSS/loader generations or replay them to reconnecting clients', async () => {
     const changed = rstest.fn();

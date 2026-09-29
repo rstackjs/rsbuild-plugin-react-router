@@ -142,78 +142,6 @@ const hasAddedCssAssetOwnership = (
   next: ReactRouterDevManifestSet
 ): boolean => hasRemovedCssAssetOwnership(next, previous);
 
-const collectManifestCssAssets = (
-  manifest: ReactRouterDevManifestSet[string]
-): Set<string> => {
-  const assets = new Set(manifest.entry?.css ?? []);
-  for (const route of Object.values(manifest.routes ?? {})) {
-    for (const asset of route.css ?? []) {
-      assets.add(asset);
-    }
-  }
-  return assets;
-};
-
-const normalizeManifestForCssOwnershipCheck = (
-  manifest: ReactRouterDevManifestSet[string]
-) => {
-  const cssAssets = collectManifestCssAssets(manifest);
-  const nonCssImports = (imports: string[] = []) =>
-    imports.filter(importPath => !cssAssets.has(importPath));
-
-  return {
-    entry: {
-      imports: nonCssImports(manifest.entry?.imports),
-      module: manifest.entry?.module,
-    },
-    routes: Object.fromEntries(
-      Object.entries(manifest.routes ?? {})
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([routeId, route]) => [
-          routeId,
-          {
-            caseSensitive: route.caseSensitive,
-            clientActionModule: route.clientActionModule,
-            clientLoaderModule: route.clientLoaderModule,
-            clientMiddlewareModule: route.clientMiddlewareModule,
-            errorBoundary: route.hasErrorBoundary,
-            hasAction: route.hasAction,
-            hasClientAction: route.hasClientAction,
-            hasClientLoader: route.hasClientLoader,
-            hasClientMiddleware: route.hasClientMiddleware,
-            hasDefaultExport: route.hasDefaultExport,
-            hasLoader: route.hasLoader,
-            hydrateFallbackModule: route.hydrateFallbackModule,
-            id: route.id,
-            imports: nonCssImports(route.imports),
-            index: route.index,
-            module: route.module,
-            parentId: route.parentId,
-            path: route.path,
-          },
-        ])
-    ),
-  };
-};
-
-const hasOnlyCssAssetOwnershipChanges = (
-  previous: ReactRouterDevManifestSet,
-  next: ReactRouterDevManifestSet
-): boolean => {
-  const previousEntryNames = Object.keys(previous).sort();
-  const nextEntryNames = Object.keys(next).sort();
-  if (previousEntryNames.join('\0') !== nextEntryNames.join('\0')) {
-    return false;
-  }
-  return previousEntryNames.every(entryName => {
-    const previousManifest = normalizeManifestForCssOwnershipCheck(
-      previous[entryName]
-    );
-    const nextManifest = normalizeManifestForCssOwnershipCheck(next[entryName]);
-    return JSON.stringify(previousManifest) === JSON.stringify(nextManifest);
-  });
-};
-
 type DevRouteManifestEntry = NonNullable<
   ReactRouterDevManifestSet[string]['routes']
 >[string];
@@ -546,12 +474,6 @@ export const createReactRouterDevRuntime = ({
           previous.web.manifestsByEntryName,
           manifestsByEntryName
         );
-      const cssOnlyWebManifestChange =
-        cssManifestChanged &&
-        hasOnlyCssAssetOwnershipChanges(
-          previous.web.manifestsByEntryName,
-          manifestsByEntryName
-        );
       const routeManifestMetadataChanged =
         !!previous &&
         webChanged &&
@@ -578,7 +500,6 @@ export const createReactRouterDevRuntime = ({
       if (
         previous &&
         webChanged !== nodeChanged &&
-        !cssOnlyWebManifestChange &&
         discardUnsafeOneSidedResult(attemptId, previous, webChanged, changes)
       ) {
         return 'ignored';

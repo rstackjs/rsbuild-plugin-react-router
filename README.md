@@ -114,6 +114,11 @@ pluginReactRouter({
 | `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
 | `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
 
+Lazy compilation applies to the browser build. Server dynamic imports still
+compile eagerly; `lazyCompilation` does not enable on-demand SSR compilation.
+Supporting suspended SSR imports across rebuilds requires support for retaining
+the server runtime and coordinating lazy activations, tracked in [#155](https://github.com/rstackjs/rsbuild-plugin-react-router/issues/155).
+
 When `federation` is enabled, configure the Module Federation plugin with
 `experiments.asyncStartup: true` on every compiler (the plugin enforces it) and
 keep shared dependencies non-eager. The dev server resolves async server build

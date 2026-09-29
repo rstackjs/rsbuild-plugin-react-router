@@ -55,7 +55,8 @@ export type PluginOptions = {
       };
 
   /**
-   * Rsbuild dev-only lazy compilation behavior.
+   * Rsbuild dev-only browser lazy compilation behavior.
+   * Server dynamic imports still compile eagerly.
    *
    * React Router's browser manifest remains eager so initial dev requests can
    * discover browser assets without lazy proxy delays.
