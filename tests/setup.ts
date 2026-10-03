@@ -183,6 +183,9 @@ rstest.mock('@scripts/test-helper', () => ({
       },
       context: {
         rootPath: process.cwd(),
+        // Mirrors Rsbuild's default so cache files land in the ignored
+        // node_modules/.cache instead of the repository root.
+        cachePath: `${process.cwd()}/node_modules/.cache`,
         action,
       },
       compiler: {
