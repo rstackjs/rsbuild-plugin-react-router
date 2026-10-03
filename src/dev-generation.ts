@@ -11,6 +11,7 @@ import {
   isSafeOneSidedChange,
   pinServerBuildsToManifests,
   snapshotDependencies,
+  snapshotRuntimeOutputs,
   type DependencySnapshot,
   type DevCompilationIdentity,
   type DevGraphChanges,
@@ -33,6 +34,7 @@ type CommittedGeneration = {
   buildsByEntryName: ReactRouterServerBuilds;
   webIdentity: DevCompilationIdentity;
   nodeIdentity: DevCompilationIdentity;
+  nodeOutputs: string | undefined;
   web: WebArtifact;
   nodeDependencies: DependencySnapshot;
 };
@@ -506,9 +508,25 @@ export const createReactRouterDevRuntime = ({
       }
 
       try {
-        const buildsByEntryName = nodeChanged
-          ? await evaluateServerBuilds(server, buildPlan.entryNames)
-          : previous!.buildsByEntryName;
+        // A node recompile with byte-identical runtime output (CSS-only edits,
+        // source-map-only changes) keeps the evaluated build instead of asking
+        // Rsbuild for a fresh runner, which would reset server module state and
+        // delay HDR. Module-scope state therefore survives same-output edits.
+        // TODO(#140): only whole-output equality is detectable here. Reusing
+        // loaded modules when just an unimported chunk changed needs runner-level
+        // consumed-output tracking from Rsbuild; revisit once
+        // https://github.com/web-infra-dev/rsbuild/issues/8496 is addressed.
+        const nodeOutputs = nodeChanged
+          ? snapshotRuntimeOutputs(nodeCompilation)
+          : previous!.nodeOutputs;
+        const reuseServerBuilds =
+          !!previous &&
+          nodeOutputs !== undefined &&
+          nodeOutputs === previous.nodeOutputs;
+        const buildsByEntryName =
+          nodeChanged && !reuseServerBuilds
+            ? await evaluateServerBuilds(server, buildPlan.entryNames)
+            : previous!.buildsByEntryName;
         if (!isCurrentAttempt(attemptId)) {
           return 'ignored';
         }
@@ -526,6 +544,7 @@ export const createReactRouterDevRuntime = ({
           ),
           webIdentity,
           nodeIdentity: nodeChanged ? nodeIdentity : previous!.nodeIdentity,
+          nodeOutputs,
           web,
           nodeDependencies: nodeChanged
             ? snapshotDependencies(nodeCompilation)

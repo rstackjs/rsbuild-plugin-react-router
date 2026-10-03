@@ -60,6 +60,52 @@ describe('React Router development runtime', () => {
     });
   });
 
+  it('reuses the evaluated server build when node runtime output is unchanged', async () => {
+    const withAssets = (
+      compilation: ReturnType<typeof createCompilation>,
+      assets: Record<string, string>
+    ) =>
+      Object.assign(compilation, {
+        getAssets: () =>
+          Object.entries(assets).map(([name, content]) => ({
+            name,
+            source: { buffer: () => Buffer.from(content) },
+          })),
+      });
+    let build = createBuild('initial');
+    const { loadBundle, runtime } = createHarness(() => build);
+    const run = async (marker: string, assets: Record<string, string>) => {
+      const web = createCompilation('web');
+      const node = withAssets(createCompilation('node'), assets);
+      runtime.beginAttempt();
+      captureWeb(runtime, web, marker);
+      await runtime.finishAttempt(
+        createGraphStats(web, node),
+        noKnownChanges,
+        graphIdentity(web, node)
+      );
+    };
+
+    await run('first', { 'app.js': 'same', 'app.js.map': 'map-1' });
+    build = createBuild('second');
+    await run('second', { 'app.js': 'same', 'app.js.map': 'map-2' });
+
+    expect(loadBundle).toHaveBeenCalledTimes(1);
+    await expect(runtime.load()).resolves.toMatchObject({
+      marker: 'initial',
+      assets: { version: 'second' },
+    });
+
+    build = createBuild('third');
+    await run('third', { 'app.js': 'changed', 'app.js.map': 'map-2' });
+
+    expect(loadBundle).toHaveBeenCalledTimes(2);
+    await expect(runtime.load()).resolves.toMatchObject({
+      marker: 'third',
+      assets: { version: 'third' },
+    });
+  });
+
   it('evaluates changed node output during css ownership removals', async () => {
     const routePath = '/app/routes/about.tsx';
     const onCssAssetOwnershipChanged = rstest.fn();

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { isAbsolute, relative } from 'node:path';
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import * as Effect from 'effect/Effect';
@@ -85,6 +86,31 @@ export const snapshotDependencies = (
   contexts: new Set(compilation.contextDependencies),
   missing: new Set(compilation.missingDependencies),
 });
+
+// Digest of every emitted runtime asset except source maps. Undefined when an
+// asset source is unavailable; callers must treat that as changed output.
+export const snapshotRuntimeOutputs = (
+  compilation: Rspack.Compilation
+): string | undefined => {
+  if (typeof compilation.getAssets !== 'function') {
+    return undefined;
+  }
+  const hash = createHash('sha1');
+  const assets = [...compilation.getAssets()].sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+  );
+  for (const asset of assets) {
+    if (asset.name.endsWith('.map')) {
+      continue;
+    }
+    const source = asset.source?.buffer?.();
+    if (!source) {
+      return undefined;
+    }
+    hash.update(asset.name).update('\0').update(source).update('\0');
+  }
+  return hash.digest('hex');
+};
 
 const isWithinDirectory = (directory: string, file: string): boolean => {
   const relativePath = relative(directory, file);
