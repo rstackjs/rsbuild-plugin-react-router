@@ -11,6 +11,8 @@ const config = defineConfig({
       source: {
         entry: {
           index: './src/index.ts',
+          'dev-node-lazy-transform-loader':
+            './src/dev-node-lazy-transform-loader.ts',
           'route-module-transform-loader':
             './src/route-module-transform-loader.ts',
           'rsc-route-transform-loader': './src/rsc-route-transform-loader.ts',

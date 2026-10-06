@@ -1,3 +1,7 @@
+import {
+  createDevNodeLazyOwner,
+  type WatchInvalidation,
+} from './dev-node-lazy.js';
 import { stripDevCssVersion } from './dev-css-assets.js';
 import type { RsbuildDevServer, Rspack } from '@rsbuild/core';
 import * as EffectDeferred from 'effect/Deferred';
@@ -55,6 +59,8 @@ type RuntimeState =
 
 export type ReactRouterDevRuntime = {
   beginAttempt: () => void;
+  observeNodeInvalidation: (event: WatchInvalidation) => void;
+  captureNode: (compilation: Rspack.Compilation) => void;
   captureWeb: (
     compilation: Rspack.Compilation,
     manifestsByEntryName: ReactRouterDevManifestSet
@@ -63,17 +69,18 @@ export type ReactRouterDevRuntime = {
     stats: DevRuntimeStats,
     changes: DevGraphChanges,
     identity: DevGraphIdentity
-  ) => Promise<'committed' | 'ignored' | 'retry-node'>;
+  ) => Promise<'committed' | 'activated' | 'ignored' | 'retry-node'>;
   /** Node identity actually retained by the last successful generation. */
   getCommittedNodeIdentity: () => DevCompilationIdentity | undefined;
   getCommittedManifest: () => ReactRouterDevManifestSet[string] | undefined;
   failAttempt: (error: Error) => void;
   load: (entryName?: string) => Promise<ServerBuild>;
-  close: (error?: Error) => void;
+  close: (error?: Error) => void | Promise<void>;
 };
 
 type CreateReactRouterDevRuntimeOptions = {
   server: RsbuildDevServer;
+  serverLazyCompilation?: boolean;
   buildPlan: ReactRouterDevBuildPlan;
   onEvaluationError: (error: Error) => void;
   onCssAssetOwnershipChanged?: (change: 'removed' | 'restored') => void;
@@ -221,11 +228,15 @@ const createReadinessDeferred = (): EffectDeferred.Deferred<
 export const createReactRouterDevRuntime = ({
   server,
   buildPlan,
+  serverLazyCompilation,
   onEvaluationError,
   onCssAssetOwnershipChanged = () => undefined,
   onRouteManifestChanged = () => undefined,
   onWarning = () => undefined,
 }: CreateReactRouterDevRuntimeOptions): ReactRouterDevRuntime => {
+  const nodeLazy = serverLazyCompilation
+    ? createDevNodeLazyOwner(buildPlan.entryNames)
+    : undefined;
   let nextAttemptId = 1;
   let reloadAfterCssRemoval = false;
   let state: RuntimeState = {
@@ -304,6 +315,7 @@ export const createReactRouterDevRuntime = ({
     if (!isCurrentAttempt(attemptId)) {
       return;
     }
+    nodeLazy?.fail(error);
     if (state.kind === 'starting') {
       const { readiness } = state;
       state = { kind: 'failed', attemptId, error };
@@ -358,7 +370,36 @@ export const createReactRouterDevRuntime = ({
     return true;
   };
 
+  const loadCurrentBuild = (entryName?: string): Promise<ServerBuild> => {
+    if (entryName && !uniqueEntryNames.has(entryName)) {
+      return Promise.reject(
+        new Error(
+          `[rsbuild-plugin-react-router] React Router server build ${JSON.stringify(entryName)} is not part of this development server build plan.`
+        )
+      );
+    }
+    if (state.kind === 'ready') {
+      return Promise.resolve(selectBuild(state.committed, entryName));
+    }
+    if (state.kind === 'starting') {
+      const selected = runPluginEffect(
+        EffectDeferred.await(state.readiness).pipe(
+          Effect.map(generation => selectBuild(generation, entryName))
+        )
+      );
+      void selected.catch(() => undefined);
+      return selected;
+    }
+    return Promise.reject(state.error);
+  };
+
   return {
+    observeNodeInvalidation(event) {
+      nodeLazy?.observeInvalidation(event);
+    },
+    captureNode(compilation) {
+      nodeLazy?.capture(compilation);
+    },
     beginAttempt(): void {
       if (state.kind === 'closed') {
         return;
@@ -434,6 +475,10 @@ export const createReactRouterDevRuntime = ({
         );
         return 'ignored';
       }
+      const activation = nodeLazy
+        ? await nodeLazy.isActivation(nodeCompilation)
+        : false;
+      if (!isCurrentAttempt(attemptId)) return 'ignored';
       const previous = state.kind === 'ready' ? state.committed : undefined;
       const webChanged = !previous || previous.webIdentity !== webIdentity;
       const nodeChanged = !previous || previous.nodeIdentity !== nodeIdentity;
@@ -487,6 +532,7 @@ export const createReactRouterDevRuntime = ({
       if (
         nodeChanged &&
         identity.nodeWeb !== webIdentity &&
+        !activation &&
         !identity.attempt
       ) {
         const message =
@@ -502,6 +548,7 @@ export const createReactRouterDevRuntime = ({
       if (
         previous &&
         webChanged !== nodeChanged &&
+        !activation &&
         discardUnsafeOneSidedResult(attemptId, previous, webChanged, changes)
       ) {
         return 'ignored';
@@ -523,33 +570,60 @@ export const createReactRouterDevRuntime = ({
           !!previous &&
           nodeOutputs !== undefined &&
           nodeOutputs === previous.nodeOutputs;
-        const buildsByEntryName =
-          nodeChanged && !reuseServerBuilds
-            ? await evaluateServerBuilds(server, buildPlan.entryNames)
-            : previous!.buildsByEntryName;
-        if (!isCurrentAttempt(attemptId)) {
-          return 'ignored';
-        }
         const web = webChanged
           ? {
               manifestsByEntryName,
               dependencies: snapshotDependencies(webCompilation),
             }
           : previous!.web;
-        const committed = commit(attemptId, {
-          buildsByEntryName: pinServerBuildsToManifests(
-            buildsByEntryName,
-            buildPlan.entryNames,
-            web.manifestsByEntryName
-          ),
-          webIdentity,
-          nodeIdentity: nodeChanged ? nodeIdentity : previous!.nodeIdentity,
-          nodeOutputs,
-          web,
-          nodeDependencies: nodeChanged
-            ? snapshotDependencies(nodeCompilation)
-            : previous!.nodeDependencies,
-        });
+        const publish = (buildsByEntryName: ReactRouterServerBuilds): boolean =>
+          commit(attemptId, {
+            buildsByEntryName: pinServerBuildsToManifests(
+              buildsByEntryName,
+              buildPlan.entryNames,
+              web.manifestsByEntryName
+            ),
+            webIdentity,
+            nodeIdentity: nodeChanged ? nodeIdentity : previous!.nodeIdentity,
+            nodeOutputs,
+            web,
+            nodeDependencies: nodeChanged
+              ? snapshotDependencies(nodeCompilation)
+              : previous!.nodeDependencies,
+          });
+        const committed =
+          nodeLazy && nodeChanged
+            ? await nodeLazy.evaluateAndPublish(
+                {
+                  compilation: nodeCompilation,
+                  reuse: reuseServerBuilds,
+                  isCurrent: () => isCurrentAttempt(attemptId),
+                  recover(builds) {
+                    if (
+                      state.kind === 'ready' &&
+                      state.committed === previous
+                    ) {
+                      state = {
+                        ...state,
+                        committed: {
+                          ...previous,
+                          buildsByEntryName: pinServerBuildsToManifests(
+                            builds,
+                            buildPlan.entryNames,
+                            previous.web.manifestsByEntryName
+                          ),
+                        },
+                      };
+                    }
+                  },
+                },
+                publish
+              )
+            : publish(
+                nodeChanged && !reuseServerBuilds
+                  ? await evaluateServerBuilds(server, buildPlan.entryNames)
+                  : previous!.buildsByEntryName
+              );
         if (!committed) {
           return 'ignored';
         }
@@ -572,7 +646,7 @@ export const createReactRouterDevRuntime = ({
             web.manifestsByEntryName[buildPlan.defaultEntryName]
           );
         }
-        return 'committed';
+        return activation ? 'activated' : 'committed';
       } catch (cause) {
         rejectAttempt(attemptId, normalizeEffectError(cause), true);
         return 'ignored';
@@ -597,41 +671,27 @@ export const createReactRouterDevRuntime = ({
     },
 
     load(entryName?: string): Promise<ServerBuild> {
-      if (entryName && !uniqueEntryNames.has(entryName)) {
-        return Promise.reject(
-          new Error(
-            `[rsbuild-plugin-react-router] React Router server build ${JSON.stringify(entryName)} is not part of this development server build plan.`
-          )
-        );
-      }
-      if (state.kind === 'ready') {
-        return Promise.resolve(selectBuild(state.committed, entryName));
-      }
-      if (state.kind === 'starting') {
-        const selected = runPluginEffect(
-          EffectDeferred.await(state.readiness).pipe(
-            Effect.map(generation => selectBuild(generation, entryName))
-          )
-        );
-        void selected.catch(() => undefined);
-        return selected;
-      }
-      return Promise.reject(state.error);
+      if (!nodeLazy) return loadCurrentBuild(entryName);
+      const loaded = nodeLazy.ready().then(() => loadCurrentBuild(entryName));
+      void loaded.catch(() => undefined);
+      return loaded;
     },
 
-    close(error?: Error): void {
+    close(error?: Error): void | Promise<void> {
       if (state.kind === 'closed') {
-        return;
+        return nodeLazy?.close(state.error);
       }
       const closeError =
         error ??
         new Error(
           '[rsbuild-plugin-react-router] The development server closed before a React Router build was ready.'
         );
+      const cleanup = nodeLazy?.close(closeError);
       if (state.kind === 'starting') {
         EffectDeferred.unsafeDone(state.readiness, Effect.fail(closeError));
       }
       state = { kind: 'closed', error: closeError };
+      return cleanup;
     },
   };
 };

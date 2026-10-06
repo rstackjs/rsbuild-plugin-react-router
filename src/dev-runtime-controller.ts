@@ -54,6 +54,7 @@ type CreateControllerOptions = {
   api: RsbuildPluginAPI;
   isBuild: boolean;
   buildPlan: ReactRouterDevBuildPlan;
+  serverLazyCompilation?: boolean;
   /**
    * The browser HMR runtime patches route manifest metadata (loader/action
    * flags) in place, so metadata-only changes no longer need a full reload.
@@ -78,6 +79,7 @@ export const createReactRouterDevRuntimeController = ({
   api,
   isBuild,
   buildPlan,
+  serverLazyCompilation,
   clientPatchesRouteMetadata,
 }: CreateControllerOptions): ReactRouterDevRuntimeController => {
   if (isBuild) {
@@ -112,7 +114,10 @@ export const createReactRouterDevRuntimeController = ({
       ? clientPatchesRouteMetadata()
       : clientPatchesRouteMetadata === true;
 
-  const closeBinding = (binding: RuntimeBinding, error?: Error): void => {
+  const closeBinding = (
+    binding: RuntimeBinding,
+    error?: Error
+  ): void | Promise<void> => {
     manifestSubscriptions.get(binding)?.();
     manifestSubscriptions.delete(binding);
     hdrChannels.get(binding)?.close();
@@ -124,8 +129,9 @@ export const createReactRouterDevRuntimeController = ({
       resetDevCompilerPair(pair);
     }
     binding.compilers = undefined;
-    binding.runtime.close(error);
+    const cleanup = binding.runtime.close(error);
     unregisterReactRouterDevRuntime(binding.server, binding.runtime);
+    return cleanup;
   };
 
   const sessions = createDevRuntimeSessionManager(closeBinding);
@@ -181,7 +187,7 @@ export const createReactRouterDevRuntimeController = ({
         pair.node.watching?.invalidate();
         return;
       }
-      if (result === 'committed') {
+      if (result === 'committed' || result === 'activated') {
         for (const side of ['web', 'node'] as const) {
           const compilation = getEnvironmentStats(stats, side)?.compilation;
           if (
@@ -283,6 +289,7 @@ export const createReactRouterDevRuntimeController = ({
       const runtime = createReactRouterDevRuntime({
         server,
         buildPlan,
+        serverLazyCompilation,
         onEvaluationError(error) {
           if (sessions.getActiveBinding()?.runtime !== runtime) {
             return;
@@ -349,13 +356,14 @@ export const createReactRouterDevRuntimeController = ({
 
   api.onCloseDevServer({
     order: 'pre',
-    handler() {
+    async handler() {
       const binding = sessions.getActiveBinding();
       if (!binding) {
         return;
       }
-      closeBinding(binding);
+      const cleanup = closeBinding(binding);
       sessions.markClosing(binding);
+      await cleanup;
     },
   });
 
@@ -417,6 +425,40 @@ export const createReactRouterDevRuntimeController = ({
         }
       }
     };
+    if (serverLazyCompilation) {
+      for (const [side, compiler] of [
+        ['latestWebStart', web],
+        ['latestNodeStart', node],
+      ] as const) {
+        const hook =
+          'watchInvalidation' in compiler.hooks
+            ? compiler.hooks.watchInvalidation
+            : undefined;
+        if (!hook)
+          throw new Error(
+            `[${PLUGIN_NAME}] Server lazy compilation requires Compiler.hooks.watchInvalidation.`
+          );
+        hook.tap(`${PLUGIN_NAME}:watch-origin`, event => {
+          if (sessions.getActiveBinding()?.id !== sessionId) return;
+          if (compiler === node) runtime.observeNodeInvalidation(event);
+          else if (
+            event.cause.kind !== 'initial' &&
+            event.cause.kind !== 'lazy'
+          )
+            runtime.failAttempt(
+              new Error(
+                `[${PLUGIN_NAME}] A web invalidation superseded the pending server import.`
+              )
+            );
+          if (event.cause.kind !== 'initial') {
+            if (pair[side]?.status === 'pending') {
+              beginDevCompilerAttempt(pair);
+              runtime.beginAttempt();
+            } else beginCompilerAttempt(side);
+          }
+        });
+      }
+    }
     web.hooks.invalid.tap(`${PLUGIN_NAME}:dev-web-invalid`, () =>
       beginCompilerAttempt('latestWebStart')
     );
@@ -435,11 +477,39 @@ export const createReactRouterDevRuntimeController = ({
         pair.latestCompletedWebStats = stats;
       }
     );
+    if (serverLazyCompilation) {
+      node.hooks.afterEmit.tap(
+        `${PLUGIN_NAME}:node-lazy-artifacts`,
+        compilation => {
+          if (
+            sessions.getActiveBinding()?.id === sessionId &&
+            !compilation.getStats().hasErrors()
+          ) {
+            try {
+              runtime.captureNode(compilation);
+            } catch (cause) {
+              runtime.failAttempt(normalizeEffectError(cause));
+            }
+          }
+        }
+      );
+    }
     node.hooks.done.tap(
       { name: `${PLUGIN_NAME}:dev-node-complete`, stage: -1000 },
       stats => {
         if (sessions.getActiveBinding()?.id === sessionId) {
           pair.latestCompletedNodeStats = stats;
+          if (
+            serverLazyCompilation &&
+            !stats.hasErrors() &&
+            !stats.compilation.needAdditionalPass
+          ) {
+            try {
+              runtime.captureNode(stats.compilation);
+            } catch (cause) {
+              runtime.failAttempt(normalizeEffectError(cause));
+            }
+          }
         }
       }
     );

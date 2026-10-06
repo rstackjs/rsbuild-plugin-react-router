@@ -76,6 +76,13 @@ export type PluginOptions = {
   unstableLazyCompilationPrewarm?: boolean;
 
   /**
+   * Compile development SSR imports on demand while retaining suspended requests.
+   * Requires the Rspack watch-origin API. Classic SSR only.
+   * @default false
+   */
+  unstableServerLazyCompilation?: boolean;
+
+  /**
    * Emit structured React Router plugin timing logs.
    * @default false
    */

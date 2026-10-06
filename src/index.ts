@@ -1,3 +1,4 @@
+import { registerNodeLazyCompilation } from './dev-node-lazy-config.js';
 import {
   createReactRouterManifestSnapshot,
   type ReactRouterManifestSnapshot,
@@ -201,6 +202,14 @@ export const pluginReactRouter = (
       ...options,
     };
     const isRscMode = Boolean(pluginOptions.rsc);
+    if (
+      pluginOptions.unstableServerLazyCompilation &&
+      (isRscMode || pluginOptions.federation)
+    ) {
+      throw new Error(
+        '[rsbuild-plugin-react-router] unstableServerLazyCompilation is only supported for classic SSR without RSC or federation.'
+      );
+    }
     const logPerformance = pluginOptions.logPerformance === true;
     const setupStartMs = logPerformance ? performance.now() : 0;
     const performanceProfiler = createReactRouterPerformanceProfiler({
@@ -681,6 +690,8 @@ export const pluginReactRouter = (
           isRscMode: false,
           assetsBuildDirectory,
           defaultEntryName: devServerBuildEntryName,
+          serverLazyCompilation:
+            pluginOptions.unstableServerLazyCompilation === true && !isBuild,
           entryServerPath: finalEntryServerPath,
           finalEntryClientPath,
           future,
@@ -699,6 +710,13 @@ export const pluginReactRouter = (
             : undefined,
         }));
 
+    if (pluginOptions.unstableServerLazyCompilation && !isBuild) {
+      if (!ssr)
+        throw new Error(
+          '[rsbuild-plugin-react-router] unstableServerLazyCompilation requires ssr: true.'
+        );
+      registerNodeLazyCompilation(api);
+    }
     const { manifestChunkNames } = modePlan;
 
     let sendRscDevUpdate: (() => void) | undefined;
@@ -807,7 +825,8 @@ export const pluginReactRouter = (
       api,
       isBuild,
       onPublish: (compilation, snapshot) => {
-        writeServerManifestStamp(snapshot);
+        if (isBuild || !pluginOptions.unstableServerLazyCompilation)
+          writeServerManifestStamp(snapshot);
         devBackgroundResources.setManifest(snapshot.browser);
         if (!isBuild && modePlan.kind === 'classic') {
           modePlan.artifacts.devRuntime.captureWeb(

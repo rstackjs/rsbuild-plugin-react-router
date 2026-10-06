@@ -207,6 +207,13 @@ export const registerBuildOutputTransforms = ({
         'manifest:transform',
         args.resource,
         async () => {
+          if (!isBuild && pluginOptions.unstableServerLazyCompilation) {
+            return {
+              code: args.resource.includes('virtual/react-router/server-build')
+                ? args.code
+                : 'export default {};',
+            };
+          }
           // Cache identity for a module whose source never changes (#136);
           // see `serverManifestStampPath` in index.ts.
           if (existsSync(serverManifestStampPath)) {
