@@ -97,6 +97,7 @@ pluginReactRouter({
   customServer: false,
   lazyCompilation: true,
   unstableLazyCompilationPrewarm: false,
+  unstableServerLazyCompilation: false,
   logPerformance: false,
   federation: false,
 });
@@ -109,15 +110,50 @@ pluginReactRouter({
 | `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
 | `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
 | `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                               |
+| `unstableServerLazyCompilation` | `false` | Experimental development SSR imports on demand. Requires the Rspack watch-origin API. Classic SSR only, without RSC or federation. |
 | `logPerformance`                 | `false`     | Logs structured React Router plugin timing information.                                                                                                                                                                          |
 | `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses an automatic worker count, and a positive integer sets the maximum worker count.                                            |
 | `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
 | `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
 
-Lazy compilation applies to the browser build. Server dynamic imports still
-compile eagerly; `lazyCompilation` does not enable on-demand SSR compilation.
-Supporting suspended SSR imports across rebuilds requires support for retaining
-the server runtime and coordinating lazy activations, tracked in [#155](https://github.com/rstackjs/rsbuild-plugin-react-router/issues/155).
+`lazyCompilation` controls the browser build. Server imports compile eagerly
+unless `unstableServerLazyCompilation` is enabled.
+
+With `unstableServerLazyCompilation: true`, Router keeps server entries eager
+and retains each suspended import until a successful Node update commits with a
+settled Web manifest. Lazy activation does not request browser revalidation.
+Source edits still use the normal HMR, data revalidation, and CSS update flow.
+Programmatic servers continue to use `loadReactRouterServerBuild(server)`.
+
+This experimental mode requires Rspack's `Compiler.hooks.watchInvalidation` and
+`Compilation.rebuildOrigin` APIs. An unsupported dependency produces an explicit
+startup error. RSC, federation, and custom Node lazy clients or backends are unsupported.
+An inactive import during initial module evaluation rejects before publication.
+Ordinary eager or external imports can still use top-level await.
+
+Source edits evaluate in separate native runtime directories. A failed hot update
+rejects pending imports and reconstructs the last accepted exports from its saved
+output. This does not undo application side effects or revoke previously returned
+functions. If activation fails or its generation is rejected after supersession,
+including a failed Web compilation after the backend consumes the import,
+inactive imports may reject until a server source edit rebuilds the runtime.
+Previously accepted, activated imports remain usable after native update recovery.
+Node's ESM cache grows across source generations until you
+restart the development server.
+
+The experimental dependency set uses the Rsbuild preview for
+[PR #8629](https://github.com/web-infra-dev/rsbuild/pull/8629) and a checked-in
+patch against released Rspack 2.2.8 for
+[PR #15968](https://github.com/web-infra-dev/rspack/pull/15968). To reproduce
+the native and browser checks from this repository, run
+`pnpm install --frozen-lockfile --registry=https://registry.npmjs.org`,
+`pnpm build`, and `pnpm test:core`. On macOS, use the physical temporary
+directory path with `TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)" pnpm test:core`
+so native resolver assertions use the same path. The browser fixture runs with
+`node scripts/verify-react-lazy-catalog.mjs --count 1000 --format esm --edits`.
+It checks deferred leaf counts, the original SSR response, retained browser
+state, and source edits. Pass `--stock-repo /absolute/path/to/stock-checkout`
+to run against another checkout with the same generated fixture.
 
 When `federation` is enabled, configure the Module Federation plugin with
 `experiments.asyncStartup: true` on every compiler (the plugin enforces it) and
