@@ -21,8 +21,10 @@ module counts. Browser hydration is measured separately by the browser verifier.
 Use `--format cjs|esm`, `--count 100|1000`, and `--out path.json` for a focused
 run. JSON records all samples, warmups, versions, and median/min/max summaries;
 the adjacent Markdown report shows medians. The Benchmark workflow's `node_lazy`
-dispatch input runs this on a dedicated CI runner after type, core, and two-tab
-browser/source-edit checks, then uploads all evidence as `node-lazy-proof`.
+dispatch input runs type, core, and two-tab browser/source-edit checks on Linux
+and Windows, then measures timings on the dedicated Linux runner. It uploads
+the evidence as `node-lazy-proof-ubuntu-latest` and
+`node-lazy-proof-windows-latest`.
 
 This repository uses a focused, shared suite for local regression checks and
 pull-request comparisons. It measures a production build and an SSR dev-server

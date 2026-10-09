@@ -160,10 +160,17 @@ jobs:
           run: pnpm bench:codspeed
 
   node-lazy:
-    name: Node lazy compilation proof
+    name: Node lazy compilation proof (${{ matrix.os }})
     if: github.event_name == 'workflow_dispatch' && inputs.node_lazy
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: read
     steps:
@@ -193,14 +200,16 @@ jobs:
           node scripts/verify-react-lazy-catalog.mjs --format esm --count 100 --edits > .benchmark/proof/browser-esm-100.json
           node scripts/verify-react-lazy-catalog.mjs --format esm --count 1000 --edits > .benchmark/proof/browser-esm-1000.json
       - name: Measure eager and lazy SSR
+        if: runner.os == 'Linux'
         run: node scripts/benchmark/node-lazy.mjs --iterations 10 --warmup 1 --out .benchmark/proof/timings.json
       - name: Add results to job summary
+        if: runner.os == 'Linux'
         run: cat .benchmark/proof/timings.json.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload proof
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: node-lazy-proof
+          name: node-lazy-proof-${{ matrix.os }}
           path: .benchmark/proof
           include-hidden-files: true
           if-no-files-found: warn
