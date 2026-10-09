@@ -84,6 +84,30 @@ const createTransformArgs = (
   }) as never;
 
 describe('build output transforms', () => {
+  it('matches native Windows route paths for pruning and client metadata', async () => {
+    const harness = createTransformHarness();
+    const options = createBaseOptions(harness);
+    const resourcePath = String.raw`C:\project\app\routes\page.tsx`;
+    const onRouteModuleAnalysis = rstest.fn();
+    registerBuildOutputTransforms({
+      ...options,
+      routeByFilePath: new Map([['C:/project/app/routes/page.tsx', { id: 'page' }]]),
+      onRouteModuleAnalysis,
+    });
+    const routeTransform = harness.transforms.find(({ descriptor }) =>
+      typeof descriptor.test === 'function' && descriptor.test(resourcePath)
+    );
+    expect(routeTransform).toBeDefined();
+    await routeTransform!.handler(createTransformArgs(resourcePath, '?react-router-route'));
+    expect(options.routeTransformRunner).toHaveBeenCalledWith(expect.objectContaining({ kind: 'routeModule' }));
+    const clientEntry = harness.transforms.find(({ descriptor }) =>
+      String(descriptor.resourceQuery) === String(/__react-router-build-client-route/)
+    )!;
+    await clientEntry.handler(createTransformArgs(resourcePath, '?__react-router-build-client-route'));
+    expect(options.routeTransformRunner).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'routeClientEntry', routeId: 'page' }));
+    expect(onRouteModuleAnalysis).toHaveBeenCalledWith(resourcePath, expect.objectContaining({ exports: ['loader'] }));
+  });
+
   it('uses one transform for explicit and queryless route modules', async () => {
     const harness = createTransformHarness();
     const options = createBaseOptions(harness);

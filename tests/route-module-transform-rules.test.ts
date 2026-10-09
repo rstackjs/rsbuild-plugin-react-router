@@ -6,9 +6,8 @@ import {
 
 const createRuleConfig = (
   parallelRouteTransform: boolean | number | undefined,
-  { isBuild = false, devHmr = false } = {}
+  { isBuild = false, devHmr = false, routePath = '/project/app/routes/page.tsx' } = {}
 ) => {
-  const routePath = '/project/app/routes/page.tsx';
   const rspackConfig = {};
 
   registerRouteModuleTransformRules(rspackConfig, {
@@ -38,6 +37,13 @@ const createRuleConfig = (
 };
 
 describe('route module transform rules', () => {
+  it('matches native Windows paths against normalized routes', () => {
+    const config = createRuleConfig(true, { routePath: 'C:/project/app/routes/page.tsx' });
+    const predicate = config.module.rules[0].test!;
+    expect(predicate(String.raw`C:\project\app\routes\page.tsx`)).toBe(true);
+    expect(predicate(String.raw`C:\project\app\routes\other.tsx`)).toBe(false);
+  });
+
   it('uses the loader only when parallel route transforms are opted into', () => {
     expect(shouldUseRouteModuleTransformLoader(undefined)).toBe(false);
     expect(shouldUseRouteModuleTransformLoader(false)).toBe(false);

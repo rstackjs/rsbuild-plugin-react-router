@@ -23,6 +23,20 @@ const routeByFilePath = new Map<string, Route>([
 ]);
 
 describe('queryless route imports', () => {
+  it('matches native Windows issuers and resolved route paths', () => {
+    const resolvedPath = String.raw`C:\app\routes\target.tsx`;
+    expect(resolveQuerylessRouteImportRequest({
+      compilerName: 'web',
+      issuer: String.raw`C:\app\routes\source.tsx?react-router-route`,
+      request: './target',
+      resolvedPath,
+      routeByFilePath: new Map([
+        ['C:/app/routes/source.tsx', { id: 'routes/source' }],
+        ['C:/app/routes/target.tsx', { id: 'routes/target' }],
+      ]),
+    })).toBe(`${resolvedPath}?react-router-route`);
+  });
+
   it('rewrites web route imports to client route build requests', () => {
     expect(
       resolveQuerylessRouteImportRequest({
