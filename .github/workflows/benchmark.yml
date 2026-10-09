@@ -187,6 +187,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
+        id: browser_setup
       - name: Verify types and core behavior
         run: |
           set -euo pipefail
@@ -198,6 +199,7 @@ jobs:
             pnpm test:core 2>&1 | tee .benchmark/proof/core.log
           fi
       - name: Verify browser state and source edits
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
         run: |
           node scripts/verify-react-lazy-catalog.mjs --format cjs --count 100 --edits > .benchmark/proof/browser-cjs-100.json
           node scripts/verify-react-lazy-catalog.mjs --format cjs --count 1000 --edits > .benchmark/proof/browser-cjs-1000.json
