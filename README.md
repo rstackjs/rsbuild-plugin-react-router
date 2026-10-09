@@ -110,7 +110,7 @@ pluginReactRouter({
 | `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
 | `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
 | `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                               |
-| `unstableServerLazyCompilation` | `false` | Experimental development SSR imports on demand. Requires the Rspack watch-origin API. Classic SSR only, without RSC or federation. |
+| `unstableServerLazyCompilation`  | `false`     | Experimental development SSR imports on demand. Requires the Rspack watch-origin API. Classic SSR only, without RSC or federation.                                                                                               |
 | `logPerformance`                 | `false`     | Logs structured React Router plugin timing information.                                                                                                                                                                          |
 | `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses an automatic worker count, and a positive integer sets the maximum worker count.                                            |
 | `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
@@ -141,11 +141,17 @@ Previously accepted, activated imports remain usable after native update recover
 Node's ESM cache grows across source generations until you
 restart the development server.
 
-The experimental dependency set uses the Rsbuild preview for
-[PR #8629](https://github.com/web-infra-dev/rsbuild/pull/8629) and a checked-in
-patch against released Rspack 2.2.8 for
-[PR #15968](https://github.com/web-infra-dev/rspack/pull/15968). To reproduce
-the native and browser checks from this repository, run
+The experimental dependency set pins the Rsbuild preview
+`https://pkg.pr.new/@rsbuild/core@465c960` for
+[PR #8629](https://github.com/web-infra-dev/rsbuild/pull/8629).
+The Rspack override uses
+`npm:@rspack-canary/core@2.2.9-canary-a9cfd15e-20261009001219`, which combines
+[watch origins from PR #15968](https://github.com/web-infra-dev/rspack/pull/15968)
+with the [lazy HMR identity fix](https://github.com/web-infra-dev/rspack/commit/1980380ceffefc89a75f977c211c31288160db3b).
+This canary includes matching native bindings and requires no local Rspack patch.
+The native fixture also covers lazy activation, SSR, and source replacement in a
+selected `serverBundles` entry. Isolation between multiple active bundles remains
+untested. To reproduce the native and browser checks from this repository, run
 `pnpm install --frozen-lockfile --registry=https://registry.npmjs.org`,
 `pnpm build`, and `pnpm test:core`. On macOS, use the physical temporary
 directory path with `TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)" pnpm test:core`
