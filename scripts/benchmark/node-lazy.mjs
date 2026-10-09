@@ -92,7 +92,8 @@ async function measure(format, count, lazy) {
       const body = await response.text();
       const completeMs = performance.now() - began;
       assert.equal(response.status, 200);
-      if (!body.includes(`Optional item ${item}`)) {
+      const hasRequestedItem = body.includes(`>Optional item ${item}</p>`);
+      if (!hasRequestedItem) {
         await writeFile(
           `${out}.failure.json`,
           JSON.stringify(
@@ -103,7 +104,7 @@ async function measure(format, count, lazy) {
         );
       }
       assert.ok(
-        body.includes(`Optional item ${item}`),
+        hasRequestedItem,
         'original SSR response includes requested content'
       );
       return { headersMs, completeMs };
