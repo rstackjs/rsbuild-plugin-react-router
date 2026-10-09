@@ -189,6 +189,7 @@ jobs:
       - name: Verify browser state and source edits
         run: |
           node scripts/verify-react-lazy-catalog.mjs --format cjs --count 100 --edits > .benchmark/proof/browser-cjs-100.json
+          node scripts/verify-react-lazy-catalog.mjs --format cjs --count 1000 --edits > .benchmark/proof/browser-cjs-1000.json
           node scripts/verify-react-lazy-catalog.mjs --format esm --count 100 --edits > .benchmark/proof/browser-esm-100.json
           node scripts/verify-react-lazy-catalog.mjs --format esm --count 1000 --edits > .benchmark/proof/browser-esm-1000.json
       - name: Measure eager and lazy SSR
