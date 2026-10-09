@@ -13,16 +13,19 @@ node scripts/benchmark/node-lazy.mjs --iterations 10 --warmup 1
 This runs alternating eager/lazy pairs for CommonJS and ESM with 100 and 1000
 optional modules. Every sample uses a fresh process and fixture; dependency
 versions are identical and filesystem caches are not flushed. Measurements cover
-server readiness, the complete first SSR response requested immediately after
-readiness, launch through that response, five repeat requests, and a second cold
-import. Assertions require HTTP 200, real SSR content, and the expected compiled
-module counts. Browser hydration is measured separately by the browser verifier.
+SSR readiness (initial compilation and runtime loading), the complete first SSR
+response requested immediately after readiness, launch through that response,
+five repeat requests, and a second cold import. Timed runs use default watcher
+settings and disable module-census instrumentation. Assertions require HTTP 200
+and real SSR content for every request. Separate native and browser checks verify
+compiled-module counts, browser hydration, retained state, and source edits.
 
 Use `--format cjs|esm`, `--count 100|1000`, and `--out path.json` for a focused
 run. JSON records all samples, warmups, versions, and median/min/max summaries;
 the adjacent Markdown report shows medians. The Benchmark workflow's `node_lazy`
-dispatch input runs type, core, and two-tab browser/source-edit checks on Linux
-and Windows, then measures timings on the dedicated Linux runner. It uploads
+dispatch input runs type and two-tab browser/source-edit checks on Linux and
+Windows, the full core suite on Linux, and the affected runtime suite on Windows.
+It then measures timings on the dedicated Linux runner. It uploads
 the evidence as `node-lazy-proof-ubuntu-latest` and
 `node-lazy-proof-windows-latest`.
 

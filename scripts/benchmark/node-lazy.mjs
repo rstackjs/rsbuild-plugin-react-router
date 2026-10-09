@@ -31,7 +31,6 @@ async function measure(format, count, lazy) {
   let child;
   let exited;
   let logs = '';
-  const compilations = [];
   const errors = [];
   try {
     await createReactLazyCatalogFixture(root, count, format);
@@ -51,7 +50,11 @@ async function measure(format, count, lazy) {
       ],
       {
         cwd: repo,
-        env: { ...process.env, ROUTER_STOCK_REPO: repo },
+        env: {
+          ...process.env,
+          ROUTER_STOCK_REPO: repo,
+          ROUTER_CATALOG_BENCHMARK: '1',
+        },
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       }
     );
@@ -69,8 +72,6 @@ async function measure(format, count, lazy) {
     child.on('message', message => {
       if (message.event === 'ready')
         onReady.accept({ ...message, startupMs: performance.now() - start });
-      if (message.event === 'compile' && message.side === 'node')
-        compilations.push(message);
       if (message.event === 'error') errors.push(message.message);
     });
     exited = new Promise(accept =>
@@ -82,12 +83,6 @@ async function measure(format, count, lazy) {
       })
     );
     const server = await ready.finally(() => clearTimeout(timer));
-    const initialLeaves = compilations.at(-1)?.leaves.length;
-    assert.equal(
-      initialLeaves,
-      lazy ? 0 : count,
-      'initial compiled optional modules'
-    );
     const request = async item => {
       const began = performance.now();
       const response = await fetch(`${server.url}/catalog/${item}`, {
@@ -101,7 +96,7 @@ async function measure(format, count, lazy) {
         await writeFile(
           `${out}.failure.json`,
           JSON.stringify(
-            { format, count, lazy, item, body, errors, compilations, logs },
+            { format, count, lazy, item, body, errors, logs },
             null,
             2
           )
@@ -115,16 +110,9 @@ async function measure(format, count, lazy) {
     };
     const first = await request(17);
     const startupThroughFirstResponseMs = performance.now() - start;
-    const firstLeaves = compilations.at(-1)?.leaves.length;
-    assert.equal(
-      firstLeaves,
-      lazy ? 1 : count,
-      'only requested optional module compiled'
-    );
     const repeated = [];
     for (let index = 0; index < 5; index++) repeated.push(await request(17));
     const second = await request(18);
-    assert.equal(compilations.at(-1)?.leaves.length, lazy ? 2 : count);
     assert.deepEqual(errors, []);
     return {
       format,
@@ -137,9 +125,6 @@ async function measure(format, count, lazy) {
       startupThroughFirstResponseMs,
       repeatedResponseCompleteMs: repeated.map(value => value.completeMs),
       secondColdResponseCompleteMs: second.completeMs,
-      initialLeaves,
-      firstLeaves,
-      finalLeaves: compilations.at(-1)?.leaves.length,
     };
   } finally {
     if (child?.connected) child.send({ event: 'close' });
@@ -182,6 +167,10 @@ const result = {
       'Fresh fixture, output directory and Node process for each sample; OS filesystem caches are not flushed.',
     order:
       'Alternating eager/lazy pairs; warmup pairs excluded from summaries.',
+    instrumentation:
+      'Module census disabled; default watcher settings. Compilation census is verified separately by native and browser tests.',
+    startup:
+      'Process launch through initial compilation and loading the SSR runtime, ready to serve SSR.',
     request:
       'Direct HTTP GET to catalog/17 immediately after server readiness; full SSR body, no browser hydration.',
     repeated:
@@ -267,7 +256,7 @@ const report = [
   '',
   `Host: ${result.host.platform} ${result.host.arch}; ${result.host.cpu}; Node ${result.host.node}.`,
   '',
-  'Median milliseconds. First SSR is the complete response to a direct request immediately after readiness, including the requested optional component. Total is measured from process launch through that response. Repeat is the median of five further requests per sample. These HTTP timings do not include browser hydration.',
+  'Median milliseconds. Startup includes initial compilation and loading the SSR runtime. First SSR is the complete response to a direct request immediately after readiness, including the requested optional component. Total is measured from process launch through that response. Repeat is the median of five further requests per sample. Default watcher settings; module census disabled. These HTTP timings do not include browser hydration.',
   '',
   '| Format | Optional modules | Mode | Startup | First SSR | Total | Repeat SSR | Second cold SSR |',
   '| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |',
@@ -276,7 +265,7 @@ const report = [
       `| ${format} | ${count} | ${lazy ? 'lazy' : 'eager'} | ${['startupMs', 'firstResponseCompleteMs', 'startupThroughFirstResponseMs', 'repeatedResponseCompleteMs', 'secondColdResponseCompleteMs'].map(metric => metrics[metric].median.toFixed(1)).join(' | ')} |`
   ),
   '',
-  'Every sample asserts HTTP 200 and real SSR content for both cold requests and all repeated requests. Eager compiles all optional modules initially; lazy compiles zero initially, one after the first request, and two after the second cold request. Raw JSON includes all warmup and measured samples, package versions, ranges, and the five repeat timings.',
+  'Every sample asserts HTTP 200 and real SSR content for both cold requests and all repeated requests. Compiled-module counts and browser state are verified separately, outside timed runs. Raw JSON includes all warmup and measured samples, package versions, ranges, and the five repeat timings.',
   '',
 ];
 await writeFile(`${out}.md`, report.join('\n'));

@@ -68,6 +68,7 @@ function parseArgs(argv) {
 const serverMode = process.argv[2] === '--server';
 const config = serverMode ? null : parseArgs(process.argv.slice(2));
 if (serverMode) {
+  const benchmark = process.env.ROUTER_CATALOG_BENCHMARK === '1';
   const side = process.argv[3];
   const root = process.argv[4];
   const repo =
@@ -98,33 +99,39 @@ if (serverMode) {
           unstableServerLazyCompilation: side === 'candidate',
         }),
         pluginReact(),
-        {
-          name: 'catalog-census',
-          setup(api) {
-            api.onAfterEnvironmentCompile(({ environment, stats }) => {
-              if (!stats || stats.hasErrors()) return;
-              const modules = [...stats.compilation.modules];
-              process.send?.({
-                event: 'compile',
-                side: environment.name,
-                hash: stats.hash,
-                leaves: modules
-                  .filter(
-                    module =>
-                      /app\/generated\/optional-\d+\.tsx$/.test(
-                        module.nameForCondition() ?? ''
-                      ) &&
-                      !module.identifier().startsWith('lazy-compilation-proxy|')
-                  )
-                  .map(
-                    module =>
-                      module.nameForCondition().match(/optional-(\d+)/)[1]
-                  ),
-                origin: stats.compilation.rebuildOrigin,
-              });
-            });
-          },
-        },
+        ...(benchmark
+          ? []
+          : [
+              {
+                name: 'catalog-census',
+                setup(api) {
+                  api.onAfterEnvironmentCompile(({ environment, stats }) => {
+                    if (!stats || stats.hasErrors()) return;
+                    const modules = [...stats.compilation.modules];
+                    process.send?.({
+                      event: 'compile',
+                      side: environment.name,
+                      hash: stats.hash,
+                      leaves: modules
+                        .filter(
+                          module =>
+                            /app[\\/]generated[\\/]optional-\d+\.tsx$/.test(
+                              module.nameForCondition() ?? ''
+                            ) &&
+                            !module
+                              .identifier()
+                              .startsWith('lazy-compilation-proxy|')
+                        )
+                        .map(
+                          module =>
+                            module.nameForCondition().match(/optional-(\d+)/)[1]
+                        ),
+                      origin: stats.compilation.rebuildOrigin,
+                    });
+                  });
+                },
+              },
+            ]),
       ],
       server: { host: '127.0.0.1', port: 0 },
       dev: {
@@ -133,6 +140,7 @@ if (serverMode) {
       },
       tools: {
         rspack(config) {
+          if (benchmark) return;
           config.watchOptions = {
             ...config.watchOptions,
             aggregateTimeout: 10,

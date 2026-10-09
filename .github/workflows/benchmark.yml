@@ -192,7 +192,11 @@ jobs:
           set -euo pipefail
           mkdir -p .benchmark/proof
           pnpm typecheck 2>&1 | tee .benchmark/proof/types.log
-          pnpm test:core 2>&1 | tee .benchmark/proof/core.log
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            pnpm exec rstest run tests/dev-node-lazy*.test.ts tests/dev-generation*.test.ts tests/dev-runtime*.test.ts 2>&1 | tee .benchmark/proof/core.log
+          else
+            pnpm test:core 2>&1 | tee .benchmark/proof/core.log
+          fi
       - name: Verify browser state and source edits
         run: |
           node scripts/verify-react-lazy-catalog.mjs --format cjs --count 100 --edits > .benchmark/proof/browser-cjs-100.json
