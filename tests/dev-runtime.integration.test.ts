@@ -192,6 +192,11 @@ const createDevRuntimeHarness = async (esm: boolean) => {
   let compiler: Rspack.MultiCompiler | undefined;
   let compileAttempts = 0;
   let completedCompiles = 0;
+  const compilationErrors: Array<{
+    environment: string;
+    message: string;
+    moduleName?: string;
+  }> = [];
   let latestWebAssets = new Set<string>();
   let cleaned = false;
 
@@ -246,6 +251,15 @@ const createDevRuntimeHarness = async (esm: boolean) => {
           completedCompiles += 1;
         });
         api.onAfterEnvironmentCompile(({ environment, stats }) => {
+          if (stats?.hasErrors()) {
+            for (const error of stats.toJson({ all: false, errors: true }).errors ?? []) {
+              compilationErrors.push({
+                environment: environment.name,
+                message: error.message,
+                moduleName: error.moduleName,
+              });
+            }
+          }
           if (environment.name === 'web') {
             latestWebAssets = new Set(
               stats?.compilation.getAssets().map(asset => asset.name)
@@ -380,10 +394,9 @@ const createDevRuntimeHarness = async (esm: boolean) => {
       get completedCompiles() {
         return completedCompiles;
       },
-      hasConsoleError: (marker: string) =>
-        consoleError.mock.calls.some(args =>
-          args.some(arg => String(arg).includes(marker))
-        ),
+      get compilationErrors() {
+        return compilationErrors;
+      },
       hasLoggedError: (marker: string) =>
         loggerError.mock.calls.some(args =>
           args.some(arg => String(arg).includes(marker))
@@ -416,11 +429,18 @@ const expectInitialCompilationFailure = async (
     withTimeout(harness.loadBuild(), 20_000, 'the initial compilation failure')
   ).rejects.toThrow('development compilation failed');
   await expect
-    .poll(() => harness.hasConsoleError('Expression expected'), {
+    .poll(() => harness.compilationErrors, {
       intervals: [50, 100, 250],
       timeout: 20_000,
     })
-    .toBe(true);
+    .toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('Expression expected'),
+          moduleName: expect.stringContaining('index.tsx'),
+        }),
+      ])
+    );
   expect(harness.compileAttempts).toBeGreaterThan(0);
   await expect
     .poll(() => harness.completedCompiles, {

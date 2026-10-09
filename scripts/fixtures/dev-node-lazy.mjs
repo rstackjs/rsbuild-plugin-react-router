@@ -58,6 +58,7 @@ let latestNode;
 let nodeBuilds = 0;
 const errors = [];
 const origins = [];
+const invalidations = [];
 let duringFirstActivation;
 let lazyInvalidations = 0;
 let nodeCompiler;
@@ -201,6 +202,18 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
                 const web = compiler.compilers.find(
                   child => child.name === 'web'
                 );
+                for (const child of compiler.compilers) {
+                  child.hooks.watchInvalidation.tap(
+                    { name: 'fixture-invalidations', stage: -Infinity },
+                    event => {
+                      invalidations.push({
+                        compiler: child.name,
+                        nodeBuilds,
+                        event,
+                      });
+                    }
+                  );
+                }
                 web.hooks.afterCompile.tapPromise(
                   'fixture-web-settlement',
                   async compilation => {
@@ -778,6 +791,7 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
           errors,
           nodeBuilds,
           origins,
+          invalidations,
           error: error.stack,
         })
       );
