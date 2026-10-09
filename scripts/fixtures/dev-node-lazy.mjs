@@ -24,6 +24,8 @@ const count = Number(process.argv[3] ?? 4);
 const scenario = process.argv[4] ?? 'basic';
 const failureFlag = `__routerLazyFailure_${format}_${scenario}`;
 const holdFlag = `__routerLazyHold_${format}_${scenario}`;
+const serverBundleScenario = scenario === 'server-bundles';
+const serverBundleEntry = serverBundleScenario ? 'catalog/index' : undefined;
 const root = await mkdtemp(join(repository, 'tests/.tmp-node-lazy-'));
 const waitFor = async (predicate, label) => {
   const deadline = Date.now() + 10000;
@@ -85,7 +87,7 @@ async function run() {
       );
     await writeFile(
       join(root, 'react-router.config.ts'),
-      `export default { ssr: true, appDirectory: 'app', buildDirectory: 'build', serverModuleFormat: ${JSON.stringify(format)} };`
+      `export default { ssr: true, appDirectory: 'app', buildDirectory: 'build', serverModuleFormat: ${JSON.stringify(format)}${serverBundleScenario ? ", serverBundles: ({ branch }) => branch.at(-1)?.id === 'routes/catalog' ? 'catalog' : 'index'" : ''} };`
     );
     await writeFile(
       join(root, 'app/routes.ts'),
@@ -270,7 +272,7 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
     const started = await within(rsbuild.startDevServer(), 'server startup');
     server = started.server;
     let build = await within(
-      loadReactRouterServerBuild(server),
+      loadReactRouterServerBuild(server, serverBundleEntry),
       'initial build'
     );
     const leaves = () =>
@@ -420,7 +422,7 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
       );
       delete globalThis[failureFlag];
       const restored = await within(
-        loadReactRouterServerBuild(server),
+        loadReactRouterServerBuild(server, serverBundleEntry),
         'recovered build'
       );
       assert.deepEqual(
@@ -467,13 +469,14 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
       await assert.rejects(within(suspended, 'superseded import'), /supersed/i);
       await waitFor(
         async () =>
-          (await loadReactRouterServerBuild(server)).routes['routes/catalog']
-            .module.loader !== loader,
+          (await loadReactRouterServerBuild(server, serverBundleEntry)).routes[
+            'routes/catalog'
+          ].module.loader !== loader,
         'new source publication during apply'
       );
       delete globalThis[holdFlag];
       finishApply();
-      const next = await loadReactRouterServerBuild(server);
+      const next = await loadReactRouterServerBuild(server, serverBundleEntry);
       assert.deepEqual(
         await within(
           next.routes['routes/catalog'].module.loader({
@@ -539,9 +542,9 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
         { value: 'Optional item 2' }
       );
     assert.equal(leaves(), 2);
-    const currentLoader = (await loadReactRouterServerBuild(server)).routes[
-      'routes/catalog'
-    ].module.loader;
+    const currentLoader = (
+      await loadReactRouterServerBuild(server, serverBundleEntry)
+    ).routes['routes/catalog'].module.loader;
     assert.deepEqual(
       await within(
         currentLoader({
@@ -554,7 +557,7 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
     );
     const response = await within(
       createRequestHandler(
-        await loadReactRouterServerBuild(server),
+        await loadReactRouterServerBuild(server, serverBundleEntry),
         'development'
       )(new Request('http://localhost/catalog/1')),
       'public SSR request'
@@ -574,7 +577,10 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
         errors.slice(beforeFailure).join('\n'),
         /Rejected source evaluation/
       );
-      const accepted = await loadReactRouterServerBuild(server);
+      const accepted = await loadReactRouterServerBuild(
+        server,
+        serverBundleEntry
+      );
       assert.deepEqual(
         await within(
           accepted.routes['routes/catalog'].module.loader({
@@ -604,11 +610,12 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
     );
     await waitFor(
       async () =>
-        (await loadReactRouterServerBuild(server)).routes['routes/catalog']
-          .module.loader !== currentLoader,
+        (await loadReactRouterServerBuild(server, serverBundleEntry)).routes[
+          'routes/catalog'
+        ].module.loader !== currentLoader,
       'source publication'
     );
-    build = await loadReactRouterServerBuild(server);
+    build = await loadReactRouterServerBuild(server, serverBundleEntry);
     assert.deepEqual(
       await within(
         build.routes['routes/catalog'].module.loader({
