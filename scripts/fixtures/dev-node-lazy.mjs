@@ -24,7 +24,9 @@ const count = Number(process.argv[3] ?? 4);
 const scenario = process.argv[4] ?? 'basic';
 const failureFlag = `__routerLazyFailure_${format}_${scenario}`;
 const holdFlag = `__routerLazyHold_${format}_${scenario}`;
-const serverBundleScenario = scenario === 'server-bundles';
+const multiBundleScenario = scenario.startsWith('multi-server-bundles');
+const serverBundleScenario =
+  scenario === 'server-bundles' || multiBundleScenario;
 const serverBundleEntry = serverBundleScenario ? 'catalog/index' : undefined;
 const root = await mkdtemp(join(repository, 'tests/.tmp-node-lazy-'));
 const waitFor = async (predicate, label) => {
@@ -162,6 +164,18 @@ ${scenario === 'bootstrap' ? `const bootstrap = await import('../generated/optio
 export async function loader({params}) { const result = await optional[Number(params.item)](); return { value: ${JSON.stringify(marker)} + result.value }; }
 export default function Catalog() { const data = useLoaderData(); return <p>{data.value}</p>; }`;
     await writeFile(join(root, 'app/routes/catalog.tsx'), catalog(''));
+    if (multiBundleScenario) {
+      await writeFile(join(root, 'app/routes/index.tsx'), catalog('index '));
+      await writeFile(
+        join(root, 'app/routes/catalog.tsx'),
+        catalog('catalog ')
+      );
+      for (let index = 0; index < count; index++)
+        await writeFile(
+          join(root, `app/generated/optional-${index}.ts`),
+          `let calls = 0; export const value = { toString() { return 'Optional item ${index} call ' + ++calls; } };`
+        );
+    }
     const logger = createLogger({ level: 'silent' });
     logger.error = message => {
       errors.push(String(message));
@@ -283,6 +297,81 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
           ) && !module.identifier().startsWith('lazy-compilation-proxy|')
       ).length;
     assert.equal(leaves(), 0, 'unused server leaves are deferred');
+    if (multiBundleScenario) {
+      let indexBuild = await loadReactRouterServerBuild(server, 'index/index');
+      const catalogLoader = build.routes['routes/catalog'].module.loader;
+      const indexLoader = indexBuild.routes['routes/index'].module.loader;
+      assert.notEqual(catalogLoader, indexLoader);
+      assert.equal(build.routes['routes/index'], undefined);
+      assert.equal(indexBuild.routes['routes/catalog'], undefined);
+      const call = (load, item) =>
+        within(
+          load({
+            params: { item: String(item) },
+            request: new Request(`http://localhost/catalog/${item}`),
+          }),
+          'isolated bundle import'
+        );
+      assert.deepEqual(await call(catalogLoader, 1), {
+        value: 'catalog Optional item 1 call 1',
+      });
+      assert.equal(leaves(), 1);
+      assert.deepEqual(await call(indexLoader, 2), {
+        value: 'index Optional item 2 call 1',
+      });
+      assert.equal(leaves(), 2);
+      if (scenario === 'multi-server-bundles') {
+        const values = await Promise.all([
+          call(catalogLoader, 2),
+          call(indexLoader, 1),
+          call(catalogLoader, 2),
+          call(indexLoader, 1),
+        ]);
+        assert.deepEqual(values.map(value => value.value).sort(), [
+          'catalog Optional item 2 call 1',
+          'catalog Optional item 2 call 2',
+          'index Optional item 1 call 1',
+          'index Optional item 1 call 2',
+        ]);
+      }
+      assert.deepEqual(await call(catalogLoader, 1), {
+        value: 'catalog Optional item 1 call 2',
+      });
+      assert.deepEqual(await call(indexLoader, 2), {
+        value: 'index Optional item 2 call 2',
+      });
+      await writeFile(
+        join(root, 'app/routes/catalog.tsx'),
+        catalog('edited catalog ')
+      );
+      await waitFor(
+        async () =>
+          (await loadReactRouterServerBuild(server, 'catalog/index')).routes[
+            'routes/catalog'
+          ].module.loader !== catalogLoader,
+        'two-bundle source publication'
+      );
+      build = await loadReactRouterServerBuild(server, 'catalog/index');
+      indexBuild = await loadReactRouterServerBuild(server, 'index/index');
+      const recovered = await Promise.all([
+        call(build.routes['routes/catalog'].module.loader, 1),
+        call(indexBuild.routes['routes/index'].module.loader, 1),
+        call(build.routes['routes/catalog'].module.loader, 3),
+        call(indexBuild.routes['routes/index'].module.loader, 3),
+      ]);
+      assert.deepEqual(
+        recovered.map(value => value.value),
+        [
+          'edited catalog Optional item 1 call 1',
+          'index Optional item 1 call 1',
+          'edited catalog Optional item 3 call 1',
+          'index Optional item 3 call 1',
+        ]
+      );
+      assert.equal(errors.length, 0, errors.join('\n'));
+      console.log(JSON.stringify({ format, scenario, result: 'passed' }));
+      return;
+    }
     const loader = build.routes['routes/catalog'].module.loader;
     let hdr = 0;
     if (webScenario) {

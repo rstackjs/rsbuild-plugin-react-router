@@ -24,6 +24,8 @@ describe.each(['cjs', 'esm'])('native server lazy compilation (%s)', format => {
     'web-pending',
     'web-error',
     'server-bundles',
+    'multi-server-bundles',
+    'multi-server-bundles-source-recovery',
   ])(
     '%s',
     async scenario => {

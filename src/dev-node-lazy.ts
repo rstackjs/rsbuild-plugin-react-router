@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -289,35 +289,42 @@ const release = (runtime: SourceRuntime): void => {
   }
 };
 
+// Native chunk caches use file paths, so each entry needs its own factories.
+const entryDirectory = (runtime: SourceRuntime, entryName: string): string =>
+  join(runtime.directory, createHash('sha256').update(entryName).digest('hex'));
+
 const writeSnapshot = async (
   runtime: SourceRuntime,
   files: ReadonlyMap<string, Uint8Array>
 ): Promise<void> => {
-  const directories = new Set<string>([runtime.directory]);
-  for (const [name, bytes] of files) {
-    const path = resolve(runtime.directory, name);
-    const relativePath = relative(runtime.directory, path);
-    if (
-      isAbsolute(relativePath) ||
-      relativePath === '..' ||
-      relativePath.startsWith(`..${sep}`)
-    )
-      throw failure(
-        `Node output asset escapes its runtime directory: ${name}.`
-      );
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, bytes);
-    directories.add(dirname(path));
-  }
-  await writeFile(
-    join(runtime.directory, 'package.json'),
-    JSON.stringify({ type: runtime.snapshot.esm ? 'module' : 'commonjs' })
-  );
-  for (const directory of directories) {
+  for (const entryName of runtime.snapshot.entries.keys()) {
+    const directory = entryDirectory(runtime, entryName);
+    const directories = new Set<string>([directory]);
+    for (const [name, bytes] of files) {
+      const path = resolve(directory, name);
+      const relativePath = relative(directory, path);
+      if (
+        isAbsolute(relativePath) ||
+        relativePath === '..' ||
+        relativePath.startsWith(`..${sep}`)
+      )
+        throw failure(
+          `Node output asset escapes its runtime directory: ${name}.`
+        );
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, bytes);
+      directories.add(dirname(path));
+    }
     await writeFile(
-      join(directory, NODE_LAZY_SIDECAR),
-      `module.exports = globalThis[Symbol.for(${JSON.stringify(NODE_LAZY_REGISTRY)})].get(${JSON.stringify(runtime.id)});\n`
+      join(directory, 'package.json'),
+      JSON.stringify({ type: runtime.snapshot.esm ? 'module' : 'commonjs' })
     );
+    for (const outputDirectory of directories) {
+      await writeFile(
+        join(outputDirectory, NODE_LAZY_SIDECAR),
+        `module.exports = globalThis[Symbol.for(${JSON.stringify(NODE_LAZY_REGISTRY)})].get(${JSON.stringify(runtime.id)});\n`
+      );
+    }
   }
 };
 
@@ -464,7 +471,7 @@ export const createDevNodeLazyOwner = (
         Awaited<ReturnType<typeof resolveServerBuildModule>>
       > = {};
       for (const [entryName, file] of accepted.entries) {
-        const path = join(runtime.directory, file);
+        const path = join(entryDirectory(runtime, entryName), file);
         const build = await interruptible(
           accepted.esm
             ? import(pathToFileURL(path).href)
