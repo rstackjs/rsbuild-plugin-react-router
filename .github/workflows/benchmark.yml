@@ -205,6 +205,15 @@ jobs:
           node scripts/verify-react-lazy-catalog.mjs --format cjs --count 1000 --edits > .benchmark/proof/browser-cjs-1000.json
           node scripts/verify-react-lazy-catalog.mjs --format esm --count 100 --edits > .benchmark/proof/browser-esm-100.json
           node scripts/verify-react-lazy-catalog.mjs --format esm --count 1000 --edits > .benchmark/proof/browser-esm-1000.json
+      - name: Repeat Windows startup and pending web activation
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.browser_setup.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          for iteration in {1..10}; do
+            for format in cjs esm; do
+              NODE_ENV=development node --experimental-vm-modules scripts/fixtures/dev-node-lazy.mjs "$format" 4 web-pending 2>&1 | tee -a .benchmark/proof/startup-repeat.log
+            done
+          done
       - name: Measure eager and lazy SSR
         if: runner.os == 'Linux'
         run: node scripts/benchmark/node-lazy.mjs --iterations 10 --warmup 1 --out .benchmark/proof/timings.json
