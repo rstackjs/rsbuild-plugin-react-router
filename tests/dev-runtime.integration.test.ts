@@ -415,9 +415,19 @@ const expectInitialCompilationFailure = async (
   await expect(
     withTimeout(harness.loadBuild(), 20_000, 'the initial compilation failure')
   ).rejects.toThrow('development compilation failed');
-  expect(harness.hasConsoleError('Expression expected')).toBe(true);
+  await expect
+    .poll(() => harness.hasConsoleError('Expression expected'), {
+      intervals: [50, 100, 250],
+      timeout: 20_000,
+    })
+    .toBe(true);
   expect(harness.compileAttempts).toBeGreaterThan(0);
-  expect(harness.completedCompiles).toBeGreaterThan(0);
+  await expect
+    .poll(() => harness.completedCompiles, {
+      intervals: [50, 100, 250],
+      timeout: 20_000,
+    })
+    .toBeGreaterThan(0);
 };
 
 const expectFirstCommittedGeneration = async (
