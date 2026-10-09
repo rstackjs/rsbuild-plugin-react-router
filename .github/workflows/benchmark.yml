@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      node_lazy:
+        description: Run Node lazy compilation correctness and timing evidence
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -119,6 +124,7 @@ jobs:
 
   codspeed:
     name: CodSpeed simulation
+    if: github.event_name != 'workflow_dispatch' || !inputs.node_lazy
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -152,3 +158,47 @@ jobs:
           mode: simulation
           simulation-track-subprocess: true
           run: pnpm bench:codspeed
+
+  node-lazy:
+    name: Node lazy compilation proof
+    if: github.event_name == 'workflow_dispatch' && inputs.node_lazy
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          package_json_file: package.json
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Verify types and core behavior
+        run: |
+          set -euo pipefail
+          mkdir -p .benchmark/proof
+          pnpm typecheck 2>&1 | tee .benchmark/proof/types.log
+          pnpm test:core 2>&1 | tee .benchmark/proof/core.log
+      - name: Verify browser state and source edits
+        run: |
+          node scripts/verify-react-lazy-catalog.mjs --format cjs --count 100 --edits > .benchmark/proof/browser-cjs-100.json
+          node scripts/verify-react-lazy-catalog.mjs --format esm --count 100 --edits > .benchmark/proof/browser-esm-100.json
+          node scripts/verify-react-lazy-catalog.mjs --format esm --count 1000 --edits > .benchmark/proof/browser-esm-1000.json
+      - name: Measure eager and lazy SSR
+        run: node scripts/benchmark/node-lazy.mjs --iterations 10 --warmup 1 --out .benchmark/proof/timings.json
+      - name: Add results to job summary
+        run: cat .benchmark/proof/timings.json.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload proof
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: node-lazy-proof
+          path: .benchmark/proof
+          if-no-files-found: warn

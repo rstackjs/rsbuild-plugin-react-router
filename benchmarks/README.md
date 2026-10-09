@@ -1,5 +1,29 @@
 # Rsbuild React Router Benchmarks
 
+## Node lazy compilation evidence
+
+Build the plugin, then compare the same generated app with
+`unstableServerLazyCompilation` disabled and enabled:
+
+```sh
+pnpm build
+node scripts/benchmark/node-lazy.mjs --iterations 10 --warmup 1
+```
+
+This runs alternating eager/lazy pairs for CommonJS and ESM with 100 and 1000
+optional modules. Every sample uses a fresh process and fixture; dependency
+versions are identical and filesystem caches are not flushed. Measurements cover
+server readiness, the complete first SSR response requested immediately after
+readiness, launch through that response, five repeat requests, and a second cold
+import. Assertions require HTTP 200, real SSR content, and the expected compiled
+module counts. Browser hydration is measured separately by the browser verifier.
+
+Use `--format cjs|esm`, `--count 100|1000`, and `--out path.json` for a focused
+run. JSON records all samples, warmups, versions, and median/min/max summaries;
+the adjacent Markdown report shows medians. The Benchmark workflow's `node_lazy`
+dispatch input runs this on a dedicated CI runner after type, core, and two-tab
+browser/source-edit checks, then uploads all evidence as `node-lazy-proof`.
+
 This repository uses a focused, shared suite for local regression checks and
 pull-request comparisons. It measures a production build and an SSR dev-server
 case, then records wall-time samples and medians as JSON.
