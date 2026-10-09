@@ -292,7 +292,7 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
     const leaves = () =>
       [...latestNode.compilation.modules].filter(
         module =>
-          /app\/generated\/optional-\d+\.ts$/.test(
+          /app[\\/]generated[\\/]optional-\d+\.ts$/.test(
             module.nameForCondition() ?? ''
           ) && !module.identifier().startsWith('lazy-compilation-proxy|')
       ).length;
@@ -387,7 +387,7 @@ export default function Catalog() { const data = useLoaderData(); return <p>{dat
         module.identifier().startsWith('lazy-compilation-proxy|')
       );
       const client = modules.find(module =>
-        module.resource?.includes('/hot/lazy-compilation-web.js?')
+        /[/\\]hot[/\\]lazy-compilation-web\.js\?/.test(module.resource ?? '')
       );
       assert.ok(proxy, 'Web lazy proxy is present');
       assert.ok(client, 'installed Web lazy client is present');
