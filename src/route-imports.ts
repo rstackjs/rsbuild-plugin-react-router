@@ -43,7 +43,7 @@ const isEligibleRouteIssuer = (
   rsc: boolean,
   routeByFilePath: ReadonlyMap<string, Route>
 ): boolean =>
-  routeByFilePath.has(issuer.split('?')[0]) &&
+  routeByFilePath.has(resolve(issuer.split('?')[0])) &&
   (rsc || compilerName === 'web' || isRscClientRouteModuleIssuer(issuer));
 
 export const resolveQuerylessRouteImportRequest = ({
@@ -76,7 +76,7 @@ export const resolveQuerylessRouteImportRequest = ({
     isRscClientRouteModuleIssuer(issuer) ||
     (rsc && issuerLayer === rspack.experiments.rsc.Layers.ssr);
   const isWebCompiler = compilerName === 'web';
-  if (!routeByFilePath.has(resolvedPath)) {
+  if (!routeByFilePath.has(resolve(resolvedPath))) {
     return;
   }
 

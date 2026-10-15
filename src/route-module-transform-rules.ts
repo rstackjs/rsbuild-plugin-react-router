@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { resolve } from 'pathe';
 import type { Rspack } from '@rsbuild/core';
 import type { RouteModuleTransformLoaderOptions } from './route-module-transform-loader.js';
 import type { PluginOptions, Route } from './types.js';
@@ -98,7 +99,7 @@ export const registerRouteModuleTransformRules = (
   rspackConfig.module ??= {};
   rspackConfig.module.rules ??= [];
   rspackConfig.module.rules.push({
-    test: path => routeByFilePath.has(path),
+    test: path => routeByFilePath.has(resolve(path)),
     resourceQuery: {
       not: /__react-router-build-client-route|route-chunk=/,
     },

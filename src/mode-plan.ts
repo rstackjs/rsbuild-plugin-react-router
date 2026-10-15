@@ -85,6 +85,7 @@ type ModePlanContext = {
 
 type CreateClassicModePlanOptions = ModePlanContext & {
   assetsBuildDirectory: string;
+  serverLazyCompilation?: boolean;
   devHmr?: DevHmrPlanOptions;
   defaultEntryName: string;
   entryServerPath: string;
@@ -257,6 +258,7 @@ const createClassicModePlan = async ({
   rootRouteFile,
   serverAppPath,
   shouldDependOnWebCompiler,
+  serverLazyCompilation,
   splitRouteModules,
   ssr,
 }: CreateClassicModePlanOptions): Promise<ClassicModePlan> => {
@@ -288,6 +290,7 @@ const createClassicModePlan = async ({
     rootDirectory: api.context.rootPath,
     ssr,
     devHmr,
+    serverLazyCompilation,
   });
   const reactRouterAliases = createReactRouterPackageAliases(
     api.context.rootPath
@@ -365,9 +368,10 @@ const createClassicModePlan = async ({
     nodeExternals: Array.from(
       new Set(['express', ...getSsrExternals(api.context.rootPath)])
     ),
-    nodeDependencies: shouldDependOnWebCompiler
-      ? { dependencies: ['web'] }
-      : {},
+    nodeDependencies:
+      shouldDependOnWebCompiler && !serverLazyCompilation
+        ? { dependencies: ['web'] }
+        : {},
   };
 };
 

@@ -72,6 +72,7 @@ type CreateClassicBuildArtifactsOptions = {
   rootDirectory: string;
   ssr: boolean;
   devHmr?: DevHmrPlanOptions;
+  serverLazyCompilation?: boolean;
 };
 
 export type ClassicBuildArtifacts = {
@@ -93,6 +94,7 @@ export const createClassicBuildArtifacts = async ({
   rootDirectory,
   ssr,
   devHmr,
+  serverLazyCompilation,
 }: CreateClassicBuildArtifactsOptions): Promise<ClassicBuildArtifacts> => {
   const buildManifest = await getBuildManifest({
     reactRouterConfig,
@@ -124,6 +126,7 @@ export const createClassicBuildArtifacts = async ({
       api,
       isBuild,
       buildPlan: serverBuildPlan,
+      serverLazyCompilation,
       clientPatchesRouteMetadata: devHmr?.isEnabled,
     }),
     prerenderPaths,

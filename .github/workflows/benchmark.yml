@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      node_lazy:
+        description: Run Node lazy compilation correctness and timing evidence
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -119,6 +124,7 @@ jobs:
 
   codspeed:
     name: CodSpeed simulation
+    if: github.event_name != 'workflow_dispatch' || !inputs.node_lazy
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -152,3 +158,76 @@ jobs:
           mode: simulation
           simulation-track-subprocess: true
           run: pnpm bench:codspeed
+
+  node-lazy:
+    name: Node lazy compilation proof (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' && inputs.node_lazy
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          package_json_file: package.json
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+        id: browser_setup
+      - name: Verify types and core behavior
+        run: |
+          set -euo pipefail
+          mkdir -p .benchmark/proof
+          pnpm typecheck 2>&1 | tee .benchmark/proof/types.log
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            pnpm exec rstest run tests/dev-node-lazy*.test.ts tests/dev-generation*.test.ts tests/dev-runtime*.test.ts 2>&1 | tee .benchmark/proof/core.log
+          else
+            pnpm test:core 2>&1 | tee .benchmark/proof/core.log
+          fi
+      - name: Verify browser state and source edits
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
+        run: |
+          node scripts/verify-react-lazy-catalog.mjs --format cjs --count 100 --edits > .benchmark/proof/browser-cjs-100.json
+          node scripts/verify-react-lazy-catalog.mjs --format cjs --count 1000 --edits > .benchmark/proof/browser-cjs-1000.json
+          node scripts/verify-react-lazy-catalog.mjs --format esm --count 100 --edits > .benchmark/proof/browser-esm-100.json
+          node scripts/verify-react-lazy-catalog.mjs --format esm --count 1000 --edits > .benchmark/proof/browser-esm-1000.json
+      - name: Repeat Windows startup and pending web activation
+        if: ${{ !cancelled() && runner.os == 'Windows' && steps.browser_setup.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          for iteration in {1..10}; do
+            for format in cjs esm; do
+              NODE_ENV=development node --experimental-vm-modules scripts/fixtures/dev-node-lazy.mjs "$format" 4 web-pending 2>&1 | tee -a .benchmark/proof/startup-repeat.log
+            done
+          done
+      - name: Measure eager and lazy SSR
+        if: runner.os == 'Linux'
+        run: node scripts/benchmark/node-lazy.mjs --iterations 10 --warmup 1 --out .benchmark/proof/timings.json
+      - name: Measure browser startup and first route
+        if: runner.os == 'Linux'
+        run: node scripts/benchmark/node-lazy-browser.mjs --iterations 10 --warmup 1 --out .benchmark/proof/browser-timings.json
+      - name: Add results to job summary
+        if: runner.os == 'Linux'
+        run: cat .benchmark/proof/timings.json.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload proof
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: node-lazy-proof-${{ matrix.os }}
+          path: .benchmark/proof
+          include-hidden-files: true
+          if-no-files-found: warn

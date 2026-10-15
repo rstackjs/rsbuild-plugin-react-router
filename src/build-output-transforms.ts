@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import type { RsbuildPluginAPI, TransformHandler } from '@rsbuild/core';
 import jsesc from 'jsesc';
-import { relative } from 'pathe';
+import { relative, resolve } from 'pathe';
 import { PLUGIN_NAME } from './constants.js';
 import {
   createReactRouterManifestOptions,
@@ -142,7 +142,7 @@ export const registerBuildOutputTransforms = ({
   ): void => {
     if (
       args.environment.name !== 'web' ||
-      !routeByFilePath.has(args.resourcePath)
+      !routeByFilePath.has(resolve(args.resourcePath))
     ) {
       return;
     }
@@ -207,6 +207,13 @@ export const registerBuildOutputTransforms = ({
         'manifest:transform',
         args.resource,
         async () => {
+          if (!isBuild && pluginOptions.unstableServerLazyCompilation) {
+            return {
+              code: args.resource.includes('virtual/react-router/server-build')
+                ? args.code
+                : 'export default {};',
+            };
+          }
           // Cache identity for a module whose source never changes (#136);
           // see `serverManifestStampPath` in index.ts.
           if (existsSync(serverManifestStampPath)) {
@@ -271,7 +278,7 @@ export const registerBuildOutputTransforms = ({
             environmentName: args.environment?.name,
             isBuild,
             routeChunkConfig,
-            routeId: routeByFilePath.get(args.resourcePath)?.id,
+            routeId: routeByFilePath.get(resolve(args.resourcePath))?.id,
             devHmr: isDevHmrEnabled(),
           })
       );
@@ -382,7 +389,7 @@ export const registerBuildOutputTransforms = ({
     // select the same loader, so Rspack gives them one module identity.
     api.transform(
       {
-        test: path => routeByFilePath.has(path),
+        test: path => routeByFilePath.has(resolve(path)),
         resourceQuery: {
           not: /__react-router-build-client-route|route-chunk=/,
         },

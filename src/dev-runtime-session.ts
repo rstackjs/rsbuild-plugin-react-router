@@ -25,7 +25,10 @@ export type ControllerState =
   | { status: 'closing'; binding: RuntimeBinding }
   | { status: 'terminal'; error: Error };
 
-type CloseBinding = (binding: RuntimeBinding, error?: Error) => void;
+type CloseBinding = (
+  binding: RuntimeBinding,
+  error?: Error
+) => void | Promise<void>;
 
 export type DevRuntimeSessionManager = {
   getState(): ControllerState;
@@ -60,17 +63,37 @@ export const createDevRuntimeSessionManager = (
     (state.status === 'active' || state.status === 'closing') &&
     state.binding === binding;
 
-  const completeClose = (binding: RuntimeBinding): void => {
+  const completeClose = async (binding: RuntimeBinding): Promise<void> => {
     if (!isCurrentBinding(binding)) {
       return;
     }
     if (state.status === 'active') {
-      closeBinding(binding);
+      state = { status: 'closing', binding };
+      await closeBinding(binding);
     }
-    state = { status: 'idle' };
+    if (isCurrentBinding(binding)) state = { status: 'idle' };
   };
 
-  const failClose = (binding: RuntimeBinding, cause: unknown): void => {
+  const terminateBinding = async (
+    binding: RuntimeBinding,
+    error: Error
+  ): Promise<void> => {
+    if (!isCurrentBinding(binding)) return;
+    state = { status: 'terminal', error };
+    try {
+      await closeBinding(binding, error);
+    } catch (cause) {
+      error.cause = new AggregateError(
+        [error.cause ?? error.message, cause],
+        'Development runtime cleanup failed'
+      );
+    }
+  };
+
+  const failClose = async (
+    binding: RuntimeBinding,
+    cause: unknown
+  ): Promise<void> => {
     if (!isCurrentBinding(binding)) {
       return;
     }
@@ -78,23 +101,22 @@ export const createDevRuntimeSessionManager = (
       `[${PLUGIN_NAME}] The previous development server failed to close. Restart the process before retrying because Rsbuild may not have finished tearing down its compiler and watchers.`,
       { cause }
     );
-    closeBinding(binding, error);
-    state = { status: 'terminal', error };
+    await terminateBinding(binding, error);
   };
 
-  const applyCloseOutcome = (
+  const applyCloseOutcome = async (
     observation: CloseObservation,
     outcome: CloseOutcome
-  ): void => {
+  ): Promise<void> => {
     observation.outcome = outcome;
     const { binding } = observation;
     if (!binding) {
       return;
     }
     if (outcome.ok) {
-      completeClose(binding);
+      await completeClose(binding);
     } else {
-      failClose(binding, outcome.cause);
+      await failClose(binding, outcome.cause);
     }
     observation.binding = undefined;
   };
@@ -118,9 +140,9 @@ export const createDevRuntimeSessionManager = (
       }
       observation.promise = closePromise
         .then(() => applyCloseOutcome(observation, { ok: true }))
-        .catch(cause => {
+        .catch(async cause => {
           const error = normalizeEffectError(cause);
-          applyCloseOutcome(observation, { ok: false, cause: error });
+          await applyCloseOutcome(observation, { ok: false, cause: error });
           throw error;
         });
       return observation.promise;
@@ -166,7 +188,9 @@ export const createDevRuntimeSessionManager = (
       const observation = observeClose(binding.server);
       observation.binding = binding;
       if (observation.outcome) {
-        applyCloseOutcome(observation, observation.outcome);
+        void applyCloseOutcome(observation, observation.outcome).catch(cause =>
+          failClose(binding, cause)
+        );
       }
     },
 
@@ -177,11 +201,7 @@ export const createDevRuntimeSessionManager = (
     },
 
     terminate(binding: RuntimeBinding, error: Error): void {
-      if (!isCurrentBinding(binding)) {
-        return;
-      }
-      closeBinding(binding, error);
-      state = { status: 'terminal', error };
+      void terminateBinding(binding, error);
     },
   };
 };
