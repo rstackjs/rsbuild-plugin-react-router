@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { rspack, type Rspack } from '@rsbuild/core';
@@ -138,7 +138,7 @@ describe('queryless route imports with the native resolver', () => {
     'RSC SSR',
     'RSC server',
   ])('uses the actual route resolved for %s', async kind => {
-    const root = mkdtempSync(join(tmpdir(), 'rr-route-import-'));
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'rr-route-import-')));
     const source = join(root, 'source.js');
     const target = join(root, 'target.js');
     const wrong = join(root, 'wrong.js');

@@ -33,6 +33,45 @@ This repository uses a focused, shared suite for local regression checks and
 pull-request comparisons. It measures a production build and an SSR dev-server
 case, then records wall-time samples and medians as JSON.
 
+## Issue #155 browser comparison
+
+To measure the milestones requested in issue #155, build both the candidate and
+pre-PR checkouts, then run:
+
+```sh
+node scripts/benchmark/node-lazy-browser.mjs \
+  --stock-repo /absolute/path/to/pre-pr-checkout \
+  --iterations 10 --warmup 1
+```
+
+The three arms are the pre-PR plugin with its installed stock packages, the
+candidate with server lazy compilation disabled, and the same candidate with it
+enabled. Package versions and identical fixture digests are recorded. The last
+two arms isolate the option from dependency changes. Without `--stock-repo`, only
+those two controlled arms run.
+
+Startup ends when the index page's hydrated click handler works. A second tab
+then requests `/catalog/17`; SSR content arrival and that page's interactivity
+are timed separately from startup. Every trial checks the original SSR response,
+retained text and document identity in the first tab, and absence of reload/HDR
+messages during activation. Fresh fixture/output, server and browser instances
+are used for each trial; OS filesystem caches are not flushed. Warmups are
+excluded and arm order alternates. Default watchers are used and module census
+instrumentation is disabled for timing.
+
+Run the verifier separately without `--timing` to assert module counts and source
+edit behavior:
+
+```sh
+node scripts/verify-react-lazy-catalog.mjs --format esm --count 1000 --edits
+node scripts/verify-react-lazy-catalog.mjs --side stock \
+  --stock-repo /absolute/path/to/pre-pr-checkout --format esm --count 1000
+```
+
+The raw browser benchmark JSON contains all samples, warmups, versions, and
+median/min/max values. Lower compiled-module counts establish deferred work;
+latency improvement must be established independently from the timing results.
+
 ## Local runs
 
 ```sh

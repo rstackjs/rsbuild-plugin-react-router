@@ -217,6 +217,9 @@ jobs:
       - name: Measure eager and lazy SSR
         if: runner.os == 'Linux'
         run: node scripts/benchmark/node-lazy.mjs --iterations 10 --warmup 1 --out .benchmark/proof/timings.json
+      - name: Measure browser startup and first route
+        if: runner.os == 'Linux'
+        run: node scripts/benchmark/node-lazy-browser.mjs --iterations 10 --warmup 1 --out .benchmark/proof/browser-timings.json
       - name: Add results to job summary
         if: runner.os == 'Linux'
         run: cat .benchmark/proof/timings.json.md >> "$GITHUB_STEP_SUMMARY"

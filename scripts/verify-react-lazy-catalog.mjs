@@ -13,17 +13,19 @@ const defaults = {
   count: 100,
   format: 'esm',
   edits: false,
+  timing: false,
 };
 
 function usage() {
   return `Usage: node scripts/verify-react-lazy-catalog.mjs [options]
 
 Options:
-  --side candidate|stock       Side to verify (default candidate)
+  --side candidate|eager|stock Side to verify (default candidate)
   --stock-repo /path           Stock repository (required for --side stock)
   --count 100|1000             Generated optional route count (default 100)
   --format cjs|esm             React Router server module format (default esm)
   --edits                      Exercise dependency, loader, action, meta, and CSS edits
+  --timing                     Default watchers and no module census for timing runs
   --help                       Show this help`;
 }
 
@@ -35,6 +37,10 @@ function parseArgs(argv) {
     if (arg === '--help') {
       console.log(usage());
       process.exit(0);
+    }
+    if (arg === '--timing') {
+      config.timing = true;
+      continue;
     }
     if (arg === '--edits') {
       config.edits = true;
@@ -53,8 +59,8 @@ function parseArgs(argv) {
     else if (arg === '--format') config.format = value;
     else throw new Error(`Unknown argument ${arg}`);
   }
-  if (!['candidate', 'stock'].includes(config.side))
-    throw new Error('--side must be candidate or stock');
+  if (!['candidate', 'eager', 'stock'].includes(config.side))
+    throw new Error('--side must be candidate, eager or stock');
   if (![100, 1000].includes(config.count))
     throw new Error('--count must be 100 or 1000');
   if (!['cjs', 'esm'].includes(config.format))
@@ -159,6 +165,8 @@ if (serverMode) {
     versions: {
       rsbuild: require('@rsbuild/core/package.json').version,
       rspack: require('@rspack/core/package.json').version,
+      react: require('react/package.json').version,
+      reactRouter: require('react-router/package.json').version,
     },
   });
   process.on('message', async message => {
@@ -266,7 +274,11 @@ if (serverMode) {
       ],
       {
         cwd: repo,
-        env: { ...process.env, ROUTER_STOCK_REPO: config.stockRepo ?? '' },
+        env: {
+          ...process.env,
+          ROUTER_STOCK_REPO: config.stockRepo ?? '',
+          ROUTER_CATALOG_BENCHMARK: config.timing ? '1' : '0',
+        },
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       }
     );
@@ -304,12 +316,14 @@ if (serverMode) {
       .fill('retained literal text');
     await new Promise(resolve => setTimeout(resolve, 150));
     const cold = compiles.filter(event => event.side === 'node').at(-1);
-    assert.ok(cold, 'actual Node compilation was observed');
-    assert.equal(
-      cold.leaves.length,
-      config.side === 'stock' ? config.count : 0,
-      'cold Node leaf census'
-    );
+    if (!config.timing) {
+      assert.ok(cold, 'actual Node compilation was observed');
+      assert.equal(
+        cold.leaves.length,
+        config.side === 'candidate' ? 0 : config.count,
+        'cold Node leaf census'
+      );
+    }
     const beforeMessages = messages.length;
     const second = await context.newPage();
     attach(second);
@@ -378,14 +392,19 @@ if (serverMode) {
     );
     assert.equal(await first.evaluate(() => window.__catalogDocument), token);
     const after = compiles.filter(event => event.side === 'node').at(-1);
-    assert.equal(
-      after.leaves.length,
-      config.side === 'stock' ? config.count : 1,
-      'requested Node leaf census'
-    );
-    assert.ok(after.leaves.includes('17'));
-    if (config.side === 'candidate')
-      assert.ok(!after.leaves.includes('18'), 'unused leaf18 remains deferred');
+    if (!config.timing) {
+      assert.equal(
+        after.leaves.length,
+        config.side === 'candidate' ? 1 : config.count,
+        'requested Node leaf census'
+      );
+      assert.ok(after.leaves.includes('17'));
+      if (config.side === 'candidate')
+        assert.ok(
+          !after.leaves.includes('18'),
+          'unused leaf18 remains deferred'
+        );
+    }
     assert.equal(
       await second
         .locator('.optional')
@@ -492,8 +511,8 @@ if (serverMode) {
         firstContentMs,
         requestInteractiveMs,
       },
-      coldLeaves: cold.leaves.length,
-      requestedLeaves: after.leaves.length,
+      coldLeaves: cold?.leaves.length,
+      requestedLeaves: after?.leaves.length,
       retainedText: true,
       retainedDocument: true,
       activationMessages,
