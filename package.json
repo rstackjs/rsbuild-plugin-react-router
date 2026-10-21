@@ -28,6 +28,16 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./compat/remix-react": {
+      "types": "./dist/compat/remix-react.d.ts",
+      "import": "./dist/compat/remix-react.js",
+      "require": "./dist/compat/remix-react.cjs"
+    },
+    "./compat/remix-node": {
+      "types": "./dist/compat/remix-node.d.ts",
+      "import": "./dist/compat/remix-node.js",
+      "require": "./dist/compat/remix-node.cjs"
+    },
     "./templates/entry.client": {
       "types": "./dist/templates/entry.client.d.ts",
       "import": "./dist/templates/entry.client.js",
@@ -69,7 +79,7 @@
     "e2e:no-build": "pnpm test:package-interop && pnpm --filter './examples/{default-template,spa-mode,prerender,custom-node-server,cloudflare,client-only,react-router-8,rsc-mode}' test:e2e",
     "dev": "rslib build --watch",
     "test": "pnpm typecheck && rstest run",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && pnpm --filter integration typecheck && pnpm --filter integration-rsbuild-template typecheck && pnpm --filter integration-rsc-framework typecheck && pnpm --filter integration-rsc-preview typecheck",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p tests/tsconfig.remix-compat.json && pnpm --filter integration typecheck && pnpm --filter integration-rsbuild-template typecheck && pnpm --filter integration-rsc-framework typecheck && pnpm --filter integration-rsc-preview typecheck",
     "test:watch": "rstest watch",
     "test:coverage": "rstest run --coverage",
     "test:core": "rstest run -c ./rstest.config.ts",

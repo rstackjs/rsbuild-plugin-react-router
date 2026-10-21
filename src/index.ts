@@ -201,6 +201,9 @@ export const pluginReactRouter = (
       ...options,
     };
     const isRscMode = Boolean(pluginOptions.rsc);
+    if (isRscMode && pluginOptions.remixCompat) {
+      throw new Error('`remixCompat` is not supported with RSC mode.');
+    }
     const logPerformance = pluginOptions.logPerformance === true;
     const setupStartMs = logPerformance ? performance.now() : 0;
     const performanceProfiler = createReactRouterPerformanceProfiler({
@@ -1012,7 +1015,23 @@ export const pluginReactRouter = (
         routeCount >= 256 &&
         (config.performance?.printFileSize === undefined ||
           config.performance.printFileSize === true);
-      const resolveConfig = modePlan.createResolveConfig(api.context.rootPath);
+      const resolveConfig =
+        modePlan.createResolveConfig(api.context.rootPath) ?? {};
+      if (pluginOptions.remixCompat) {
+        resolveConfig.alias = {
+          ...resolveConfig.alias,
+          '@remix-run/react$': resolve(__dirname, 'compat/remix-react.js'),
+          '@remix-run/node$': resolve(__dirname, 'compat/remix-node.js'),
+          ...(resolveAppPackagePath('react-router', api.context.rootPath)
+            ? {
+                'react-router-dom6$': resolveAppPackagePath(
+                  'react-router',
+                  api.context.rootPath
+                ),
+              }
+            : {}),
+        };
+      }
 
       // Browser code (React itself) reads `process.env.NODE_ENV`. Rsbuild only
       // emits the define for its recognized modes; an unrecognized NODE_ENV

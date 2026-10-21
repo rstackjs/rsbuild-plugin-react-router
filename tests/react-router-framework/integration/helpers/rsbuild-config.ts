@@ -13,6 +13,7 @@ type RsbuildConfigBuildArgs = {
 };
 
 type RsbuildConfigBaseArgs = {
+  remixCompat?: boolean;
   templateName?: TemplateName;
   /** Rspack persistent cache, kept inside the fixture (fixtures share the template's node_modules). */
   buildCache?: boolean;
@@ -188,7 +189,7 @@ export const rsbuildConfig = {
           ]
         : []),
       ...(args.cssCodeSplit === false ? [CSS_CODE_SPLIT_NOTE] : []),
-      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${args.svgr ? "pluginSvgr(), " : ""}${args.tailwind ? "pluginTailwindcss(), " : ""}${args.sass ? "pluginSass(), " : ""}${args.less ? "pluginLess(), " : ""}${routerPlugin}()],`,
+      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${args.svgr ? "pluginSvgr(), " : ""}${args.tailwind ? "pluginTailwindcss(), " : ""}${args.sass ? "pluginSass(), " : ""}${args.less ? "pluginLess(), " : ""}${routerPlugin}(${args.remixCompat ? "{ remixCompat: true }" : ""})],`,
     ];
 
     return [

@@ -163,6 +163,7 @@ export interface FixtureInit {
   prerender?: boolean;
   port?: number;
   templateName?: TemplateName;
+  remixCompat?: boolean;
 }
 
 export type Fixture = Awaited<ReturnType<typeof createFixture>>;
@@ -566,6 +567,7 @@ export async function createFixtureProject(
             "rsbuild.config.ts": await rsbuildConfig.basic({
               port,
               templateName,
+              remixCompat: init.remixCompat,
             }),
           }),
       ...(hasReactRouterConfig

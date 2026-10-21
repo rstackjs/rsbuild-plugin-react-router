@@ -100,6 +100,43 @@ describe('pluginReactRouter', () => {
     });
   });
 
+  it('only installs exact Remix compatibility aliases when enabled', async () => {
+    const disabled = await createStubRsbuild({ rsbuildConfig: {} });
+    disabled.context.rootPath = process.cwd();
+    disabled.addPlugins([pluginReactRouter()]);
+    const disabledConfig = await disabled.unwrapConfig();
+    expect(disabledConfig.tools.rspack.resolve.alias).not.toHaveProperty(
+      '@remix-run/react$'
+    );
+
+    const enabled = await createStubRsbuild({ rsbuildConfig: {} });
+    enabled.context.rootPath = process.cwd();
+    enabled.addPlugins([pluginReactRouter({ remixCompat: true })]);
+    const enabledConfig = await enabled.unwrapConfig();
+    expect(enabledConfig.tools.rspack.resolve.alias).toMatchObject({
+      '@remix-run/react$': expect.stringMatching(/compat[\/]remix-react\.js$/),
+      '@remix-run/node$': expect.stringMatching(/compat[\/]remix-node\.js$/),
+      'react-router-dom6$': requireFromHere.resolve('react-router'),
+    });
+    expect(enabledConfig.tools.rspack.resolve.alias).not.toHaveProperty(
+      '@remix-run/react/'
+    );
+    expect(enabledConfig.tools.rspack.resolve.alias).not.toHaveProperty(
+      '@remix-run/node/'
+    );
+  });
+
+  it('rejects Remix compatibility in RSC mode', async () => {
+    const rsbuild = await createStubRsbuild({ rsbuildConfig: {} });
+    rsbuild.addPlugins([
+      pluginReactRouter({ remixCompat: true, rsc: true }),
+    ]);
+
+    await expect(rsbuild.unwrapConfig()).rejects.toThrow(
+      '`remixCompat` is not supported with RSC mode.'
+    );
+  });
+
   it('checks RSC support in the target project rather than the caller project', async () => {
     const directory = fs.mkdtempSync(join(tmpdir(), 'rr-rsc-project-version-'));
     try {

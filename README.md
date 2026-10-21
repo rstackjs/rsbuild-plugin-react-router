@@ -99,6 +99,7 @@ pluginReactRouter({
   unstableLazyCompilationPrewarm: false,
   logPerformance: false,
   federation: false,
+  remixCompat: false,
 });
 ```
 
@@ -113,6 +114,59 @@ pluginReactRouter({
 | `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses an automatic worker count, and a positive integer sets the maximum worker count.                                            |
 | `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
 | `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
+| `remixCompat`                    | `false`     | Aliases supported Remix v2 root imports to the package's React Router compatibility facades. See [Remix source compatibility](#remix-source-compatibility).                                                                      |
+
+### Remix source compatibility
+
+Set `remixCompat: true` to keep selected Remix v2 source imports while running
+one React Router 7 or 8 runtime:
+
+```ts
+pluginReactRouter({ remixCompat: true });
+```
+
+The option installs exact build aliases for `@remix-run/react`,
+`@remix-run/node`, and `react-router-dom6`. It does not alias package prefixes
+or arbitrary deep imports. The same facades are public package exports for
+TypeScript and explicit use:
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@remix-run/react": [
+        "./node_modules/rsbuild-plugin-react-router/dist/compat/remix-react.d.ts"
+      ],
+      "@remix-run/node": [
+        "./node_modules/rsbuild-plugin-react-router/dist/compat/remix-node.d.ts"
+      ],
+      "react-router-dom6": [
+        "./node_modules/rsbuild-plugin-react-router/dist/compat/remix-react.d.ts"
+      ]
+    }
+  }
+}
+```
+
+`compat/remix-react` re-exports React Router's public root API and provides
+`RemixBrowser` as `HydratedRouter` plus a `RemixServer` wrapper around
+`ServerRouter`. `compat/remix-node` re-exports the public `react-router` and
+`@react-router/node` APIs. Both facades add these source-compatible helpers:
+
+- `json(value, init)` returns a real JSON `Response`, preserving status and
+  headers.
+- `defer(value, init)` delegates to React Router `data(value, init)`. Promises,
+  including rejected promises, are streamed by React Router's single-fetch
+  protocol and retain response status and headers. It is not Remix's old
+  `TypedDeferredData` runtime protocol.
+
+The compatibility boundary is intentionally narrow. It does not support
+Remix private context/protocol APIs, package deep imports, `installGlobals`,
+legacy upload APIs, Remix config/build conventions, or two router runtimes.
+`RemixServer` accepts `abortDelay` to ease source migration but cannot apply it;
+the server entry must abort its render stream. The wrapper emits a one-time
+warning when the prop is present. RSC mode rejects `remixCompat`.
 
 Lazy compilation applies to the browser build. Server dynamic imports still
 compile eagerly; `lazyCompilation` does not enable on-demand SSR compilation.

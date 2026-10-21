@@ -11,6 +11,8 @@ const config = defineConfig({
       source: {
         entry: {
           index: './src/index.ts',
+          'compat/remix-node': './src/compat/remix-node.ts',
+          'compat/remix-react': './src/compat/remix-react.tsx',
           'route-module-transform-loader':
             './src/route-module-transform-loader.ts',
           'rsc-route-transform-loader': './src/rsc-route-transform-loader.ts',
@@ -28,6 +30,8 @@ const config = defineConfig({
       source: {
         entry: {
           index: './src/index.ts',
+          'compat/remix-node': './src/compat/remix-node.ts',
+          'compat/remix-react': './src/compat/remix-react.tsx',
           'rsc-route-transform-loader': './src/rsc-route-transform-loader.ts',
           'templates/entry.server': './src/templates/entry.server.tsx',
           'templates/entry.client': './src/templates/entry.client.tsx',

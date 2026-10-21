@@ -12,6 +12,14 @@ export type Route = {
 
 export type PluginOptions = {
   /**
+   * Alias supported Remix v2 root imports to React Router compatibility
+   * facades. This keeps one React Router runtime and does not emulate the
+   * legacy Remix deferred protocol or private APIs.
+   * @default false
+   */
+  remixCompat?: boolean;
+
+  /**
    * Generate React Router route types during development and builds.
    * Set to false when type generation is managed separately.
    * @default true

@@ -177,11 +177,32 @@ const verifyRscPublicSurface = (esm, commonjs) => {
   }
 };
 
+const verifyRemixCompatPublicSurface = async () => {
+  const esmNode = await import('rsbuild-plugin-react-router/compat/remix-node');
+  const esmReact =
+    await import('rsbuild-plugin-react-router/compat/remix-react');
+  const commonjsNode = require('rsbuild-plugin-react-router/compat/remix-node');
+  const commonjsReact = require('rsbuild-plugin-react-router/compat/remix-react');
+
+  for (const runtime of [esmNode, commonjsNode]) {
+    assert.equal(typeof runtime.defer, 'function');
+    assert.equal(typeof runtime.json, 'function');
+    assert.equal(typeof runtime.createReadableStreamFromReadable, 'function');
+  }
+  for (const runtime of [esmReact, commonjsReact]) {
+    assert.equal(typeof runtime.RemixBrowser, 'function');
+    assert.equal(typeof runtime.RemixServer, 'function');
+    assert.equal(typeof runtime.Await, 'function');
+    assert.equal(typeof runtime.useLoaderData, 'function');
+  }
+};
+
 const main = async () => {
   const [esm, commonjs] = await loadEntryPoints();
   await verifyPackIncludesOriginalSource();
   verifyEffectFreeRuntimeOutputs();
   verifyRscPublicSurface(esm, commonjs);
+  await verifyRemixCompatPublicSurface();
   process.chdir(
     fileURLToPath(new URL('../tests/fixtures/dev-runtime/', import.meta.url))
   );
