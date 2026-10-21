@@ -164,6 +164,7 @@ export interface FixtureInit {
   port?: number;
   templateName?: TemplateName;
   remixCompat?: boolean;
+  stripServerOnlyRouteExportsInSpa?: boolean;
 }
 
 export type Fixture = Awaited<ReturnType<typeof createFixture>>;
@@ -568,6 +569,8 @@ export async function createFixtureProject(
               port,
               templateName,
               remixCompat: init.remixCompat,
+              stripServerOnlyRouteExportsInSpa:
+                init.stripServerOnlyRouteExportsInSpa,
             }),
           }),
       ...(hasReactRouterConfig

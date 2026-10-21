@@ -15,6 +15,7 @@ import { combineURLs, createRouteId } from './plugin-utils.js';
 import {
   CLIENT_EXPORTS,
   DEFAULT_JS_DIST_PATH,
+  SERVER_ONLY_ROUTE_EXPORTS_SET,
   SERVER_EXPORTS,
 } from './constants.js';
 import {
@@ -119,21 +120,27 @@ export type RouteModuleAnalysisProvider = (
 
 export type ReactRouterManifestOptions = RouteChunkManifestOptions & {
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
+  stripServerOnlyRouteExports?: boolean;
 };
 
 export const createReactRouterManifestOptions = ({
   routeChunks,
   routeModuleAnalysis,
+  stripServerOnlyRouteExports,
 }: {
   routeChunks?: RouteChunkManifestOptions;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
+  stripServerOnlyRouteExports?: boolean;
 }): ReactRouterManifestOptions | undefined => {
-  if (!routeChunks && !routeModuleAnalysis) {
+  if (!routeChunks && !routeModuleAnalysis && !stripServerOnlyRouteExports) {
     return undefined;
   }
   return {
     ...routeChunks,
     ...(routeModuleAnalysis ? { routeModuleAnalysis } : {}),
+    ...(stripServerOnlyRouteExports
+      ? { stripServerOnlyRouteExports: true }
+      : {}),
   };
 };
 
@@ -263,6 +270,7 @@ const analyzeRouteForManifestEffect = ({
   routeFilePath,
   route,
   routeModuleAnalysis,
+  stripServerOnlyRouteExports,
 }: {
   discoveredCssAssets: string[];
   isBuild: boolean;
@@ -271,6 +279,7 @@ const analyzeRouteForManifestEffect = ({
   routeFilePath: string;
   route: Route;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
+  stripServerOnlyRouteExports?: boolean;
 }): Effect.Effect<RouteManifestAnalysis, Error, never> =>
   tryPluginPromise(async () => {
     const { code, exports: exportNames } =
@@ -286,10 +295,14 @@ const analyzeRouteForManifestEffect = ({
           )
         : null;
 
+    const manifestExportNames = stripServerOnlyRouteExports
+      ? exportNames.filter(name => !SERVER_ONLY_ROUTE_EXPORTS_SET.has(name))
+      : exportNames;
+
     return {
       cssAssets: discoveredCssAssets,
-      exports: new Set(exportNames),
-      routeModuleExports: exportNames,
+      exports: new Set(manifestExportNames),
+      routeModuleExports: manifestExportNames,
       hasRouteChunkByExportName: chunkInfo?.hasRouteChunkByExportName ?? null,
     };
   }).pipe(
@@ -457,6 +470,8 @@ function generateReactRouterManifestForDevEffect(
             routeFilePath,
             route,
             routeModuleAnalysis: manifestOptions?.routeModuleAnalysis,
+            stripServerOnlyRouteExports:
+              manifestOptions?.stripServerOnlyRouteExports,
           });
 
           if (isBuild && enforceSplitRouteModules && routeChunkConfig) {

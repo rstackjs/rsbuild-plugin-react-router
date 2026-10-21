@@ -738,6 +738,45 @@ describe('manifest', () => {
     }
   });
 
+  it('removes stripped SPA server exports from manifest flags and export metadata', async () => {
+    const { root, appDir } = createTempApp(`
+      export const loader = () => 'server';
+      export const clientLoader = () => 'client';
+      export const action = () => 'server';
+      export const clientAction = () => 'client';
+      export const headers = () => ({});
+      export default function Page() { return null; }
+    `);
+    try {
+      const { manifest, moduleExportsByRouteId } =
+        await generateReactRouterManifestForDev(
+          routes,
+          {},
+          clientStats,
+          appDir,
+          '/',
+          {
+            isBuild: true,
+            stripServerOnlyRouteExports: true,
+          }
+        );
+
+      expect(manifest.routes['routes/page']).toMatchObject({
+        hasLoader: false,
+        hasAction: false,
+        hasClientLoader: true,
+        hasClientAction: true,
+      });
+      expect(moduleExportsByRouteId['routes/page']).toEqual([
+        'clientLoader',
+        'clientAction',
+        'default',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not invent dev CSS assets when the compilation emitted none', async () => {
     const { root, appDir } = createTempApp(`
       import './page.css';

@@ -14,6 +14,7 @@ type RsbuildConfigBuildArgs = {
 
 type RsbuildConfigBaseArgs = {
   remixCompat?: boolean;
+  stripServerOnlyRouteExportsInSpa?: boolean;
   templateName?: TemplateName;
   /** Rspack persistent cache, kept inside the fixture (fixtures share the template's node_modules). */
   buildCache?: boolean;
@@ -189,7 +190,7 @@ export const rsbuildConfig = {
           ]
         : []),
       ...(args.cssCodeSplit === false ? [CSS_CODE_SPLIT_NOTE] : []),
-      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${args.svgr ? "pluginSvgr(), " : ""}${args.tailwind ? "pluginTailwindcss(), " : ""}${args.sass ? "pluginSass(), " : ""}${args.less ? "pluginLess(), " : ""}${routerPlugin}(${args.remixCompat ? "{ remixCompat: true }" : ""})],`,
+      `plugins: [pluginReact(), ${args.mdx ? "pluginMdx(), " : ""}${args.svgr ? "pluginSvgr(), " : ""}${args.tailwind ? "pluginTailwindcss(), " : ""}${args.sass ? "pluginSass(), " : ""}${args.less ? "pluginLess(), " : ""}${routerPlugin}(${args.remixCompat || args.stripServerOnlyRouteExportsInSpa ? `{${args.remixCompat ? " remixCompat: true," : ""}${args.stripServerOnlyRouteExportsInSpa ? " stripServerOnlyRouteExportsInSpa: true," : ""} }` : ""})],`,
     ];
 
     return [

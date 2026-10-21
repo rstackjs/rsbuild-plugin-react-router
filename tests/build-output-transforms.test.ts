@@ -63,6 +63,7 @@ const createBaseOptions = (
     ssr: true,
     isSpaMode: false,
     rootRoutePath: resolve(appDirectory, 'root.tsx'),
+    stripServerOnlyRouteExportsInSpa: false,
     routePath,
   };
 };

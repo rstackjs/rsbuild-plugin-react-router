@@ -49,6 +49,7 @@ type ModifyBrowserManifestOptions = {
   future?: { unstable_subResourceIntegrity?: boolean };
   manifestChunkNames?: ReadonlySet<string>;
   routeModuleAnalysis?: RouteModuleAnalysisProvider;
+  stripServerOnlyRouteExports?: boolean;
   onManifest?: (
     manifest: ReactRouterManifest,
     sri: Record<string, string> | true | undefined,
@@ -212,6 +213,7 @@ export function registerModifyBrowserManifestAssets(
         createReactRouterManifestOptions({
           routeChunks: routeChunkOptions,
           routeModuleAnalysis: options?.routeModuleAnalysis,
+          stripServerOnlyRouteExports: options?.stripServerOnlyRouteExports,
         })
       );
     const browserManifest = { ...manifest };

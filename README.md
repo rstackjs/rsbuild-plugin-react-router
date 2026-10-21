@@ -100,21 +100,46 @@ pluginReactRouter({
   logPerformance: false,
   federation: false,
   remixCompat: false,
+  stripServerOnlyRouteExportsInSpa: false,
 });
 ```
 
-| Option                           | Default     | Description                                                                                                                                                                                                                      |
-| -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `typegen`                        | `true`      | Generates React Router route types during development and builds. Set to `false` when type generation is managed separately.                                                                                                     |
-| `customServer`                   | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
-| `serverOutput`                   | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
-| `lazyCompilation`                | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
-| `unstableLazyCompilationPrewarm` | `false`     | Experimental prewarm for emitted lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                               |
-| `logPerformance`                 | `false`     | Logs structured React Router plugin timing information.                                                                                                                                                                          |
-| `parallelRouteTransform`         | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses an automatic worker count, and a positive integer sets the maximum worker count.                                            |
-| `onRouteTopologyChange`          | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
-| `federation`                     | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
-| `remixCompat`                    | `false`     | Aliases supported Remix v2 root imports to the package's React Router compatibility facades. See [Remix source compatibility](#remix-source-compatibility).                                                                      |
+| Option                             | Default     | Description                                                                                                                                                                                                                      |
+| ---------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typegen`                          | `true`      | Generates React Router route types during development and builds. Set to `false` when type generation is managed separately.                                                                                                     |
+| `customServer`                     | `false`     | Disables the built-in development SSR middleware. Enable this when an app owns the server with `createDevServer()` or an adapter.                                                                                                |
+| `serverOutput`                     | Derived     | Emitted Rsbuild server format: `'module'` or `'commonjs'`. When omitted, React Router's `serverModuleFormat` selects the format (`'esm'` -> `'module'`, `'cjs'` -> `'commonjs'`); setting `serverOutput` overrides it.           |
+| `lazyCompilation`                  | `true`      | Optional Rsbuild dev lazy-compilation config. When enabled here or through `dev.lazyCompilation`, React Router hydration-critical modules stay eager so the browser manifest and route modules are not replaced by lazy proxies. |
+| `unstableLazyCompilationPrewarm`   | `false`     | Experimental prewarm for emitted lazy-compilation proxy modules after dev compiles. Enable with `true` when route JS proxy startup should happen shortly after compiler readiness.                                               |
+| `logPerformance`                   | `false`     | Logs structured React Router plugin timing information.                                                                                                                                                                          |
+| `parallelRouteTransform`           | `undefined` | Controls worker-thread route transforms. `undefined` and `false` keep transforms inline, `true` uses an automatic worker count, and a positive integer sets the maximum worker count.                                            |
+| `onRouteTopologyChange`            | `undefined` | Notification for programmatic/custom dev servers. Recreate the Rsbuild server when route files are added, removed, or moved. The callback is not awaited.                                                                        |
+| `federation`                       | `false`     | Enables the plugin's experimental Module Federation integration.                                                                                                                                                                 |
+| `remixCompat`                      | `false`     | Aliases supported Remix v2 root imports to the package's React Router compatibility facades. See [Remix source compatibility](#remix-source-compatibility).                                                                      |
+| `stripServerOnlyRouteExportsInSpa` | `false`     | For a client-only SPA recovery build, strips `loader`, `action`, `middleware`, and `headers` while preserving explicit client equivalents. See [SPA recovery builds](#spa-recovery-builds).                                      |
+
+### SPA recovery builds
+
+An application that normally builds with SSR can produce a separate, strictly
+client-only recovery artifact from the same route sources:
+
+```ts
+pluginReactRouter({ stripServerOnlyRouteExportsInSpa: true });
+```
+
+This option only applies when React Router is configured with `ssr: false` and
+without prerender paths. It removes `loader`, `action`, `middleware`, and
+`headers` from both browser and build-time server route modules. Browser and
+server manifests therefore report no server loader or action, so recovery
+navigations do not issue `.data` requests. `clientLoader`, `clientAction`,
+`clientMiddleware`, and the root `HydrateFallback` remain available. A route
+with a server loader, action, or middleware must define the corresponding
+client export; the build fails with the missing export otherwise.
+
+This does not turn server logic into client logic, synthesize `serverLoader`,
+or emit an SSR snapshot. The default SPA validation is unchanged when the
+option is absent. Non-root `HydrateFallback` exports remain invalid, and
+`ssr: false` prerender builds retain their normal server-export validation.
 
 ### Remix source compatibility
 

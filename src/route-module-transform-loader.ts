@@ -12,6 +12,7 @@ export type RouteModuleTransformLoaderOptions = {
   isBuild: boolean;
   isSpaMode: boolean;
   rootRoutePath: string | null;
+  stripServerOnlyRouteExportsInSpa: boolean;
   devHmr: boolean;
 };
 
@@ -113,6 +114,8 @@ const routeModuleTransformLoader: LoaderDefinition<RouteModuleTransformLoaderOpt
         isBuild: options.isBuild,
         isSpaMode: options.isSpaMode,
         rootRoutePath: options.rootRoutePath,
+        stripServerOnlyRouteExportsInSpa:
+          options.stripServerOnlyRouteExportsInSpa,
         devHmr: options.devHmr,
       });
 

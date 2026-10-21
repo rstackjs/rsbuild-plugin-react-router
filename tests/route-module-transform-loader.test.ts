@@ -3,6 +3,7 @@ import {
   TraceMap,
 } from '@jridgewell/trace-mapping';
 import { describe, expect, it, rstest } from '@rstest/core';
+import { getExportNames } from '../src/export-utils';
 import routeModuleTransformLoader, {
   flushRouteModuleTransformLoaderPerformance,
   type RouteModuleTransformLoaderOptions,
@@ -18,6 +19,7 @@ const defaultOptions: RouteModuleTransformLoaderOptions = {
   isBuild: false,
   isSpaMode: false,
   rootRoutePath: '/project/app/root.tsx',
+  stripServerOnlyRouteExportsInSpa: false,
   devHmr: false,
 };
 
@@ -71,6 +73,74 @@ describe('route module transform loader', () => {
     expect(result.code).toContain('export default _withComponentProps');
     expect(result.code).not.toContain('export async function loader');
     expect(result.map).toBeUndefined();
+  });
+
+  it('strips server exports from the SPA server module when opted in', async () => {
+    const result = await runLoader(
+      `
+        import { serverValue } from './data.server';
+        export function loader() { return serverValue; }
+        export function clientLoader() { return 'client'; }
+        export function action() { return serverValue; }
+        export function clientAction() { return 'client action'; }
+        export function headers() { return {}; }
+        export default function Route() { return null; }
+      `,
+      {
+        options: {
+          ...defaultOptions,
+          environmentName: 'node',
+          ssr: false,
+          isBuild: true,
+          isSpaMode: true,
+          stripServerOnlyRouteExportsInSpa: true,
+        },
+      }
+    );
+
+    expect(await getExportNames(result.code)).toEqual([
+      'clientLoader',
+      'clientAction',
+      'default',
+    ]);
+    expect(result.code).not.toContain('./data.server');
+  });
+
+  it('requires client equivalents before stripping SPA server exports', async () => {
+    await expect(
+      runLoader(`export function loader() { return null; }`, {
+        options: {
+          ...defaultOptions,
+          ssr: false,
+          isBuild: true,
+          isSpaMode: true,
+          stripServerOnlyRouteExportsInSpa: true,
+        },
+      })
+    ).rejects.toThrow('`loader` requires `clientLoader`');
+  });
+
+  it('keeps non-root HydrateFallback validation when stripping server exports', async () => {
+    await expect(
+      runLoader(
+        `
+          export function loader() { return null; }
+          export function clientLoader() { return null; }
+          export function HydrateFallback() { return null; }
+        `,
+        {
+          options: {
+            ...defaultOptions,
+            ssr: false,
+            isBuild: true,
+            isSpaMode: true,
+            stripServerOnlyRouteExportsInSpa: true,
+          },
+        }
+      )
+    ).rejects.toThrow(
+      '`HydrateFallback` is only permitted on the root route in SPA Mode'
+    );
   });
 
   it('emits a source map when the loader context requests one', async () => {

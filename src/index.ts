@@ -204,6 +204,11 @@ export const pluginReactRouter = (
     if (isRscMode && pluginOptions.remixCompat) {
       throw new Error('`remixCompat` is not supported with RSC mode.');
     }
+    if (isRscMode && pluginOptions.stripServerOnlyRouteExportsInSpa) {
+      throw new Error(
+        '`stripServerOnlyRouteExportsInSpa` is not supported with RSC mode.'
+      );
+    }
     const logPerformance = pluginOptions.logPerformance === true;
     const setupStartMs = logPerformance ? performance.now() : 0;
     const performanceProfiler = createReactRouterPerformanceProfiler({
@@ -520,6 +525,9 @@ export const pluginReactRouter = (
     const isPrerenderEnabled =
       prerenderConfig !== undefined && prerenderConfig !== false;
     const isSpaMode = !ssr && !isPrerenderEnabled;
+    const stripServerOnlyRouteExportsInSpa = Boolean(
+      isSpaMode && pluginOptions.stripServerOnlyRouteExportsInSpa
+    );
     const routeCount = Object.keys(routes).length;
     const routeChunkCache: RouteChunkCache = new Map();
     const useRouteModuleTransformLoader =
@@ -1233,6 +1241,7 @@ export const pluginReactRouter = (
                   isBuild,
                   isSpaMode,
                   rootRoutePath,
+                  stripServerOnlyRouteExportsInSpa,
                   devHmr: environmentDevHmrEnabled,
                   logPerformance,
                   routeByFilePath,
@@ -1311,6 +1320,7 @@ export const pluginReactRouter = (
           future,
           manifestChunkNames,
           routeModuleAnalysis,
+          stripServerOnlyRouteExports: stripServerOnlyRouteExportsInSpa,
           onManifest: (manifest, sri, moduleExportsByRouteId, context) =>
             performanceProfiler.recordSync(
               'web',
@@ -1360,6 +1370,7 @@ export const pluginReactRouter = (
         ssr,
         isSpaMode,
         rootRoutePath,
+        stripServerOnlyRouteExportsInSpa,
         outputClientPath,
         isDevHmrEnabled: () => devHmrEnabled,
         onRouteModuleAnalysis: rememberRouteModuleAnalysis,

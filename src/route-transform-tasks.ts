@@ -71,6 +71,8 @@ export type RouteModuleTransformTask = BaseRouteTransformTask & {
   isBuild: boolean;
   isSpaMode: boolean;
   rootRoutePath: string | null;
+  stripServerOnlyRouteExportsInSpa?: boolean;
+  skipSpaValidation?: boolean;
   devHmr?: boolean;
 };
 
@@ -314,10 +316,12 @@ export const validateSpaModeRouteExports = ({
   exportNames,
   resourcePath,
   rootRoutePath,
+  stripServerOnlyRouteExports = false,
 }: {
   exportNames: readonly string[];
   resourcePath: string;
   rootRoutePath: string | null;
+  stripServerOnlyRouteExports?: boolean;
 }): void => {
   const isRootRoute = resourcePath === rootRoutePath;
   const relativePath = relative(process.cwd(), resourcePath);
@@ -326,13 +330,38 @@ export const validateSpaModeRouteExports = ({
     return SERVER_ONLY_ROUTE_EXPORTS_SET.has(exp);
   });
 
-  if (invalidServerOnly.length > 0) {
+  if (!stripServerOnlyRouteExports && invalidServerOnly.length > 0) {
     const list = invalidServerOnly.map(exp => `\`${exp}\``).join(', ');
     throw new Error(
       `SPA Mode: ${invalidServerOnly.length} invalid route export(s) in ` +
         `\`${relativePath}\`: ${list}. ` +
         `See https://reactrouter.com/how-to/spa for more information.`
     );
+  }
+
+  if (stripServerOnlyRouteExports) {
+    const missingClientEquivalents = [
+      ['loader', 'clientLoader'],
+      ['action', 'clientAction'],
+      ['middleware', 'clientMiddleware'],
+    ].filter(
+      ([serverExport, clientExport]) =>
+        exportNames.includes(serverExport) &&
+        !exportNames.includes(clientExport)
+    );
+    if (missingClientEquivalents.length > 0) {
+      const list = missingClientEquivalents
+        .map(
+          ([serverExport, clientExport]) =>
+            `\`${serverExport}\` requires \`${clientExport}\``
+        )
+        .join(', ');
+      throw new Error(
+        `SPA Mode: Cannot strip server-only route exports in ` +
+          `\`${relativePath}\`: ${list}. Add explicit client equivalents ` +
+          `for this client-only build.`
+      );
+    }
   }
 
   if (!isRootRoute && exportNames.includes('HydrateFallback')) {
@@ -359,16 +388,23 @@ const transformRouteModule = async (
   }
 
   const ast = parse(code, { sourceType: 'module' });
-  if (task.environmentName === 'web' && !task.ssr && task.isSpaMode) {
+  if (
+    task.environmentName === 'web' &&
+    !task.ssr &&
+    task.isSpaMode &&
+    !task.skipSpaValidation
+  ) {
     validateSpaModeRouteExports({
       exportNames: collectProgramExportNames(getProgram(ast)),
       resourcePath: task.resourcePath,
       rootRoutePath: task.rootRoutePath,
+      stripServerOnlyRouteExports: task.stripServerOnlyRouteExportsInSpa,
     });
   }
 
   const removedServerOnlyExports =
-    task.environmentName === 'web'
+    task.environmentName === 'web' ||
+    (task.isSpaMode && task.stripServerOnlyRouteExportsInSpa)
       ? removeExports(
           ast,
           SERVER_ONLY_ROUTE_EXPORTS,

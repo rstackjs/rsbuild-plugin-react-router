@@ -102,6 +102,7 @@ type RegisterBuildOutputTransformsOptions = {
   ssr: boolean;
   isSpaMode: boolean;
   rootRoutePath: string;
+  stripServerOnlyRouteExportsInSpa: boolean;
   outputClientPath: string;
   isDevHmrEnabled?: () => boolean;
   onRouteModuleAnalysis?: (
@@ -133,6 +134,7 @@ export const registerBuildOutputTransforms = ({
   ssr,
   isSpaMode,
   rootRoutePath,
+  stripServerOnlyRouteExportsInSpa,
   outputClientPath,
   isDevHmrEnabled = () => false,
   onRouteModuleAnalysis,
@@ -173,6 +175,7 @@ export const registerBuildOutputTransforms = ({
           isBuild,
           isSpaMode,
           rootRoutePath,
+          stripServerOnlyRouteExportsInSpa,
           devHmr: isDevHmrEnabled(),
         })
     );
@@ -243,6 +246,7 @@ export const registerBuildOutputTransforms = ({
               createReactRouterManifestOptions({
                 routeChunks: routeChunkOptions,
                 routeModuleAnalysis,
+                stripServerOnlyRouteExports: stripServerOnlyRouteExportsInSpa,
               })
             ));
           return {
@@ -297,6 +301,7 @@ export const registerBuildOutputTransforms = ({
                 .exports,
               resourcePath: args.resourcePath,
               rootRoutePath,
+              stripServerOnlyRouteExports: stripServerOnlyRouteExportsInSpa,
             });
           }
 
@@ -328,6 +333,8 @@ export const registerBuildOutputTransforms = ({
             isBuild,
             isSpaMode,
             rootRoutePath,
+            stripServerOnlyRouteExportsInSpa,
+            skipSpaValidation: true,
           });
         }
       );

@@ -60,6 +60,7 @@ export const registerRouteModuleTransformRules = (
     isBuild,
     isSpaMode,
     rootRoutePath,
+    stripServerOnlyRouteExportsInSpa,
     devHmr,
     logPerformance,
     routeByFilePath,
@@ -70,6 +71,7 @@ export const registerRouteModuleTransformRules = (
     isBuild: boolean;
     isSpaMode: boolean;
     rootRoutePath: string | null;
+    stripServerOnlyRouteExportsInSpa: boolean;
     devHmr: boolean;
     logPerformance: boolean;
     routeByFilePath: Map<string, Route>;
@@ -90,6 +92,7 @@ export const registerRouteModuleTransformRules = (
       isBuild,
       isSpaMode,
       rootRoutePath,
+      stripServerOnlyRouteExportsInSpa,
       devHmr,
     },
     parallelRouteTransform

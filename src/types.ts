@@ -20,6 +20,15 @@ export type PluginOptions = {
   remixCompat?: boolean;
 
   /**
+   * In SPA mode, discard server-only route exports after requiring explicit
+   * client equivalents for loaders, actions, and middleware. This is intended
+   * for client-only recovery builds of applications whose source routes are
+   * also used by an SSR build.
+   * @default false
+   */
+  stripServerOnlyRouteExportsInSpa?: boolean;
+
+  /**
    * Generate React Router route types during development and builds.
    * Set to false when type generation is managed separately.
    * @default true
@@ -106,7 +115,10 @@ export type PluginOptions = {
   onRouteTopologyChange?: () => void | Promise<void>;
 };
 
-export type ReactRouterRSCPluginOptions = Omit<PluginOptions, 'rsc'> & {
+export type ReactRouterRSCPluginOptions = Omit<
+  PluginOptions,
+  'rsc' | 'stripServerOnlyRouteExportsInSpa'
+> & {
   /**
    * Optional overrides forwarded to `rsbuild-plugin-rsc`.
    * Environment names are managed by this plugin.
