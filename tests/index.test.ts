@@ -108,6 +108,9 @@ describe('pluginReactRouter', () => {
     expect(disabledConfig.tools.rspack.resolve.alias).not.toHaveProperty(
       '@remix-run/react$'
     );
+    expect(disabledConfig.tools.rspack.resolve.alias).not.toHaveProperty(
+      'react-router-dom$'
+    );
 
     const enabled = await createStubRsbuild({ rsbuildConfig: {} });
     enabled.context.rootPath = process.cwd();
@@ -116,6 +119,7 @@ describe('pluginReactRouter', () => {
     expect(enabledConfig.tools.rspack.resolve.alias).toMatchObject({
       '@remix-run/react$': expect.stringMatching(/compat[\/]remix-react\.js$/),
       '@remix-run/node$': expect.stringMatching(/compat[\/]remix-node\.js$/),
+      'react-router-dom$': requireFromHere.resolve('react-router'),
       'react-router-dom6$': requireFromHere.resolve('react-router'),
     });
     expect(enabledConfig.tools.rspack.resolve.alias).not.toHaveProperty(

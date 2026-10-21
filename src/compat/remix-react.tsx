@@ -14,6 +14,7 @@ export { defer, json } from './responses.js';
 export type {
   DeferFunction,
   JsonFunction,
+  Jsonify,
   SerializeFrom,
   TypedDeferredData,
   TypedResponse,

@@ -15,6 +15,32 @@ test.describe('Remix source compatibility', () => {
     fixture = await createFixture({
       remixCompat: true,
       files: {
+        'tsconfig.json': js`
+          {
+            "extends": "./node_modules/rsbuild-plugin-react-router/tests/react-router-framework/tsconfig.base.json",
+            "include": ["env.d.ts", "app/**/*.ts", "app/**/*.tsx", ".react-router/types/**/*"],
+            "compilerOptions": {
+              "lib": ["DOM", "DOM.Iterable", "ES2022"],
+              "jsx": "react-jsx",
+              "baseUrl": ".",
+              "paths": {
+                "~/*": ["./app/*"],
+                "@remix-run/node": ["./app/compat/remix-node.ts"],
+                "@remix-run/react": ["./app/compat/remix-react.ts"],
+                "react-router-dom": ["./app/compat/remix-react.ts"],
+                "react-router-dom6": ["./app/compat/remix-react.ts"]
+              },
+              "noEmit": true,
+              "rootDirs": [".", ".react-router/types/"]
+            }
+          }
+        `,
+        'app/compat/remix-node.ts': js`
+          export * from 'rsbuild-plugin-react-router/compat/remix-node';
+        `,
+        'app/compat/remix-react.ts': js`
+          export * from 'rsbuild-plugin-react-router/compat/remix-react';
+        `,
         'app/entry.client.tsx': js`
           import { startTransition, StrictMode } from 'react';
           import { hydrateRoot } from 'react-dom/client';
@@ -72,14 +98,15 @@ test.describe('Remix source compatibility', () => {
           import { Suspense, useEffect, useState } from 'react';
           import { defer, json } from '@remix-run/node';
           import { Await, Form, Link, useActionData, useLoaderData } from '@remix-run/react';
+          import { NavLink } from 'react-router-dom';
           import { Link as Link6 } from 'react-router-dom6';
 
           export function loader() {
             return defer(
               {
-                value: new Promise(resolve => setTimeout(resolve, 500, 'document deferred')),
+                value: new Promise(resolve => setTimeout(resolve, 2_000, 'document deferred')),
                 failure: new Promise((_, reject) =>
-                  setTimeout(reject, 250, new Error('document rejection')),
+                  setTimeout(reject, 1_000, new Error('document rejection')),
                 ),
               },
               { status: 207, headers: { 'X-Remix-Compat': 'document' } },
@@ -116,6 +143,7 @@ test.describe('Remix source compatibility', () => {
               </Form>
               {actionData && <p id="action">{actionData.message}</p>}
               <Link to="/next">next</Link>
+              <NavLink to="/next" id="next-dom">next-dom</NavLink>
               <Link6 to="/next" id="next6">next6</Link6>
             </main>;
           }
@@ -128,9 +156,9 @@ test.describe('Remix source compatibility', () => {
           export function loader() {
             return defer(
               {
-                value: new Promise(resolve => setTimeout(resolve, 500, 'navigation deferred')),
+                value: new Promise(resolve => setTimeout(resolve, 2_000, 'navigation deferred')),
                 failure: new Promise((_, reject) =>
-                  setTimeout(reject, 250, new Error('expected rejection')),
+                  setTimeout(reject, 1_000, new Error('expected rejection')),
                 ),
               },
               { status: 206, headers: { 'X-Remix-Compat': 'navigation' } },
@@ -182,7 +210,7 @@ test.describe('Remix source compatibility', () => {
     const navigationResponse = page.waitForResponse(response =>
       response.url().includes('.data'),
     );
-    await page.locator('#next6').click();
+    await page.locator('#next-dom').click();
     expect((await navigationResponse).status()).toBe(206);
     expect((await navigationResponse).headers()['x-remix-compat']).toBe(
       'navigation',

@@ -126,28 +126,41 @@ pluginReactRouter({ remixCompat: true });
 ```
 
 The option installs exact build aliases for `@remix-run/react`,
-`@remix-run/node`, and `react-router-dom6`. It does not alias package prefixes
-or arbitrary deep imports. The same facades are public package exports for
-TypeScript and explicit use:
+`@remix-run/node`, `react-router-dom`, and `react-router-dom6`. Both DOM package
+names resolve to the application's `react-router` installation so an installed
+React Router 6 package cannot create a second router context. It does not alias
+package prefixes or arbitrary deep imports. The same facades are public package
+exports for explicit use. For old import names to work in both TypeScript and
+Rsbuild, add runtime modules to the app:
+
+```ts title="app/compat/remix-node.ts"
+export * from 'rsbuild-plugin-react-router/compat/remix-node';
+```
+
+```ts title="app/compat/remix-react.ts"
+export * from 'rsbuild-plugin-react-router/compat/remix-react';
+```
+
+Then point the exact TypeScript paths at those modules:
 
 ```json
 {
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@remix-run/react": [
-        "./node_modules/rsbuild-plugin-react-router/dist/compat/remix-react.d.ts"
-      ],
-      "@remix-run/node": [
-        "./node_modules/rsbuild-plugin-react-router/dist/compat/remix-node.d.ts"
-      ],
-      "react-router-dom6": [
-        "./node_modules/rsbuild-plugin-react-router/dist/compat/remix-react.d.ts"
-      ]
+      "@remix-run/react": ["./app/compat/remix-react.ts"],
+      "@remix-run/node": ["./app/compat/remix-node.ts"],
+      "react-router-dom6": ["./app/compat/remix-react.ts"],
+      "react-router-dom": ["./app/compat/remix-react.ts"]
     }
   }
 }
 ```
+
+Do not point `paths` directly at files under this package's `dist` directory.
+Rsbuild also applies TypeScript paths during bundling, so a `.d.ts` target can
+be treated as runtime source. The local modules above resolve through the
+package exports in both the compiler and bundler.
 
 `compat/remix-react` re-exports React Router's public root API and provides
 `RemixBrowser` as `HydratedRouter` plus a `RemixServer` wrapper around

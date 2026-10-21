@@ -27,6 +27,21 @@ describe('Remix compatibility facades', () => {
     );
   });
 
+  it('matches JSON serialization for dates, undefined values, arrays, and toJSON', async () => {
+    const response = json({
+      created: new Date('2026-10-21T00:00:00.000Z'),
+      omitted: undefined,
+      array: [undefined, () => 'omitted'],
+      custom: { toJSON: () => ({ serialized: 'yes' }) },
+    });
+
+    await expect(response.json()).resolves.toEqual({
+      created: '2026-10-21T00:00:00.000Z',
+      array: [null, null],
+      custom: { serialized: 'yes' },
+    });
+  });
+
   it('passes deferred values and response metadata to React Router data', async () => {
     const resolved = Promise.resolve('done');
     const rejected = Promise.reject(new Error('deferred failure'));

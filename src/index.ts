@@ -1018,16 +1018,18 @@ export const pluginReactRouter = (
       const resolveConfig =
         modePlan.createResolveConfig(api.context.rootPath) ?? {};
       if (pluginOptions.remixCompat) {
+        const reactRouterPath = resolveAppPackagePath(
+          'react-router',
+          api.context.rootPath
+        );
         resolveConfig.alias = {
           ...resolveConfig.alias,
           '@remix-run/react$': resolve(__dirname, 'compat/remix-react.js'),
           '@remix-run/node$': resolve(__dirname, 'compat/remix-node.js'),
-          ...(resolveAppPackagePath('react-router', api.context.rootPath)
+          ...(reactRouterPath
             ? {
-                'react-router-dom6$': resolveAppPackagePath(
-                  'react-router',
-                  api.context.rootPath
-                ),
+                'react-router-dom$': reactRouterPath,
+                'react-router-dom6$': reactRouterPath,
               }
             : {}),
         };
