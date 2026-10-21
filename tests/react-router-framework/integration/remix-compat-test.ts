@@ -207,8 +207,10 @@ test.describe('Remix source compatibility', () => {
     expect((await actionResponse).headers()['x-remix-action']).toBe('json');
     await expect(page.locator('#action')).toHaveText('action json');
 
-    const navigationResponse = page.waitForResponse(response =>
-      response.url().includes('.data'),
+    const navigationResponse = page.waitForResponse(
+      response =>
+        new URL(response.url()).pathname === '/next.data' &&
+        response.request().method() === 'GET',
     );
     await page.locator('#next-dom').click();
     expect((await navigationResponse).status()).toBe(206);
