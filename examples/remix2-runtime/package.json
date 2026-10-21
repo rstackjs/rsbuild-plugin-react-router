@@ -1,0 +1,46 @@
+{
+  "name": "remix2-runtime-acceptance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:native": "remix build",
+    "build": "rsbuild build",
+    "dev": "node --experimental-vm-modules ./node_modules/@rsbuild/core/bin/rsbuild.js dev",
+    "start": "node server.mjs",
+    "typecheck": "tsc --noEmit",
+    "typecheck:plugin": "tsc --noEmit -p tsconfig.plugin.json",
+    "test:versions": "node tests/versions.mjs",
+    "test:package": "node tests/package.mjs",
+    "test:artifacts": "node tests/artifacts.mjs",
+    "test:http": "node --test tests/http.test.mjs",
+    "test:failures": "node --test tests/failures.mjs",
+    "test:dev-generation": "NODE_ENV=development node --experimental-vm-modules --test tests/dev-generation.mjs",
+    "test:dev-assets": "NODE_ENV=development node --experimental-vm-modules --test tests/dev-assets.mjs",
+    "test:review-regressions": "NODE_ENV=development node --experimental-vm-modules --test tests/review-regressions.mjs",
+    "test:aliases": "NODE_ENV=development node --experimental-vm-modules --test tests/aliases.mjs",
+    "test:e2e:production": "playwright test",
+    "test:e2e:dev": "REMIX2_TEST_MODE=dev playwright test"
+  },
+  "dependencies": {
+    "@remix-run/express": "2.11.2",
+    "@remix-run/node": "2.11.2",
+    "@remix-run/react": "2.11.2",
+    "@remix-run/router": "1.19.1",
+    "@remix-run/server-runtime": "2.11.2",
+    "express": "4.22.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router": "6.26.1",
+    "react-router-dom": "6.26.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@remix-run/dev": "2.11.2",
+    "@rsbuild/core": "2.2.8",
+    "@rsbuild/plugin-react": "2.1.0",
+    "@types/node": "22.19.0",
+    "@types/react": "18.3.1",
+    "@types/react-dom": "18.3.0",
+    "typescript": "5.9.3"
+  }
+}

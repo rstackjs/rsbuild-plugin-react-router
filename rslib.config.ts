@@ -11,6 +11,7 @@ const config = defineConfig({
       source: {
         entry: {
           index: './src/index.ts',
+          remix2: './src/remix2/index.ts',
           'route-module-transform-loader':
             './src/route-module-transform-loader.ts',
           'rsc-route-transform-loader': './src/rsc-route-transform-loader.ts',
@@ -28,6 +29,7 @@ const config = defineConfig({
       source: {
         entry: {
           index: './src/index.ts',
+          remix2: './src/remix2/index.ts',
           'rsc-route-transform-loader': './src/rsc-route-transform-loader.ts',
           'templates/entry.server': './src/templates/entry.server.tsx',
           'templates/entry.client': './src/templates/entry.client.tsx',

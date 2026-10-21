@@ -28,6 +28,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./remix2": {
+      "types": "./dist/remix2/index.d.ts",
+      "import": "./dist/remix2.js",
+      "require": "./dist/remix2.cjs"
+    },
     "./templates/entry.client": {
       "types": "./dist/templates/entry.client.d.ts",
       "import": "./dist/templates/entry.client.js",
@@ -75,6 +80,7 @@
     "test:core": "rstest run -c ./rstest.config.ts",
     "test:core:watch": "rstest watch -c ./rstest.config.ts",
     "test:package-interop": "node scripts/test-package-interop.mts",
+    "test:remix2-isolated": "node scripts/test-remix2-isolated.mts",
     "test:react-router-framework": "pnpm build && playwright test --config tests/react-router-framework/integration/playwright.config.ts",
     "test:react-router-framework:failfast": "pnpm build && pnpm test:react-router-framework:failfast:no-build",
     "test:react-router-framework:failfast:no-build": "RR_FRAMEWORK_MAX_WORKERS=2 playwright test --config tests/react-router-framework/integration/playwright.config.ts tests/react-router-framework/integration/hmr-hdr-test.ts --workers=2 --max-failures=1 --retries=0 --reporter=line && RR_FRAMEWORK_MAX_WORKERS=2 playwright test --config tests/react-router-framework/integration/playwright.config.ts tests/react-router-framework/integration/hmr-hdr-rsc-test.ts --workers=2 --max-failures=1 --retries=0 --reporter=line && RR_FRAMEWORK_MAX_WORKERS=4 playwright test --config tests/react-router-framework/integration/playwright.config.ts --grep-invert 'HMR & HDR' --workers=4 --max-failures=1 --retries=0 --reporter=line",
@@ -89,7 +95,6 @@
   },
   "dependencies": {
     "@jridgewell/remapping": "^2.3.5",
-    "@react-router/node": "^7.13.0 || ^8.0.0",
     "@remix-run/node-fetch-server": "^0.13.3",
     "@rspack/plugin-react-refresh": "^2.0.2",
     "execa": "^9.6.1",
@@ -110,6 +115,7 @@
     "@playwright/test": "^1.61.1",
     "@react-router/dev": "^8.3.1",
     "@react-router/express": "^8.3.1",
+    "@react-router/node": "^7.13.0 || ^8.0.0",
     "@react-router/fs-routes": "^8.3.1",
     "@react-router/remix-routes-option-adapter": "^8.3.1",
     "@react-router/serve": "^8.3.1",
@@ -163,13 +169,32 @@
   },
   "peerDependencies": {
     "@react-router/dev": "^7.13.0 || ^8.0.0",
+    "@react-router/node": "^7.13.0 || ^8.0.0",
+    "@remix-run/dev": "2.11.2",
+    "@remix-run/node": "2.11.2",
+    "@remix-run/react": "2.11.2",
     "@rsbuild/core": "^2.2.8",
-    "react-router": "^7.13.0 || ^8.0.0",
+    "react-router": "6.26.1 || ^7.13.0 || ^8.0.0",
     "react-server-dom-rspack": "0.1.0",
     "rsbuild-plugin-rsc": "^0.1.1"
   },
   "peerDependenciesMeta": {
     "@react-router/dev": {
+      "optional": true
+    },
+    "@react-router/node": {
+      "optional": true
+    },
+    "@remix-run/dev": {
+      "optional": true
+    },
+    "@remix-run/node": {
+      "optional": true
+    },
+    "@remix-run/react": {
+      "optional": true
+    },
+    "react-router": {
       "optional": true
     },
     "react-server-dom-rspack": {

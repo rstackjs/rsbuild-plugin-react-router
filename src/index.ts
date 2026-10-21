@@ -62,6 +62,7 @@ import { getRouteRestartMarkerPath, mergeWatchFiles } from './route-watch.js';
 import { validateRouteConfig } from './route-config.js';
 import { warnOnClientSourceMaps } from './warnings/warn-on-client-source-maps.js';
 import { validatePluginOrderFromConfig } from './validation/validate-plugin-order.js';
+import { validateReactRouterModePackages } from './validation/validate-mode-packages.js';
 import {
   createReactRouterPerformanceProfiler,
   roundMs,
@@ -184,6 +185,7 @@ export const pluginReactRouter = (
   name: PLUGIN_NAME,
 
   async setup(api) {
+    if (!options.rsc) validateReactRouterModePackages(api.context.rootPath);
     const effectRuntime = createPluginEffectRuntime();
     api.onCloseBuild(effectRuntime.dispose);
     api.onCloseDevServer(effectRuntime.dispose);
@@ -443,6 +445,7 @@ export const pluginReactRouter = (
         resolvePackagePath: specifier =>
           resolveAppPackagePath(specifier, rootDirectory),
       });
+      validateReactRouterModePackages(rootDirectory);
       assertReactRouterRscConfigSupport({
         pluginName: PLUGIN_NAME,
         userConfig: resolvedConfig,
@@ -458,6 +461,16 @@ export const pluginReactRouter = (
 
     const getRootRoutePath = () => findEntryFile(resolve(appDirectory, 'root'));
     const rootRoutePath = getRootRoutePath();
+    if (
+      !isRscMode &&
+      !existsSync(findEntryFile(resolve(appDirectory, 'entry.server')))
+    ) {
+      if (!resolveAppPackagePath('@react-router/node', rootDirectory)) {
+        throw new Error(
+          '[react-router] The default server entry requires @react-router/node in the application. Install its optional peer or provide entry.server.'
+        );
+      }
+    }
     // React Router's server build expects route files relative to `appDirectory`
     // so it can resolve them correctly during compilation.
     const rootRouteFile = relative(appDirectory, rootRoutePath);

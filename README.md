@@ -6,6 +6,10 @@
 
 React Router Framework Mode for Rsbuild.
 
+Native Remix `2.11.2` and React Router `6.26.1` applications use the independent
+[`pluginRemix2` entry](docs/remix2.md). The root entry below remains React Router
+7 and 8 Framework Mode.
+
 ## Features
 
 - 🚀 Zero-config setup with sensible defaults
