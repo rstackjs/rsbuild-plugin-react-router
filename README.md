@@ -513,8 +513,10 @@ startServer().catch(console.error);
 generation. During rebuilds it returns the last successfully evaluated server
 build, whose embedded manifest is paired with the selected web compilation.
 A failed or incomplete candidate does not replace that last-good pair. The
-built-in development middleware uses the same path. Calling
-`devServer.environments.node.loadBundle()` directly bypasses this guarantee.
+built-in development middleware uses the same path. Loading
+`virtual/react-router/server-build` directly from another custom-server bundle
+or calling `devServer.environments.node.loadBundle()` directly bypasses this
+guarantee.
 
 When `serverBundles` is configured, pass its exact Rsbuild entry name as the
 optional second argument (for example, `bundle-a/index`). The default build
@@ -524,7 +526,10 @@ previous generation active.
 
 ### Sharing `createContext()` instances with a custom server
 
-React Router middleware contexts are matched by identity, so a custom server's
+The paired React Router server build is a separate module graph from a
+separately bundled custom-server entry; module-scope singleton identity is not
+shared between them. Pass shared values through `getLoadContext`. React Router
+middleware contexts are matched by identity, so a custom server's
 `getLoadContext` must use the same `createContext()` instance the routes import.
 With a bundled server build that instance lives inside the build. Re-export it
 from `app/entry.server.tsx` and read it from `build.entry.module`:

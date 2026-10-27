@@ -40,7 +40,10 @@ if (SENTRY_ENABLED) {
 	void import('./utils/monitoring.ts').then(({ init }) => init())
 }
 
-export async function createApp(devServer?: any) {
+export async function createApp(
+	devServer?: any,
+	loadDevBuild?: () => Promise<ServerBuild>,
+) {
 	const app = express()
 
 	const getHost = (req: { get: (key: string) => string | undefined }) =>
@@ -251,6 +254,7 @@ export async function createApp(devServer?: any) {
 			}),
 			mode: MODE,
 			build: async () => {
+				if (loadDevBuild) return loadDevBuild()
 				const { error, build } = await getBuild()
 				// gracefully "catch" the error
 				if (error) {

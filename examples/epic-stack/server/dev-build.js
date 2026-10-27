@@ -1,4 +1,5 @@
 import { createRsbuild, loadConfig } from '@rsbuild/core'
+import { loadReactRouterServerBuild } from 'rsbuild-plugin-react-router'
 import 'dotenv/config'
 
 async function startServer() {
@@ -13,9 +14,12 @@ async function startServer() {
 		throw new Error('Node environment not found in dev server')
 	}
 
-	const bundle = await devServer.environments.node.loadBundle('app')
+	const bundle = await devServer.environments.node.loadBundle('static/js/app')
 	const { createApp } = bundle
-	const app = await createApp(devServer)
+	const app = await createApp(
+		devServer,
+		() => loadReactRouterServerBuild(devServer),
+	)
 
 	devServer.connectWebSocket({ server: app })
 }
