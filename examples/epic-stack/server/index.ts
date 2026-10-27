@@ -254,13 +254,14 @@ export async function createApp(
 			}),
 			mode: MODE,
 			build: async () => {
-				if (loadDevBuild) return loadDevBuild()
 				const { error, build } = await getBuild()
 				// gracefully "catch" the error
 				if (error) {
 					throw error
 				}
-				return build
+				if (!loadDevBuild) return build
+				const pairedBuild = await loadDevBuild()
+				return { ...(await build), assets: pairedBuild.assets }
 			},
 		}),
 	)
