@@ -513,8 +513,12 @@ startServer().catch(console.error);
 generation. During rebuilds it returns the last successfully evaluated server
 build, whose embedded manifest is paired with the selected web compilation.
 A failed or incomplete candidate does not replace that last-good pair. The
-built-in development middleware uses the same path. Calling
-`devServer.environments.node.loadBundle()` directly bypasses this guarantee.
+built-in development middleware uses the same path. A custom server may still
+load its own `server/index` bundle, but returning that bundle's embedded
+`virtual/react-router/server-build` unchanged can leave its manifest out of
+sync. Use the paired build as the handler build, or, when module-instance
+identity must be preserved, keep the embedded build and replace only its
+`assets` with those from the paired build.
 
 When `serverBundles` is configured, pass its exact Rsbuild entry name as the
 optional second argument (for example, `bundle-a/index`). The default build
@@ -524,8 +528,14 @@ previous generation active.
 
 ### Sharing `createContext()` instances with a custom server
 
-React Router middleware contexts are matched by identity, so a custom server's
-`getLoadContext` must use the same `createContext()` instance the routes import.
+The paired React Router server build is a separate module graph from a
+separately bundled custom-server entry, so module-scope singleton identity is
+not shared between them. If the handler must keep the bundled server entry's
+route modules, retain its embedded build and replace only its `assets` with the
+paired build's `assets` (as above). Pass per-request shared values through
+`getLoadContext`. React Router middleware contexts are matched by identity, so
+a custom server's `getLoadContext` must use the same `createContext()` instance
+that its routes import.
 With a bundled server build that instance lives inside the build. Re-export it
 from `app/entry.server.tsx` and read it from `build.entry.module`:
 

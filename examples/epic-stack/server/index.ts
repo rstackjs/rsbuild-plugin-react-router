@@ -40,7 +40,10 @@ if (SENTRY_ENABLED) {
 	void import('./utils/monitoring.ts').then(({ init }) => init())
 }
 
-export async function createApp(devServer?: any) {
+export async function createApp(
+	devServer?: any,
+	loadDevBuild?: () => Promise<ServerBuild>,
+) {
 	const app = express()
 
 	const getHost = (req: { get: (key: string) => string | undefined }) =>
@@ -256,7 +259,9 @@ export async function createApp(devServer?: any) {
 				if (error) {
 					throw error
 				}
-				return build
+				if (!loadDevBuild) return build
+				const pairedBuild = await loadDevBuild()
+				return { ...(await build), assets: pairedBuild.assets }
 			},
 		}),
 	)
